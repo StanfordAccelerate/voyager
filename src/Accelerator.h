@@ -1,0 +1,158 @@
+#pragma once
+
+#include <mc_connections.h>
+#include <systemc.h>
+
+#include "AccelTypes.h"
+#include "ArchitectureParams.h"
+#include "DoubleBuffer.h"
+#include "InputController.h"
+#include "MatrixProcessor.h"
+#include "ParamsDeserializer.h"
+#include "VectorUnit.h"
+#include "WeightController.h"
+
+SC_MODULE(Accelerator) {
+  sc_in<bool> CCS_INIT_S1(clk);
+  sc_in<bool> CCS_INIT_S1(rstn);
+
+  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+  ParamsDeserializer CCS_INIT_S1(paramsDeserializer);
+  Connections::Combinational<Params> CCS_INIT_S1(paramsIn);
+
+  InputController<INPUT_DATATYPE, DIMENSION> CCS_INIT_S1(inputController);
+  DoubleBuffer<INPUT_DATATYPE, DIMENSION, INPUT_BUFFER_SIZE> CCS_INIT_S1(
+      inputBuffer);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
+  Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      inputDataResponse);
+  Connections::Combinational<int> inputBufferWriteAddress[2];
+  Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
+      inputBufferWriteData[2];
+  Connections::Combinational<int> inputBufferWriteControl[2];
+  Connections::Combinational<int> inputBufferReadAddress[2];
+  Connections::Combinational<int> inputBufferReadControl[2];
+  Connections::Combinational<Params> inputControllerParams;
+
+  WeightController<INPUT_DATATYPE, DIMENSION, DIMENSION> CCS_INIT_S1(
+      weightController);
+  DoubleBuffer<INPUT_DATATYPE, DIMENSION, WEIGHT_BUFFER_SIZE> CCS_INIT_S1(
+      weightBuffer);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
+  Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      weightDataResponse);
+  Connections::Combinational<int> weightBufferWriteAddress[2];
+  Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
+      weightBufferWriteData[2];
+  Connections::Combinational<int> weightBufferWriteControl[2];
+  Connections::Combinational<int> weightBufferReadAddress[2];
+  Connections::Combinational<int> weightBufferReadControl[2];
+  Connections::Combinational<Params> weightControllerParams;
+
+  MatrixProcessor<INPUT_DATATYPE, WEIGHT_DATATYPE, OUTPUT_DATATYPE, DIMENSION,
+                  DIMENSION, ACCUMULATION_BUFFER_SIZE>
+      CCS_INIT_S1(matrixProcessor);
+  Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      inputsToSystolicArray);
+  Connections::Combinational<Pack1D<WEIGHT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      weightsToSystolicArray);
+  Connections::Combinational<Pack1D<OUTPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      outputsFromSystolicArray);
+  Connections::Combinational<Params> CCS_INIT_S1(matrixProcessorParams);
+
+  VectorUnit<INPUT_DATATYPE, DIMENSION, DIMENSION> CCS_INIT_S1(vectorUnit);
+  Connections::Out<int> CCS_INIT_S1(vectorFetchAddressRequest);
+  Connections::In<Pack1D<OUTPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      vectorFetchDataResponse);
+  Connections::Out<int> CCS_INIT_S1(scalarAddressRequest);
+  Connections::In<OUTPUT_DATATYPE> CCS_INIT_S1(scalarDataResponse);
+  Connections::Out<int> CCS_INIT_S1(varianceAddressRequest);
+  Connections::In<OUTPUT_DATATYPE> CCS_INIT_S1(varianceDataResponse);
+  Connections::Out<Pack1D<OUTPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      vectorUnitOutput);
+  Connections::Out<int> CCS_INIT_S1(outputAddress);
+  Connections::Combinational<Params> CCS_INIT_S1(vectorUnitParams);
+
+  Connections::SyncOut doneSignal;
+
+  SC_CTOR(Accelerator) {
+    paramsDeserializer.clk(clk);
+    paramsDeserializer.rstn(rstn);
+    paramsDeserializer.serialParamsIn(serialParamsIn);
+    paramsDeserializer.paramsOut(paramsIn);
+
+    inputController.clk(clk);
+    inputController.rstn(rstn);
+    inputController.addressRequest(inputAddressRequest);
+    inputController.dataResponse(inputDataResponse);
+    inputController.paramsIn(inputControllerParams);
+
+    inputBuffer.clk(clk);
+    inputBuffer.rstn(rstn);
+    for (int i = 0; i < 2; i++) {
+      inputController.writeAddress[i](inputBufferWriteAddress[i]);
+      inputController.writeData[i](inputBufferWriteData[i]);
+      inputController.writeControl[i](inputBufferWriteControl[i]);
+      inputController.readAddress[i](inputBufferReadAddress[i]);
+      inputController.readControl[i](inputBufferReadControl[i]);
+
+      inputBuffer.writeAddress[i](inputBufferWriteAddress[i]);
+      inputBuffer.writeData[i](inputBufferWriteData[i]);
+      inputBuffer.writeControl[i](inputBufferWriteControl[i]);
+      inputBuffer.readAddress[i](inputBufferReadAddress[i]);
+      inputBuffer.readControl[i](inputBufferReadControl[i]);
+    }
+    inputBuffer.output(inputsToSystolicArray);
+
+    weightController.clk(clk);
+    weightController.rstn(rstn);
+    weightController.addressRequest(weightAddressRequest);
+    weightController.dataResponse(weightDataResponse);
+    weightController.paramsIn(weightControllerParams);
+
+    weightBuffer.clk(clk);
+    weightBuffer.rstn(rstn);
+    for (int i = 0; i < 2; i++) {
+      weightController.writeAddress[i](weightBufferWriteAddress[i]);
+      weightController.writeData[i](weightBufferWriteData[i]);
+      weightController.writeControl[i](weightBufferWriteControl[i]);
+      weightController.readAddress[i](weightBufferReadAddress[i]);
+      weightController.readControl[i](weightBufferReadControl[i]);
+
+      weightBuffer.writeAddress[i](weightBufferWriteAddress[i]);
+      weightBuffer.writeData[i](weightBufferWriteData[i]);
+      weightBuffer.writeControl[i](weightBufferWriteControl[i]);
+      weightBuffer.readAddress[i](weightBufferReadAddress[i]);
+      weightBuffer.readControl[i](weightBufferReadControl[i]);
+    }
+    weightBuffer.output(weightsToSystolicArray);
+
+    matrixProcessor.clk(clk);
+    matrixProcessor.rstn(rstn);
+    matrixProcessor.inputsChannel(inputsToSystolicArray);
+    matrixProcessor.weightsChannel(weightsToSystolicArray);
+    matrixProcessor.outputsChannel(outputsFromSystolicArray);
+    matrixProcessor.paramsIn(matrixProcessorParams);
+
+    vectorUnit.clk(clk);
+    vectorUnit.rstn(rstn);
+
+    vectorUnit.paramsIn(vectorUnitParams);
+    vectorUnit.systolicArrayOutput(outputsFromSystolicArray);
+    vectorUnit.vectorFetchAddressRequest(vectorFetchAddressRequest);
+    vectorUnit.vectorFetchDataResponse(vectorFetchDataResponse);
+    vectorUnit.scalarAddressRequest(scalarAddressRequest);
+    vectorUnit.scalarDataResponse(scalarDataResponse);
+    vectorUnit.varianceAddressRequest(varianceAddressRequest);
+    vectorUnit.varianceDataResponse(varianceDataResponse);
+    vectorUnit.vectorUnitOutput(vectorUnitOutput);
+    vectorUnit.outputAddress(outputAddress);
+    vectorUnit.done(doneSignal);
+
+    SC_THREAD(run);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+  }
+
+  void run();
+};
