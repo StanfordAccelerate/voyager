@@ -36,7 +36,8 @@ SC_MODULE(Harness) {
       vectorOutput);
   Connections::Combinational<int> CCS_INIT_S1(vectorOutputAddress);
 
-  Connections::SyncChannel done;
+  Connections::SyncChannel CCS_INIT_S1(start);
+  Connections::SyncChannel CCS_INIT_S1(done);
 
   Harness(sc_module_name, Params, INPUT_DATATYPE *);
   SC_HAS_PROCESS(Harness);
@@ -66,6 +67,7 @@ SC_MODULE(Harness) {
   void reset();
   void storeOutputs();
   void sendParams();
+  void waitForStart();
   void waitForDone();
 };
 

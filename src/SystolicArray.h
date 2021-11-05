@@ -14,13 +14,13 @@ SC_MODULE(SystolicArray) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   sc_in<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputs);
-  sc_in<bool> CCS_INIT_S1(inputsValid);
+  sc_in<bool> CCS_INIT_S1(inputsToggle);
 
   sc_in<Pack1D<WDTYPE, NCOLS> > CCS_INIT_S1(weights);
   sc_in<bool> CCS_INIT_S1(weightsToggle);
 
   sc_in<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(psums);
-  sc_in<bool> CCS_INIT_S1(psumsValid);
+  // sc_in<bool> CCS_INIT_S1(psumsValid);
 
   sc_out<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(outputs);
   sc_out<bool> CCS_INIT_S1(outputsValid);
@@ -88,6 +88,7 @@ SC_MODULE(SystolicArray) {
   }
 
   void run() {
+    bool oldToggle = false;
     outputs.write(Pack1D<ODTYPE, NCOLS>());
     enable.write(false);
 
@@ -106,7 +107,7 @@ SC_MODULE(SystolicArray) {
 
 #pragma hls_pipeline_init_interval 1
     while (true) {
-      enable.write(inputsValid && psumsValid);
+      enable.write(inputsToggle != oldToggle);
       CCS_LOG("enable: " << enable);
       Pack1D<IDTYPE, NROWS> arrayInput = inputs.read();
       Pack1D<ODTYPE, NCOLS> arrayPsum = psums.read();
@@ -131,7 +132,8 @@ SC_MODULE(SystolicArray) {
       }
 
       outputs.write(arrayPsumOut);
-      outputsValid.write(inputsValid && psumsValid);
+      outputsValid.write(inputsToggle != oldToggle);
+      oldToggle = inputsToggle;
       wait();
     }
   }

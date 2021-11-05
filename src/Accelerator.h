@@ -73,6 +73,7 @@ SC_MODULE(Accelerator) {
   Connections::Out<int> CCS_INIT_S1(outputAddress);
   Connections::Combinational<Params> CCS_INIT_S1(vectorUnitParams);
 
+  Connections::SyncOut startSignal;
   Connections::SyncOut doneSignal;
 
   SC_CTOR(Accelerator) {

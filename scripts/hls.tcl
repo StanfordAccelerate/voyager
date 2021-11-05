@@ -8,9 +8,11 @@ options set /Input/CppStandard c++11
 solution options set /Input/CppStandard c++11
 options set Input/SearchPath ./lib
 options set Output/OutputVHDL false
+options set Architectural/DefaultMemMapThreshold 256
 options set Architectural/DefaultRegisterThreshold 4096
 options set Flows/Enable-SCVerify yes
 options set Flows/VCS/SYSC_VERSION 2.3.2
+options set Flows/VCS/COMP_FLAGS {-g -Wall -Wno-unknown-pragmas -I../../../lib/ -I../../../src/ -I../../../}
 flow package require /SCVerify
 flow package option set /SCVerify/USE_VCS true
 
@@ -21,6 +23,8 @@ go new
 solution file add ./src/Accelerator.cc
 solution file add ./test/simple/SimpleTest.cc -exclude true
 solution file add ./test/common/Harness.cc -exclude true
+solution file add ./test/common/Utils.cc -exclude true
+solution file add ./test/common/GoldModel.cc -exclude true
 
 go analyze
 
@@ -30,7 +34,9 @@ directive set -DESIGN_HIERARCHY {
 
 go compile
 
-solution library add nangate-45nm_beh -- -rtlsyntool DesignCompiler -vendor Nangate -technology 045nm
+solution options set ComponentLibs/SearchPath /home/kprabhu7/catapult3_char -append
+solution library add tcbn40lpbwptc_dc -- -rtlsyntool DesignCompiler -vendor TSMC -technology 40nm
+
 solution library add ccs_sample_mem
 
 go libraries

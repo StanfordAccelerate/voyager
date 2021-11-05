@@ -26,6 +26,7 @@ Harness::Harness(sc_module_name name, Params params, INPUT_DATATYPE *memory)
   accelerator.varianceDataResponse(varianceDataResponse);
   accelerator.vectorUnitOutput(vectorOutput);
   accelerator.outputAddress(vectorOutputAddress);
+  accelerator.startSignal(start);
   accelerator.doneSignal(done);
 
   SC_CTHREAD(reset, clk);
@@ -55,6 +56,10 @@ Harness::Harness(sc_module_name name, Params params, INPUT_DATATYPE *memory)
   async_reset_signal_is(rstn, false);
 
   SC_THREAD(sendParams);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(waitForStart);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -204,6 +209,16 @@ void Harness::storeOutputs() {
       mainMemory[address + i] = data[i];
     }
   }
+}
+
+void Harness::waitForStart() {
+  start.ResetRead();
+
+  wait();
+
+  start.SyncPop();
+
+  CCS_LOG("Accelerator Started.");
 }
 
 void Harness::waitForDone() {

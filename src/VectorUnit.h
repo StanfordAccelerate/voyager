@@ -257,22 +257,27 @@ SC_MODULE(ScaleUnit) {
     while (true) {
       Params params = paramsIn.Pop();
 
+      int p = 0;
+      DTYPE scale = params.SCALE;
 #pragma hls_pipeline_init_interval 1
-      for (int m = 0; m < params.M0 * params.M1; m++) {
-        DTYPE scale = params.SCALE;
-        if (!params.CONST_SCALE) {
-          scale = scaleChannel.Pop();
-        }
-        for (int p = 0; p < params.P1 * params.P2; p++) {
-          Pack1D<DTYPE, NROWS> vec = vectorIn.Pop();
+#pragma hls_pipeline_stall_mode flush
+      for (int count = 0; count < params.M0 * params.M1 * params.P1 * params.P2;
+           count++) {
+        Pack1D<DTYPE, NROWS> vec = vectorIn.Pop();
 
-          // TODO: fix scale
-          // #pragma hls_unroll yes
-          // for(int i = 0; i < NROWS; i++){
-          //   vec[i] /= scale;
-          // }
+        // TODO: fix scale
+        // #pragma hls_unroll yes
+        // for(int i = 0; i < NROWS; i++){
+        //   vec[i] /= scale;
+        // }
 
-          vectorOut.Push(vec);
+        vectorOut.Push(vec);
+        p++;
+        if (p == params.P1 * params.P2) {
+          p = 0;
+          if (!params.CONST_SCALE) {
+            scale = scaleChannel.Pop();
+          }
         }
       }
     }
@@ -477,6 +482,7 @@ SC_MODULE(VectorUnit) {
       Params params = inputConnectionParams.Pop();
 
 #pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
       for (int i = 0; i < params.M0 * params.M1 * params.P1 * params.P2; i++) {
         Pack1D<DTYPE, NROWS> data;
 
