@@ -1,11 +1,6 @@
 #pragma once
 
 const Params simple = {
-    32,                       // M0
-    2,                        // P1
-    2,                        // N1
-    1,                        // M1
-    1,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET

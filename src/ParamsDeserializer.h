@@ -26,11 +26,6 @@ SC_MODULE(ParamsDeserializer) {
     while (true) {
       Params params;
 
-      params.M0 = serialParamsIn.Pop();
-      params.P1 = serialParamsIn.Pop();
-      params.N1 = serialParamsIn.Pop();
-      params.M1 = serialParamsIn.Pop();
-      params.P2 = serialParamsIn.Pop();
       params.INPUT_OFFSET = serialParamsIn.Pop();
       params.WEIGHT_OFFSET = serialParamsIn.Pop();
       params.OUTPUT_OFFSET = serialParamsIn.Pop();

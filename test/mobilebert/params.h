@@ -1,10 +1,5 @@
 // (128 x 512) * (512 x 128)
 const Params inputBottleneck = {
-    32,                        // M0
-    2,                         // P1
-    32,                        // N1
-    4,                         // M1
-    4,                         // P2
     0,                         // INPUT_OFFSET
     1024 * 1024,               // WEIGHT_OFFSET
     2 * 1024 * 1024,           // OUTPUT_OFFSET
@@ -28,11 +23,6 @@ const Params inputBottleneck = {
 
 // (128 x 128) x (128 x 32)
 const Params qkvProjection = {
-    32,                       // M0
-    2,                        // P1
-    8,                        // N1
-    4,                        // M1
-    1,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET
@@ -57,11 +47,6 @@ const Params qkvProjection = {
 // attention- Q*KT
 // (128 x 32) * (32 x 128)
 const Params qkAttention = {
-    32,                       // M0
-    2,                        // P1
-    2,                        // N1
-    4,                        // M1
-    4,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET
@@ -86,11 +71,6 @@ const Params qkAttention = {
 // attention- *v
 // (128 x 128) * (128 x 32)
 const Params vAttention = {
-    32,                       // M0
-    2,                        // P1
-    8,                        // N1
-    4,                        // M1
-    1,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET
@@ -115,11 +95,6 @@ const Params vAttention = {
 // wo projection
 // (128 x 128) x (128 x 128)
 const Params wProjection = {
-    32,                       // M0
-    2,                        // P1
-    8,                        // N1
-    4,                        // M1
-    4,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET
@@ -144,11 +119,6 @@ const Params wProjection = {
 // FFN 1
 // (128 x 128) * (128 x 512)
 const Params ffn1 = {
-    32,                       // M0
-    4,                        // P1
-    8,                        // N1
-    4,                        // M1
-    8,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET
@@ -173,11 +143,6 @@ const Params ffn1 = {
 // FFN 2
 // (128 x 512) x (512 x 128)
 const Params ffn2 = {
-    32,                        // M0
-    2,                         // P1
-    32,                        // N1
-    4,                         // M1
-    4,                         // P2
     0,                         // INPUT_OFFSET
     1024 * 1024,               // WEIGHT_OFFSET
     2 * 1024 * 1024,           // OUTPUT_OFFSET
@@ -202,11 +167,6 @@ const Params ffn2 = {
 // output bottleneck
 // (128 x 128) x (128 x 512)
 const Params outputBottleneck = {
-    32,                       // M0
-    4,                        // P1
-    8,                        // N1
-    4,                        // M1
-    8,                        // P2
     0,                        // INPUT_OFFSET
     1024 * 1024,              // WEIGHT_OFFSET
     2 * 1024 * 1024,          // OUTPUT_OFFSET

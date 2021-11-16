@@ -1,12 +1,6 @@
 #pragma once
 
 struct Params {
-  int M0;
-  int P1;
-  int N1;
-  int M1;
-  int P2;
-
   int INPUT_OFFSET;
   int WEIGHT_OFFSET;
   int OUTPUT_OFFSET;
@@ -32,15 +26,10 @@ struct Params {
   int reductionLoopIndex[2];
   int weightLoopIndex[2];
 
-  static const unsigned int width = 12 * 32 + 12 * 32 + 8 * 1;
+  static const unsigned int width = 7 * 32 + 12 * 32 + 8 * 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    m& M0;
-    m& P1;
-    m& N1;
-    m& M1;
-    m& P2;
     m& INPUT_OFFSET;
     m& WEIGHT_OFFSET;
     m& OUTPUT_OFFSET;

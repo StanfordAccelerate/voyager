@@ -10,39 +10,44 @@
 void run_test(Params params) {
   INPUT_DATATYPE *mainMemory = new INPUT_DATATYPE[4 * 1024 * 1024];
 
+  int inputRows = params.loops[0][params.inputLoopIndex[0]] *
+                  params.loops[1][params.inputLoopIndex[1]];
+  int inputCols = params.loops[1][params.reductionLoopIndex[1]];
+  int weightCols = params.loops[0][params.weightLoopIndex[0]] *
+                   params.loops[1][params.weightLoopIndex[1]];
+
   // Create matrix A
   INPUT_DATATYPE *matrixA =
-      new INPUT_DATATYPE[params.M0 * params.M1 * params.N1 * DIMENSION];
-  for (int i = 0; i < params.M0 * params.M1; i++) {
-    for (int j = 0; j < params.N1 * DIMENSION; j++) {
-      int val = i * 10 + j;
+      new INPUT_DATATYPE[inputRows * inputCols * DIMENSION];
+  for (int i = 0; i < inputRows; i++) {
+    for (int j = 0; j < inputCols * DIMENSION; j++) {
+      // int val = i * 10 + j;
+      int val = rand() % 128;
 
-      mainMemory[params.INPUT_OFFSET + i * (params.N1 * DIMENSION) + j] = val;
-      matrixA[i * (params.N1 * DIMENSION) + j] = val;
+      mainMemory[params.INPUT_OFFSET + i * (inputCols * DIMENSION) + j] = val;
+      matrixA[i * (inputCols * DIMENSION) + j] = val;
     }
   }
 
   INPUT_DATATYPE *matrixB =
-      new INPUT_DATATYPE[params.N1 * DIMENSION * params.P1 * params.P2 *
-                         DIMENSION];
-  for (int i = 0; i < params.N1 * DIMENSION; i++) {
-    for (int j = 0; j < params.P1 * params.P2 * DIMENSION; j++) {
-      int val = i;
+      new INPUT_DATATYPE[inputCols * DIMENSION * weightCols * DIMENSION];
+  for (int i = 0; i < inputCols * DIMENSION; i++) {
+    for (int j = 0; j < weightCols * DIMENSION; j++) {
+      // int val = i;
+      int val = rand() % 128;
 
-      mainMemory[params.WEIGHT_OFFSET +
-                 i * (params.P1 * params.P2 * DIMENSION) + j] = val;
-      matrixB[i * (params.P1 * params.P2 * DIMENSION) + j] = val;
+      mainMemory[params.WEIGHT_OFFSET + i * (weightCols * DIMENSION) + j] = val;
+      matrixB[i * (weightCols * DIMENSION) + j] = val;
     }
   }
 
   OUTPUT_DATATYPE *matrixC =
-      new OUTPUT_DATATYPE[params.M0 * params.M1 * params.P1 * params.P2 *
-                          DIMENSION];
+      new OUTPUT_DATATYPE[inputRows * weightCols * DIMENSION];
 
   run_op(params, mainMemory);
   run_gold_op(params, matrixA, matrixB, matrixC);
   compare_arrays(&mainMemory[params.OUTPUT_OFFSET], matrixC,
-                 params.M0 * params.M1 * params.P1 * params.P2 * DIMENSION);
+                 inputRows * weightCols * DIMENSION);
 
   delete[] matrixA;
   delete[] matrixB;

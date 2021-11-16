@@ -157,11 +157,6 @@ void Harness::sendParams() {
 
   wait();
 
-  serialParamsIn.Push(params.M0);
-  serialParamsIn.Push(params.P1);
-  serialParamsIn.Push(params.N1);
-  serialParamsIn.Push(params.M1);
-  serialParamsIn.Push(params.P2);
   serialParamsIn.Push(params.INPUT_OFFSET);
   serialParamsIn.Push(params.WEIGHT_OFFSET);
   serialParamsIn.Push(params.OUTPUT_OFFSET);

@@ -46,8 +46,10 @@ SC_MODULE(FetchUnit) {
     while (true) {
       Params params = vectorFetchParams.Pop();
 
-      int rows = params.M0 * params.M1;
-      int cols = NROWS * params.P1 * params.P2;
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+      int cols = NROWS * params.loops[0][params.weightLoopIndex[0]] *
+                 params.loops[1][params.weightLoopIndex[1]];
 
 #pragma hls_pipeline_init_interval 1
       for (int i = 0; i < rows; i++) {
@@ -69,8 +71,11 @@ SC_MODULE(FetchUnit) {
     while (true) {
       Params params = subtractionFetchParams.Pop();
 
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+
 #pragma hls_pipeline_init_interval 1
-      for (int i = 0; i < params.M0 * params.M1; i++) {
+      for (int i = 0; i < rows; i++) {
         int address = params.VEC_SUB_OFFSET + i;
         scalarAddressRequest.Push(address);
       }
@@ -86,8 +91,11 @@ SC_MODULE(FetchUnit) {
     while (true) {
       Params params = varianceFetchParams.Pop();
 
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+
 #pragma hls_pipeline_init_interval 1
-      for (int i = 0; i < params.M0 * params.M1; i++) {
+      for (int i = 0; i < rows; i++) {
         int address = params.VEC_SCALE_OFFSET + i;
         varianceAddressRequest.Push(address);
       }
@@ -148,13 +156,17 @@ SC_MODULE(ArithmeticUnit) {
     while (true) {
       Params params = paramsIn.Pop();
 
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+      int cols = NROWS * params.loops[0][params.weightLoopIndex[0]] *
+                 params.loops[1][params.weightLoopIndex[1]];
+
       if (params.VEC_SUB) {
 #pragma hls_pipeline_init_interval 1
-        for (int m = 0; m < params.M0 * params.M1; m++) {
+        for (int m = 0; m < rows; m++) {
           DTYPE subtract = scalarSubtraction.Pop();
 
-          for (int chunk = 0; chunk < NROWS * params.P1 * params.P2 / WIDTH;
-               chunk++) {
+          for (int chunk = 0; chunk < cols / WIDTH; chunk++) {
             Pack1D<DTYPE, WIDTH> vector = vectorIn.Pop();
 #pragma hls_unroll yes
             for (int i = 0; i < WIDTH; i++) {
@@ -173,9 +185,7 @@ SC_MODULE(ArithmeticUnit) {
         }
       } else {  // bypass
 #pragma hls_pipeline_init_interval 1
-        for (int i = 0;
-             i < params.M0 * params.M1 * NROWS * params.P1 * params.P2 / WIDTH;
-             i++) {
+        for (int i = 0; i < rows * cols / WIDTH; i++) {
           vectorOut.Push(vectorIn.Pop());
         }
       }
@@ -208,12 +218,16 @@ SC_MODULE(ReduceUnit) {
     while (true) {
       Params params = paramsIn.Pop();
 
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+      int cols = NROWS * params.loops[0][params.weightLoopIndex[0]] *
+                 params.loops[1][params.weightLoopIndex[1]];
+
 #pragma hls_pipeline_init_interval 1
-      for (int m = 0; m < params.M0 * params.M1; m++) {
+      for (int m = 0; m < rows; m++) {
         DTYPE sum = 0;
 
-        for (int chunk = 0; chunk < NROWS * params.P1 * params.P2 / WIDTH;
-             chunk++) {
+        for (int chunk = 0; chunk < cols / WIDTH; chunk++) {
           Pack1D<DTYPE, WIDTH> vector = vectorIn.Pop();
 
 #pragma hls_unroll yes
@@ -257,12 +271,16 @@ SC_MODULE(ScaleUnit) {
     while (true) {
       Params params = paramsIn.Pop();
 
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+      int cols = params.loops[0][params.weightLoopIndex[0]] *
+                 params.loops[1][params.weightLoopIndex[1]];
+
       int p = 0;
       DTYPE scale = params.SCALE;
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int count = 0; count < params.M0 * params.M1 * params.P1 * params.P2;
-           count++) {
+      for (int count = 0; count < rows * cols; count++) {
         Pack1D<DTYPE, NROWS> vec = vectorIn.Pop();
 
         // TODO: fix scale
@@ -273,7 +291,7 @@ SC_MODULE(ScaleUnit) {
 
         vectorOut.Push(vec);
         p++;
-        if (p == params.P1 * params.P2) {
+        if (p == cols) {
           p = 0;
           if (!params.CONST_SCALE) {
             scale = scaleChannel.Pop();
@@ -307,35 +325,64 @@ SC_MODULE(OutputAddressGenerator) {
     while (true) {
       Params params = paramsIn.Pop();
 
+      int rows = params.loops[0][params.inputLoopIndex[0]] *
+                 params.loops[1][params.inputLoopIndex[1]];
+      int cols = params.loops[0][params.weightLoopIndex[0]] *
+                 params.loops[1][params.weightLoopIndex[1]];
+
       if (params.VEC_OP) {
         if (params.VEC_REDUCE) {
 #pragma hls_pipeline_init_interval 1
-          for (int m = 0; m < params.M0 * params.M1 / WIDTH; m++) {
+          for (int m = 0; m < rows / WIDTH; m++) {
             int address = params.OUTPUT_OFFSET + m;
             outputAddress.Push(address);
           }
         } else {
 #pragma hls_pipeline_init_interval 1
-          for (int m = 0; m < params.M0 * params.M1; m++) {
-            for (int p = 0; p < NROWS * params.P1 * params.P2; p++) {
-              int address = m * (NROWS * params.P1 * params.P2) + p;
+          for (int m = 0; m < rows; m++) {
+            for (int p = 0; p < NROWS * cols; p++) {
+              int address = m * (NROWS * cols) + p;
               address = params.OUTPUT_OFFSET + address;
               outputAddress.Push(address);
             }
           }
         }
       } else {
-#pragma hls_pipeline_init_interval 1
-        for (int p2 = 0; p2 < params.P2; p2++) {
-          for (int m1 = 0; m1 < params.M1; m1++) {
-            for (int p1 = 0; p1 < params.P1; p1++) {
-              for (int m0 = 0; m0 < params.M0; m0++) {
-                int m = m1 * params.M0 + m0;
-                int p = p2 * params.P1 * NROWS + p1 * NROWS;
+        int loop_counters[2][3];
 
-                int address = params.OUTPUT_OFFSET +
-                              (m * (params.P1 * params.P2 * NROWS) + p);
-                outputAddress.Push(address);
+#pragma hls_pipeline_init_interval 1
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < params.loops[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0;
+               loop_counters[0][1] < params.loops[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < params.loops[0][2];
+                 loop_counters[0][2]++) {
+              // inner memory
+              for (loop_counters[1][params.weightLoopIndex[1]] = 0;
+                   loop_counters[1][params.weightLoopIndex[1]] <
+                   params.loops[1][params.weightLoopIndex[1]];
+                   loop_counters[1][params.weightLoopIndex[1]]++) {
+                for (loop_counters[1][params.inputLoopIndex[1]] = 0;
+                     loop_counters[1][params.inputLoopIndex[1]] <
+                     params.loops[1][params.inputLoopIndex[1]];
+                     loop_counters[1][params.inputLoopIndex[1]]++) {
+                  int m0 = loop_counters[1][params.inputLoopIndex[1]];
+                  int m1 = loop_counters[0][params.inputLoopIndex[0]];
+                  int M0 = params.loops[1][params.inputLoopIndex[1]];
+                  int P1 = params.loops[1][params.weightLoopIndex[1]];
+                  int p1 = loop_counters[1][params.weightLoopIndex[1]];
+                  int p2 = loop_counters[0][params.weightLoopIndex[0]];
+                  int P2 = params.loops[0][params.weightLoopIndex[0]];
+
+                  int m = m1 * M0 + m0;
+                  int p = p2 * P1 * NROWS + p1 * NROWS;
+
+                  int address =
+                      params.OUTPUT_OFFSET + (m * (P1 * P2 * NROWS) + p);
+                  outputAddress.Push(address);
+                }
               }
             }
           }
@@ -481,9 +528,14 @@ SC_MODULE(VectorUnit) {
     while (true) {
       Params params = inputConnectionParams.Pop();
 
+      int total_outputs = params.loops[0][params.inputLoopIndex[0]] *
+                          params.loops[1][params.inputLoopIndex[1]] *
+                          params.loops[0][params.weightLoopIndex[0]] *
+                          params.loops[1][params.weightLoopIndex[1]];
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < params.M0 * params.M1 * params.P1 * params.P2; i++) {
+      for (int i = 0; i < total_outputs; i++) {
         Pack1D<DTYPE, NROWS> data;
 
         if (params.VEC_OP) {
@@ -516,9 +568,12 @@ SC_MODULE(VectorUnit) {
       Params params = outputConnectionParams.Pop();
 
       if (params.VEC_REDUCE) {
+        int inputSize = params.loops[0][params.inputLoopIndex[0]] *
+                        params.loops[1][params.inputLoopIndex[1]];
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < params.M0 * params.M1 / WIDTH; i++) {
+        for (int i = 0; i < inputSize / WIDTH; i++) {
           Pack1D<DTYPE, WIDTH> reduceUnitOutputVector;
           for (int i = 0; i < WIDTH; i++) {
             reduceUnitOutputVector[i] = reduceUnitOutput.Pop();
@@ -526,10 +581,14 @@ SC_MODULE(VectorUnit) {
           vectorUnitOutput.Push(reduceUnitOutputVector);
         }
       } else {
+        int total_outputs = params.loops[0][params.inputLoopIndex[0]] *
+                            params.loops[1][params.inputLoopIndex[1]] *
+                            params.loops[0][params.weightLoopIndex[0]] *
+                            params.loops[1][params.weightLoopIndex[1]];
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < params.M0 * params.M1 * params.P1 * params.P2;
-             i++) {
+        for (int i = 0; i < total_outputs; i++) {
           vectorUnitOutput.Push(scaleUnitOutput.Pop());
         }
       }
