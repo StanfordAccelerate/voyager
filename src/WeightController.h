@@ -102,9 +102,9 @@ SC_MODULE(WeightController) {
                               params.loops[1][params.reductionLoopIndex[1]];
                           int c1 =
                               loop_counters[1][params.reductionLoopIndex[1]];
-                          int fx = loop_counters[0][params.fxIndex];
+                          int fx = loop_counters[1][params.fxIndex];
                           int FX = params.loops[1][params.fxIndex];
-                          int fy = loop_counters[0][params.fyIndex];
+                          int fy = loop_counters[1][params.fyIndex];
                           int FY = params.loops[1][params.fyIndex];
 
                           int c = c1 * DIMENSION + n0;
@@ -204,9 +204,9 @@ SC_MODULE(WeightController) {
                               params.loops[1][params.reductionLoopIndex[1]];
                           int c1 =
                               loop_counters[1][params.reductionLoopIndex[1]];
-                          int fx = loop_counters[0][params.fxIndex];
+                          int fx = loop_counters[1][params.fxIndex];
                           int FX = params.loops[1][params.fxIndex];
-                          int fy = loop_counters[0][params.fyIndex];
+                          int fy = loop_counters[1][params.fyIndex];
                           int FY = params.loops[1][params.fyIndex];
 
                           int c = n0;
@@ -304,9 +304,9 @@ SC_MODULE(WeightController) {
                               params.loops[1][params.reductionLoopIndex[1]];
                           int c1 =
                               loop_counters[1][params.reductionLoopIndex[1]];
-                          int fx = loop_counters[0][params.fxIndex];
+                          int fx = loop_counters[1][params.fxIndex];
                           int FX = params.loops[1][params.fxIndex];
-                          int fy = loop_counters[0][params.fyIndex];
+                          int fy = loop_counters[1][params.fyIndex];
                           int FY = params.loops[1][params.fyIndex];
 
                           int c = n0;
