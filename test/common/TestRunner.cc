@@ -10,10 +10,13 @@
 void run_test(Params params) {
   INPUT_DATATYPE *mainMemory = new INPUT_DATATYPE[4 * 1024 * 1024];
 
-  int X = params.loops[0][params.inputXLoopIndex[0]] * params.loops[1][params.inputXLoopIndex[1]];
-  int Y = params.loops[0][params.inputYLoopIndex[0]] * params.loops[1][params.inputYLoopIndex[1]];
+  int X = params.loops[0][params.inputXLoopIndex[0]] *
+          params.loops[1][params.inputXLoopIndex[1]];
+  int Y = params.loops[0][params.inputYLoopIndex[0]] *
+          params.loops[1][params.inputYLoopIndex[1]];
   int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
-  int K = params.loops[0][params.weightLoopIndex[0]] * params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+  int K = params.loops[0][params.weightLoopIndex[0]] *
+          params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
@@ -58,6 +61,13 @@ void run_test(Params params) {
         }
       }
     }
+  }
+
+  for (int i = 0; i < 512; i++) {
+    if (i % 16 == 0) {
+      std::cout << std::endl;
+    }
+    std::cout << mainMemory[params.INPUT_OFFSET + i] << " ";
   }
 
   INPUT_DATATYPE *matrixB = new INPUT_DATATYPE[FX * FY * C * K];

@@ -195,7 +195,9 @@ SC_MODULE(InputController) {
                           if (params.REPLICATION) {
                             baseAddress = y * (X / 4) * 16 + (x / 4) * 16 + c;
                             // baseAddress = baseAddress >> 2;
-                            CCS_LOG("request: " << baseAddress);
+
+                            CCS_LOG("y: " << y << " x: " << x << " c: " << c
+                                          << " addr: " << baseAddress);
                           }
 
                           memRequest = {params.INPUT_OFFSET + baseAddress,
@@ -214,7 +216,6 @@ SC_MODULE(InputController) {
           }
         }
       }
-      CCS_LOG("count: " << req_count);
     }
   }
 
@@ -237,6 +238,9 @@ SC_MODULE(InputController) {
       bool bankSel = 0;
 
       int FX = params.loops[1][params.fxIndex];
+      if (params.REPLICATION) {
+        FX = 7;
+      }
       int FY = params.loops[1][params.fyIndex];
       int fx_bound = (FX - 1) / 2;
       int fy_bound = (FY - 1) / 2;
@@ -287,20 +291,6 @@ SC_MODULE(InputController) {
                  loop_counters[1][0]++) {
               // TODO: make this dynamic
 
-              if (params.REPLICATION) {
-                writeControl[bankSel].Push(
-                    loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
-                    loop_bounds[1][4] * ((params.STRIDE * X0) / 4 + 2));
-                CCS_LOG("y: " << loop_bounds[1][4]);
-                CCS_LOG("y: " << loop_bounds[1][params.inputYLoopIndex[1]]);
-                CCS_LOG("repl "
-                        << loop_bounds[1][4] * ((params.STRIDE * X0) / 4 + 2));
-              } else {
-                writeControl[bankSel].Push(
-                    loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
-                    loop_bounds[1][4] * loop_bounds[1][5]);
-              }
-
               for (loop_counters[1][1] = 0;
                    loop_counters[1][1] < loop_bounds[1][1];
                    loop_counters[1][1]++) {
@@ -345,6 +335,7 @@ SC_MODULE(InputController) {
                         // offsets
                         else {
                           temp = dataResponse.Pop();
+                          // CCS_LOG("left boundary read");
 
 #pragma hls_unroll yes
                           for (int word = 0; word < 3; word++) {
@@ -364,10 +355,11 @@ SC_MODULE(InputController) {
                          */
                         for (int x = 0; x < params.STRIDE * X0; x += 4) {
                           int full_x = x + x1 * params.STRIDE * X0;
+                          // CCS_LOG("x: " << x << " full_x: " << full_x);
                           // padding
                           if ((full_y < 0) ||
                               (full_y >= params.STRIDE * Y0 * Y1)) {
-                            CCS_LOG(x << " : zero pad");
+                            // CCS_LOG(x << " : zero pad");
 #pragma hls_unroll yes
                             for (int dims = 0; dims < 3; dims++) {
                               int index = 3 * ((x + fx_bound) % 4) + dims;
@@ -375,6 +367,7 @@ SC_MODULE(InputController) {
                             }
                           } else {
                             temp = dataResponse.Pop();
+                            // CCS_LOG("tile read");
 
 #pragma hls_unroll yes
                             for (int i = 0; i < 3; i++) {
@@ -385,10 +378,14 @@ SC_MODULE(InputController) {
                           }
 
                           int address =
-                              (y0) * ((params.STRIDE * X0) >> 2 + 2) + (x >> 2);
+                              (y0) * (((params.STRIDE * X0) >> 2) + 2) +
+                              (x >> 2);
 
+                          writeControl[bankSel].Push(1);
                           writeAddress[bankSel].Push(address);
                           writeData[bankSel].Push(data);
+                          CCS_LOG(y0 << " " << x << "addr: " << address
+                                     << " data: " << data);
 
                           if ((full_y < 0) ||
                               (full_y >= (params.STRIDE * Y0 * Y1))) {
@@ -431,6 +428,7 @@ SC_MODULE(InputController) {
                           }
                         } else {
                           temp = dataResponse.Pop();
+                          // CCS_LOG("right boundary read");
 
 #pragma hls_unroll yes
                           for (int i = 0; i < 3; i++) {
@@ -441,10 +439,12 @@ SC_MODULE(InputController) {
                         }
 
                         int address =
-                            (y0) * ((params.STRIDE * X0) >> 2 + 2) + (x >> 2);
+                            (y0) * (((params.STRIDE * X0) >> 2) + 2) + (x >> 2);
 
+                        writeControl[bankSel].Push(1);
                         writeAddress[bankSel].Push(address);
                         writeData[bankSel].Push(data);
+                        CCS_LOG("(1) addr: " << address << " data: " << data);
 
                         if ((full_x < 0) || (full_y < 0) ||
                             (full_x >= (X1 * params.STRIDE * X0)) ||
@@ -471,13 +471,16 @@ SC_MODULE(InputController) {
                         }
 
                         int next_address =
-                            (y0) * ((params.STRIDE * X0) >> 2 + 2) + (x >> 2) +
-                            1;
-
+                            (y0) * (((params.STRIDE * X0) >> 2) + 2) +
+                            (x >> 2) + 1;
+                        writeControl[bankSel].Push(1);
                         writeAddress[bankSel].Push(next_address);
                         writeData[bankSel].Push(data);
-                        CCS_LOG("done " << loop_counters[1][4] << " out of "
-                                        << loop_bounds[1][4]);
+                        CCS_LOG("(2)addr: " << next_address
+                                            << " data: " << data);
+
+                        // CCS_LOG("done " << loop_counters[1][4] << " out of "
+                        //                 << loop_bounds[1][4]);
                       }
 
                       else {
@@ -508,8 +511,10 @@ SC_MODULE(InputController) {
                           int address =
                               (y0) * (params.STRIDE * X0 + FX - 1) + (x0);
 
+                          writeControl[bankSel].Push(1);
                           writeAddress[bankSel].Push(address);
                           writeData[bankSel].Push(data);
+                          CCS_LOG("addr: " << address << " data: " << data);
                         }
                       }
 
@@ -518,9 +523,10 @@ SC_MODULE(InputController) {
                   }
                 }
               }
-            }
 
-            bankSel = !bankSel;
+              writeControl[bankSel].Push(0);
+              bankSel = !bankSel;
+            }
           }
         }
       }
@@ -572,10 +578,6 @@ SC_MODULE(InputController) {
             for (loop_counters[1][0] = 0;
                  loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
-              readControl[bankSel].Push(loop_bounds[1][1] * loop_bounds[1][2] *
-                                        loop_bounds[1][3] * loop_bounds[1][4] *
-                                        loop_bounds[1][5]);
-
               for (loop_counters[1][1] = 0;
                    loop_counters[1][1] < loop_bounds[1][1];
                    loop_counters[1][1]++) {
@@ -607,11 +609,14 @@ SC_MODULE(InputController) {
                         } else {
                           address = y * (params.STRIDE * X0 + FX - 1) + x;
                         }
+
+                        readControl[bankSel].Push(1);
                         readAddress[bankSel].Push(address);
 
-                        CCS_LOG("x0: " << x0 << ", y0: " << y0 << ", fx: " << fx
-                                       << ", fy: " << fy
-                                       << ", address: " << address);
+                        // CCS_LOG("x0: " << x0 << ", y0: " << y0 << ", fx: " <<
+                        // fx
+                        //                << ", fy: " << fy
+                        //                << ", address: " << address);
                       }
                     }
                   }
@@ -680,7 +685,9 @@ SC_MODULE(InputController) {
                            loop_counters[1][4] < loop_bounds[1][4];
                            loop_counters[1][4]++) {
                         Pack1D<DTYPE, NROWS> data;
+
                         Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
+
                         for (loop_counters[1][5] = 0;
                              loop_counters[1][5] < loop_bounds[1][5] / 2;
                              loop_counters[1][5]++) {

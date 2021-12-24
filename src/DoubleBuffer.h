@@ -56,6 +56,11 @@ SC_MODULE(DoubleBuffer) {
       }
     }
 
+    CCS_LOG("contents:");
+    for (int i = 0; i < 1024; i++) {
+      std::cout << mem[i] << std::endl;
+    }
+
     swap = false;
     while (!swap) {
       if (rControl->Pop() == 1) {
