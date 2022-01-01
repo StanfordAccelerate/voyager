@@ -26,6 +26,12 @@ void run_test(Params params) {
     C = 3;
   }
 
+  std::cout << "Performing the following operation:" << std::endl;
+  std::cout << "(" << X << "x" << Y << "x" << C << ")"
+            << " * "
+            << "(" << FX << "x" << FY << "x" << C << "x" << K << ")"
+            << std::endl;
+
   // Create matrix A
   INPUT_DATATYPE *matrixA = new INPUT_DATATYPE[(STRIDE * X) * (STRIDE * Y) * C];
 
