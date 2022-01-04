@@ -49,7 +49,7 @@ build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/Architec
 build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
-build/TestRunner.o: test/common/TestRunner.cc test/mobilebert/params.h test/simple/params.h
+build/TestRunner.o: test/common/TestRunner.cc test/mobilebert/params.h test/simple/params.h test/resnet/params.h
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 
