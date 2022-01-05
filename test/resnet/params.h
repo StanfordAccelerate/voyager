@@ -31,7 +31,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          2,                                           // stride
-         true                                         // replication
+         true,                                        // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer1_0_conv1",
@@ -61,7 +67,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer1_0_conv2",
@@ -91,7 +103,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer1_1_conv1",
@@ -121,7 +139,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer1_1_conv2",
@@ -151,7 +175,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer2_0_downsample",
@@ -181,7 +211,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          2,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer2_0_conv1",
@@ -211,7 +247,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                    // weightReuseIndex
          false,                                     // matmul
          2,                                         // stride
-         false                                      // replication
+         false,                                     // replication
+         false,                                     // maxpool
+         true,                                      // bias
+         30 * 1024,                                 // BIAS_OFFSET
+         false,                                     // residual
+         40 * 1024,                                 // RESIDUAL_OFFSET
+         false                                      // avgpool
      }},
 
     {"layer2_0_conv2",
@@ -241,7 +283,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
     {"layer2_1_conv1",
      {
@@ -270,7 +318,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
     {"layer2_1_conv2",
      {
@@ -299,7 +353,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer3_0_downsample",
@@ -329,7 +389,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          2,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer3_0_conv_1",
@@ -359,7 +425,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          2,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
 
     {"layer3_0_conv_2",
@@ -389,7 +461,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                       // weightReuseIndex
          false,                                        // matmul
          1,                                            // stride
-         false                                         // replication
+         false,                                        // replication
+         false,                                        // maxpool
+         true,                                         // bias
+         30 * 1024,                                    // BIAS_OFFSET
+         false,                                        // residual
+         40 * 1024,                                    // RESIDUAL_OFFSET
+         false                                         // avgpool
      }},
     {"layer3_1_conv_1",
      {
@@ -418,7 +496,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                       // weightReuseIndex
          false,                                        // matmul
          1,                                            // stride
-         false                                         // replication
+         false,                                        // replication
+         false,                                        // maxpool
+         true,                                         // bias
+         30 * 1024,                                    // BIAS_OFFSET
+         false,                                        // residual
+         40 * 1024,                                    // RESIDUAL_OFFSET
+         false                                         // avgpool
      }},
     {"layer3_1_conv_2",
      {
@@ -447,7 +531,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                       // weightReuseIndex
          false,                                        // matmul
          1,                                            // stride
-         false                                         // replication
+         false,                                        // replication
+         false,                                        // maxpool
+         true,                                         // bias
+         30 * 1024,                                    // BIAS_OFFSET
+         false,                                        // residual
+         40 * 1024,                                    // RESIDUAL_OFFSET
+         false                                         // avgpool
      }},
     {"layer4_0_downsample",
      {
@@ -476,7 +566,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          2,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
     {"layer4_0_conv_1",
      {
@@ -505,7 +601,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          2,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
     {"layer4_0_conv_2",
      {
@@ -534,7 +636,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
     {"layer4_1_conv_1",
      {
@@ -563,7 +671,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }},
     {"layer4_1_conv_2",
      {
@@ -592,7 +706,13 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         true                                         // avgpool
      }},
 
     // map to vector processor instead
@@ -623,5 +743,11 @@ std::map<std::string, Params> resnet{
          {4, 5},                                      // weightReuseIndex
          false,                                       // matmul
          1,                                           // stride
-         false                                        // replication
+         false,                                       // replication
+         false,                                       // maxpool
+         false,                                       // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false                                        // avgpool
      }}};
