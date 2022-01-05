@@ -126,6 +126,11 @@ void run_test(Params params) {
     Y = Y / 2;
   }
 
+  if (params.AVGPOOL) {
+    X = 1;
+    Y = 1;
+  }
+
   run_op(params, mainMemory);
   run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
   compare_arrays(&mainMemory[params.OUTPUT_OFFSET], matrixC, X * Y * K);

@@ -38,6 +38,7 @@ struct Params {
   int BIAS_OFFSET;
   bool RESIDUAL;
   int RESIDUAL_OFFSET;
+  bool AVGPOOL;
 
   static const unsigned int width = 7 * 32 + 12 * 32 + 8 * 1;
 

@@ -226,6 +226,8 @@ void Harness::sendParams() {
   serialParamsIn.Push(params.RESIDUAL);
   serialParamsIn.Push(params.RESIDUAL_OFFSET);
 
+  serialParamsIn.Push(params.AVGPOOL);
+
   wait();
 }
 

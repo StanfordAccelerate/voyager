@@ -75,6 +75,8 @@ SC_MODULE(ParamsDeserializer) {
       params.RESIDUAL = serialParamsIn.Pop();
       params.RESIDUAL_OFFSET = serialParamsIn.Pop();
 
+      params.AVGPOOL = serialParamsIn.Pop();
+
       paramsOut.Push(params);
     }
   }

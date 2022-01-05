@@ -616,10 +616,20 @@ SC_MODULE(ArithmeticUnit) {
                             }
                             tensorOut.Push(maxpool_comparator[(x0 - 1) / 2]);
                           }
-                        }
-                        // TODO:
-                        // else if(params.AVGPOOL){}
-                        else {
+                        } else if (params.AVGPOOL) {
+                          if (x0 == 0 && y0 == 0) {
+                            avgpool = outputPixel;
+                          } else {
+#pragma hls_unroll yes
+                            for (int i = 0; i < NROWS; i++) {
+                              avgpool.value[i] += outputPixel.value[i];
+                            }
+                          }
+
+                          if (x0 == X0 - 1 && y0 == Y0 - 1) {
+                            tensorOut.Push(avgpool);
+                          }
+                        } else {
                           tensorOut.Push(outputPixel);
                         }
                       }
@@ -636,6 +646,7 @@ SC_MODULE(ArithmeticUnit) {
 
  private:
   Pack1D<DTYPE, WIDTH> maxpool_comparator[16];  // row buffer for maxpool
+  Pack1D<DTYPE, WIDTH> avgpool;
 };
 
 template <int NROWS, int WIDTH>
@@ -704,6 +715,11 @@ SC_MODULE(OutputAddressGenerator) {
               loop_bounds[1][params.inputXLoopIndex[1]] / 2;
           loop_bounds[1][params.inputYLoopIndex[1]] =
               loop_bounds[1][params.inputYLoopIndex[1]] / 2;
+        }
+
+        if (params.AVGPOOL) {
+          loop_bounds[1][params.inputXLoopIndex[1]] = 1;
+          loop_bounds[1][params.inputYLoopIndex[1]] = 1;
         }
 
 #pragma hls_pipeline_init_interval 1
@@ -991,6 +1007,10 @@ SC_MODULE(VectorUnit) {
                             params.loops[1][params.weightLoopIndex[1]];
         if (params.MAXPOOL) {
           total_outputs = total_outputs / 4;
+        }
+        if (params.AVGPOOL) {
+          total_outputs = params.loops[0][params.weightLoopIndex[0]] *
+                          params.loops[1][params.weightLoopIndex[1]];
         }
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush

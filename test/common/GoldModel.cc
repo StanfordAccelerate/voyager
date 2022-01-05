@@ -123,6 +123,8 @@ void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
         }
       }
 
+      delete[] tmpMatrixC;
+
       std::cout << "after MP" << std::endl;
       for (int y = 0; y < Y / 2; y++) {
         for (int x = 0; x < X / 2; x++) {
@@ -130,6 +132,24 @@ void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
         }
         std::cout << std::endl;
       }
+    }
+
+    if (params.AVGPOOL) {
+      // create copy
+      OUTPUT_DATATYPE *tmpMatrixC = new OUTPUT_DATATYPE[X * Y * K];
+      memcpy(tmpMatrixC, matrixC, sizeof(OUTPUT_DATATYPE) * X * Y * K);
+
+      for (int k = 0; k < K; k++) {
+        int acc = 0;
+        for (int y = 0; y < Y; y++) {
+          for (int x = 0; x < X; x++) {
+            acc += tmpMatrixC[y * X * K + x * K + k];
+          }
+        }
+        matrixC[k] = acc;
+      }
+
+      delete[] tmpMatrixC;
     }
   }
 }
