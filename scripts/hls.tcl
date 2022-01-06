@@ -69,6 +69,8 @@ directive set /Accelerator/MatrixProcessor<ac_int<8,true>,ac_int<8,true>,ac_int<
 if {[info exists env(DEBUG)] == 0} {
   directive set /Accelerator/MatrixProcessor<ac_int<8,true>,ac_int<8,true>,ac_int<8,true>,16,16,1024>/MatrixProcessor<ac_int<8,true>,ac_int<8,true>,ac_int<8,true>,16,16,1024>:run/run/accumulation_buffer.value:rsc -MAP_TO_MODULE custom1024x128.custom1024x128
 }
+directive set /Accelerator/ArithmeticUnit<ac_int<8,true>,16,16>/run/maxpool_comparator.value:rsc -MAP_TO_MODULE {[Register]}
+
 go architect
 
 ignore_memory_precedences -from WRITE_ACC_BUFFER* -to READ_ACC_BUFFER*
