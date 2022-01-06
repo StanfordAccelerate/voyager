@@ -22,7 +22,6 @@ struct Params {
   bool RELU;
 
   int loops[2][6];
-  // int inputLoopIndex[2];
   int inputXLoopIndex[2];
   int inputYLoopIndex[2];
   int reductionLoopIndex[2];
@@ -40,7 +39,7 @@ struct Params {
   int RESIDUAL_OFFSET;
   bool AVGPOOL;
 
-  static const unsigned int width = 7 * 32 + 12 * 32 + 8 * 1;
+  static const unsigned int width = 12 * 32 + 12 * 32 + 10 * 32 + 14 * 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
@@ -60,27 +59,36 @@ struct Params {
     m& VEC_SUB_OFFSET;
     m& RELU;
     for (int i = 0; i < 2; i++) {
-      for (int j = 0; j < 3; j++) {
+      for (int j = 0; j < 6; j++) {
         m& loops[i][j];
       }
     }
-    // for (int i = 0; i < 2; i++) {
-    //   m& inputLoopIndex[i];
-    // }
-    // for (int i = 0; i < 2; i++) {
-    //   m& inputXLoopIndex[i];
-    // }
-    // for (int i = 0; i < 2; i++) {
-    //   m& inputYLoopIndex[i];
-    // }
+    for (int i = 0; i < 2; i++) {
+      m& inputXLoopIndex[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      m& inputYLoopIndex[i];
+    }
     for (int i = 0; i < 2; i++) {
       m& reductionLoopIndex[i];
     }
     for (int i = 0; i < 2; i++) {
       m& weightLoopIndex[i];
     }
-    // m& fxIndex;
-    // m& fyIndex;
+    m& fxIndex;
+    m& fyIndex;
+    for (int i = 0; i < 2; i++) {
+      m& weightReuseIndex[i];
+    }
+    m& matMul;
+    m& STRIDE;
+    m& REPLICATION;
+    m& MAXPOOL;
+    m& BIAS;
+    m& BIAS_OFFSET;
+    m& RESIDUAL;
+    m& RESIDUAL_OFFSET;
+    m& AVGPOOL;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const Params& params,
