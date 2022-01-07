@@ -38,87 +38,6 @@ SC_MODULE(DoubleBuffer) {
     async_reset_signal_is(rstn, false);
   }
 
-  void run(Connections::In<int> * wAddress,
-           Connections::In<Pack1D<DTYPE, WIDTH> > * wData,
-           Connections::In<int> * wControl,
-           Connections::Combinational<Pack1D<DTYPE, WIDTH> > * rData,
-           Connections::In<int> * rAddress, Connections::In<int> * rControl,
-           Connections::Combinational<int> * oControl,
-           Pack1D<DTYPE, WIDTH> mem[BUFFER_SIZE]) {
-    int wsize = wControl->Pop();
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-    for (int i = 0; i < wsize; i++) {
-      int address = wAddress->Pop();
-      Pack1D<DTYPE, WIDTH> data = wData->Pop();
-      mem[address] = data;
-    }
-
-    int rsize = rControl->Pop();
-    oControl->Push(rsize);
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-    for (int i = 0; i < rsize; i++) {
-      int address = rAddress->Pop();
-      Pack1D<DTYPE, WIDTH> data;
-
-      if (address != -1) {
-        data = mem[address];
-      } else {
-#pragma hls_unroll yes
-        for (int j = 0; j < WIDTH; j++) {
-          data[j] = 0;
-        }
-      }
-
-      rData->Push(data);
-    }
-
-    //     bool swap = false;
-    // #pragma hls_pipeline_init_interval 1
-    // #pragma hls_pipeline_stall_mode flush
-    //     while (true) {
-    //       swap = wControl->Pop() == 0;
-    //       int address = wAddress->Pop();
-    //       Pack1D<DTYPE, WIDTH> data = wData->Pop();
-    //       mem[address] = data;
-    //       if (swap) {
-    //         break;
-    //       }
-    //     }
-
-    //     // CCS_LOG("contents:");
-    //     // for (int i = 0; i < 1024; i++) {
-    //     //   std::cout << mem[i] << std::endl;
-    //     // }
-
-    //     bool swap2 = false;
-    // #pragma hls_pipeline_init_interval 1
-    // #pragma hls_pipeline_stall_mode flush
-    //     while (true) {
-    //       swap2 = rControl->Pop() == 0;
-
-    //       int address = rAddress->Pop();
-    //       Pack1D<DTYPE, WIDTH> data;
-
-    //       if (address != -1) {
-    //         data = mem[address];
-    //       } else {
-    // #pragma hls_unroll yes
-    //         for (int j = 0; j < WIDTH; j++) {
-    //           data[j] = 0;
-    //         }
-    //       }
-    //       oControl->Push(!swap2);
-    //       rData->Push(data);
-
-    //       if (swap2) {
-    //         break;
-    //       }
-    //     }
-  }
-
   void mem0Run() {
     writeAddress[0].Reset();
     writeData[0].Reset();
@@ -132,11 +51,36 @@ SC_MODULE(DoubleBuffer) {
 
     wait();
 
-    // #pragma hls_pipeline_init_interval 1
-    // #pragma hls_pipeline_stall_mode flush
     while (true) {
-      run(&writeAddress[0], &writeData[0], &writeControl[0], &readData[0],
-          &readAddress[0], &readControl[0], &outputControl[0], mem0);
+      int wsize = writeControl[0].Pop();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (int i = 0; i < wsize; i++) {
+        int address = writeAddress[0].Pop();
+        Pack1D<DTYPE, WIDTH> data = writeData[0].Pop();
+        mem0[address] = data;
+      }
+
+      int rsize = readControl[0].Pop();
+      outputControl[0].Push(rsize);
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (int i = 0; i < rsize; i++) {
+        int address = readAddress[0].Pop();
+        Pack1D<DTYPE, WIDTH> data;
+
+        if (address != -1) {
+          data = mem0[address];
+        } else {
+#pragma hls_unroll yes
+          for (int j = 0; j < WIDTH; j++) {
+            data[j] = 0;
+          }
+        }
+
+        readData[0].Push(data);
+      }
     }
   }
 
@@ -153,11 +97,36 @@ SC_MODULE(DoubleBuffer) {
 
     wait();
 
-    // #pragma hls_pipeline_init_interval 1
-    // #pragma hls_pipeline_stall_mode flush
     while (true) {
-      run(&writeAddress[1], &writeData[1], &writeControl[1], &readData[1],
-          &readAddress[1], &readControl[1], &outputControl[1], mem1);
+      int wsize = writeControl[1].Pop();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (int i = 0; i < wsize; i++) {
+        int address = writeAddress[1].Pop();
+        Pack1D<DTYPE, WIDTH> data = writeData[1].Pop();
+        mem1[address] = data;
+      }
+
+      int rsize = readControl[1].Pop();
+      outputControl[1].Push(rsize);
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (int i = 0; i < rsize; i++) {
+        int address = readAddress[1].Pop();
+        Pack1D<DTYPE, WIDTH> data;
+
+        if (address != -1) {
+          data = mem1[address];
+        } else {
+#pragma hls_unroll yes
+          for (int j = 0; j < WIDTH; j++) {
+            data[j] = 0;
+          }
+        }
+
+        readData[1].Push(data);
+      }
     }
   }
 
