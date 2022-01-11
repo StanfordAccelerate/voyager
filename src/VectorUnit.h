@@ -509,6 +509,7 @@ SC_MODULE(ArithmeticUnit) {
       Pack1D<DTYPE, NROWS> bias;
 
 #pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -632,13 +633,40 @@ SC_MODULE(ArithmeticUnit) {
                         } else {
                           tensorOut.Push(outputPixel);
                         }
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
                       }
                     }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
                   }
                 }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
               }
             }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
+            }
           }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
     }
@@ -772,13 +800,41 @@ SC_MODULE(OutputAddressGenerator) {
                           int baseAddress = y * X * K + x * K + k;
                           int address = params.OUTPUT_OFFSET + baseAddress;
                           outputAddress.Push(address);
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
+                        }
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                          break;
                         }
                       }
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                      break;
                     }
                   }
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                  break;
                 }
               }
+              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+                break;
+              }
             }
+            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+            break;
           }
         }
       }

@@ -125,14 +125,46 @@ SC_MODULE(WeightController) {
                           MemoryRequest memRequest = {
                               params.WEIGHT_OFFSET + baseAddress, burstSize};
                           addressRequest.Push(memRequest);
+
+                          if (c0 >= c0_bound - 1) {
+                            break;
+                          }
+                        }
+
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
                         }
                       }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
                     }
                   }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
                 }
               }
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
     }
@@ -240,18 +272,48 @@ SC_MODULE(WeightController) {
                           // writeControl[bankSel].Push(!swapBank);
                           writeAddress[bankSel].Push(address);
                           writeData[bankSel].Push(data);
+                          if (c >= c0_bound - 1) {
+                            break;
+                          }
+                        }
 
-                          // CCS_LOG("c: " << c);
+                        // CCS_LOG("c: " << c);
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
                         }
                       }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
                     }
                   }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
                 }
               }
               // writeControl[bankSel].Push(0);
               bankSel = !bankSel;
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
     }
@@ -336,6 +398,10 @@ SC_MODULE(WeightController) {
                           for (int i = 0; i < numPadding; i++) {
                             // readControl[bankSel].Push(1);
                             readAddress[bankSel].Push(-1);
+
+                            if (i >= numPadding - 1) {
+                              break;
+                            }
                           }
                         }
 
@@ -387,18 +453,51 @@ SC_MODULE(WeightController) {
 
                             // readControl[bankSel].Push(!swapBank);
                             readAddress[bankSel].Push(address);
+
+                            if (c == 0) {
+                              break;
+                            }
+                          }
+                          if (fx_repl == 0) {
+                            break;
                           }
                         }
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
                       }
                     }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
                   }
                 }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
+                }
               }
-              CCS_LOG("read all");
-              // readControl[bankSel].Push(0);
+              // writeControl[bankSel].Push(0);
               bankSel = !bankSel;
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
     }

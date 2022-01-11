@@ -199,13 +199,46 @@ SC_MODULE(InputController) {
                         }
 
                         addressRequest.Push(memRequest);
+                        if (params.REPLICATION) {
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 4) {
+                            break;
+                          }
+                        } else {
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
+                        }
+                      }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
                       }
                     }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
                   }
                 }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
               }
             }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
+            }
           }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
     }
@@ -399,6 +432,10 @@ SC_MODULE(InputController) {
                               }
                             }
                           }
+
+                          if (x >= params.STRIDE * X0 - 4) {
+                            break;
+                          }
                         }
 
                         /*
@@ -468,15 +505,40 @@ SC_MODULE(InputController) {
                         // writeControl[bankSel].Push(!swapBank);
                         writeAddress[bankSel].Push(next_address);
                         writeData[bankSel].Push(data);
+
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                        break;
                       }
                     }
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                    break;
                   }
                 }
 
                 // writeControl[bankSel].Push(0);
                 bankSel = !bankSel;
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+                break;
               }
             }
+            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+            break;
           }
         }
       } else {
@@ -557,16 +619,42 @@ SC_MODULE(InputController) {
                           // writeControl[bankSel].Push(!swapBank);
                           writeAddress[bankSel].Push(address);
                           writeData[bankSel].Push(data);
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
+                        }
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                          break;
                         }
                       }
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                      break;
                     }
                   }
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                    break;
+                  }
                 }
-
                 // writeControl[bankSel].Push(0);
                 bankSel = !bankSel;
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+                break;
               }
             }
+            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+            break;
           }
         }
       }
@@ -653,23 +741,53 @@ SC_MODULE(InputController) {
                           address = y * (params.STRIDE * X0 + FX - 1) + x;
                         }
                         // int swapBank =
-                        //     (loop_counters[1][1] == loop_bounds[1][1] - 1)
-                        //     && (loop_counters[1][2] == loop_bounds[1][2] -
-                        //     1) && (loop_counters[1][3] == loop_bounds[1][3]
+                        //     (loop_counters[1][1] == loop_bounds[1][1] -
+                        //     1)
+                        //     && (loop_counters[1][2] == loop_bounds[1][2]
+                        //     - 1) && (loop_counters[1][3] ==
+                        //     loop_bounds[1][3]
                         //     - 1) && (loop_counters[1][4] ==
-                        //     loop_bounds[1][4] - 1) && (loop_counters[1][5]
+                        //     loop_bounds[1][4] - 1) &&
+                        //     (loop_counters[1][5]
                         //     == loop_bounds[1][5] - 1);
                         // readControl[bankSel].Push(!swapBank);
                         readAddress[bankSel].Push(address);
+
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
                       }
                     }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
                   }
                 }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
+                }
               }
-              // readControl[bankSel].Push(0);
               bankSel = !bankSel;
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
     }
@@ -765,43 +883,15 @@ SC_MODULE(InputController) {
           }
         }
       } else {  // bypass
+
+        int total_count =
+            loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
+            loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
+            loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < loop_bounds[1][5];
-                             loop_counters[1][5]++) {
-                          windowBufferOut.Push(windowBufferIn.Pop());
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
+        for (int i = 0; i < total_count; i++) {
+          windowBufferOut.Push(windowBufferIn.Pop());
         }
       }
     }

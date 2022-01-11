@@ -60,6 +60,10 @@ SC_MODULE(DoubleBuffer) {
         int address = writeAddress[0].Pop();
         Pack1D<DTYPE, WIDTH> data = writeData[0].Pop();
         mem0[address] = data;
+
+        if (i >= wsize - 1) {
+          break;
+        }
       }
 
       int rsize = readControl[0].Pop();
@@ -80,6 +84,10 @@ SC_MODULE(DoubleBuffer) {
         }
 
         readData[0].Push(data);
+
+        if (i >= rsize - 1) {
+          break;
+        }
       }
     }
   }
@@ -106,6 +114,10 @@ SC_MODULE(DoubleBuffer) {
         int address = writeAddress[1].Pop();
         Pack1D<DTYPE, WIDTH> data = writeData[1].Pop();
         mem1[address] = data;
+
+        if (i >= wsize - 1) {
+          break;
+        }
       }
 
       int rsize = readControl[1].Pop();
@@ -126,6 +138,10 @@ SC_MODULE(DoubleBuffer) {
         }
 
         readData[1].Push(data);
+
+        if (i >= rsize - 1) {
+          break;
+        }
       }
     }
   }
@@ -148,6 +164,10 @@ SC_MODULE(DoubleBuffer) {
 
       for (int i = 0; i < size; i++) {
         output.Push(readData[bankSel].Pop());
+
+        if (i >= size - 1) {
+          break;
+        }
       }
 
       bankSel = !bankSel;
