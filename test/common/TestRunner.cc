@@ -18,14 +18,18 @@ void validateMapping(Params params) {
   int stride = params.STRIDE;
 
   // Input buffer
-  if ((x0 * stride + fx - 1) * (y0 * stride + fy - 1) * c0 >
-      INPUT_BUFFER_SIZE) {
+  int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy - 1);
+  if (params.REPLICATION) {
+    // don't check temporarily
+    input_buffer_tile_size = 1;
+  }
+  if (input_buffer_tile_size > INPUT_BUFFER_SIZE) {
     std::cout << "[ERROR] Input buffer tile size violation." << std::endl;
     std::terminate();
   }
 
   // Weight buffer
-  if (fx * fy * c0 * k0 > WEIGHT_BUFFER_SIZE) {
+  if (fx * fy * k0 > WEIGHT_BUFFER_SIZE) {
     std::cout << "[ERROR] Weight buffer tile size violation." << std::endl;
     std::terminate();
   }
