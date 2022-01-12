@@ -2,7 +2,7 @@
 
 #include <fstream>
 
-void compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
+int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
                     size_t size) {
   // buckets of <0.001, <0.01, <0.1, <1, >1
   int diff_buckets[5] = {0, 0, 0, 0, 0};
@@ -39,4 +39,6 @@ void compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
   std::cout << "> 1: " << diff_buckets[4] << "("
             << (float)diff_buckets[4] / (size)*100.0 << "%)" << std::endl;
   std::cout << std::endl;
+
+  return diff_buckets[4];
 }

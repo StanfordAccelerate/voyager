@@ -37,7 +37,7 @@ void validateMapping(Params params) {
   }
 }
 
-void run_test(Params params) {
+int run_test(Params params) {
   validateMapping(params);
 
   INPUT_DATATYPE *mainMemory = new INPUT_DATATYPE[4 * 1024 * 1024];
@@ -164,12 +164,21 @@ void run_test(Params params) {
 
   run_op(params, mainMemory);
   run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
-  compare_arrays(&mainMemory[params.OUTPUT_OFFSET], matrixC, X * Y * K);
+  int errors =
+      compare_arrays(&mainMemory[params.OUTPUT_OFFSET], matrixC, X * Y * K);
 
   delete[] matrixA;
   delete[] matrixB;
   delete[] matrixC;
   delete[] mainMemory;
+
+  if (errors == 0) {
+    std::cout << "Test passed!" << std::endl;
+  } else {
+    std::cout << "Test failed!" << std::endl;
+  }
+
+  return errors;
 }
 
 int sc_main(int argc, char *argv[]) {
@@ -208,6 +217,5 @@ int sc_main(int argc, char *argv[]) {
               << std::endl;
   }
 
-  run_test(params);
-  return 0;
+  return run_test(params);
 }
