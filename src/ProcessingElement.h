@@ -69,7 +69,7 @@ SC_MODULE(ProcessingElement) {
         swap_weights_reg = swap_weights_in.read();
 
         if (swap_weights_reg) {
-          CCS_LOG("swap");
+          // CCS_LOG("swap");
           weight_reg = weight_fifo;
         }
 

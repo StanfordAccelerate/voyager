@@ -199,11 +199,11 @@ SC_MODULE(MatrixProcessor) {
         bool newWeights = loop_counters[1][params.weightReuseIndex[0]] == 0 &&
                           loop_counters[1][params.weightReuseIndex[1]] == 0;
         if (newWeights && step < totalOps) {
-          CCS_LOG("*****");
+          // CCS_LOG("*****");
           while (!weightReady) {
             wait();
           }
-          CCS_LOG("weight ready");
+          // CCS_LOG("weight ready");
 
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
@@ -221,7 +221,7 @@ SC_MODULE(MatrixProcessor) {
         Pack1D<IDTYPE, NROWS> inputs;
         if (step < totalOps) {
           inputs = inputsChannel.Pop();
-          CCS_LOG("input: " << inputs);
+          // CCS_LOG("input: " << inputs);
         }
         toggle = !toggle;
         toggleOut.write(toggle);
@@ -251,7 +251,7 @@ SC_MODULE(MatrixProcessor) {
         READ_ACC_BUFFER:
 #endif
           psum = accumulation_buffer[readAddress];
-          CCS_LOG("readAddress: " << readAddress << " psum " << psum);
+          // CCS_LOG("readAddress: " << readAddress << " psum " << psum);
         }
 
         psumInSkewerDin.Push(psum);
@@ -290,8 +290,8 @@ SC_MODULE(MatrixProcessor) {
           WRITE_ACC_BUFFER:
 #endif
             accumulation_buffer[writeAddress] = flippedOutputs;
-            CCS_LOG("writeAddress: " << writeAddress << " val "
-                                     << flippedOutputs);
+            // CCS_LOG("writeAddress: " << writeAddress << " val "
+            //                          << flippedOutputs);
           }
         }
 
