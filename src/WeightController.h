@@ -24,6 +24,9 @@ SC_MODULE(WeightController) {
   Connections::Combinational<Params> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<Params> CCS_INIT_S1(writerParams);
   Connections::Combinational<Params> CCS_INIT_S1(readerParams);
+  Connections::Combinational<Params> CCS_INIT_S1(transposerParams);
+
+  Connections::Combinational<Pack1D<DTYPE, NCOLS> > transposeOut;
 
   SC_CTOR(WeightController) {
     SC_THREAD(read_params);
@@ -39,6 +42,10 @@ SC_MODULE(WeightController) {
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(writer);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(transposer);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -120,6 +127,9 @@ SC_MODULE(WeightController) {
 
                           int baseAddress =
                               (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
+                          if (params.TRANSPOSE) {
+                            baseAddress = (k + c0) * C + c1 * DIMENSION;
+                          }
                           int burstSize = NCOLS;
 
                           MemoryRequest memRequest = {
@@ -172,7 +182,7 @@ SC_MODULE(WeightController) {
 
   void writer() {
     writerParams.ResetRead();
-    dataResponse.Reset();
+    transposeOut.ResetRead();
 
     writeControl[0].Reset();
     writeControl[1].Reset();
@@ -256,7 +266,7 @@ SC_MODULE(WeightController) {
                           int k = k2 * K1 * DIMENSION + k1 * DIMENSION;
                           int K = K2 * K1 * DIMENSION;
 
-                          Pack1D<DTYPE, NROWS> data = dataResponse.Pop();
+                          Pack1D<DTYPE, NROWS> data = transposeOut.Pop();
 
                           int address = (fy * FX * C * K1) + (fx * C * K1) +
                                         (c * K1) + k1;
@@ -432,8 +442,6 @@ SC_MODULE(WeightController) {
                               FX = 7;
                             }
 
-                            CCS_LOG("fx: " << fx);
-
                             int k = k2 * K1 * DIMENSION + k1 * DIMENSION;
                             int K = K2 * K1 * DIMENSION;
                             int address = (fy * FX * C * K1) + (fx * C * K1) +
@@ -503,11 +511,146 @@ SC_MODULE(WeightController) {
     }
   }
 
+  void transposer() {
+    transposerParams.ResetRead();
+    dataResponse.Reset();
+    transposeOut.ResetWrite();
+
+    wait();
+
+    while (true) {
+      Params params = transposerParams.Pop();
+
+      int loop_counters[2][6];
+      int loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.inputXLoopIndex[1]] = 1;
+      loop_bounds[1][params.inputYLoopIndex[1]] = 1;
+
+      int c0_bound = NROWS;
+      if (params.REPLICATION) {
+        c0_bound = 3;
+        loop_bounds[1][params.fxIndex] = 7;
+      }
+
+      if (params.TRANSPOSE) {
+        INPUT_DATATYPE transposeBuffer[NROWS][NCOLS];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              // inner memory
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          // Fill up transposeBuffer
+                          for (int c0 = 0; c0 < NROWS; c0++) {
+                            Pack1D<DTYPE, NCOLS> originalValue =
+                                dataResponse.Pop();
+#pragma hls_unroll yes
+                            for (int dim = 0; dim < NCOLS; dim++) {
+                              transposeBuffer[dim][c0] = originalValue[dim];
+                            }
+                          }
+
+                          // Write out from tranposeBuffer
+                          for (int c0 = 0; c0 < NROWS; c0++) {
+                            Pack1D<DTYPE, NCOLS> transposedValue;
+
+#pragma hls_unroll yes
+                            for (int dim = 0; dim < NCOLS; dim++) {
+                              transposedValue[dim] = transposeBuffer[c0][dim];
+                            }
+                            transposeOut.Push(transposedValue);
+                          }
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
+                        }
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+            break;
+          }
+        }
+      } else {  // passthrough
+        int total_values = loop_bounds[0][0] * loop_bounds[0][1] *
+                           loop_bounds[0][2] * loop_bounds[1][0] *
+                           loop_bounds[1][1] * loop_bounds[1][2] *
+                           loop_bounds[1][3] * loop_bounds[1][4] *
+                           loop_bounds[1][5] * c0_bound;
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (int i = 0; i < total_values; i++) {
+          transposeOut.Push(dataResponse.Pop());
+        }
+      }
+    }
+  }
+
   void read_params() {
     paramsIn.Reset();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();
+    transposerParams.ResetWrite();
 
     wait();
 
@@ -517,6 +660,7 @@ SC_MODULE(WeightController) {
       fetcherParams.Push(params);
       writerParams.Push(params);
       readerParams.Push(params);
+      transposerParams.Push(params);
     }
   }
 };

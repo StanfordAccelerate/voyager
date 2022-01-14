@@ -61,6 +61,32 @@ void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
       C = 3;
     }
 
+    if (params.TRANSPOSE) {
+      std::cout << "Before Transpose:" << std::endl;
+      for (int c = 0; c < C; c++) {
+        for (int k = 0; k < K; k++) {
+          std::cout << matrixB[c * K + k] << " ";
+        }
+        std::cout << std::endl;
+      }
+      // create copy
+      INPUT_DATATYPE *tmpMatrixB = new INPUT_DATATYPE[C * K];
+      for (int c = 0; c < C; c++) {
+        for (int k = 0; k < K; k++) {
+          tmpMatrixB[c * K + k] = matrixB[k * C + c];
+        }
+      }
+      memcpy(matrixB, tmpMatrixB, sizeof(INPUT_DATATYPE) * C * K);
+
+      std::cout << "After Transpose:" << std::endl;
+      for (int c = 0; c < C; c++) {
+        for (int k = 0; k < K; k++) {
+          std::cout << matrixB[c * K + k] << " ";
+        }
+        std::cout << std::endl;
+      }
+    }
+
     for (int x = 0; x < X; x++) {
       for (int y = 0; y < Y; y++) {
         for (int k = 0; k < K; k++) {
