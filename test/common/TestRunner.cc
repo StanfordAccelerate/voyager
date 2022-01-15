@@ -12,6 +12,75 @@
 #define SRAM_MEMORY_SIZE (2*1024*1024)
 #define RRAM_MEMORY_SIZE (12*1024*1024)
 
+size_t load_layer_memory(const std::string& filename, INPUT_DATATYPE* memory)
+{
+	std::ifstream is(filename, std::ios::binary);
+
+  if (!is.good())
+    throw std::runtime_error("File \"" + filename + "\" does not exist");
+
+  // Read data into buffer and copy data into memory
+	std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(is), {});
+  std::memcpy(memory, buffer.data(), buffer.size());
+  return buffer.size();
+}
+
+int run_complete(const std::string& group, std::map<std::string, Params>* param_map)
+{
+  // Allocate accelerator memory
+  INPUT_DATATYPE *sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+  INPUT_DATATYPE *rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+  if (sram_memory == nullptr || rram_memory == nullptr)
+    throw std::runtime_error("Failed to allocate accelerator memory");
+  std::memset(sram_memory, 0, SRAM_MEMORY_SIZE );
+  std::memset(rram_memory, 0, RRAM_MEMORY_SIZE);
+
+  // Load input
+  std::string data_path = "data/" + group + '/';
+  load_layer_memory(data_path + "input", sram_memory + (*(param_map->begin())).second.INPUT_OFFSET);
+
+  // Load weights and biases
+  for (const auto& param_pair: *param_map)
+  {
+    const std::string& name = param_pair.first;
+    Params param = param_pair.second;
+    // Load weights
+    load_layer_memory(data_path + name + "_weight", rram_memory + param.WEIGHT_OFFSET);
+
+    // Load biases
+    // load_layer_memory(data_path + name + ".bias", main_memory + weight_offset + param.BIAS_OFFSET);
+  }
+
+  // Perform run with main memory
+  for (const auto& param_pair: *param_map)
+  {
+    Params param = param_pair.second;
+    run_op(param, (INPUT_DATATYPE*)sram_memory, (INPUT_DATATYPE*)rram_memory, true);
+  }
+
+  // Compare with pytorch data
+	std::ifstream is(data_path + "input", std::ios::binary);
+  if (!is.good())
+    throw std::runtime_error("File does not exist");
+	std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(is), {});
+  INPUT_DATATYPE* pytorch_output = new INPUT_DATATYPE[buffer.size()];
+  std::memcpy(pytorch_output, buffer.data(), buffer.size());
+
+  int errors =
+      compare_arrays(&sram_memory[(*(--param_map->end())).second.OUTPUT_OFFSET], pytorch_output, buffer.size());
+
+  delete[] sram_memory;
+  delete[] rram_memory;
+
+  if (errors == 0) {
+    std::cout << "Test passed!" << std::endl;
+  } else {
+    std::cout << "Test failed!" << std::endl;
+  }
+
+  return errors;
+}
+
 void validateMapping(Params params) {
   int x0 = params.loops[1][params.inputXLoopIndex[1]];
   int y0 = params.loops[1][params.inputYLoopIndex[1]];
@@ -170,7 +239,7 @@ int run_test(Params params) {
     Y = 1;
   }
 
-  run_op(params, sramMemory, rramMemory);
+  run_op(params, sramMemory, rramMemory, true);
   run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
   int errors =
       compare_arrays(&sramMemory[params.OUTPUT_OFFSET], matrixC, X * Y * K);
@@ -211,6 +280,13 @@ int sc_main(int argc, char *argv[]) {
       mapPtr = &resnet;
     } else {
       std::cout << "Warning! Group " << group << " not found!" << std::endl;
+    }
+
+    // Run end to end if complete is specified
+    if (test == "complete")
+    {
+      run_complete(group, mapPtr);
+      return 0;
     }
 
     auto search = mapPtr->find(test);

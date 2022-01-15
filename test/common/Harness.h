@@ -8,6 +8,9 @@
 #include "Accelerator.h"
 #include "ArchitectureParams.h"
 
+#define USE_SRAM (false)
+#define USE_RRAM (true)
+
 SC_MODULE(Harness) {
   sc_clock CCS_INIT_S1(clk);
   sc_signal<bool> CCS_INIT_S1(rstn);
@@ -47,35 +50,25 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(start);
   Connections::SyncChannel CCS_INIT_S1(done);
 
-  Harness(sc_module_name, Params, INPUT_DATATYPE *, INPUT_DATATYPE *);
+  Harness(sc_module_name, Params, INPUT_DATATYPE *, INPUT_DATATYPE *, bool);
   SC_HAS_PROCESS(Harness);
 
  private:
   Params params;
   INPUT_DATATYPE *sramMemory, *rramMemory;
+  bool weightFromRRAM;
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
 
-  void memAccessBurstRRAM(
+  void memAccessBurst(
       Connections::Combinational<MemoryRequest> * addressRequest,
       Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse);
-  void memAccessPackRRAM(
+          dataResponse, bool useRRAM);
+  void memAccessPack(
       Connections::Combinational<int> * addressRequest,
       Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse);
-  void memAccessRRAM(Connections::Combinational<int> * addressRequest,
-                 Connections::Combinational<INPUT_DATATYPE> * dataResponse);
-
-  void memAccessBurstSRAM(
-      Connections::Combinational<MemoryRequest> * addressRequest,
-      Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse);
-  void memAccessPackSRAM(
-      Connections::Combinational<int> * addressRequest,
-      Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse);
-  void memAccessSRAM(Connections::Combinational<int> * addressRequest,
-                 Connections::Combinational<INPUT_DATATYPE> * dataResponse);
+          dataResponse, bool useRRAM);
+  void memAccess(Connections::Combinational<int> * addressRequest,
+                 Connections::Combinational<INPUT_DATATYPE> * dataResponse, bool useRRAM);
 
   void memAccessInputs();
   void memAccessWeights();
@@ -92,4 +85,4 @@ SC_MODULE(Harness) {
   void waitForDone();
 };
 
-void run_op(const Params params, INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory);
+void run_op(const Params params, INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory, bool weightFromRRAM=true);

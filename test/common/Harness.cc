@@ -5,12 +5,13 @@
 
 #include "AccelTypes.h"
 
-Harness::Harness(sc_module_name name, Params params, INPUT_DATATYPE *sram, INPUT_DATATYPE *rram)
+Harness::Harness(sc_module_name name, Params params, INPUT_DATATYPE *sram, INPUT_DATATYPE *rram, bool weightFromRRAM)
     : sc_module(name),
       clk("clk", 1, SC_NS, 0.5, 0, SC_NS, true),
       params(params),
       sramMemory(sram),
-      rramMemory(rram) {
+      rramMemory(rram),
+      weightFromRRAM(weightFromRRAM) {
   accelerator.clk(clk);
   accelerator.rstn(rstn);
   accelerator.serialParamsIn(serialParamsIn);
@@ -88,10 +89,11 @@ void Harness::reset() {
   wait();
 }
 
-void Harness::memAccessBurstSRAM(
+void Harness::memAccessBurst(
     Connections::Combinational<MemoryRequest> *addressRequest,
     Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
-        *dataResponse) {
+        *dataResponse, bool useRRAM) {
+  INPUT_DATATYPE* memory = useRRAM ? rramMemory : sramMemory;
   addressRequest->ResetRead();
   dataResponse->ResetWrite();
 
@@ -103,17 +105,18 @@ void Harness::memAccessBurstSRAM(
     for (int b = 0; b < memRequest.burstSize / DIMENSION; b++) {
       Pack1D<INPUT_DATATYPE, DIMENSION> data;
       for (int i = 0; i < DIMENSION; i++) {
-        data[i] = sramMemory[memRequest.address + b * DIMENSION + i];
+        data[i] = memory[memRequest.address + b * DIMENSION + i];
       }
       dataResponse->Push(data);
     }
   }
 }
 
-void Harness::memAccessPackSRAM(
+void Harness::memAccessPack(
     Connections::Combinational<int> *addressRequest,
     Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
-        *dataResponse) {
+        *dataResponse, bool useRRAM) {
+  INPUT_DATATYPE* memory = useRRAM ? rramMemory : sramMemory;
   addressRequest->ResetRead();
   dataResponse->ResetWrite();
 
@@ -124,16 +127,17 @@ void Harness::memAccessPackSRAM(
     int count = 0;
     while (count < DIMENSION) {
       int address = addressRequest->Pop();
-      data[count] = sramMemory[address];
+      data[count] = memory[address];
       count++;
     }
     dataResponse->Push(data);
   }
 }
 
-void Harness::memAccessSRAM(
+void Harness::memAccess(
     Connections::Combinational<int> *addressRequest,
-    Connections::Combinational<INPUT_DATATYPE> *dataResponse) {
+    Connections::Combinational<INPUT_DATATYPE> *dataResponse, bool useRRAM) {
+  INPUT_DATATYPE* memory = useRRAM ? rramMemory : sramMemory;
   addressRequest->ResetRead();
   dataResponse->ResetWrite();
 
@@ -141,92 +145,36 @@ void Harness::memAccessSRAM(
 
   while (true) {
     int address = addressRequest->Pop();
-    dataResponse->Push(sramMemory[address]);
+    dataResponse->Push(memory[address]);
   }
 }
 
-void Harness::memAccessBurstRRAM(
-    Connections::Combinational<MemoryRequest> *addressRequest,
-    Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
-        *dataResponse) {
-  addressRequest->ResetRead();
-  dataResponse->ResetWrite();
-
-  wait();
-
-  while (true) {
-    MemoryRequest memRequest = addressRequest->Pop();
-
-    for (int b = 0; b < memRequest.burstSize / DIMENSION; b++) {
-      Pack1D<INPUT_DATATYPE, DIMENSION> data;
-      for (int i = 0; i < DIMENSION; i++) {
-        data[i] = rramMemory[memRequest.address + b * DIMENSION + i];
-      }
-      dataResponse->Push(data);
-    }
-  }
-}
-
-void Harness::memAccessPackRRAM(
-    Connections::Combinational<int> *addressRequest,
-    Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
-        *dataResponse) {
-  addressRequest->ResetRead();
-  dataResponse->ResetWrite();
-
-  wait();
-
-  while (true) {
-    Pack1D<INPUT_DATATYPE, DIMENSION> data;
-    int count = 0;
-    while (count < DIMENSION) {
-      int address = addressRequest->Pop();
-      data[count] = rramMemory[address];
-      count++;
-    }
-    dataResponse->Push(data);
-  }
-}
-
-void Harness::memAccessRRAM(
-    Connections::Combinational<int> *addressRequest,
-    Connections::Combinational<INPUT_DATATYPE> *dataResponse) {
-  addressRequest->ResetRead();
-  dataResponse->ResetWrite();
-
-  wait();
-
-  while (true) {
-    int address = addressRequest->Pop();
-    dataResponse->Push(rramMemory[address]);
-  }
-}
 void Harness::memAccessInputs() {
-  memAccessBurstSRAM(&inputAddressRequest, &inputDataResponse);
+  memAccessBurst(&inputAddressRequest, &inputDataResponse, USE_SRAM);
 }
 
 void Harness::memAccessWeights() {
-  memAccessBurstRRAM(&weightAddressRequest, &weightDataResponse);
+  memAccessBurst(&weightAddressRequest, &weightDataResponse, weightFromRRAM);
 }
 
 void Harness::memAccessVector() {
-  memAccessPackSRAM(&vectorAddressRequest, &vectorDataResponse);
+  memAccessPack(&vectorAddressRequest, &vectorDataResponse, USE_SRAM);
 }
 
 void Harness::memAccessScalar() {
-  memAccessSRAM(&scalarAddressRequest, &scalarDataResponse);
+  memAccess(&scalarAddressRequest, &scalarDataResponse, USE_SRAM);
 }
 
 void Harness::memAccessVariance() {
-  memAccessSRAM(&varianceAddressRequest, &varianceDataResponse);
+  memAccess(&varianceAddressRequest, &varianceDataResponse, USE_SRAM);
 }
 
 void Harness::memAccessBias() {
-  memAccessBurstRRAM(&biasAddressRequest, &biasDataResponse);
+  memAccessBurst(&biasAddressRequest, &biasDataResponse, USE_RRAM);
 }
 
 void Harness::memAccessResidual() {
-  memAccessBurstSRAM(&residualAddressRequest, &residualDataResponse);
+  memAccessBurst(&residualAddressRequest, &residualDataResponse, USE_SRAM);
 }
 
 void Harness::sendParams() {
@@ -323,7 +271,7 @@ void Harness::waitForDone() {
   sc_stop();
 }
 
-void run_op(const Params params, INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory) {
-  Harness harness("harness", params, sramMemory, rramMemory);
+void run_op(const Params params, INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory, bool weightFromRRAM) {
+  Harness harness("harness", params, sramMemory, rramMemory, weightFromRRAM);
   sc_start();
 }
