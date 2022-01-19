@@ -1,5 +1,14 @@
 #include "test/common/GoldModel.h"
 
+ACCUM_DATATYPE fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
+                   ACCUM_DATATYPE psum) {
+#ifdef POSIT
+  return input.fma(weight, psum);
+#else
+  return input * weight + psum;
+#endif
+}
+
 void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
                  INPUT_DATATYPE *matrixB, OUTPUT_DATATYPE *matrixC,
                  INPUT_DATATYPE *biasMatrix, OUTPUT_DATATYPE *residualMatrix) {
@@ -97,10 +106,15 @@ void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
                 if (STRIDE * x + fx >= 0 && STRIDE * x + fx < STRIDE * X &&
                     STRIDE * y + fy >= 0 &&
                     STRIDE * y + fy < STRIDE * Y) {  // check if in bounds
-                  acc += matrixA[(STRIDE * y + fy) * STRIDE * X * C +
-                                 (STRIDE * x + fx) * C + c] *
-                         matrixB[(fy + (FY - 1) / 2) * FX * C * K +
-                                 (fx + (FX - 1) / 2) * C * K + c * K + k];
+
+                  ACCUM_DATATYPE a =
+                      matrixA[(STRIDE * y + fy) * STRIDE * X * C +
+                              (STRIDE * x + fx) * C + c];
+                  ACCUM_DATATYPE b =
+                      matrixB[(fy + (FY - 1) / 2) * FX * C * K +
+                              (fx + (FX - 1) / 2) * C * K + c * K + k];
+
+                  acc = fma(a, b, acc);
                 }
               }
             }

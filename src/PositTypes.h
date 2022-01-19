@@ -34,7 +34,7 @@ class Posit {
   }
 
   inline friend std::ostream &operator<<(ostream &os, const Posit &posit) {
-    os << posit.bits;
+    os << float(posit);
     return os;
   }
 
@@ -55,6 +55,7 @@ class PositFP {
     scale = -127;
   }
 
+  PositFP &operator+=(const PositFP &rhs);
   PositFP &operator+=(const Posit &rhs);
 
   PositFP operator*(const PositFP &op) {
@@ -159,9 +160,8 @@ class PositFP {
   }
 
   inline friend std::ostream &operator<<(ostream &os, const PositFP &positFP) {
-    os << positFP.sign;
-    os << positFP.scale;
-    os << positFP.fraction;
+    Posit p = positFP;
+    os << p;
     return os;
   }
 
@@ -294,6 +294,12 @@ inline bool Posit::operator<(const Posit &rhs) const {
   PositFP op2 = rhs;
 
   return op1 < op2;
+}
+
+inline PositFP &PositFP::operator+=(const PositFP &rhs) {
+  *this = *this + rhs;
+
+  return *this;
 }
 
 inline PositFP &PositFP::operator+=(const Posit &rhs) {
