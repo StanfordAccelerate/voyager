@@ -1,4 +1,8 @@
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <locale>
+#include <stdexcept>
 #include <string>
 
 #include "test/common/GoldModel.h"
@@ -7,27 +11,25 @@
 #include "test/mobilebert/params.h"
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
-
-#include <stdexcept>
-#include <unistd.h>
-#include <sys/wait.h>
-#define SRAM_MEMORY_SIZE (2*1024*1024)
-#define RRAM_MEMORY_SIZE (12*1024*1024)
+#define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
+#define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
 #define USE_RRAM_WEIGHTS (true)
 
 // NOTE: Binary data files are always supplied in [Y][X][C][K] ordering
 
 size_t load_layer_memory(const std::string& filename, INPUT_DATATYPE* memory);
-void run_op_contain(const Params& param, INPUT_DATATYPE* sram, INPUT_DATATYPE* rram, bool weightFromRRAM);
-int run_test_torch(const std::string& group, const std::string& test, std::map<std::string, Params>* param_map);
+void run_op_contain(const Params& param, INPUT_DATATYPE* sram,
+                    INPUT_DATATYPE* rram, bool weightFromRRAM);
+int run_test_torch(const std::string& group, const std::string& test,
+                   std::map<std::string, Params>* param_map);
 
-size_t load_layer_bias(const std::string& filename, INPUT_DATATYPE* memory, const Params& param)
-{
+size_t load_layer_bias(const std::string& filename, INPUT_DATATYPE* memory,
+                       const Params& param) {
   // Load file into buffer
-	std::ifstream is(filename, std::ios::binary);
+  std::ifstream is(filename, std::ios::binary);
   if (!is.good())
     throw std::runtime_error("File \"" + filename + "\" does not exist");
-	std::vector<char> buffer(std::istreambuf_iterator<char>(is), {});
+  std::vector<char> buffer(std::istreambuf_iterator<char>(is), {});
   char* bp = buffer.data();
 
   int X = param.loops[0][param.inputXLoopIndex[0]] *
@@ -48,7 +50,7 @@ size_t load_layer_bias(const std::string& filename, INPUT_DATATYPE* memory, cons
 
   if (param.BIAS) {
     for (int k = 0; k < K; k++) {
-          int val = (int)*(bp++);
+      int val = (int)*(bp++);
       // rramMemory[params.BIAS_OFFSET + k] = val;
       memory[k] = val;
     }
@@ -57,27 +59,24 @@ size_t load_layer_bias(const std::string& filename, INPUT_DATATYPE* memory, cons
 }
 
 /// @brief: Returns name of residual layer for layer_name
-std::string get_resnet_residual(const std::string layer_name)
-{
+std::string get_resnet_residual(const std::string layer_name) {
   int i = 0;
-  for (; i < resnet_order.size(); i++)
-  {
-    if (layer_name == resnet_order[i])
-      break;
+  for (; i < resnet_order.size(); i++) {
+    if (layer_name == resnet_order[i]) break;
   }
 
-  assert (i >= 2);
+  assert(i >= 2);
 
   return resnet_order[i - 2];
 }
 
-size_t load_layer_weight(const std::string& filename, INPUT_DATATYPE* memory, const Params& param)
-{
+size_t load_layer_weight(const std::string& filename, INPUT_DATATYPE* memory,
+                         const Params& param) {
   // Load file into buffer
-	std::ifstream is(filename, std::ios::binary);
+  std::ifstream is(filename, std::ios::binary);
   if (!is.good())
     throw std::runtime_error("File \"" + filename + "\" does not exist");
-	std::vector<char> buffer(std::istreambuf_iterator<char>(is), {});
+  std::vector<char> buffer(std::istreambuf_iterator<char>(is), {});
   char* bp = buffer.data();
 
   int X = param.loops[0][param.inputXLoopIndex[0]] *
@@ -98,8 +97,8 @@ size_t load_layer_weight(const std::string& filename, INPUT_DATATYPE* memory, co
 
   std::cout << "possible segfault 1" << std::endl;
   printf("fx: %d, fy: %d, c: %d, k: %d\n", FX, FY, C, K);
-    for (int fy = 0; fy < FY; fy++) {
-  for (int fx = 0; fx < FX; fx++) {
+  for (int fy = 0; fy < FY; fy++) {
+    for (int fx = 0; fx < FX; fx++) {
       for (int c = 0; c < C; c++) {
         for (int k = 0; k < K; k++) {
           int address = fy * FX * C * K + fx * C * K + c * K + k;
@@ -116,13 +115,13 @@ size_t load_layer_weight(const std::string& filename, INPUT_DATATYPE* memory, co
   return 0;
 }
 
-size_t load_layer_input(const std::string& filename, INPUT_DATATYPE* memory, const Params& param)
-{
+size_t load_layer_input(const std::string& filename, INPUT_DATATYPE* memory,
+                        const Params& param) {
   // Load file into buffer
-	std::ifstream is(filename, std::ios::binary);
+  std::ifstream is(filename, std::ios::binary);
   if (!is.good())
     throw std::runtime_error("File \"" + filename + "\" does not exist");
-	std::vector<char> buffer(std::istreambuf_iterator<char>(is), {});
+  std::vector<char> buffer(std::istreambuf_iterator<char>(is), {});
   char* bp = buffer.data();
 
   int X = param.loops[0][param.inputXLoopIndex[0]] *
@@ -141,7 +140,7 @@ size_t load_layer_input(const std::string& filename, INPUT_DATATYPE* memory, con
     C = 3;
   }
   std::cout << "possible segfault 1" << std::endl;
-  printf("x: %d, y: %d, c: %d\n", STRIDE * X, STRIDE*Y, C);
+  printf("x: %d, y: %d, c: %d\n", STRIDE * X, STRIDE * Y, C);
   if (param.REPLICATION) {
     // size_t data_address = 0;
     for (int y = 0; y < STRIDE * Y; y++) {
@@ -175,20 +174,19 @@ size_t load_layer_input(const std::string& filename, INPUT_DATATYPE* memory, con
     }
   }
   std::cout << "possible segfault 2" << std::endl;
-return 0;
+  return 0;
 }
 
-/// @brief: Simulates param in child process and writes memory to parent process.
-void run_op_contain(const Params& param, INPUT_DATATYPE* sram, INPUT_DATATYPE* rram, bool weightFromRRAM)
-{
+/// @brief: Simulates param in child process and writes memory to parent
+/// process.
+void run_op_contain(const Params& param, INPUT_DATATYPE* sram,
+                    INPUT_DATATYPE* rram, bool weightFromRRAM) {
   // Create pipe
   int pipefd[2];
-  if (pipe(pipefd) < 0)
-    throw std::runtime_error("Failed to create pipe");
-  
+  if (pipe(pipefd) < 0) throw std::runtime_error("Failed to create pipe");
+
   pid_t pid = fork();
-  if (pid == 0)
-  {
+  if (pid == 0) {
     // Close read end
     close(pipefd[0]);
 
@@ -197,35 +195,34 @@ void run_op_contain(const Params& param, INPUT_DATATYPE* sram, INPUT_DATATYPE* r
 
     // Write sram then rram
     size_t sram_written = 0;
-    while (sram_written < SRAM_MEMORY_SIZE)
-    {
-      sram_written += write(pipefd[1], sram + sram_written, SRAM_MEMORY_SIZE - sram_written);
+    while (sram_written < SRAM_MEMORY_SIZE) {
+      sram_written += write(pipefd[1], sram + sram_written,
+                            SRAM_MEMORY_SIZE - sram_written);
     }
 
     size_t rram_written = 0;
-    while(rram_written < RRAM_MEMORY_SIZE)
-    {
-      rram_written += write(pipefd[1], rram + rram_written, RRAM_MEMORY_SIZE - rram_written);
+    while (rram_written < RRAM_MEMORY_SIZE) {
+      rram_written += write(pipefd[1], rram + rram_written,
+                            RRAM_MEMORY_SIZE - rram_written);
     }
 
     close(pipefd[1]);
     exit(0);
-  }
-  else{
+  } else {
     // Close write end
     close(pipefd[1]);
 
     // Read sram then rram
     size_t sram_read = 0;
-    while (sram_read < SRAM_MEMORY_SIZE)
-    {
-      sram_read += read(pipefd[0], sram + sram_read, SRAM_MEMORY_SIZE - sram_read);
+    while (sram_read < SRAM_MEMORY_SIZE) {
+      sram_read +=
+          read(pipefd[0], sram + sram_read, SRAM_MEMORY_SIZE - sram_read);
     }
 
     size_t rram_read = 0;
-    while(rram_read < RRAM_MEMORY_SIZE)
-    {
-      rram_read += write(pipefd[0], rram + rram_read, RRAM_MEMORY_SIZE - rram_read);
+    while (rram_read < RRAM_MEMORY_SIZE) {
+      rram_read +=
+          write(pipefd[0], rram + rram_read, RRAM_MEMORY_SIZE - rram_read);
     }
 
     close(pipefd[0]);
@@ -235,14 +232,13 @@ void run_op_contain(const Params& param, INPUT_DATATYPE* sram, INPUT_DATATYPE* r
 }
 
 /// @brief: Loads input and comparison data from filename to memory.
-size_t load_layer_memory(const std::string& filename, INPUT_DATATYPE* memory)
-{
-	std::ifstream is(filename, std::ios::binary);
+size_t load_layer_memory(const std::string& filename, INPUT_DATATYPE* memory) {
+  std::ifstream is(filename, std::ios::binary);
   if (!is.good())
     throw std::runtime_error("File \"" + filename + "\" does not exist");
 
   // Read data into buffer and copy data into memory
-	std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(is), {});
+  std::vector<unsigned char> buffer(std::istreambuf_iterator<char>(is), {});
   for (unsigned char c : buffer) {
     // Converts memory from char to INPUT_DATATYPE/OUTPUT_DATATYPE
     *memory = (int)c;
@@ -286,15 +282,15 @@ void validateMapping(Params params) {
 }
 
 /// @brief: Simulates param and compares against pytorch output
-int run_test_torch(const std::string& group, const std::string& test, std::map<std::string, Params>* param_map)
-{
+int run_test_torch(const std::string& group, const std::string& test,
+                   std::map<std::string, Params>* param_map) {
   // Validate params
   Params param = (*param_map)[test];
   validateMapping(param);
 
   // Allocate memory
-  INPUT_DATATYPE *sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-  INPUT_DATATYPE *rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
   if (sram_memory == nullptr || rram_memory == nullptr)
     throw std::runtime_error("Failed to allocate accelerator memory");
   std::memset(sram_memory, 0, SRAM_MEMORY_SIZE);
@@ -304,30 +300,30 @@ int run_test_torch(const std::string& group, const std::string& test, std::map<s
   std::string data_path = "data/" + group + '/';
 
   // Run operation
-  INPUT_DATATYPE *matrixA = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* matrixA = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
   load_layer_input(data_path + test + "_input", matrixA, param);
-  INPUT_DATATYPE *matrixB = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* matrixB = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
   load_layer_weight(data_path + test + "_weight", matrixB, param);
-  INPUT_DATATYPE *biasMatrix = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* biasMatrix = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
   load_layer_bias(data_path + test + "_bias", biasMatrix, param);
-  INPUT_DATATYPE *resMatrix = nullptr;
-  
-  if (param.RESIDUAL)
-  {
-  resMatrix = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-  load_layer_memory(data_path + get_resnet_residual(test) + "_comp", resMatrix);
+  INPUT_DATATYPE* resMatrix = nullptr;
+
+  if (param.RESIDUAL) {
+    resMatrix = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+    load_layer_memory(data_path + get_resnet_residual(test) + "_comp",
+                      resMatrix);
   }
-  OUTPUT_DATATYPE *matrixC = new OUTPUT_DATATYPE[SRAM_MEMORY_SIZE];
+  OUTPUT_DATATYPE* matrixC = new OUTPUT_DATATYPE[SRAM_MEMORY_SIZE];
   run_gold_op(param, matrixA, matrixB, matrixC, biasMatrix, resMatrix);
 
   // Compare with pytorch data
-  INPUT_DATATYPE *pytorch_output = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* pytorch_output = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
   if (pytorch_output == nullptr)
     throw std::runtime_error("Failed to allocate comparison memory");
-  size_t output_size = load_layer_memory(data_path + test + "_comp", pytorch_output);
+  size_t output_size =
+      load_layer_memory(data_path + test + "_comp", pytorch_output);
 
-  int errors = 
-        compare_arrays(matrixC, pytorch_output, output_size);
+  int errors = compare_arrays(matrixC, pytorch_output, output_size);
 
   delete[] sram_memory;
   delete[] rram_memory;
@@ -348,8 +344,8 @@ int run_test_torch(const std::string& group, const std::string& test, std::map<s
 int run_test(Params params) {
   validateMapping(params);
 
-  INPUT_DATATYPE *sramMemory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-  INPUT_DATATYPE *rramMemory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* sramMemory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* rramMemory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
 
   if (sramMemory == nullptr || rramMemory == nullptr)
     throw std::runtime_error("Failed to allocate accelerator memory");
@@ -377,7 +373,7 @@ int run_test(Params params) {
             << std::endl;
 
   // Create matrix A
-  INPUT_DATATYPE *matrixA = new INPUT_DATATYPE[(STRIDE * X) * (STRIDE * Y) * C];
+  INPUT_DATATYPE* matrixA = new INPUT_DATATYPE[(STRIDE * X) * (STRIDE * Y) * C];
 
   if (params.REPLICATION) {
     for (int y = 0; y < STRIDE * Y; y++) {
@@ -418,7 +414,7 @@ int run_test(Params params) {
     std::cout << sramMemory[params.INPUT_OFFSET + i] << " ";
   }
 
-  INPUT_DATATYPE *matrixB = new INPUT_DATATYPE[FX * FY * C * K];
+  INPUT_DATATYPE* matrixB = new INPUT_DATATYPE[FX * FY * C * K];
   for (int fy = 0; fy < FY; fy++) {
     for (int fx = 0; fx < FX; fx++) {
       for (int c = 0; c < C; c++) {
@@ -433,7 +429,7 @@ int run_test(Params params) {
     }
   }
 
-  INPUT_DATATYPE *biasMatrix = new INPUT_DATATYPE[K];
+  INPUT_DATATYPE* biasMatrix = new INPUT_DATATYPE[K];
 
   if (params.BIAS) {
     for (int k = 0; k < K; k++) {
@@ -443,7 +439,7 @@ int run_test(Params params) {
     }
   }
 
-  INPUT_DATATYPE *residualMatrix = new INPUT_DATATYPE[X * Y * K];
+  INPUT_DATATYPE* residualMatrix = new INPUT_DATATYPE[X * Y * K];
   if (params.RESIDUAL) {
     for (int y = 0; y < Y; y++) {
       for (int x = 0; x < X; x++) {
@@ -458,7 +454,7 @@ int run_test(Params params) {
     }
   }
 
-  OUTPUT_DATATYPE *matrixC = new OUTPUT_DATATYPE[X * Y * K];
+  OUTPUT_DATATYPE* matrixC = new OUTPUT_DATATYPE[X * Y * K];
 
   if (params.MAXPOOL) {
     X = X / 2;
@@ -490,53 +486,50 @@ int run_test(Params params) {
   return errors;
 }
 
-int sc_main(int argc, char *argv[]) {
+int sc_main(int argc, char* argv[]) {
   Params params;
 
-  const char *groupName = std::getenv("GROUP");
-  const char *testName = std::getenv("TEST");
+  const char* groupName = std::getenv("GROUP");
+  const char* testName = std::getenv("TEST");
 
-  if (!(testName && groupName)){
+  if (!(testName && groupName)) {
     std::cout << "Warning! No group/test specified! Please set the environment "
                  "variables GROUP and TEST"
               << std::endl;
-              return -1;
+    return -1;
   }
 
-    std::string group(groupName);
-    std::string test(testName);
+  std::string group(groupName);
+  std::string test(testName);
 
-    std::cout << "Running: " << group << ": " << test << std::endl;
+  std::cout << "Running: " << group << ": " << test << std::endl;
 
-    std::map<std::string, Params> *mapPtr;
+  std::map<std::string, Params>* mapPtr;
 
-    if (group == "simple") {
-      mapPtr = &simple;
-    } else if (group == "mobilebert") {
-      mapPtr = &mobilebert;
-    } else if (group == "resnet") {
-      mapPtr = &resnet;
-    } else {
-      // std::cout << "Warning! Group " << group << " not found!" << std::endl;
-      throw std::runtime_error("Group: " + group + " not found");
-    }
+  if (group == "simple") {
+    mapPtr = &simple;
+  } else if (group == "mobilebert") {
+    mapPtr = &mobilebert;
+  } else if (group == "resnet") {
+    mapPtr = &resnet;
+  } else {
+    throw std::runtime_error("Group: " + group + " not found");
+  }
 
-    // Run end to end if complete is specified
-    // if (test == "complete")
-    // {
-    //   run_complete(group, mapPtr);
-    //   return 0;
-    // }
+  // Run end to end if complete is specified
+  // if (test == "complete")
+  // {
+  //   run_complete(group, mapPtr);
+  //   return 0;
+  // }
 
-    auto search = mapPtr->find(test);
-    if (search != mapPtr->end()) {
-      params = search->second;
-    } else {
-      // std::cout << "Warning! Test " << test << " not found!" << std::endl;
-      throw std::runtime_error("Test: " + test + " not found");
-    }
+  auto search = mapPtr->find(test);
+  if (search != mapPtr->end()) {
+    params = search->second;
+  } else {
+    throw std::runtime_error("Test: " + test + " not found");
+  }
 
-    // return comp_gold ? run_test(params) : run_test_torch(group, test, mapPtr);
-    return  run_test_torch(group, test, mapPtr);
-
+  // return comp_gold ? run_test(params) : run_test_torch(group, test, mapPtr);
+  return run_test_torch(group, test, mapPtr);
 }
