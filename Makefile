@@ -35,7 +35,7 @@ rtl_sim_debug: debug_rtl
 gui:
 	catapult build/Catapult_debug
 
-build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o
+build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/Accelerator.o: src/Accelerator.cc $(wildcard src/*.h)
@@ -48,6 +48,9 @@ build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/Architec
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
+	$(CC) $(CPPFLAGS) -c -o $@ $<
+
+build/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h src/ArchitectureParams.h
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 build/TestRunner.o: test/common/TestRunner.cc test/mobilebert/params.h test/simple/params.h test/resnet/params.h

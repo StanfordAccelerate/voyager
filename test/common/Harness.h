@@ -7,9 +7,7 @@
 #include "AccelTypes.h"
 #include "Accelerator.h"
 #include "ArchitectureParams.h"
-
-#define USE_SRAM (false)
-#define USE_RRAM (true)
+#include "test/common/VerificationTypes.h"
 
 SC_MODULE(Harness) {
   sc_clock CCS_INIT_S1(clk);
@@ -50,25 +48,29 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(start);
   Connections::SyncChannel CCS_INIT_S1(done);
 
-  Harness(sc_module_name, Params, INPUT_DATATYPE *, INPUT_DATATYPE *, bool);
+  Harness(sc_module_name, Params, INPUT_DATATYPE *, INPUT_DATATYPE *,
+          MemoryMap);
   SC_HAS_PROCESS(Harness);
 
  private:
   Params params;
   INPUT_DATATYPE *sramMemory, *rramMemory;
-  bool weightFromRRAM;
+  MemoryMap memoryMap;
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
 
   void memAccessBurst(
       Connections::Combinational<MemoryRequest> * addressRequest,
       Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse, bool useRRAM);
+          dataResponse,
+      MemorySource memSource);
   void memAccessPack(
       Connections::Combinational<int> * addressRequest,
       Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse, bool useRRAM);
+          dataResponse,
+      MemorySource memSource);
   void memAccess(Connections::Combinational<int> * addressRequest,
-                 Connections::Combinational<INPUT_DATATYPE> * dataResponse, bool useRRAM);
+                 Connections::Combinational<INPUT_DATATYPE> * dataResponse,
+                 MemorySource memSource);
 
   void memAccessInputs();
   void memAccessWeights();
@@ -85,4 +87,5 @@ SC_MODULE(Harness) {
   void waitForDone();
 };
 
-void run_op(const Params params, INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory, bool weightFromRRAM=true);
+void run_op(const Params params, INPUT_DATATYPE *sramMemory,
+            INPUT_DATATYPE *rramMemory, MemoryMap memoryMap);

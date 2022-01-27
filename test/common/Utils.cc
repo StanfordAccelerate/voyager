@@ -3,12 +3,12 @@
 #include <fstream>
 
 int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
-                    size_t size) {
+                   size_t size) {
   // buckets of <0.001, <0.01, <0.1, <1, >1
   int diff_buckets[5] = {0, 0, 0, 0, 0};
 
   for (int index = 0; index < size; index++) {
-    std::cout << matrixA[index] << " vs. " << matrixB[index] << std::endl;
+    // std::cout << matrixA[index] << " vs. " << matrixB[index] << std::endl;
     float diff = abs(((float)matrixA[index] - (float)matrixB[index]));
 
     if (diff < 0.001) {
