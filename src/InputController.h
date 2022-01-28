@@ -603,7 +603,10 @@ SC_MODULE(InputController) {
                           if ((full_x < 0) || (full_y < 0) ||
                               (full_x >= params.STRIDE * X0 * X1) ||
                               (full_y >= params.STRIDE * Y0 * Y1)) {
-                            data = 0;
+#pragma hls_unroll yes
+                            for (int dims = 0; dims < NROWS; dims++) {
+                              data[dims] = 0;
+                            }
                           } else {
                             data = dataResponse.Pop();
                           }
