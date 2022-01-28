@@ -483,10 +483,20 @@ SC_MODULE(ArithmeticUnit) {
 
 #pragma hls_design interface ccore
   void add(Pack1D<DTYPE, WIDTH> & a, Pack1D<DTYPE, WIDTH> & b,
-           Pack1D<DTYPE, WIDTH> & c) {
+           Pack1D<DTYPE, WIDTH> & c, bool relu) {
 #pragma hls_unroll yes
     for (int i = 0; i < WIDTH; i++) {
       a[i] = a[i] + b[i] + c[i];
+
+      if (relu) {
+#ifdef POSIT
+        if (a[i].get_sign() == 1) {
+          a[i].setZero();
+        }
+#else
+        a[i] = a[i] < 0 ? (DTYPE)0 : a[i];
+#endif
+      }
     }
   }
 
@@ -591,7 +601,7 @@ SC_MODULE(ArithmeticUnit) {
                           }
                         }
 
-                        add(outputPixel, bias, residualPixel);
+                        add(outputPixel, bias, residualPixel, params.RELU);
 
                         if (params.MAXPOOL) {
                           if (x0 % 2 == 0 && y0 % 2 == 0) {
