@@ -83,6 +83,17 @@ int run_test(const Params params, const std::string& dataDir,
             << "(" << FX << "x" << FY << "x" << C << "x" << K << ")"
             << std::endl;
 
+  std::cout << "Using the following memory map:" << std::endl;
+  std::cout << "Inputs: " << (memoryMap.inputs == 0 ? "SRAM" : "RRAM")
+            << std::endl;
+  std::cout << "Weights: " << (memoryMap.weights == 0 ? "SRAM" : "RRAM")
+            << std::endl;
+  std::cout << "Bias: " << (memoryMap.bias == 0 ? "SRAM" : "RRAM") << std::endl;
+  std::cout << "Residual: " << (memoryMap.residual == 0 ? "SRAM" : "RRAM")
+            << std::endl;
+  std::cout << "Outputs: " << (memoryMap.outputs == 0 ? "SRAM" : "RRAM")
+            << std::endl;
+
   INPUT_DATATYPE* matrixA = new INPUT_DATATYPE[(STRIDE * X) * (STRIDE * Y) * C];
   INPUT_DATATYPE* matrixB = new INPUT_DATATYPE[FX * FY * C * K];
   INPUT_DATATYPE* biasMatrix = new INPUT_DATATYPE[K];
@@ -113,10 +124,12 @@ int run_test(const Params params, const std::string& dataDir,
   int errors =
       compare_arrays(&sramMemory[params.OUTPUT_OFFSET], matrixC, X * Y * K);
 
-  std::cout << "Gold Model vs. Pytorch" << std::endl;
-  std::cout << "(reveals bugs in mapping operations to accelerator)"
-            << std::endl;
-  errors += compare_arrays(matrixC, dataFileOutput, X * Y * K);
+  if (useDataFile) {
+    std::cout << "Gold Model vs. Pytorch" << std::endl;
+    std::cout << "(reveals bugs in mapping operations to accelerator)"
+              << std::endl;
+    errors += compare_arrays(matrixC, dataFileOutput, X * Y * K);
+  }
 
   delete[] matrixA;
   delete[] matrixB;
@@ -171,10 +184,10 @@ int sc_main(int argc, char* argv[]) {
     throw std::runtime_error("Test: " + test + " not found");
   }
 
-  bool useDataFiles = true;
-  std::string dataDir;
+  bool useDataFiles = false;
+  std::string dataDir = "";
   Files files;
-  MemoryMap memoryMap;
+  MemoryMap memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
   if (group == "resnet") {  // currently only resnet has data files
     useDataFiles = true;
 
@@ -195,5 +208,5 @@ int sc_main(int argc, char* argv[]) {
     }
   }
 
-  run_test(params, dataDir, files, memoryMap, useDataFiles);
+  return run_test(params, dataDir, files, memoryMap, useDataFiles);
 }
