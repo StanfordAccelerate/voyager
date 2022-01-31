@@ -53,7 +53,8 @@ void validateMapping(Params params) {
 }
 
 int run_test(const Params params, const std::string& dataDir,
-             const Files& files, const MemoryMap& memoryMap, bool useDataFile) {
+             const Files& files, const MemoryMap& memoryMap, bool useDataFile,
+             std::string& fileOutputPrefix) {
   validateMapping(params);
 
   INPUT_DATATYPE* sramMemory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
@@ -121,15 +122,16 @@ int run_test(const Params params, const std::string& dataDir,
 
   std::cout << "Accelerator vs. Gold Model" << std::endl;
   std::cout << "(reveals bugs in accelerator or memory placement)" << std::endl;
-
-  int errors =
-      compare_arrays(&sramMemory[params.OUTPUT_OFFSET], matrixC, X * Y * K);
+  std::string diffFile = fileOutputPrefix + "accel_vs_gold.txt";
+  int errors = compare_arrays(&sramMemory[params.OUTPUT_OFFSET], matrixC,
+                              X * Y * K, diffFile);
 
   if (useDataFile) {
     std::cout << "Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals bugs in mapping operations to accelerator)"
               << std::endl;
-    errors += compare_arrays(matrixC, dataFileOutput, X * Y * K);
+    diffFile = fileOutputPrefix + "gold_vs_pytorch.txt";
+    errors += compare_arrays(matrixC, dataFileOutput, X * Y * K, diffFile);
   }
 
   delete[] matrixA;
@@ -163,6 +165,8 @@ int sc_main(int argc, char* argv[]) {
 
   std::string group(groupName);
   std::string test(testName);
+
+  std::string fullName = "test_outputs/" + group + "." + test + ".";
 
   std::cout << "Running: " << group << ": " << test << std::endl;
 
@@ -209,5 +213,5 @@ int sc_main(int argc, char* argv[]) {
     }
   }
 
-  return run_test(params, dataDir, files, memoryMap, useDataFiles);
+  return run_test(params, dataDir, files, memoryMap, useDataFiles, fullName);
 }
