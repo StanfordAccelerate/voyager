@@ -5,7 +5,11 @@
 ACCUM_DATATYPE fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
                    ACCUM_DATATYPE psum) {
 #ifdef POSIT
-  return input.fma(weight, psum);
+  INTERMEDIATE_DATATYPE intermediate_weight = weight;
+  INTERMEDIATE_DATATYPE intermediate_result =
+      intermediate_weight.fma(input, psum);
+  ACCUM_DATATYPE result = intermediate_result;
+  return result;
 #else
   return input * weight + psum;
 #endif
@@ -131,9 +135,8 @@ void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
 
           if (params.RELU) {
 #ifdef POSIT
-            if (acc.get_sign() == 1) {
-              acc.setZero();
-            }
+
+            acc.relu();
 #else
             acc = std::max(0, (int)acc);
 #endif
