@@ -498,22 +498,14 @@ SC_MODULE(ArithmeticUnit) {
 
 #pragma hls_design interface ccore
 #pragma hls_pipeline_init_interval 1
-  void add(Pack1D<DTYPE, WIDTH> & a, Pack1D<IDTYPE, WIDTH> & b,
-           Pack1D<IDTYPE, WIDTH> & c, bool relu) {
-#pragma hls_unroll yes
-    for (int i = 0; i < WIDTH; i++) {
-      a[i] = a[i] + b[i] + c[i];
-
-      if (relu) {
+  void add_relu(DTYPE & a, IDTYPE & b, IDTYPE & c, bool relu) {
+    a = a + b + c;
+    if (relu) {
 #ifdef POSIT
-        // ac_int<8, false> bits = a[i].bits;
-        // if (bits.slc<1>(7) == 1) {
-        //   a[i].setZero();
-        // }
+      a.relu();
 #else
-        a[i] = a[i] < 0 ? (DTYPE)0 : a[i];
+      a[i] = a[i] < 0 ? (DTYPE)0 : a[i];
 #endif
-      }
     }
   }
 
@@ -618,7 +610,11 @@ SC_MODULE(ArithmeticUnit) {
                           }
                         }
 
-                        add(outputPixel, bias, residualPixel, params.RELU);
+#pragma hls_unroll yes
+                        for (int i = 0; i < NROWS; i++) {
+                          add_relu(outputPixel[i], bias[i], residualPixel[i],
+                                   params.RELU);
+                        }
 
                         if (params.MAXPOOL) {
                           if (x0 % 2 == 0 && y0 % 2 == 0) {

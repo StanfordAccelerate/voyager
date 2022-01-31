@@ -36,6 +36,20 @@ class Posit {
     }
   }
 
+  void negate() { bits = bits.bit_complement() + 1; }
+
+  void reciprocal() {
+    ac_int<nbits, false> sub = (1 << (nbits - 1));
+    bits = sub - bits;
+  }
+
+  void sigmoid() {
+    // invert MSB
+    ac_int<1, false> msb = bits.slc<1>(7);
+    bits.set_slc(7, msb.bit_complement());
+    bits = bits >> 2;
+  }
+
   // overridden operators
   Posit &operator+=(const Posit &rhs);
   Posit &operator-=(const Posit &rhs);
