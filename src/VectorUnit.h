@@ -285,15 +285,15 @@ SC_MODULE(FetchUnit) {
   }
 };
 
-template <typename DTYPE, int WIDTH, int NROWS>
+template <typename IDTYPE, typename ACC_DTYPE, int WIDTH, int NROWS>
 SC_MODULE(VectorOpUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Params> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(vectorIn);
-  Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(vectorOut);
-  Connections::In<DTYPE> CCS_INIT_S1(scalarSubtraction);
+  Connections::In<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(vectorIn);
+  Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(vectorOut);
+  Connections::In<IDTYPE> CCS_INIT_S1(scalarSubtraction);
 
   SC_CTOR(VectorOpUnit) {
     SC_THREAD(run);
@@ -320,21 +320,28 @@ SC_MODULE(VectorOpUnit) {
       if (params.VEC_SUB) {
 #pragma hls_pipeline_init_interval 1
         for (int m = 0; m < rows; m++) {
-          DTYPE subtract = scalarSubtraction.Pop();
+          IDTYPE subtract = scalarSubtraction.Pop();
 
           for (int chunk = 0; chunk < cols / WIDTH; chunk++) {
-            Pack1D<DTYPE, WIDTH> vector = vectorIn.Pop();
-#pragma hls_unroll yes
-            for (int i = 0; i < WIDTH; i++) {
-              vector.value[i] -= subtract;
-            }
+            Pack1D<IDTYPE, WIDTH> origVector = vectorIn.Pop();
+            Pack1D<ACC_DTYPE, WIDTH> vector;
 
-            if (params.VEC_SQUARE) {
-#pragma hls_unroll yes
-              for (int i = 0; i < WIDTH; i++) {
-                vector.value[i] *= vector.value[i];
-              }
-            }
+            // #pragma hls_unroll yes
+            //             for (int i = 0; i < WIDTH; i++) {
+            //               vector.value[i] = origVector[i];
+            //             }
+
+            // #pragma hls_unroll yes
+            //             for (int i = 0; i < WIDTH; i++) {
+            //               vector.value[i] -= subtract;
+            //             }
+
+            //             if (params.VEC_SQUARE) {
+            // #pragma hls_unroll yes
+            //               for (int i = 0; i < WIDTH; i++) {
+            //                 vector.value[i] *= vector.value[i];
+            //               }
+            //             }
 
             vectorOut.Push(vector);
           }
@@ -342,21 +349,29 @@ SC_MODULE(VectorOpUnit) {
       } else {  // bypass
 #pragma hls_pipeline_init_interval 1
         for (int i = 0; i < rows * cols / WIDTH; i++) {
-          vectorOut.Push(vectorIn.Pop());
+          Pack1D<IDTYPE, WIDTH> origVector = vectorIn.Pop();
+          Pack1D<ACC_DTYPE, WIDTH> vector;
+
+#pragma hls_unroll yes
+          for (int i = 0; i < WIDTH; i++) {
+            vector.value[i] = origVector[i];
+          }
+
+          vectorOut.Push(vector);
         }
       }
     }
   }
 };
 
-template <typename DTYPE, int WIDTH, int NROWS>
+template <typename ACC_DTYPE, int WIDTH, int NROWS>
 SC_MODULE(ReduceUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Params> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(vectorIn);
-  Connections::Out<DTYPE> CCS_INIT_S1(scalarOut);
+  Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(vectorIn);
+  Connections::Out<ACC_DTYPE> CCS_INIT_S1(scalarOut);
 
   SC_CTOR(ReduceUnit) {
     SC_THREAD(run);
@@ -381,10 +396,10 @@ SC_MODULE(ReduceUnit) {
 
 #pragma hls_pipeline_init_interval 1
       for (int m = 0; m < rows; m++) {
-        DTYPE sum = 0;
+        ACC_DTYPE sum = 0;
 
         for (int chunk = 0; chunk < cols / WIDTH; chunk++) {
-          Pack1D<DTYPE, WIDTH> vector = vectorIn.Pop();
+          Pack1D<ACC_DTYPE, WIDTH> vector = vectorIn.Pop();
 
 // #pragma cluster addtree
 // #pragma cluster_type both
@@ -463,7 +478,7 @@ SC_MODULE(ScaleUnit) {
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename DTYPE, int WIDTH, int NROWS>
+template <typename DTYPE, typename IDTYPE, int WIDTH, int NROWS>
 SC_MODULE(ArithmeticUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -472,8 +487,8 @@ SC_MODULE(ArithmeticUnit) {
   Connections::In<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(tensorIn);
   Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
 
-  Connections::In<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(biasIn);
-  Connections::In<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(residualIn);
+  Connections::In<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(biasIn);
+  Connections::In<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(residualIn);
 
   SC_CTOR(ArithmeticUnit) {
     SC_THREAD(run);
@@ -482,17 +497,19 @@ SC_MODULE(ArithmeticUnit) {
   }
 
 #pragma hls_design interface ccore
-  void add(Pack1D<DTYPE, WIDTH> & a, Pack1D<DTYPE, WIDTH> & b,
-           Pack1D<DTYPE, WIDTH> & c, bool relu) {
+#pragma hls_pipeline_init_interval 1
+  void add(Pack1D<DTYPE, WIDTH> & a, Pack1D<IDTYPE, WIDTH> & b,
+           Pack1D<IDTYPE, WIDTH> & c, bool relu) {
 #pragma hls_unroll yes
     for (int i = 0; i < WIDTH; i++) {
       a[i] = a[i] + b[i] + c[i];
 
       if (relu) {
 #ifdef POSIT
-        if (a[i].get_sign() == 1) {
-          a[i].setZero();
-        }
+        // ac_int<8, false> bits = a[i].bits;
+        // if (bits.slc<1>(7) == 1) {
+        //   a[i].setZero();
+        // }
 #else
         a[i] = a[i] < 0 ? (DTYPE)0 : a[i];
 #endif
@@ -525,7 +542,7 @@ SC_MODULE(ArithmeticUnit) {
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
-      Pack1D<DTYPE, NROWS> bias;
+      Pack1D<IDTYPE, NROWS> bias;
       Pack1D<DTYPE, WIDTH> avgpool;
       Pack1D<DTYPE, WIDTH> maxpool_comparator[16];  // row buffer for maxpool
 
@@ -591,7 +608,7 @@ SC_MODULE(ArithmeticUnit) {
                           }
                         }
 
-                        Pack1D<DTYPE, NROWS> residualPixel;
+                        Pack1D<IDTYPE, NROWS> residualPixel;
                         if (params.RESIDUAL) {
                           residualPixel = residualIn.Pop();
                         } else {
@@ -863,52 +880,53 @@ SC_MODULE(OutputAddressGenerator) {
   }
 };
 
-template <typename DTYPE, int WIDTH, int NROWS>
+template <typename ACC_DTYPE, typename ODTYPE, int WIDTH, int NROWS>
 SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Params> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(systolicArrayOutput);
+  Connections::In<Pack1D<ACC_DTYPE, NROWS> > CCS_INIT_S1(systolicArrayOutput);
 
   Connections::Out<int> CCS_INIT_S1(vectorFetchAddressRequest);
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(vectorFetchDataResponse);
+  Connections::In<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(vectorFetchDataResponse);
   Connections::Out<int> CCS_INIT_S1(scalarAddressRequest);
-  Connections::In<DTYPE> CCS_INIT_S1(scalarDataResponse);
+  Connections::In<ODTYPE> CCS_INIT_S1(scalarDataResponse);
   Connections::Out<int> CCS_INIT_S1(varianceAddressRequest);
-  Connections::In<DTYPE> CCS_INIT_S1(varianceDataResponse);
+  Connections::In<ODTYPE> CCS_INIT_S1(varianceDataResponse);
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(biasDataResponse);
+  Connections::In<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(biasDataResponse);
   Connections::Out<MemoryRequest> CCS_INIT_S1(residualAddressRequest);
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(residualDataResponse);
-  Connections::Out<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(vectorUnitOutput);
+  Connections::In<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(residualDataResponse);
+  Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(vectorUnitOutput);
   Connections::Out<int> CCS_INIT_S1(outputAddress);
   Connections::SyncOut CCS_INIT_S1(done);
 
   FetchUnit<NROWS> CCS_INIT_S1(fetchUnit);
   Connections::Combinational<Params> CCS_INIT_S1(fetchUnitParams);
 
-  VectorOpUnit<DTYPE, NROWS, NROWS> CCS_INIT_S1(vectorOpUnit);
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(
+  VectorOpUnit<ODTYPE, ACC_DTYPE, NROWS, NROWS> CCS_INIT_S1(vectorOpUnit);
+  Connections::Combinational<Pack1D<ACC_DTYPE, NROWS> > CCS_INIT_S1(
       vectorOpUnitOutput);
   Connections::Combinational<Params> CCS_INIT_S1(vectorOpUnitParams);
 
-  ReduceUnit<DTYPE, NROWS, NROWS> CCS_INIT_S1(reduceUnit);
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(
+  ReduceUnit<ACC_DTYPE, NROWS, NROWS> CCS_INIT_S1(reduceUnit);
+  Connections::Combinational<Pack1D<ACC_DTYPE, NROWS> > CCS_INIT_S1(
       reduceUnitInput);
-  Connections::Combinational<DTYPE> CCS_INIT_S1(reduceUnitOutput);
+  Connections::Combinational<ACC_DTYPE> CCS_INIT_S1(reduceUnitOutput);
   Connections::Combinational<Params> CCS_INIT_S1(reduceUnitParams);
 
-  ScaleUnit<DTYPE, WIDTH, NROWS> CCS_INIT_S1(scaleUnit);
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(scaleUnitInput);
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(
-      scaleUnitOutput);
-  Connections::Combinational<Params> CCS_INIT_S1(scaleUnitParams);
+  // ScaleUnit<DTYPE, WIDTH, NROWS> CCS_INIT_S1(scaleUnit);
+  // Connections::Combinational<Pack1D<DTYPE, NROWS> >
+  // CCS_INIT_S1(scaleUnitInput); Connections::Combinational<Pack1D<DTYPE,
+  // NROWS> > CCS_INIT_S1(
+  //     scaleUnitOutput);
+  // Connections::Combinational<Params> CCS_INIT_S1(scaleUnitParams);
 
-  ArithmeticUnit<DTYPE, WIDTH, NROWS> CCS_INIT_S1(arithmeticUnit);
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(
+  ArithmeticUnit<ACC_DTYPE, ODTYPE, WIDTH, NROWS> CCS_INIT_S1(arithmeticUnit);
+  Connections::Combinational<Pack1D<ACC_DTYPE, NROWS> > CCS_INIT_S1(
       arithmeticUnitInput);
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<ACC_DTYPE, NROWS> > CCS_INIT_S1(
       arithmeticUnitOutput);
   Connections::Combinational<Params> CCS_INIT_S1(arithmeticUnitParams);
 
@@ -941,12 +959,12 @@ SC_MODULE(VectorUnit) {
     reduceUnit.scalarOut(reduceUnitOutput);
     reduceUnit.paramsIn(reduceUnitParams);
 
-    scaleUnit.clk(clk);
-    scaleUnit.rstn(rstn);
-    scaleUnit.paramsIn(scaleUnitParams);
-    scaleUnit.vectorIn(scaleUnitInput);
-    scaleUnit.vectorOut(scaleUnitOutput);
-    scaleUnit.scaleChannel(varianceDataResponse);
+    // scaleUnit.clk(clk);
+    // scaleUnit.rstn(rstn);
+    // scaleUnit.paramsIn(scaleUnitParams);
+    // scaleUnit.vectorIn(scaleUnitInput);
+    // scaleUnit.vectorOut(scaleUnitOutput);
+    // scaleUnit.scaleChannel(varianceDataResponse);
 
     arithmeticUnit.clk(clk);
     arithmeticUnit.rstn(rstn);
@@ -1031,7 +1049,7 @@ SC_MODULE(VectorUnit) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (int i = 0; i < total_outputs; i++) {
-        Pack1D<DTYPE, NROWS> data;
+        Pack1D<ACC_DTYPE, NROWS> data;
 
         if (params.VEC_OP) {
           data = vectorOpUnitOutput.Pop();
@@ -1069,7 +1087,7 @@ SC_MODULE(VectorUnit) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (int i = 0; i < inputSize / WIDTH; i++) {
-          Pack1D<DTYPE, WIDTH> reduceUnitOutputVector;
+          Pack1D<ODTYPE, WIDTH> reduceUnitOutputVector;
           for (int i = 0; i < WIDTH; i++) {
             reduceUnitOutputVector[i] = reduceUnitOutput.Pop();
           }
@@ -1092,7 +1110,16 @@ SC_MODULE(VectorUnit) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (int i = 0; i < total_outputs; i++) {
-          vectorUnitOutput.Push(arithmeticUnitOutput.Pop());
+          Pack1D<ACC_DTYPE, WIDTH> origArithmeticUnitOutputVector =
+              arithmeticUnitOutput.Pop();
+          Pack1D<ODTYPE, WIDTH> arithmeticUnitOutputVector;
+
+#pragma hls_unroll yes
+          for (int i = 0; i < WIDTH; i++) {
+            arithmeticUnitOutputVector[i] = origArithmeticUnitOutputVector[i];
+          }
+
+          vectorUnitOutput.Push(arithmeticUnitOutputVector);
         }
       }
 

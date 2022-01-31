@@ -5,7 +5,7 @@
 
 #include "SystolicArray.h"
 
-template <typename IDTYPE, typename WDTYPE, typename ADTYPE, typename ODTYPE,
+template <typename IDTYPE, typename INTERMEDIATE_DTYPE, typename ODTYPE,
           int NROWS, int NCOLS, int BUFFER_SIZE>
 SC_MODULE(MatrixProcessor) {
  private:
@@ -17,50 +17,44 @@ SC_MODULE(MatrixProcessor) {
 
   sc_signal<bool> CCS_INIT_S1(toggleOut);
 
-  Skewer<ADTYPE, NROWS> CCS_INIT_S1(inputSkewer);
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
+  Skewer<IDTYPE, NROWS> CCS_INIT_S1(inputSkewer);
+  Connections::Combinational<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(
       inputSkewerDin);
 
-  Skewer<ADTYPE, NROWS> CCS_INIT_S1(psumInSkewer);
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
+  Skewer<ODTYPE, NROWS> CCS_INIT_S1(psumInSkewer);
+  Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumInSkewerDin);
 
-  Skewer<ADTYPE, NROWS> CCS_INIT_S1(psumOutSkewer);
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
+  Skewer<ODTYPE, NROWS> CCS_INIT_S1(psumOutSkewer);
+  Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumOutSkewerDout);
 
   Skewer<ac_int<1, false>, NROWS> CCS_INIT_S1(weightSwapSkewer);
   Connections::Combinational<Pack1D<ac_int<1, false>, NROWS> > CCS_INIT_S1(
       weightSwapSkewerDin);
-  SystolicArray<ADTYPE, ADTYPE, ADTYPE, NROWS, NCOLS> CCS_INIT_S1(
+  SystolicArray<IDTYPE, INTERMEDIATE_DTYPE, ODTYPE, NROWS, NCOLS> CCS_INIT_S1(
       systolicArray);
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
-      convertedInputsChannel);
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
-      convertedWeightsChannel);
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
-      convertedOutputsChannel);
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputsChannel);
-  Connections::In<Pack1D<WDTYPE, NROWS> > CCS_INIT_S1(weightsChannel);
+  Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(weightsChannel);
   Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(outputsChannel);
 
   Connections::In<Params> CCS_INIT_S1(paramsIn);
 
-  Connections::Combinational<Pack1D<ADTYPE, NROWS> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(
       inputsToSystolicArray);
-  Connections::Combinational<Pack1D<ADTYPE, NCOLS> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(
       psumsToSystolicArray);
-  Connections::Combinational<Pack1D<ADTYPE, NCOLS> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(
       outputsFromSystolicArray);
   Connections::Combinational<Pack1D<ac_int<1, false>, NROWS> > CCS_INIT_S1(
       weightSwapToSystolicArray);
 
-  sc_signal<Pack1D<ADTYPE, NCOLS> > CCS_INIT_S1(weightsToSystolicArray);
+  sc_signal<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(weightsToSystolicArray);
   sc_signal<bool> CCS_INIT_S1(weightsToggle);
 
   SC_CTOR(MatrixProcessor) {
@@ -111,7 +105,7 @@ SC_MODULE(MatrixProcessor) {
   // #pragma hls_pipeline_init_interval 1
   //     while (true) {
   //       Pack1D<IDTYPE, NROWS> val = inputsChannel.Pop();
-  //       Pack1D<ADTYPE, NROWS> convertedVal;
+  //       Pack1D<IDTYPE, NROWS> convertedVal;
   // #pragma hls_unroll yes
   //       for (int i = 0; i < NROWS; i++) {
   //         convertedVal[i] = val[i];
@@ -126,7 +120,7 @@ SC_MODULE(MatrixProcessor) {
   // #pragma hls_pipeline_init_interval 1
   //     while (true) {
   //       Pack1D<IDTYPE, NROWS> val = weightsChannel.Pop();
-  //       Pack1D<ADTYPE, NROWS> convertedVal;
+  //       Pack1D<IDTYPE, NROWS> convertedVal;
   // #pragma hls_unroll yes
   //       for (int i = 0; i < NROWS; i++) {
   //         convertedVal[i] = val[i];
@@ -140,7 +134,7 @@ SC_MODULE(MatrixProcessor) {
 
   // #pragma hls_pipeline_init_interval 1
   //     while (true) {
-  //       Pack1D<ADTYPE, NROWS> val = unconvertedOutputsChannel.Pop();
+  //       Pack1D<IDTYPE, NROWS> val = unconvertedOutputsChannel.Pop();
   //       Pack1D<IDTYPE, NROWS> convertedVal;
   // #pragma hls_unroll yes
   //       for (int i = 0; i < NROWS; i++) {
@@ -151,7 +145,7 @@ SC_MODULE(MatrixProcessor) {
 
   void process_weights() {
     weightsChannel.Reset();
-    weightsToSystolicArray.write(Pack1D<ADTYPE, NCOLS>());
+    weightsToSystolicArray.write(Pack1D<IDTYPE, NCOLS>());
     weightReady.write(false);
     weightSync.ResetRead();
     weightsToggle.write(false);
@@ -164,16 +158,10 @@ SC_MODULE(MatrixProcessor) {
     while (true) {
 #pragma hls_pipeline_init_interval 1
       for (int weight_count = 0; weight_count < NROWS; weight_count++) {
-        Pack1D<WDTYPE, NCOLS> arrayWeights = weightsChannel.Pop();
+        Pack1D<IDTYPE, NCOLS> arrayWeights = weightsChannel.Pop();
         // std::cout << "Weights: " << arrayWeights << std::endl;
 
-        Pack1D<ADTYPE, NCOLS> convertedArrayWeights;
-#pragma hls_unroll yes
-        for (int i = 0; i < NCOLS; i++) {
-          convertedArrayWeights[i] = arrayWeights[i];
-        }
-
-        weightsToSystolicArray.write(convertedArrayWeights);
+        weightsToSystolicArray.write(arrayWeights);
         toggle = !toggle;
         weightsToggle.write(toggle);
         wait();
@@ -236,7 +224,7 @@ SC_MODULE(MatrixProcessor) {
         }
       }
 
-      Pack1D<ADTYPE, NCOLS> accumulation_buffer[BUFFER_SIZE];
+      Pack1D<ODTYPE, NCOLS> accumulation_buffer[BUFFER_SIZE];
 
       int step = 0;
       int outputCounter = 0;
@@ -281,25 +269,20 @@ SC_MODULE(MatrixProcessor) {
         }
 
         Pack1D<IDTYPE, NROWS> inputs;
-        Pack1D<ADTYPE, NROWS> convertedInputs;
         if (step < totalOps) {
           inputs = inputsChannel.Pop();
 
-#pragma hls_unroll yes
-          for (int i = 0; i < NROWS; i++) {
-            convertedInputs[i] = inputs[i];
-          }
           // CCS_LOG("input: " << inputs);
         }
         toggle = !toggle;
         toggleOut.write(toggle);
 
-        inputSkewerDin.Push(convertedInputs);
+        inputSkewerDin.Push(inputs);
         weightSwapSkewerDin.Push(weightSwap);
 
         weightFill.write(weightFillToggle);
 
-        Pack1D<ADTYPE, NCOLS> psum;
+        Pack1D<ODTYPE, NCOLS> psum;
 #pragma hls_unroll yes
         for (int i = 0; i < NCOLS; i++) {
           psum.value[i] = 0;
@@ -326,9 +309,9 @@ SC_MODULE(MatrixProcessor) {
 
         wait();
 
-        Pack1D<ADTYPE, NCOLS> outputs;
+        Pack1D<ODTYPE, NCOLS> outputs;
         psumOutSkewerDout.PopNB(outputs);
-        Pack1D<ADTYPE, NCOLS> flippedOutputs;
+        Pack1D<ODTYPE, NCOLS> flippedOutputs;
 
 #pragma hls_unroll yes
         for (int i = 0; i < NCOLS; i++) {
@@ -344,14 +327,7 @@ SC_MODULE(MatrixProcessor) {
               (loop_counters_out[1][params.fyIndex] ==
                params.loops[1][params.fyIndex] - 1);
           if (accumulationFinished) {
-            Pack1D<ODTYPE, NCOLS> convertedOutputs;
-
-#pragma hls_unroll yes
-            for (int i = 0; i < NCOLS; i++) {
-              convertedOutputs[i] = flippedOutputs[i];
-            }
-
-            outputsChannel.Push(convertedOutputs);
+            outputsChannel.Push(flippedOutputs);
             // std::cout << "Output: " << flippedOutputs << std::endl;
           } else {
             int writeAddress = loop_counters_out[1][params.weightLoopIndex[1]] *

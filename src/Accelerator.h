@@ -51,18 +51,19 @@ SC_MODULE(Accelerator) {
   Connections::Combinational<int> weightBufferReadControl[2];
   Connections::Combinational<Params> weightControllerParams;
 
-  MatrixProcessor<INPUT_DATATYPE, WEIGHT_DATATYPE, ACCUM_DATATYPE, OUTPUT_DATATYPE, DIMENSION,
-                  DIMENSION, ACCUMULATION_BUFFER_SIZE>
+  MatrixProcessor<INPUT_DATATYPE, INTERMEDIATE_DATATYPE, ACCUM_DATATYPE,
+                  DIMENSION, DIMENSION, ACCUMULATION_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
   Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       inputsToSystolicArray);
   Connections::Combinational<Pack1D<WEIGHT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       weightsToSystolicArray);
-  Connections::Combinational<Pack1D<OUTPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<ACCUM_DATATYPE, DIMENSION> > CCS_INIT_S1(
       outputsFromSystolicArray);
   Connections::Combinational<Params> CCS_INIT_S1(matrixProcessorParams);
 
-  VectorUnit<INPUT_DATATYPE, DIMENSION, DIMENSION> CCS_INIT_S1(vectorUnit);
+  VectorUnit<ACCUM_DATATYPE, OUTPUT_DATATYPE, DIMENSION, DIMENSION> CCS_INIT_S1(
+      vectorUnit);
   Connections::Out<int> CCS_INIT_S1(vectorFetchAddressRequest);
   Connections::In<Pack1D<OUTPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       vectorFetchDataResponse);

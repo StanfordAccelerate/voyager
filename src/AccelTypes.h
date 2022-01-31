@@ -65,43 +65,43 @@ class Pack1D {
   }
 };
 
-template <size_t SIZE>
-class Pack1D<PositFP, SIZE> {
- public:
-  PositFP value[SIZE];
+// template <size_t SIZE>
+// class Pack1D<PositFP, SIZE> {
+//  public:
+//   PositFP value[SIZE];
 
-  static const unsigned int width = PositFP::width * SIZE;
+//   static const unsigned int width = PositFP::width * SIZE;
 
-  Pack1D() {}
-  Pack1D(const int a) {}
+//   Pack1D() {}
+//   Pack1D(const int a) {}
 
-  operator int() const { return Pack1D<PositFP, SIZE>(); }
+//   operator int() const { return Pack1D<PositFP, SIZE>(); }
 
-  PositFP &operator[](unsigned int i) { return this->value[i]; }
-  const PositFP &operator[](unsigned int i) const { return this->value[i]; }
+//   PositFP &operator[](unsigned int i) { return this->value[i]; }
+//   const PositFP &operator[](unsigned int i) const { return this->value[i]; }
 
-  template <unsigned int Size>
-  void Marshall(Marshaller<Size> &m) {
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].bits;
-      // m &value[i].scale;
-      // m &value[i].fraction;
-    }
-    // #pragma hls_unroll yes
-    //     for (unsigned int i = 0; i < SIZE; i++) {
-    //       // m &value[i].sign;
-    //       m &value[i].scale;
-    //       // m &value[i].fraction;
-    //     }
-    // #pragma hls_unroll yes
-    //     for (unsigned int i = 0; i < SIZE; i++) {
-    //       // m &value[i].sign;
-    //       // m &value[i].scale;
-    //       m &value[i].fraction;
-    //     }
-  }
-};
+//   template <unsigned int Size>
+//   void Marshall(Marshaller<Size> &m) {
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].bits;
+//       // m &value[i].scale;
+//       // m &value[i].fraction;
+//     }
+//     // #pragma hls_unroll yes
+//     //     for (unsigned int i = 0; i < SIZE; i++) {
+//     //       // m &value[i].sign;
+//     //       m &value[i].scale;
+//     //       // m &value[i].fraction;
+//     //     }
+//     // #pragma hls_unroll yes
+//     //     for (unsigned int i = 0; i < SIZE; i++) {
+//     //       // m &value[i].sign;
+//     //       // m &value[i].scale;
+//     //       m &value[i].fraction;
+//     //     }
+//   }
+// };
 
 // template <typename TYPE, size_t SIZE>
 // class Wrapped<Pack1D<TYPE, SIZE> > {

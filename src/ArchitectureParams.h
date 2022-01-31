@@ -1,14 +1,15 @@
 #define POSIT
 
 #ifdef POSIT
-#define INPUT_DATATYPE Posit
-#define WEIGHT_DATATYPE Posit
-#define ACCUM_DATATYPE PositFP
-#define OUTPUT_DATATYPE Posit
+#define INPUT_DATATYPE Posit<8, 1, 8, 16>
+#define WEIGHT_DATATYPE Posit<8, 1, 8, 16>
+#define ACCUM_DATATYPE Posit<16, 1, 8, 16>
+#define INTERMEDIATE_DATATYPE PositFP<8, 16>
+#define OUTPUT_DATATYPE Posit<8, 1, 8, 16>
 #else
 #define INPUT_DATATYPE ac_int<8, true>
 #define WEIGHT_DATATYPE ac_int<8, true>
-#define ACCUM_DATATYPE ac_int<32, true>
+#define ACCUM_DATATYPE ac_int<8, true>
 #define OUTPUT_DATATYPE ac_int<8, true>
 #endif
 

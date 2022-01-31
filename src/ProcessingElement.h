@@ -5,7 +5,7 @@
 
 #include "AccelTypes.h"
 
-template <typename IDTYPE, typename WDTYPE, typename ODTYPE>
+template <typename IDTYPE, typename INTERMEDIATE_DTYPE, typename ODTYPE>
 SC_MODULE(ProcessingElement) {
  public:
   sc_in<bool> CCS_INIT_S1(clk);
@@ -13,8 +13,8 @@ SC_MODULE(ProcessingElement) {
 
   sc_in<bool> CCS_INIT_S1(toggle);
 
-  sc_in<WDTYPE> CCS_INIT_S1(weight_in);
-  sc_out<WDTYPE> CCS_INIT_S1(weight_out);
+  sc_in<IDTYPE> CCS_INIT_S1(weight_in);
+  sc_out<IDTYPE> CCS_INIT_S1(weight_out);
   sc_in<bool> CCS_INIT_S1(push_weights);
 
   sc_in<ac_int<1, false> > CCS_INIT_S1(swap_weights_in);
@@ -28,8 +28,8 @@ SC_MODULE(ProcessingElement) {
 
   sc_out<bool> CCS_INIT_S1(valid_output);
 
-  WDTYPE weight_reg;
-  WDTYPE weight_fifo;
+  INTERMEDIATE_DTYPE weight_reg;
+  IDTYPE weight_fifo;
 
   IDTYPE input_reg;
   ODTYPE psum_reg;
@@ -102,7 +102,10 @@ SC_MODULE(ProcessingElement) {
     return input * weight + psum;
   }
 
-  PositFP fma(PositFP input, PositFP weight, PositFP psum) {
-    return input.fma(weight, psum);
+  Posit<16, 1, 8, 16> fma(Posit<8, 1, 8, 16> input, PositFP<8, 16> weight,
+                          Posit<16, 1, 8, 16> psum) {
+    PositFP<8, 16> intermediate = weight.fma(input, psum);
+    Posit<16, 1, 8, 16> output = intermediate;
+    return output;
   }
 };

@@ -7,38 +7,39 @@
 #include "ProcessingElement.h"
 #include "Skewer.h"
 
-template <typename IDTYPE, typename WDTYPE, typename ODTYPE, int NROWS,
-          int NCOLS>
+template <typename IDTYPE, typename INTERMEDIATE_DTYPE, typename ODTYPE,
+          int NROWS, int NCOLS>
 SC_MODULE(SystolicArray) {
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputs);
-  Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(psums);
-  Connections::Out<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(outputs);
+  Connections::In<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(psums);
+  Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(outputs);
   Connections::In<Pack1D<ac_int<1, false>, NROWS> > CCS_INIT_S1(swapWeights);
 
-  sc_in<Pack1D<WDTYPE, NCOLS> > CCS_INIT_S1(weights);
+  sc_in<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(weights);
   sc_in<bool> CCS_INIT_S1(weightsToggle);
 
   sc_signal<IDTYPE> inputConnection[NROWS][NCOLS + 1];
   sc_signal<ODTYPE> psumConnection[NROWS + 1][NCOLS];
-  sc_signal<WDTYPE> weightConnection[NROWS + 1][NCOLS];
+  sc_signal<IDTYPE> weightConnection[NROWS + 1][NCOLS];
   sc_signal<ac_int<1, false> > weightSwap[NROWS][NCOLS + 1];
   sc_signal<bool> weightPush;
   sc_signal<bool> enable;
   sc_signal<bool> peToggle;
   sc_signal<bool> validOutput[NROWS][NCOLS];
 
-  sc_fifo<Pack1D<IDTYPE, NROWS> > outputFifo;
+  sc_fifo<Pack1D<ODTYPE, NROWS> > outputFifo;
 
   SC_CTOR(SystolicArray) {
-    ProcessingElement<IDTYPE, WDTYPE, ODTYPE> *pe[NROWS * NCOLS];
+    ProcessingElement<IDTYPE, INTERMEDIATE_DTYPE, ODTYPE> *pe[NROWS * NCOLS];
     for (int i = 0; i < NROWS; i++) {
       for (int j = 0; j < NCOLS; j++) {
-        pe[i * NCOLS + j] = new ProcessingElement<IDTYPE, WDTYPE, ODTYPE>(
-            sc_gen_unique_name("pe_inst"));
+        pe[i * NCOLS + j] =
+            new ProcessingElement<IDTYPE, INTERMEDIATE_DTYPE, ODTYPE>(
+                sc_gen_unique_name("pe_inst"));
         pe[i * NCOLS + j]->clk(clk);
         pe[i * NCOLS + j]->rstn(rstn);
         pe[i * NCOLS + j]->input_in(inputConnection[i][j]);
@@ -82,7 +83,7 @@ SC_MODULE(SystolicArray) {
 
 #pragma hls_pipeline_init_interval 1
     while (true) {
-      Pack1D<WDTYPE, NCOLS> arrayWeights = weights.read();
+      Pack1D<IDTYPE, NCOLS> arrayWeights = weights.read();
 #pragma hls_unroll yes
       for (int i = 0; i < NCOLS; i++) {
         weightConnection[0][i].write(arrayWeights[i]);
