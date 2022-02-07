@@ -14,6 +14,7 @@ project new -dir $project_folder
 
 project save
 
+options set Message/ErrorOverride ASSERT-1 -remove
 options set Input/TargetPlatform x86_64
 options set /Input/CppStandard c++11
 solution options set /Input/CppStandard c++11
@@ -68,7 +69,6 @@ directive set /Accelerator/DoubleBuffer<$IO_DATATYPE,$DIMENSION,1024>/DoubleBuff
 
 # Map onto same resource
 directive set /Accelerator/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$ACCUM_DATATYPE,$DIMENSION,$DIMENSION,1024>/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$ACCUM_DATATYPE,$DIMENSION,$DIMENSION,1024>:run/run/while:accumulation_buffer.value.bits -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $DIMENSION]
-directive set /Accelerator/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$ACCUM_DATATYPE,$DIMENSION,$DIMENSION,1024>/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$ACCUM_DATATYPE,$DIMENSION,$DIMENSION,1024>:run/run/while:accumulation_buffer.value.bits:rsc -MAP_TO_MODULE mem_1024x402.custom1024x402
 # directive set /Accelerator/MatrixProcessor<Posit,Posit,PositFP,Posit,16,16,1024>/MatrixProcessor<Posit,Posit,PositFP,Posit,16,16,1024>:run/run/accumulation_buffer.value.scale -WORD_WIDTH 128
 # directive set /Accelerator/MatrixProcessor<Posit,Posit,PositFP,Posit,16,16,1024>/MatrixProcessor<Posit,Posit,PositFP,Posit,16,16,1024>:run/run/accumulation_buffer.value.fraction -WORD_WIDTH 256
 # directive set /Accelerator/MatrixProcessor<Posit,Posit,PositFP,Posit,16,16,1024>/MatrixProcessor<Posit,Posit,PositFP,Posit,16,16,1024>:run/run/accumulation_buffer.value.sign -WORD_WIDTH 16
@@ -81,9 +81,9 @@ directive set /Accelerator/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$
 # directive set /Accelerator/MatrixProcessor<$IO_DATATYPE,$IO_DATATYPE,$ACCUM_DATATYPE,$IO_DATATYPE,$DIMENSION,$DIMENSION,1024>/run/accumulation_buffer.value.bits -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH*$DIMENSION]
 
 if {[info exists env(DEBUG)] == 0} {
-  # directive set /Accelerator/MatrixProcessor<$IO_DATATYPE,$IO_DATATYPE,$ACCUM_DATATYPE,$IO_DATATYPE,16,16,1024>/MatrixProcessor<$IO_DATATYPE,$IO_DATATYPE,$ACCUM_DATATYPE,$IO_DATATYPE,16,16,1024>:run/run/accumulation_buffer.value:rsc -MAP_TO_MODULE custom1024x128.custom1024x128
+  directive set /Accelerator/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$ACCUM_DATATYPE,$DIMENSION,$DIMENSION,1024>/MatrixProcessor<$IO_DATATYPE,$INTERMEDIATE_DATATYPE,$ACCUM_DATATYPE,$DIMENSION,$DIMENSION,1024>:run/run/while:accumulation_buffer.value.bits:rsc -MAP_TO_MODULE mem_1024x402.custom1024x402
 }
-directive set /Accelerator/ArithmeticUnit<$ACCUM_DATATYPE,$IO_DATATYPE,$DIMENSION,$DIMENSION>/run/while:maxpool_comparator.value.bits:rsc -MAP_TO_MODULE {[Register]}
+directive set /Accelerator/MaxpoolUnit<Posit<8,1,8,16>,16>/run/while:maxpool_comparator.value.bits:rsc -MAP_TO_MODULE {[Register]}
 
 directive set /Accelerator/WeightController<$IO_DATATYPE,$DIMENSION,$DIMENSION>/WeightController<$IO_DATATYPE,$DIMENSION,$DIMENSION>:transposer/transposer/while:if#1:transposeBuffer.bits:rsc -MAP_TO_MODULE {[Register]}
 
