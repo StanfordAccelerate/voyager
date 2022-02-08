@@ -48,6 +48,7 @@ SC_MODULE(OutputAddressGenerator) {
 
   void scalarAddressGen() {
     scalarOutputAddress.Reset();
+    scalarOutputAddressParams.ResetRead();
 
     wait();
 
@@ -62,6 +63,7 @@ SC_MODULE(OutputAddressGenerator) {
 
   void vectorAddressGen() {
     vectorOutputAddress.Reset();
+    vectorOutputAddressParams.ResetRead();
 
     wait();
 

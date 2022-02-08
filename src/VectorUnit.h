@@ -326,6 +326,11 @@ SC_MODULE(VectorUnit) {
   }
 
   void read_params() {
+    paramsIn.Reset();
+    vectorFetchParams.ResetWrite();
+    maxpoolUnitParams.ResetWrite();
+    outputAddressGenParams.ResetWrite();
+
     wait();
 
     while (true) {
