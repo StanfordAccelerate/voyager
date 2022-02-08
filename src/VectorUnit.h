@@ -364,7 +364,7 @@ SC_MODULE(VectorUnit) {
             }
           }
 
-          if (instAddress > instConfig.instLen) {
+          if (instAddress >= instConfig.instLen) {
             break;
           }
         }
