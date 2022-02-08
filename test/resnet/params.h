@@ -561,30 +561,30 @@ std::map<std::string, SimplifiedParams> resnetParams{
     // map to vector processor instead
     {"fc",
      {
-         401408,                                       // INPUT_OFFSET
-         11166912,                                     // WEIGHT_OFFSET
-         1605632,                                      // OUTPUT_OFFSET
-         false,                                        // TRANSPOSE
-         {{1, 1, 32, 1, 1, 1}, {32, 1, 3, 3, 1, 32}},  // LOOPS
-         {0, 5},                                       // INPUTX
-         {1, 4},                                       // INPUTY
-         {3, 0},                                       // REDUCTION
-         {2, 1},                                       // WEIGHT
-         3,                                            // fxIndex
-         2,                                            // fyIndex
-         {4, 5},                                       // weightReuseIndex
-         1,                                            // stride
-         false,                                        // replication
-         false,                                        // RELU
-         true,                                         // bias
-         11683712,                                     // BIAS_OFFSET
-         false,                                        // residual
-         1204224,                                      // RESIDUAL_OFFSET
-         false,                                        // maxpool
-         false,                                        // avgpool
-         false,                                        // SOFTMAX
-         true,                                         // FC
-         false,                                        // no-norm
+         401408,                                      // INPUT_OFFSET
+         11166912,                                    // WEIGHT_OFFSET
+         1605632,                                     // OUTPUT_OFFSET
+         false,                                       // TRANSPOSE
+         {{1, 1, 1, 1, 1, 1}, {32, 63, 1, 1, 1, 1}},  // LOOPS
+         {0, 5},                                      // INPUTX
+         {1, 4},                                      // INPUTY
+         {3, 0},                                      // REDUCTION
+         {2, 1},                                      // WEIGHT
+         3,                                           // fxIndex
+         2,                                           // fyIndex
+         {4, 5},                                      // weightReuseIndex
+         1,                                           // stride
+         false,                                       // replication
+         false,                                       // RELU
+         true,                                        // bias
+         11683712,                                    // BIAS_OFFSET
+         false,                                       // residual
+         1204224,                                     // RESIDUAL_OFFSET
+         false,                                       // maxpool
+         false,                                       // avgpool
+         false,                                       // SOFTMAX
+         true,                                        // FC
+         false,                                       // no-norm
      }}};
 
 std::array<std::string, 21> resnet_order{"conv1",

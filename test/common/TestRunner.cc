@@ -27,6 +27,11 @@ void validateMapping(SimplifiedParams params) {
   int fy = params.loops[1][params.fyIndex];
   int stride = params.STRIDE;
 
+  if (params.FC || params.SOFTMAX ||
+      params.NO_NORM) {  // don't check for vector ops
+    return;
+  }
+
   // Input buffer
   int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy - 1);
   if (params.REPLICATION) {
@@ -117,7 +122,8 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
     Y = 1;
   }
 
-  run_op(params, sramMemory, rramMemory, memoryMap);
+  // FIXME!
+  // run_op(params, sramMemory, rramMemory, memoryMap);
   run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
 
   std::cout << "Accelerator vs. Gold Model" << std::endl;

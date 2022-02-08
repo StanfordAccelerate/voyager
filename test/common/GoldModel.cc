@@ -54,16 +54,19 @@ void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
     int K = params.loops[0][params.weightLoopIndex[0]] *
             params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
     for (int k = 0; k < K; k++) {
-      ACCUM_DATATYPE accum = 0;
+      ACCUM_DATATYPE acc = 0;
       for (int c = 0; c < C; c++) {
-        accum += matrixA[c] * matrixB[c * K + k];
+        ACCUM_DATATYPE a = matrixA[c];
+        ACCUM_DATATYPE b = matrixB[c * K + k];
+
+        acc = fma(a, b, acc);
       }
 
       if (params.BIAS) {
-        accum += biasMatrix[k];
+        acc += biasMatrix[k];
       }
 
-      matrixC[k] = accum;
+      matrixC[k] = acc;
     }
   } else if (params.NO_NORM) {
     // not yet implemented
