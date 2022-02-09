@@ -129,8 +129,7 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
     Y = 1;
   }
 
-  // FIXME!
-  // run_op(params, sramMemory, rramMemory, memoryMap);
+  run_op(params, sramMemory, rramMemory, memoryMap);
   run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
 
   std::cout << "Accelerator vs. Gold Model" << std::endl;
