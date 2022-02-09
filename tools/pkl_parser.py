@@ -101,7 +101,7 @@ if __name__ == "__main__":
             prefilename = outputfolder + "/" + "pre" + clean_name(key)
             postfilename = outputfolder + "/" + clean_name(key)
             write_fp64(prefilename, value)
-            os.system("./decode " + prefilename + " " + postfilename)
-            # print(postfilename)
+            os.system("./tools/decode " + prefilename + " " + postfilename)
+            print(postfilename)
 
     infile.close()

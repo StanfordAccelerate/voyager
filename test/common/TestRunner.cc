@@ -57,7 +57,7 @@ void validateMapping(SimplifiedParams params) {
   }
 }
 
-int run_test(const SimplifiedParams params, const std::string& dataDir,
+int run_test(SimplifiedParams params, const std::string& dataDir,
              const Files& files, const MemoryMap& memoryMap, bool useDataFile,
              std::string& fileOutputPrefix) {
   validateMapping(params);
@@ -129,7 +129,7 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
     Y = 1;
   }
 
-  run_op(params, sramMemory, rramMemory, memoryMap);
+  run_op({params}, sramMemory, rramMemory, memoryMap);
   run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
 
   std::cout << "Accelerator vs. Gold Model" << std::endl;
