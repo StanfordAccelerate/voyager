@@ -12,6 +12,7 @@
 #include "test/mobilebert/params.h"
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
+#include "test/mobilebert/params.h"
 
 #define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
@@ -307,6 +308,24 @@ int sc_main(int argc, char* argv[]) {
 
     auto memoryMapSearch = resnetMemoryMap.find(test);
     if (memoryMapSearch != resnetMemoryMap.end()) {
+      memoryMap = memoryMapSearch->second;
+    } else {
+      throw std::runtime_error("Memory map for " + test + " not found");
+    }
+  } else if (group == "mobilebert") {
+    useDataFiles = true;
+
+    dataDir = mobilebertDataDir;
+
+    auto fileSearch = mobilebertFiles.find(test);
+    if (fileSearch != mobilebertFiles.end()) {
+      files = fileSearch->second;
+    } else {
+      throw std::runtime_error("Files for " + test + " not found");
+    }
+
+    auto memoryMapSearch = mobilebertMemoryMap.find(test);
+    if (memoryMapSearch != mobilebertMemoryMap.end()) {
       memoryMap = memoryMapSearch->second;
     } else {
       throw std::runtime_error("Memory map for " + test + " not found");

@@ -102,10 +102,17 @@ SC_MODULE(ProcessingElement) {
     return input * weight + psum;
   }
 
-  Posit<16, 1, 8, 16> fma(Posit<8, 1, 8, 16> input, PositFP<8, 16> weight,
-                          Posit<16, 1, 8, 16> psum) {
-    PositFP<8, 16> intermediate = weight.fma(input, psum);
-    Posit<16, 1, 8, 16> output = intermediate;
+  // Posit<16, 1, 8, 16> fma(Posit<8, 1, 8, 16> input, PositFP<8, 16> weight,
+  //                         Posit<16, 1, 8, 16> psum) {
+  //   PositFP<8, 16> intermediate = weight.fma(input, psum);
+  //   Posit<16, 1, 8, 16> output = intermediate;
+  //   return output;
+  // }
+
+  ODTYPE fma(IDTYPE input, INTERMEDIATE_DTYPE weight,
+             ODTYPE psum) {
+    INTERMEDIATE_DTYPE intermediate = weight.fma(input, psum);
+    ODTYPE output = intermediate;
     return output;
   }
 };

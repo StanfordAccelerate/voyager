@@ -1,5 +1,7 @@
 CC = /cad/mentor/2021.1/Mgc_home/bin/g++
-CPPFLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++11 -DCONNECTIONS_FAST_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_NAMING_ORIGINAL -O3
+CC17 = /opt/rh/devtoolset-10/root/bin/g++
+CPPFLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++11 -DCONNECTIONS_FAST_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_NAMING_ORIGINAL -g
+POSIT_FLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++17
 LDFLAGS = -lsystemc
 LDLIBS = -L/cad/mentor/2021.1/Mgc_home/shared/lib/
 TEST ?= simple
@@ -42,7 +44,7 @@ build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/G
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/PositTest: build/PositTest.o
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+	$(CC) -o $@ $^
 
 build/Accelerator.o: src/Accelerator.cc $(wildcard src/*.h)
 	$(CC) $(CPPFLAGS) -c -o $@ $< 
@@ -63,7 +65,7 @@ build/TestRunner.o: test/common/TestRunner.cc test/mobilebert/params.h test/simp
 	$(CC) $(CPPFLAGS) -c -o $@ $<
 
 build/PositTest.o: test/common/PositTest.cc src/PositTypes.h
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(CC17) $(POSIT_FLAGS) -c -o $@ $<
 
 .PHONY: clean rtl sim PositTest
 clean:

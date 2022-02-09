@@ -13,6 +13,7 @@ int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
   for (int index = 0; index < size; index++) {
     diffFile << matrixA[index] << " vs. " << matrixB[index] << std::endl;
     float diff = abs(((float)matrixA[index] - (float)matrixB[index]));
+    // std::cerr << (float) matrixA[index] << '\t' << (float) matrixB[index] << std::endl;
 
     if (diff < 0.001) {
       diff_buckets[0]++;

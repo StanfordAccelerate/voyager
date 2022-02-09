@@ -360,6 +360,13 @@ inline posit<nbits, es>& convert_(bool _sign, int _scale, const bitblock<fbits>&
 		pt_bits |= fraction;
 		pt_bits |= sticky_bit;
 
+		// std::cerr << "fraction_in: " << fraction_in << std::endl;
+		// std::cerr << "regime: " << regime << std::endl;
+		// std::cerr << "exponent: " << exponent << std::endl;
+		// std::cerr << "fraction: " << fraction << std::endl;
+		// std::cerr << "sticky_bit: " << sticky_bit << std::endl;
+		// std::cerr << "convert_: " << pt_bits << std::endl;
+
 		size_t len = 1 + std::max<size_t>((nbits + 1), (2 + run + es));
 		bool blast = pt_bits.test(len - nbits);
 		bool bafter = pt_bits.test(len - nbits - 1);

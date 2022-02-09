@@ -1,1 +1,6 @@
 build
+pybuild
+data/resnet
+data/mobilebert
+.direnv
+.vscode
