@@ -28,19 +28,6 @@ void print_char(char c) {
   std::cout << result << std::endl;
 }
 
-char posit_char(Real posit)
-{
-
-  // int64_t* num = reinterpret_cast<int64_t*>(posit);
-  // char result = 0;
-  // for (int i = 0; i < 8; i++)
-  // {
-  //   result += (*num & 1) << i;
-  //   *num = *num >> 1;
-  // }
-  // return result;
-}
-
 size_t readdp(const std::string &filename, double *buf)
 {
   // Read file into vector
@@ -52,9 +39,6 @@ size_t readdp(const std::string &filename, double *buf)
   const std::string &s = ss.str();
   std::vector<char> vec(s.begin(), s.end());
 
-  // check:
-//   std::copy(vec.begin(), vec.end(), std::ostream_iterator<char>(std::cout));
-//   buf = new double[vec.size() / 8];
   memcpy(buf, vec.data(), vec.size());
   file.close();
 
@@ -69,7 +53,6 @@ void rewrite_data(std::string infile, std::string outfile)
   for (size_t i = 0; i < size; i++)
   {
     // Posit conversion from double
-    // std::cout << size << std::endl;
     Real intermediate = tmp[i];
     // print_char(posit_char(&intermediate));
     // print_posit(&intermediate);

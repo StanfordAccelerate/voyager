@@ -1,6 +1,6 @@
 #include "test/common/DataLoader.h"
 
-void load_inputs(const Params& params, const std::string& filename,
+void load_inputs(const SimplifiedParams& params, const std::string& filename,
                  bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
                  INPUT_DATATYPE* goldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -69,7 +69,7 @@ void load_inputs(const Params& params, const std::string& filename,
   delete[] tmpValues;
 }
 
-void load_weights(const Params& params, const std::string& filename,
+void load_weights(const SimplifiedParams& params, const std::string& filename,
                   bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
                   INPUT_DATATYPE* goldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -120,7 +120,7 @@ void load_weights(const Params& params, const std::string& filename,
   delete[] tmpValues;
 }
 
-void load_bias(const Params& params, const std::string& filename,
+void load_bias(const SimplifiedParams& params, const std::string& filename,
                bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
                INPUT_DATATYPE* goldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -165,7 +165,7 @@ void load_bias(const Params& params, const std::string& filename,
   delete[] tmpValues;
 }
 
-void load_residual(const Params& params, const std::string& filename,
+void load_residual(const SimplifiedParams& params, const std::string& filename,
                    bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
                    INPUT_DATATYPE* goldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -214,7 +214,7 @@ void load_residual(const Params& params, const std::string& filename,
   delete[] tmpValues;
 }
 
-void load_datafile_outputs(const Params params, const std::string& filename,
+void load_datafile_outputs(const SimplifiedParams params, const std::string& filename,
                            INPUT_DATATYPE* outputMatrix) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
@@ -262,7 +262,7 @@ void load_datafile_outputs(const Params params, const std::string& filename,
   delete[] tmpValues;
 }
 
-void load_memory(const Params& params, const std::string& dataDir,
+void load_memory(const SimplifiedParams& params, const std::string& dataDir,
                  const Files& files, const MemoryMap& memoryMap,
                  bool useDataFile, INPUT_DATATYPE* sramMemory,
                  INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,

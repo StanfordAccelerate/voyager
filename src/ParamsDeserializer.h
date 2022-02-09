@@ -4,13 +4,16 @@
 #include <systemc.h>
 
 #include "AccelTypes.h"
+#include "TypeToBits.h"
 
 SC_MODULE(ParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
-  Connections::Out<Params> CCS_INIT_S1(paramsOut);
+  Connections::Out<MatrixParams> CCS_INIT_S1(paramsOut);
+  Connections::Out<VectorParams> CCS_INIT_S1(vectorParamsOut);
+  Connections::Out<VectorInstructionConfig> CCS_INIT_S1(vectorInstructionsOut);
 
   SC_CTOR(ParamsDeserializer) {
     SC_THREAD(run);
@@ -18,66 +21,55 @@ SC_MODULE(ParamsDeserializer) {
     async_reset_signal_is(rstn, false);
   }
 
+  template <typename T, unsigned int interfaceWidth>
+  T getSerializedParams() {
+    ac_int<((T::width + interfaceWidth - 1) / interfaceWidth) * interfaceWidth,
+           false>
+        serializedParamsPadded;
+    for (int i = 0; i < serializedParamsPadded.width / interfaceWidth; i++) {
+      ac_int<interfaceWidth, false> val = serialParamsIn.Pop();
+      serializedParamsPadded.set_slc(i * interfaceWidth, val);
+    }
+    ac_int<T::width, false> serializedParams =
+        serializedParamsPadded.template slc<T::width>(0);
+    sc_lv<T::width> serializedParamsLV;
+    type_to_vector(serializedParams, T::width, serializedParamsLV);
+    return BitsToType<T>(serializedParamsLV);
+  }
+
   void run() {
     serialParamsIn.Reset();
     paramsOut.Reset();
+    vectorParamsOut.Reset();
 
     wait();
     while (true) {
-      Params params;
+      // Matrix Unit Params
+      while (serialParamsIn.Pop() == 1) {
+        MatrixParams params = getSerializedParams<MatrixParams, 32>();
 
-      params.INPUT_OFFSET = serialParamsIn.Pop();
-      params.WEIGHT_OFFSET = serialParamsIn.Pop();
-      params.OUTPUT_OFFSET = serialParamsIn.Pop();
-      params.SOFTMAX = serialParamsIn.Pop();
-      params.SCALE = serialParamsIn.Pop();
-      params.TRANSPOSE = serialParamsIn.Pop();
-      params.VECTOR_OFFSET = serialParamsIn.Pop();
-      params.VEC_OP = serialParamsIn.Pop();
-      params.VEC_SUB = serialParamsIn.Pop();
-      params.VEC_SQUARE = serialParamsIn.Pop();
-      params.VEC_REDUCE = serialParamsIn.Pop();
-      params.CONST_SCALE = serialParamsIn.Pop();
-      params.VEC_SCALE_OFFSET = serialParamsIn.Pop();
-      params.VEC_SUB_OFFSET = serialParamsIn.Pop();
-      params.RELU = serialParamsIn.Pop();
+        std::cout << "Matrix Params Received" << std::endl;
+        std::cout << params << std::endl;
+        paramsOut.Push(params);
+      }
 
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 6; j++) {
-          params.loops[i][j] = serialParamsIn.Pop();
-        }
-      }
-      for (int i = 0; i < 2; i++) {
-        params.inputXLoopIndex[i] = serialParamsIn.Pop();
-      }
-      for (int i = 0; i < 2; i++) {
-        params.inputYLoopIndex[i] = serialParamsIn.Pop();
-      }
-      for (int i = 0; i < 2; i++) {
-        params.reductionLoopIndex[i] = serialParamsIn.Pop();
-      }
-      for (int i = 0; i < 2; i++) {
-        params.weightLoopIndex[i] = serialParamsIn.Pop();
-      }
-      params.fxIndex = serialParamsIn.Pop();
-      params.fyIndex = serialParamsIn.Pop();
-      for (int i = 0; i < 2; i++) {
-        params.weightReuseIndex[i] = serialParamsIn.Pop();
-      }
-      params.matMul = serialParamsIn.Pop();
-      params.STRIDE = serialParamsIn.Pop();
-      params.REPLICATION = serialParamsIn.Pop();
-      params.MAXPOOL = serialParamsIn.Pop();
+      // Vector Unit Params
+      while (serialParamsIn.Pop() == 1) {
+        VectorParams vectorParams = getSerializedParams<VectorParams, 32>();
 
-      params.BIAS = serialParamsIn.Pop();
-      params.BIAS_OFFSET = serialParamsIn.Pop();
+        std::cout << "Vector Params Received" << std::endl;
+        std::cout << vectorParams << std::endl;
 
-      params.RESIDUAL = serialParamsIn.Pop();
-      params.RESIDUAL_OFFSET = serialParamsIn.Pop();
+        vectorParamsOut.Push(vectorParams);
 
-      params.AVGPOOL = serialParamsIn.Pop();
+        VectorInstructionConfig vectorInstructionConfig =
+            getSerializedParams<VectorInstructionConfig, 32>();
 
-      paramsOut.Push(params);
+        std::cout << "Vector Instructions Received" << std::endl;
+        std::cout << vectorInstructionConfig << std::endl;
+
+        vectorInstructionsOut.Push(vectorInstructionConfig);
+      }
     }
   }
 };

@@ -10,7 +10,7 @@ SC_MODULE(InputController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<Params> paramsIn;
+  Connections::In<MatrixParams> paramsIn;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
@@ -24,10 +24,10 @@ SC_MODULE(InputController) {
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferIn);
   Connections::Out<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferOut);
 
-  Connections::Combinational<Params> CCS_INIT_S1(fetcherParams);
-  Connections::Combinational<Params> CCS_INIT_S1(writerParams);
-  Connections::Combinational<Params> CCS_INIT_S1(readerParams);
-  Connections::Combinational<Params> CCS_INIT_S1(windowBufferParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(windowBufferParams);
 
   SC_CTOR(InputController) {
     SC_THREAD(read_params);
@@ -58,7 +58,7 @@ SC_MODULE(InputController) {
     wait();
 
     while (true) {
-      Params params = fetcherParams.Pop();
+      MatrixParams params = fetcherParams.Pop();
 
       int FX = params.loops[1][params.fxIndex];
       if (params.REPLICATION) {
@@ -258,7 +258,7 @@ SC_MODULE(InputController) {
     wait();
 
     while (true) {
-      Params params = writerParams.Pop();
+      MatrixParams params = writerParams.Pop();
 
       bool bankSel = 0;
 
@@ -675,7 +675,7 @@ SC_MODULE(InputController) {
     wait();
 
     while (true) {
-      Params params = readerParams.Pop();
+      MatrixParams params = readerParams.Pop();
 
       int FX = params.loops[1][params.fxIndex];
       int FY = params.loops[1][params.fyIndex];
@@ -808,7 +808,7 @@ SC_MODULE(InputController) {
     windowBufferOut.Reset();
 
     while (true) {
-      Params params = windowBufferParams.Pop();
+      MatrixParams params = windowBufferParams.Pop();
       int loop_counters[2][6];
       int loop_bounds[2][6];
 
@@ -910,7 +910,7 @@ SC_MODULE(InputController) {
     wait();
 
     while (true) {
-      Params params = paramsIn.Pop();
+      MatrixParams params = paramsIn.Pop();
 
       fetcherParams.Push(params);
       writerParams.Push(params);

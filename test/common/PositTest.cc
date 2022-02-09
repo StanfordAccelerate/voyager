@@ -39,17 +39,17 @@ int main(int argc, char* argv[]) {
   // }
 
   std::cerr << "Testing posit fma." << std::endl;
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < 10000; i++) {
     float a = (double) rand() / RAND_MAX;
     float b = (double) rand() / RAND_MAX;
     float c = (double) rand() / RAND_MAX;
 
-    Posit<32, 2, 8, 23> pA(a);
-    Posit<32, 2, 8, 23> pB(b);
-    Posit<32, 2, 8, 23> pC(c);
-    PositFP<8, 23> fp1(pA);
-    PositFP<8, 23> fp2(pB);
-    PositFP<8, 23> fp3(pC);
+    Posit<8, 1, 8, 16> pA(a);
+    Posit<8, 1, 8, 16> pB(b);
+    Posit<8, 1, 8, 16> pC(c);
+    PositFP<8, 16> fp1(pA);
+    PositFP<8, 16> fp2(pB);
+    PositFP<8, 16> fp3(pC);
     fp1 = fp1.fma(pB, pC);
 
     Real rA = a;
@@ -59,7 +59,10 @@ int main(int argc, char* argv[]) {
 
     float gold = a * b + c;
 
-    if (gold != (float) fp1) {
+    float positDiff = abs(((float) fp1 - gold) / gold);
+    float refDiff = abs(((float) ref - gold) / gold);
+
+    if (gold != (float) fp1 && positDiff > refDiff) {
         // printf("a: %f, b: %f, c: %f\n", a, b, c);
         printf("float: %f,  hls: %f, universal: %f\n",  gold, (float) fp1, (float) ref);
     }

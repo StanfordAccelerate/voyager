@@ -4,7 +4,7 @@
 #include "src/ArchitectureParams.h"
 #include "test/common/VerificationTypes.h"
 
-void load_memory(const Params& params, const std::string& dataDir,
+void load_memory(const SimplifiedParams& params, const std::string& dataDir,
                  const Files& files, const MemoryMap& memoryMap,
                  bool useDataFile, INPUT_DATATYPE* sramMemory,
                  INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,

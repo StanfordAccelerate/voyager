@@ -5,8 +5,9 @@
 
 #include "AccelTypes.h"
 
-Harness::Harness(sc_module_name name, std::vector<Params> params_list, INPUT_DATATYPE *sram,
-                 INPUT_DATATYPE *rram, MemoryMap memoryMap)
+Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
+                 INPUT_DATATYPE *sram, INPUT_DATATYPE *rram,
+                 MemoryMap memoryMap)
     : sc_module(name),
       clk("clk", 1, SC_NS, 0.5, 0, SC_NS, true),
       params_list(params_list),
@@ -21,18 +22,16 @@ Harness::Harness(sc_module_name name, std::vector<Params> params_list, INPUT_DAT
   accelerator.inputDataResponse(inputDataResponse);
   accelerator.weightAddressRequest(weightAddressRequest);
   accelerator.weightDataResponse(weightDataResponse);
-  accelerator.vectorFetchAddressRequest(vectorAddressRequest);
-  accelerator.vectorFetchDataResponse(vectorDataResponse);
-  accelerator.scalarAddressRequest(scalarAddressRequest);
-  accelerator.scalarDataResponse(scalarDataResponse);
-  accelerator.varianceAddressRequest(varianceAddressRequest);
-  accelerator.varianceDataResponse(varianceDataResponse);
-  accelerator.biasAddressRequest(biasAddressRequest);
-  accelerator.biasDataResponse(biasDataResponse);
-  accelerator.residualAddressRequest(residualAddressRequest);
-  accelerator.residualDataResponse(residualDataResponse);
-  accelerator.vectorUnitOutput(vectorOutput);
-  accelerator.outputAddress(vectorOutputAddress);
+  accelerator.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
+  accelerator.vectorFetch0DataResponse(vectorFetch0DataResponse);
+  accelerator.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
+  accelerator.vectorFetch1DataResponse(vectorFetch1DataResponse);
+  accelerator.vectorFetch2AddressRequest(vectorFetch2AddressRequest);
+  accelerator.vectorFetch2DataResponse(vectorFetch2DataResponse);
+  accelerator.vectorOutput(vectorOutput);
+  accelerator.vectorOutputAddress(vectorOutputAddress);
+  accelerator.scalarUnitOutput(scalarUnitOutput);
+  accelerator.scalarOutputAddress(scalarOutputAddress);
   accelerator.startSignal(start);
   accelerator.doneSignal(done);
 
@@ -46,27 +45,23 @@ Harness::Harness(sc_module_name name, std::vector<Params> params_list, INPUT_DAT
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessVector);
+  SC_THREAD(memAccessVector0);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessScalar);
+  SC_THREAD(memAccessVector1);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessVariance);
+  SC_THREAD(memAccessVector2);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessBias);
+  SC_THREAD(storeVectorOutputs);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessResidual);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-
-  SC_THREAD(storeOutputs);
+  SC_THREAD(storeScalarOutputs);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -164,90 +159,244 @@ void Harness::memAccessWeights() {
   memAccessBurst(&weightAddressRequest, &weightDataResponse, memoryMap.weights);
 }
 
-void Harness::memAccessVector() {
-  memAccessPack(&vectorAddressRequest, &vectorDataResponse, memoryMap.inputs);
+void Harness::memAccessVector0() {
+  memAccessBurst(&vectorFetch0AddressRequest, &vectorFetch0DataResponse,
+                 memoryMap.inputs);
 }
 
-void Harness::memAccessScalar() {
-  memAccess(&scalarAddressRequest, &scalarDataResponse, memoryMap.inputs);
+void Harness::memAccessVector1() {
+  // FIXME: memory map should also be dependent on the layer being run
+  if (currentParams.FC) {
+    memAccessBurst(&vectorFetch1AddressRequest, &vectorFetch1DataResponse,
+                   memoryMap.weights);
+  } else {
+    memAccessBurst(&vectorFetch1AddressRequest, &vectorFetch1DataResponse,
+                   memoryMap.residual);
+  }
 }
 
-void Harness::memAccessVariance() {
-  memAccess(&varianceAddressRequest, &varianceDataResponse, memoryMap.inputs);
+void Harness::memAccessVector2() {
+  memAccessBurst(&vectorFetch2AddressRequest, &vectorFetch2DataResponse,
+                 memoryMap.bias);
 }
 
-void Harness::memAccessBias() {
-  memAccessBurst(&biasAddressRequest, &biasDataResponse, memoryMap.bias);
-}
+template <typename T, unsigned int interfaceWidth>
+void sendSerializedParams(T params,
+                          Connections::Combinational<int> *serialParamsIn) {
+  ac_int<T::width, false> serializedParam;
+  vector_to_type(TypeToBits<T>(params), false, &serializedParam);
 
-void Harness::memAccessResidual() {
-  memAccessBurst(&residualAddressRequest, &residualDataResponse,
-                 memoryMap.residual);
+  // round up to the nearest multiple of interfaceWidth
+  ac_int<((T::width + interfaceWidth - 1) / interfaceWidth) * interfaceWidth,
+         false>
+      serializedParamsPadded = serializedParam;
+
+  for (int i = 0; i < serializedParamsPadded.width / interfaceWidth; i++) {
+    serialParamsIn->Push(serializedParamsPadded.template slc<interfaceWidth>(
+        i * interfaceWidth));
+  }
 }
 
 void Harness::sendParams() {
+  done.ResetRead();
   serialParamsIn.ResetWrite();
 
   wait();
 
-  for (Params params : params_list){
-  serialParamsIn.Push(params.INPUT_OFFSET);
-  serialParamsIn.Push(params.WEIGHT_OFFSET);
-  serialParamsIn.Push(params.OUTPUT_OFFSET);
-  serialParamsIn.Push(params.SOFTMAX);
-  serialParamsIn.Push(params.SCALE);
-  serialParamsIn.Push(params.TRANSPOSE);
-  serialParamsIn.Push(params.VECTOR_OFFSET);
-  serialParamsIn.Push(params.VEC_OP);
-  serialParamsIn.Push(params.VEC_SUB);
-  serialParamsIn.Push(params.VEC_SQUARE);
-  serialParamsIn.Push(params.VEC_REDUCE);
-  serialParamsIn.Push(params.CONST_SCALE);
-  serialParamsIn.Push(params.VEC_SCALE_OFFSET);
-  serialParamsIn.Push(params.VEC_SUB_OFFSET);
-  serialParamsIn.Push(params.RELU);
+  for (SimplifiedParams params : params_list) {
+    currentParams = params;
 
-  for (int i = 0; i < 2; i++) {
-    for (int j = 0; j < 6; j++) {
-      serialParamsIn.Push(params.loops[i][j]);
+    // create Matrix and Vector Params from SimplifiedParams
+    if (params.SOFTMAX) {
+      // TODO
+    } else if (params.FC) {
+      // TODO
+    } else if (params.NO_NORM) {
+      // TODO
+    } else {
+      // matrix params
+      serialParamsIn.Push(1);
+
+      MatrixParams matrixParams;
+      matrixParams.INPUT_OFFSET = params.INPUT_OFFSET;
+      matrixParams.WEIGHT_OFFSET = params.WEIGHT_OFFSET;
+      matrixParams.OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+      matrixParams.SOFTMAX = params.SOFTMAX;
+      matrixParams.SCALE = 0;  // unused
+      matrixParams.TRANSPOSE = params.TRANSPOSE;
+      matrixParams.VECTOR_OFFSET = 0;     // unused
+      matrixParams.VEC_OP = 0;            // unused
+      matrixParams.VEC_SUB = 0;           // unused
+      matrixParams.VEC_SQUARE = 0;        // unused
+      matrixParams.VEC_REDUCE = 0;        // unused
+      matrixParams.CONST_SCALE = 0;       // unused
+      matrixParams.VEC_SCALE_OFFSET = 0;  // unused
+      matrixParams.VEC_SUB_OFFSET = 0;    // unused
+      matrixParams.RELU = params.RELU;
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          matrixParams.loops[i][j] = params.loops[i][j];
+        }
+        matrixParams.inputXLoopIndex[i] = params.inputXLoopIndex[i];
+        matrixParams.inputYLoopIndex[i] = params.inputYLoopIndex[i];
+        matrixParams.reductionLoopIndex[i] = params.reductionLoopIndex[i];
+        matrixParams.weightLoopIndex[i] = params.weightLoopIndex[i];
+        matrixParams.weightReuseIndex[i] = params.weightReuseIndex[i];
+      }
+      matrixParams.fxIndex = params.fxIndex;
+      matrixParams.fyIndex = params.fyIndex;
+      matrixParams.matMul = false;  // unused
+      matrixParams.STRIDE = params.STRIDE;
+      matrixParams.REPLICATION = params.REPLICATION;
+      matrixParams.MAXPOOL = params.MAXPOOL;
+      matrixParams.BIAS = params.BIAS;
+      matrixParams.BIAS_OFFSET = params.BIAS_OFFSET;
+      matrixParams.RESIDUAL = params.RESIDUAL;
+      matrixParams.RESIDUAL_OFFSET = params.RESIDUAL_OFFSET;
+      matrixParams.AVGPOOL = params.AVGPOOL;
+      sendSerializedParams<MatrixParams, 32>(matrixParams, &serialParamsIn);
+
+      serialParamsIn.Push(0);
+
+      serialParamsIn.Push(1);
+      VectorParams vectorParams;
+
+      vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
+      vectorParams.addressGen0Enable = false;  // use matrix unit outputs
+
+      // residual
+      vectorParams.ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
+      vectorParams.addressGen1Mode = params.RESIDUAL;
+
+      for (int i = 0; i < 3; i++) {
+        vectorParams.addressGen1Loops[0][i] = params.loops[0][i];
+      }
+      int residualLoopIndex = 0;
+      for (int i = 0; i < 6; i++) {
+        // ignore the loops not present in outputs (reduction, fx, fy)
+        if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
+            i == params.inputYLoopIndex[1]) {
+          vectorParams.addressGen1Loops[1][residualLoopIndex] =
+              params.loops[1][i];
+          residualLoopIndex++;
+        }
+      }
+      for (int i = 0; i < 2; i++) {
+        vectorParams.addressGen1InputXLoopIndex[i] = params.inputXLoopIndex[i];
+        vectorParams.addressGen1InputYLoopIndex[i] = params.inputYLoopIndex[i];
+        vectorParams.addressGen1WeightLoopIndex[i] = params.weightLoopIndex[i];
+      }
+
+      // bias
+      vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
+      vectorParams.addressGen2Mode = params.BIAS;
+      for (int i = 0; i < 3; i++) {
+        vectorParams.addressGen2Loops[0][i] = params.loops[0][i];
+      }
+      int biasLoopIndex = 0;
+      for (int i = 0; i < 6; i++) {
+        // ignore the loops not present in outputs (reduction, fx, fy)
+        if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
+            i == params.inputYLoopIndex[1]) {
+          vectorParams.addressGen2Loops[1][biasLoopIndex] = params.loops[1][i];
+          biasLoopIndex++;
+        }
+      }
+      for (int i = 0; i < 2; i++) {
+        vectorParams.addressGen2InputXLoopIndex[i] = params.inputXLoopIndex[i];
+        vectorParams.addressGen2InputYLoopIndex[i] = params.inputYLoopIndex[i];
+        vectorParams.addressGen2WeightLoopIndex[i] = params.weightLoopIndex[i];
+      }
+
+      vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+      vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+      vectorParams.scalarOutputCount = 0;
+      vectorParams.MAXPOOL = params.MAXPOOL;
+      vectorParams.AVGPOOL = params.AVGPOOL;
+
+      // output
+      for (int i = 0; i < 3; i++) {
+        vectorParams.outputLoops[0][i] = params.loops[0][i];
+      }
+      int outputLoopIndex = 0;
+      for (int i = 0; i < 6; i++) {
+        // ignore the loops not present in outputs (reduction, fx, fy)
+        if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
+            i == params.inputYLoopIndex[1]) {
+          vectorParams.outputLoops[1][outputLoopIndex] = params.loops[1][i];
+          outputLoopIndex++;
+        }
+      }
+      for (int i = 0; i < 2; i++) {
+        vectorParams.outputXLoopIndex[i] = params.inputXLoopIndex[i];
+        vectorParams.outputYLoopIndex[i] = params.inputYLoopIndex[i];
+        vectorParams.outputWeightLoopIndex[i] = params.weightLoopIndex[i];
+      }
+      sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
+
+      // create instruction stream
+      VectorInstructionConfig vectorInstructionConfig;
+      vectorInstructionConfig.inst[0].instType = VectorInstructions::vector;
+      vectorInstructionConfig.inst[0].vInput =
+          VectorInstructions::readFromSystolicArray;
+      if (params.RESIDUAL) {
+        vectorInstructionConfig.inst[0].vOp0Src1 =
+            VectorInstructions::readInterface;
+        vectorInstructionConfig.inst[0].vOp0 = VectorInstructions::vadd;
+      } else {
+        vectorInstructionConfig.inst[0].vOp0Src1 = VectorInstructions::nop;
+        vectorInstructionConfig.inst[0].vOp0 = VectorInstructions::nop;
+      }
+
+      vectorInstructionConfig.inst[0].vOp1 = VectorInstructions::nop;
+      vectorInstructionConfig.inst[0].vOp1 = VectorInstructions::nop;
+      vectorInstructionConfig.inst[0].vOp3Src0 =
+          VectorInstructions::nop;  // use existing
+
+      if (params.BIAS) {
+        vectorInstructionConfig.inst[0].vOp3Src1 =
+            VectorInstructions::readNormalInterface;
+        vectorInstructionConfig.inst[0].vOp3 = VectorInstructions::vadd;
+      } else {
+        vectorInstructionConfig.inst[0].vOp3Src1 = VectorInstructions::nop;
+        vectorInstructionConfig.inst[0].vOp3 = VectorInstructions::nop;
+      }
+
+      if (params.RELU) {
+        vectorInstructionConfig.inst[0].vOp4 = VectorInstructions::vrelu;
+      } else {
+        vectorInstructionConfig.inst[0].vOp4 = VectorInstructions::nop;
+      }
+
+      vectorInstructionConfig.inst[0].vDest = VectorInstructions::vWriteOut;
+
+      // total output count
+      vectorInstructionConfig.instCount[0] =
+          params.loops[0][params.inputXLoopIndex[0]] *
+          params.loops[1][params.inputXLoopIndex[1]] *
+          params.loops[0][params.inputYLoopIndex[0]] *
+          params.loops[1][params.inputYLoopIndex[1]] *
+          params.loops[0][params.weightLoopIndex[0]] *
+          params.loops[1][params.weightLoopIndex[1]];
+      std::cout << "count: " << vectorInstructionConfig.instCount[0]
+                << std::endl;
+      vectorInstructionConfig.instLen = 1;
+      vectorInstructionConfig.instLoopCount = 1;
+
+      sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
+                                                        &serialParamsIn);
+
+      serialParamsIn.Push(0);
+
+      done.SyncPop();
+      CCS_LOG("Accelerator Layer Finished.");
     }
-  }
-  for (int i = 0; i < 2; i++) {
-    serialParamsIn.Push(params.inputXLoopIndex[i]);
-  }
-  for (int i = 0; i < 2; i++) {
-    serialParamsIn.Push(params.inputYLoopIndex[i]);
-  }
-  for (int i = 0; i < 2; i++) {
-    serialParamsIn.Push(params.reductionLoopIndex[i]);
-  }
-  for (int i = 0; i < 2; i++) {
-    serialParamsIn.Push(params.weightLoopIndex[i]);
-  }
-  serialParamsIn.Push(params.fxIndex);
-  serialParamsIn.Push(params.fyIndex);
-  for (int i = 0; i < 2; i++) {
-    serialParamsIn.Push(params.weightReuseIndex[i]);
-  }
-  serialParamsIn.Push(params.matMul);
-  serialParamsIn.Push(params.STRIDE);
-  serialParamsIn.Push(params.REPLICATION);
-  serialParamsIn.Push(params.MAXPOOL);
 
-  serialParamsIn.Push(params.BIAS);
-  serialParamsIn.Push(params.BIAS_OFFSET);
-
-  serialParamsIn.Push(params.RESIDUAL);
-  serialParamsIn.Push(params.RESIDUAL_OFFSET);
-
-  serialParamsIn.Push(params.AVGPOOL);
-
-  CCS_LOG("Accelerator Params Sent.");
-  wait();
+    sc_stop();
   }
 }
 
-void Harness::storeOutputs() {
+void Harness::storeVectorOutputs() {
   vectorOutput.ResetRead();
   vectorOutputAddress.ResetRead();
 
@@ -262,41 +411,45 @@ void Harness::storeOutputs() {
   }
 }
 
+void Harness::storeScalarOutputs() {
+  scalarUnitOutput.ResetRead();
+  scalarOutputAddress.ResetRead();
+
+  wait();
+
+  while (true) {
+    Pack1D<OUTPUT_DATATYPE, DIMENSION> data = scalarUnitOutput.Pop();
+    int address = scalarOutputAddress.Pop();
+  }
+}
+
 void Harness::waitForStart() {
   start.ResetRead();
 
   wait();
 
   int i = 0;
-  for (Params params : params_list){
-  start.SyncPop();
-  CCS_LOG("Accelerator Layer "+ std::to_string(i) +" Started.");
-  i++;
+  for (SimplifiedParams params : params_list) {
+    start.SyncPop();
+    CCS_LOG("Accelerator Layer " + std::to_string(i) + " Started.");
+    i++;
   }
-
 }
-
 void Harness::waitForDone() {
-  done.ResetRead();
-  wait();
+  // done.ResetRead();
+  // wait();
 
-  for (Params params : params_list){
-    done.SyncPop();
-    CCS_LOG("Accelerator Layer Finished.");
-  }
+  // for (SimplifiedParams params : params_list) {
 
-  CCS_LOG("Accelerator Finished.");
-  sc_stop();
+  // }
+
+  // CCS_LOG("Accelerator Finished.");
+  // sc_stop();
 }
 
-// void run_op(const Params params, INPUT_DATATYPE *sramMemory,
-//             INPUT_DATATYPE *rramMemory, MemoryMap memoryMap) {
-//   Harness harness("harness", params, sramMemory, rramMemory, memoryMap);
-//   sc_start();
-// }
-
-void run_op(std::vector<Params> params_list, INPUT_DATATYPE *sramMemory,
-            INPUT_DATATYPE *rramMemory, MemoryMap memoryMap) {
+void run_op(std::vector<SimplifiedParams> params_list,
+            INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
+            MemoryMap memoryMap) {
   Harness harness("harness", params_list, sramMemory, rramMemory, memoryMap);
   sc_start();
 }

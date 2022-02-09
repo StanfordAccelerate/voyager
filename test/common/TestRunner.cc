@@ -19,7 +19,7 @@
 
 // NOTE: Binary data files are always supplied in [Y][X][C][K] ordering
 
-void validateMapping(Params params) {
+void validateMapping(SimplifiedParams params) {
   int x0 = params.loops[1][params.inputXLoopIndex[1]];
   int y0 = params.loops[1][params.inputYLoopIndex[1]];
   int c0 = params.loops[1][params.reductionLoopIndex[1]];
@@ -27,6 +27,11 @@ void validateMapping(Params params) {
   int fx = params.loops[1][params.fxIndex];
   int fy = params.loops[1][params.fyIndex];
   int stride = params.STRIDE;
+
+  if (params.FC || params.SOFTMAX ||
+      params.NO_NORM) {  // don't check for vector ops
+    return;
+  }
 
   // Input buffer
   int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy - 1);
@@ -52,13 +57,9 @@ void validateMapping(Params params) {
   }
 }
 
-int run_complete(const std::string& dataDir,
-             const Files& files)
-             {
-  bool useDataFile = true;
-  MemoryMap& memoryMap = resnetMemoryMap["conv1"];
-  Params params = resnetParams["conv1"];
-
+int run_test(SimplifiedParams params, const std::string& dataDir,
+             const Files& files, const MemoryMap& memoryMap, bool useDataFile,
+             std::string& fileOutputPrefix) {
   validateMapping(params);
 
 
@@ -89,6 +90,13 @@ int run_complete(const std::string& dataDir,
             << " * "
             << "(" << FX << "x" << FY << "x" << C << "x" << K << ")"
             << std::endl;
+
+  std::cout << "Additional Ops: " << std::endl;
+  std::cout << "Bias: " << params.BIAS << std::endl;
+  std::cout << "Residual: " << params.RESIDUAL << std::endl;
+  std::cout << "Relu: " << params.RELU << std::endl;
+  std::cout << "Maxpool: " << params.MAXPOOL << std::endl;
+  std::cout << "Avgpool: " << params.AVGPOOL << std::endl;
 
   std::cout << "Using the following memory map:" << std::endl;
   std::cout << "Inputs: " << (memoryMap.inputs == 0 ? "SRAM" : "RRAM")
@@ -252,7 +260,7 @@ int run_test(const Params params, const std::string& dataDir,
 }
 
 int sc_main(int argc, char* argv[]) {
-  Params params;
+  SimplifiedParams params;
 
   const char* groupName = std::getenv("GROUP");
   const char* testName = std::getenv("TEST");
@@ -271,7 +279,7 @@ int sc_main(int argc, char* argv[]) {
 
   std::cout << "Running: " << group << ": " << test << std::endl;
 
-  std::map<std::string, Params>* mapPtr;
+  std::map<std::string, SimplifiedParams>* mapPtr;
 
   if (group == "simple") {
     mapPtr = &simple;

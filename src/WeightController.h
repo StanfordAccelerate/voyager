@@ -10,7 +10,7 @@ SC_MODULE(WeightController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<Params> paramsIn;
+  Connections::In<MatrixParams> paramsIn;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
@@ -21,10 +21,10 @@ SC_MODULE(WeightController) {
   Connections::Out<int> readAddress[2];
   Connections::Out<int> readControl[2];
 
-  Connections::Combinational<Params> CCS_INIT_S1(fetcherParams);
-  Connections::Combinational<Params> CCS_INIT_S1(writerParams);
-  Connections::Combinational<Params> CCS_INIT_S1(readerParams);
-  Connections::Combinational<Params> CCS_INIT_S1(transposerParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
 
   Connections::Combinational<Pack1D<DTYPE, NCOLS> > transposeOut;
 
@@ -57,7 +57,7 @@ SC_MODULE(WeightController) {
     wait();
 
     while (true) {
-      Params params = fetcherParams.Pop();
+      MatrixParams params = fetcherParams.Pop();
 
       int loop_counters[2][6];
       int loop_bounds[2][6];
@@ -194,7 +194,7 @@ SC_MODULE(WeightController) {
     wait();
 
     while (true) {
-      Params params = writerParams.Pop();
+      MatrixParams params = writerParams.Pop();
 
       bool bankSel = 0;
 
@@ -340,7 +340,7 @@ SC_MODULE(WeightController) {
     wait();
 
     while (true) {
-      Params params = readerParams.Pop();
+      MatrixParams params = readerParams.Pop();
 
       bool bankSel = 0;
 
@@ -519,7 +519,7 @@ SC_MODULE(WeightController) {
     wait();
 
     while (true) {
-      Params params = transposerParams.Pop();
+      MatrixParams params = transposerParams.Pop();
 
       int loop_counters[2][6];
       int loop_bounds[2][6];
@@ -655,7 +655,7 @@ SC_MODULE(WeightController) {
     wait();
 
     while (true) {
-      Params params = paramsIn.Pop();
+      MatrixParams params = paramsIn.Pop();
 
       fetcherParams.Push(params);
       writerParams.Push(params);

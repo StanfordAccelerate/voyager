@@ -43,7 +43,7 @@ SC_MODULE(MatrixProcessor) {
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(weightsChannel);
   Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(outputsChannel);
 
-  Connections::In<Params> CCS_INIT_S1(paramsIn);
+  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
 
   Connections::Combinational<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(
       inputsToSystolicArray);
@@ -201,7 +201,7 @@ SC_MODULE(MatrixProcessor) {
     wait();
 
     while (true) {
-      Params params = paramsIn.Pop();
+      MatrixParams params = paramsIn.Pop();
 
       int loop_counters[2][6];
       int loop_counters_out[2][6];

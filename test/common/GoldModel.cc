@@ -15,49 +15,61 @@ ACCUM_DATATYPE fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
 #endif
 }
 
-void run_gold_op(const Params params, INPUT_DATATYPE *matrixA,
+void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
                  INPUT_DATATYPE *matrixB, OUTPUT_DATATYPE *matrixC,
                  INPUT_DATATYPE *biasMatrix, OUTPUT_DATATYPE *residualMatrix) {
   std::cout << "Running gold model " << std::endl;
 
-  if (params.VEC_OP) {
-    // FIXME!
-    // if (params.VEC_REDUCE) {
-    //   for (int m = 0; m < inputs; m++) {
-    //     OUTPUT_DATATYPE acc = 0;
-    //     for (int p = 0; p < weights * DIMENSION; p++) {
-    //       int index = m * (weights * DIMENSION) + p;
-    //       OUTPUT_DATATYPE tmp = matrixA[index];
-    //       if (params.VEC_SUB) {
-    //         tmp -= matrixB[m];
-    //       }
+  if (params.SOFTMAX) {
+    // 2D softmax
+    for (int i = 0; i < params.loops[1][params.inputYLoopIndex[1]]; i++) {
+      // find max value
+      ACCUM_DATATYPE max = 0;
+      for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
+        int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
+        if (matrixA[index] > max) {
+          max = matrixA[index];
+        }
+      }
 
-    //       if (params.VEC_SQUARE) {
-    //         tmp *= tmp;
-    //       }
+      // subtract max, exp, and sum
+      ACCUM_DATATYPE sum = 0;
+      for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
+        int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
+        matrixC[index] = matrixA[index] - max;
+        matrixC[index].exp();
+        sum += matrixC[index];
+      }
+      sum.reciprocal();
 
-    //       acc += tmp;
-    //     }
+      // div
+      for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
+        int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
+        matrixC[index] = matrixC[index] * sum;
+      }
+    }
+  } else if (params.FC) {
+    // fully connected layer (matrix-vector)
+    int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+    int K = params.loops[0][params.weightLoopIndex[0]] *
+            params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+    for (int k = 0; k < K; k++) {
+      ACCUM_DATATYPE acc = 0;
+      for (int c = 0; c < C; c++) {
+        ACCUM_DATATYPE a = matrixA[c];
+        ACCUM_DATATYPE b = matrixB[c * K + k];
 
-    //     matrixC[m] = acc / params.SCALE;
-    //   }
-    // } else {
-    //   for (int m = 0; m < inputs; m++) {
-    //     for (int p = 0; p < weights * DIMENSION; p++) {
-    //       int index = m * (weights * DIMENSION) + p;
-    //       OUTPUT_DATATYPE tmp = matrixA[index];
+        acc = fma(a, b, acc);
+      }
 
-    //       if (params.VEC_SUB) {
-    //         tmp -= matrixB[m];
-    //       }
-    //       if (!params.CONST_SCALE) {
-    //         tmp /= matrixC[m];
-    //       }
+      if (params.BIAS) {
+        acc += biasMatrix[k];
+      }
 
-    //       matrixA[index] = tmp;
-    //     }
-    //   }
-    // }
+      matrixC[k] = acc;
+    }
+  } else if (params.NO_NORM) {
+    // not yet implemented
   } else {  // normal operation
 
     int X = params.loops[0][params.inputXLoopIndex[0]] *

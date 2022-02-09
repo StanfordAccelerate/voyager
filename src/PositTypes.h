@@ -39,13 +39,6 @@ void convert_(const bool sign, const int scale, const ac_int<fbits, false> fract
     sticky_bit = fraction_in << (nf + 1) ? 0x1 : 0x0;
     pt_bits = regime | exponent | fraction | sticky_bit;
 
-    // std::cerr << "fraction_in: " << fraction_in.to_string(AC_BIN) << std::endl;
-    // std::cerr << "regime: " << regime.to_string(AC_BIN) << std::endl;
-		// std::cerr << "exponent: " << exponent.to_string(AC_BIN) << std::endl;
-		// std::cerr << "fraction: " << fraction.to_string(AC_BIN) << std::endl;
-		// std::cerr << "sticky_bit: " << sticky_bit.to_string(AC_BIN) << std::endl;
-    // std::cerr << "pt_bits: " << pt_bits.to_string(AC_BIN) << std::endl;
-
     int len = 1 + max(nbits + 1, 2 + run + es);
     bool blast = pt_bits[len - nbits];
     bool bafter = pt_bits[len - nbits - 1];
@@ -98,9 +91,6 @@ union ufloat {
 
 template<int fbits>
 float to_float(const bool sign, const int scale, ac_int<fbits, false> fraction) {
-  // std::cerr << "sign: " << sign << std::endl
-  //           << "scale: " << scale << std::endl
-  //           << "fraction: " << fraction.to_string(AC_BIN) << std::endl;
   union ufloat uf;
   uf.u = sign ? 1 << 31 : 0;
   uf.u += (scale + 127) << 23;
@@ -108,7 +98,6 @@ float to_float(const bool sign, const int scale, ac_int<fbits, false> fraction) 
   fraction <<= 1;  // remove hidden bit
   ac_int<23, false> mantissa = fraction.template slc<23>(23 >= fbits ? 0 : fbits - 23);
   uf.u += (mantissa << max(22 - (fbits - 1), 0));
-  // std::cerr << "decoded value: " << uf.f << std::endl;
   return uf.f;
 }
 
@@ -148,10 +137,16 @@ class Posit {
 
   void sigmoid() {
     // invert MSB
-    ac_int<1, false> msb = bits.slc<1>(7);
-    bits.set_slc(7, msb.bit_complement());
+    // bits.set_slc(7, (bits.slc<1>(7).bit_complement()));
+
+    // ac_int<1, false> msb = bits.slc<1>(7);
+    bits[nbits - 1] = ~bits[nbits - 1];
+
+    // bits.set_slc(7, bits.slc<1>(7).bit_complement());
     bits = bits >> 2;
   }
+
+  void exp();
 
   // overridden operators
   template <int nbits2, int es2>
@@ -178,13 +173,13 @@ class Posit {
                               const std::string &name) {
     sc_trace(tf, posit.bits, name + ".bits");
   }
-
-  inline friend std::ostream &operator<<(ostream &os, const Posit &posit) {
-    os << posit.bits << " ";
-
-    return os;
-  }
 #endif
+
+  // inline friend std::ostream &operator<<(ostream &os, const Posit &posit) {
+  //   os << posit.bits << " ";
+
+  //   return os;
+  // }
 };
 
 template <int nbits, int es, int sbits, int fbits>
@@ -304,6 +299,8 @@ class PositFP {
 
   PositFP() {}
 
+#pragma hls_design ccore
+#pragma ccore_type combinational
   template <int nbits, int es>
   PositFP(const Posit<nbits, es, sbits, fbits> &input);
   
@@ -422,13 +419,12 @@ PositFP<sbits, fbits> PositFP<sbits, fbits>::operator*(
 
   result.sign = lhs.sign ^ rhs.sign;
   result.scale = lhs.scale + rhs.scale;
+  result.fraction = (lhs.fraction >> (fbits/2)) * (rhs.fraction >> (fbits - fbits/2));
 
-  ac_int<fbits+fbits, false> product = (lhs.fraction >> ) * rhs.fraction;
-  if (product[2*fbits-1]) {
+  if (result.fraction[fbits-1]) {
     result.scale++;
-    result.fraction = product >> fbits;
   } else {
-    result.fraction = product >> (fbits - 1);
+    result.fraction <<= 1;
   }
 
   return result;
@@ -504,3 +500,29 @@ inline bool operator==(const Posit<nbits, es, sbits, fbits> &lhs,
                        const Posit<nbits, es, sbits, fbits> &rhs) {
   return lhs.bits == rhs.bits;
 }
+
+// template <int sbits, int fbits>
+// class Wrapped<PositFP<sbits, fbits> > {
+//  public:
+//   typedef PositFP<sbits, fbits> Type;
+//   Type val;
+//   Wrapped() {}
+//   Wrapped(const Type &v) : val(v) {}
+//   static const unsigned int width = Type::width;
+//   static const bool is_signed = false;
+//   template <unsigned int Size>
+//   void Marshall(Marshaller<Size> &m) {
+//     m &val.sign;
+//     m &val.scale;
+//     m &val.fraction;
+//   }
+// };
+
+// template <unsigned int Size, int sbits, int fbits>
+// Marshaller<Size> &operator&(Marshaller<Size> &m, PositFP<sbits, fbits> &rhs) {
+//   typedef PositFP<sbits, fbits> Type;
+//   m.template AddField<ac_int<1, false>, 1>(rhs.sign);
+//   m.template AddField<ac_int<sbits, true>, sbits>(rhs.scale);
+//   m.template AddField<ac_int<fbits, false>, fbits>(rhs.fraction);
+//   return m;
+// }

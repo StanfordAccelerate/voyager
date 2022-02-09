@@ -7,6 +7,8 @@
 #include <stdint.h>
 #include "universal/number/posit/posit.hpp"
 
+#define VERBOSE
+
 using Real = sw::universal::posit<8, 1>;
 
 void print_posit(Real posit) {
@@ -36,7 +38,6 @@ assert(vec.size() == 1000);
   Real mx;
   uint64_t tmp = (uint64_t)vec[0];
   memcpy(&mx, &tmp, sizeof(Real));
-  // mx = *reinterpret_cast<Real*>(&tmp);
   print_posit(mx);
 
   for (int i = 0;i < vec.size();i++)
@@ -44,8 +45,9 @@ assert(vec.size() == 1000);
     Real posit;
 tmp = (uint64_t)vec[i];
     memcpy(&posit, &tmp, sizeof(Real));
+    #ifdef VERBOSE
         std::cout << posit << " " << mx <<" "<< i << std::endl;
-        // break;
+    #endif VERBOSE
 
       if (posit >= mx)
       {
@@ -81,12 +83,13 @@ int main(int argc, char **argv)
     throw std::runtime_error("File \"" + outfile + "\" does not exist");
 
 std::string postring = std::to_string(pos) + '\n';
-// std::cout << pos << " " <<postring << std::endl;
+#ifdef VERBOSE
+std::cout << pos << " " <<postring << std::endl;
+#endif
   wf.write(postring.c_str(), sizeof(postring.size()));
   wf.close();
 
 
     
-//   rewrite_data(std::string(argv[1]), std::string(argv[2]));
   return 0;
 }
