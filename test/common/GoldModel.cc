@@ -2,19 +2,19 @@
 
 #include <algorithm>
 
-ACCUM_DATATYPE fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
-                   ACCUM_DATATYPE psum) {
-#ifdef POSIT
-  // INTERMEDIATE_DATATYPE intermediate_weight = weight;
-  // INTERMEDIATE_DATATYPE intermediate_result =
-  //     intermediate_weight.fma(input, psum);
-  // ACCUM_DATATYPE result = intermediate_result;
-  // return result;
-  return fma(input, weight, psum);
-#else
-  return input * weight + psum;
-#endif
-}
+// ACCUM_DATATYPE gold_fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
+//                    ACCUM_DATATYPE psum) {
+// #ifdef POSIT
+//   // INTERMEDIATE_DATATYPE intermediate_weight = weight;
+//   // INTERMEDIATE_DATATYPE intermediate_result =
+//   //     intermediate_weight.fma(input, psum);
+//   // ACCUM_DATATYPE result = intermediate_result;
+//   // return result;
+//   return fma(input, weight, psum);
+// #else
+//   return input * weight + psum;
+// #endif
+// }
 
 void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
                  INPUT_DATATYPE *matrixB, OUTPUT_DATATYPE *matrixC,
@@ -60,7 +60,8 @@ void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
         ACCUM_DATATYPE a = matrixA[c];
         ACCUM_DATATYPE b = matrixB[c * K + k];
 
-        acc = fma(a, b, acc);
+        // FIXME!
+        // acc = fma(a, b, acc);
       }
 
       if (params.BIAS) {
@@ -126,10 +127,10 @@ void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
                     STRIDE * y + fy >= 0 &&
                     STRIDE * y + fy < STRIDE * Y) {  // check if in bounds
 
-                  ACCUM_DATATYPE a =
+                  INPUT_DATATYPE a =
                       matrixA[(STRIDE * y + fy) * STRIDE * X * C +
                               (STRIDE * x + fx) * C + c];
-                  ACCUM_DATATYPE b =
+                  INPUT_DATATYPE b =
                       matrixB[(fy + (FY - 1) / 2) * FX * C * K +
                               (fx + (FX - 1) / 2) * C * K + c * K + k];
 
@@ -199,7 +200,7 @@ void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
             acc += tmpMatrixC[y * X * K + x * K + k];
           }
         }
-        matrixC[k] = acc / (Y * X); // Average
+        matrixC[k] = acc / (Y * X);  // Average
       }
 
       delete[] tmpMatrixC;
