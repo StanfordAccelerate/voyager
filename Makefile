@@ -1,7 +1,7 @@
 CC = /cad/mentor/2021.1/Mgc_home/bin/g++
 CC17 = /opt/rh/devtoolset-10/root/bin/g++
 CPPFLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++11 -DCONNECTIONS_FAST_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_NAMING_ORIGINAL -g
-POSIT_FLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++17
+POSIT_FLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++17 -g
 LDFLAGS = -lsystemc
 LDLIBS = -L/cad/mentor/2021.1/Mgc_home/shared/lib/
 TEST ?= simple

@@ -12,10 +12,17 @@ void load_memory(const SimplifiedParams& params, const std::string& dataDir,
                  INPUT_DATATYPE* residualMatrix, INPUT_DATATYPE* matrixC,
                  INPUT_DATATYPE* dataFileOutput);
 
-void load_wb(const Params& params, const std::string& dataDir,
+void load_wb(const SimplifiedParams& params, const std::string& dataDir,
                  const Files& files, const MemoryMap& memoryMap,
                  bool useDataFile, INPUT_DATATYPE* sramMemory,
                  INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,
                  INPUT_DATATYPE* matrixB, INPUT_DATATYPE* biasMatrix,
                  INPUT_DATATYPE* residualMatrix, INPUT_DATATYPE* matrixC,
                  INPUT_DATATYPE* dataFileOutput);
+
+void load_inputs(const SimplifiedParams& params, const std::string& filename,
+                 bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
+                 INPUT_DATATYPE* goldMemory);
+                 
+void load_datafile_outputs(const SimplifiedParams params, const std::string& filename,
+                           INPUT_DATATYPE* outputMatrix);

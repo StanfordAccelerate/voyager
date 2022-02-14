@@ -781,8 +781,10 @@ void module_add(const value<fbits>& lhs, const value<fbits>& rhs, value<abits + 
 	int lhs_scale = lhs.scale(), rhs_scale = rhs.scale(), scale_of_result = std::max(lhs_scale, rhs_scale);
 
 	// align the fractions
+	// std::cerr << "rhs.fraction: " << rhs.fraction() << std::endl;
 	bitblock<abits> r1 = lhs.template nshift<abits>(lhs_scale - scale_of_result + 3);
 	bitblock<abits> r2 = rhs.template nshift<abits>(rhs_scale - scale_of_result + 3);
+	// std::cerr << "r2: " << r2 << std::endl;
 	bool r1_sign = lhs.sign(), r2_sign = rhs.sign();
 	bool signs_are_different = r1_sign != r2_sign;
 
@@ -803,6 +805,9 @@ void module_add(const value<fbits>& lhs, const value<fbits>& rhs, value<abits + 
 
 	bitblock<abits + 1> sum;
 	const bool carry = add_unsigned(r1, r2, sum);
+	// std::cerr << "r1: " << r1 << std::endl;
+	// std::cerr << "r2: " << r2 << std::endl;
+	// std::cerr << "sum: " << sum << std::endl;
 
 	if (_trace_value_add) std::cout << (r1_sign ? "sign -1" : "sign  1") << " carry " << std::setw(3) << (carry ? 1 : 0) << " sum     " << sum << std::endl;
 
@@ -831,6 +836,7 @@ void module_add(const value<fbits>& lhs, const value<fbits>& rhs, value<abits + 
 	sum <<= abits - hpos + 1;
 	if (_trace_value_add) std::cout << (r1_sign ? "sign -1" : "sign  1") << " scale " << std::setw(3) << scale_of_result << " sum     " << sum << std::endl;
 	result.set(r1_sign, scale_of_result, sum, false, false, false);
+	// std::cerr << "fraction ref: " << sum << std::endl;
 }
 
 // subtract module: use ADDER

@@ -49,7 +49,7 @@ void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
 template <typename ACC_DTYPE, int WIDTH>
 void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
   // convert to Posit16
-  Pack1D<Posit<16, 0, 8, 16>, WIDTH> tmp;
+  Pack1D<Posit<16, 1>, WIDTH> tmp;
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
     tmp[i] = op0[i];
@@ -73,7 +73,7 @@ template <typename ACC_DTYPE, int WIDTH>
 void vdiv(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
           Pack1D<ACC_DTYPE, WIDTH>& res) {
   // convert to Posit16
-  Pack1D<Posit<16, 0, 8, 16>, WIDTH> tmp;
+  Pack1D<Posit<16, 1>, WIDTH> tmp;
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
     tmp[i] = op0[i];

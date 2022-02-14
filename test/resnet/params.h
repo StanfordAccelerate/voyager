@@ -614,7 +614,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                        // no-norm
      }}};
 
-std::array<std::string, 21> resnet_order{"conv1",
+std::array<std::string, 22> resnet_order{"conv1",
                                          "layer1_0_conv1",
                                          "layer1_0_conv2",
                                          "layer1_1_conv1",
@@ -634,7 +634,8 @@ std::array<std::string, 21> resnet_order{"conv1",
                                          "layer4_0_conv2",
                                          "layer4_1_conv1",
                                          "layer4_1_conv2",
-                                         "fc"};
+                                         "fc",
+                                         "softmax"};
 
 std::string resnetDataDir = "data/resnet/";
 

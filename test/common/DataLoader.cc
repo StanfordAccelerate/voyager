@@ -34,7 +34,9 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
     }
   }
 
-  if (params.REPLICATION) {
+  // if (params.REPLICATION) {
+    // TODO:WARNING:CHANGE: quick fix
+  if (false) {
     for (int y = 0; y < STRIDE * Y; y++) {
       for (int x_o = 0; x_o < (STRIDE * X) / 4; x_o++) {
         for (int x_i = 0; x_i < 4; x_i++) {  // 4 packed together
@@ -96,7 +98,6 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
     if (!is.good())
       throw std::runtime_error("File \"" + filename + "\" does not exist");
     is.read(tmpValues, size);
-
   } else {
     for (int i = 0; i < size; i++) {
       tmpValues[i] = rand() % 128;
@@ -262,6 +263,21 @@ void load_datafile_outputs(const SimplifiedParams params, const std::string& fil
   delete[] tmpValues;
 }
 
+void load_wb(const SimplifiedParams& params, const std::string& dataDir,
+                 const Files& files, const MemoryMap& memoryMap,
+                 bool useDataFile, INPUT_DATATYPE* sramMemory,
+                 INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,
+                 INPUT_DATATYPE* matrixB, INPUT_DATATYPE* biasMatrix,
+                 INPUT_DATATYPE* residualMatrix, INPUT_DATATYPE* matrixC,
+                 INPUT_DATATYPE* dataFileOutput) {
+  load_weights(params, dataDir + files.weights_file, useDataFile,
+               memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB);
+  if (params.BIAS) {
+    load_bias(params, dataDir + files.bias_file, useDataFile,
+              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix);
+  }
+                 }
+
 void load_memory(const SimplifiedParams& params, const std::string& dataDir,
                  const Files& files, const MemoryMap& memoryMap,
                  bool useDataFile, INPUT_DATATYPE* sramMemory,
@@ -284,20 +300,5 @@ void load_memory(const SimplifiedParams& params, const std::string& dataDir,
   }
   if (useDataFile) {
     load_datafile_outputs(params, dataDir + files.outputs_file, dataFileOutput);
-  }
-}
-
-void load_wb(const Params& params, const std::string& dataDir,
-                 const Files& files, const MemoryMap& memoryMap,
-                 bool useDataFile, INPUT_DATATYPE* sramMemory,
-                 INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,
-                 INPUT_DATATYPE* matrixB, INPUT_DATATYPE* biasMatrix,
-                 INPUT_DATATYPE* residualMatrix, INPUT_DATATYPE* matrixC,
-                 INPUT_DATATYPE* dataFileOutput) {
-  load_weights(params, dataDir + files.weights_file, useDataFile,
-               memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB);
-  if (params.BIAS) {
-    load_bias(params, dataDir + files.bias_file, useDataFile,
-              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix);
   }
 }

@@ -5,11 +5,12 @@
 ACCUM_DATATYPE fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
                    ACCUM_DATATYPE psum) {
 #ifdef POSIT
-  INTERMEDIATE_DATATYPE intermediate_weight = weight;
-  INTERMEDIATE_DATATYPE intermediate_result =
-      intermediate_weight.fma(input, psum);
-  ACCUM_DATATYPE result = intermediate_result;
-  return result;
+  // INTERMEDIATE_DATATYPE intermediate_weight = weight;
+  // INTERMEDIATE_DATATYPE intermediate_result =
+  //     intermediate_weight.fma(input, psum);
+  // ACCUM_DATATYPE result = intermediate_result;
+  // return result;
+  return fma(input, weight, psum);
 #else
   return input * weight + psum;
 #endif
@@ -198,7 +199,7 @@ void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
             acc += tmpMatrixC[y * X * K + x * K + k];
           }
         }
-        matrixC[k] = acc;
+        matrixC[k] = acc / (Y * X); // Average
       }
 
       delete[] tmpMatrixC;
