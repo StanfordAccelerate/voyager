@@ -135,8 +135,8 @@ if __name__ == "__main__":
         for key, value in new_dict.items():
             prefilename = outputfolder + "/" + "pre" + clean_name(key)
             postfilename = outputfolder + "/" + clean_name(key)
-            write_fp64(prefilename, value)
-            os.system("./tools/decode " + prefilename + " " + postfilename)
+            write_fp64(postfilename, value)
+            #os.system("./tools/decode " + prefilename + " " + postfilename)
             print(postfilename)
 
     infile.close()
