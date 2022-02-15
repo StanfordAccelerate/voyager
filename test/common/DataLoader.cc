@@ -1,8 +1,42 @@
 #include "test/common/DataLoader.h"
 
+#include <fstream>
+#include <iostream>
+
+void save_double(INPUT_DATATYPE* array, double val) {
+  float fval = (float)val;
+  *array = INPUT_DATATYPE(fval);
+}
+
+void save_double(UniversalPosit* array, double val) {
+  float fval = (float)val;
+  *array = fval;
+}
+
+double* read_file_as_double(const std::string& filename, int size,
+                            bool useDataFile) {
+  // Files are written in binary format as dtype=float64 (double in c)
+  char* tmpValuesArray = new char[size * sizeof(double)];
+  double* tmpValuePtr = (double*)tmpValuesArray;
+
+  if (useDataFile) {
+    std::ifstream is(filename, std::ios::binary);
+    if (!is.good())
+      throw std::runtime_error("File \"" + filename + "\" does not exist");
+    is.read(tmpValuesArray, size * sizeof(double));
+  } else {
+    for (int i = 0; i < size; i++) {
+      tmpValuePtr[i] = rand() % 128;
+    }
+  }
+
+  return tmpValuePtr;
+}
+
 void load_inputs(const SimplifiedParams& params, const std::string& filename,
                  bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
-                 INPUT_DATATYPE* goldMemory) {
+                 INPUT_DATATYPE* goldMemory,
+                 UniversalPosit* universalGoldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -19,36 +53,26 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
   }
 
   int size = STRIDE * Y * STRIDE * X * C;
-  char* tmpValues = new char[size];
-  char* tmpValuePtr = tmpValues;
 
-  if (useDataFile) {
-    std::ifstream is(filename, std::ios::binary);
-    if (!is.good())
-      throw std::runtime_error("File \"" + filename + "\" does not exist");
-    is.read(tmpValues, size);
-
-  } else {
-    for (int i = 0; i < size; i++) {
-      tmpValues[i] = rand() % 128;
-    }
-  }
+  double* tmpValues = read_file_as_double(filename, size, useDataFile);
+  double* tmpValuePtr = tmpValues;
 
   // if (params.REPLICATION) {
-    // TODO:WARNING:CHANGE: quick fix
+  // TODO:WARNING:CHANGE: quick fix
   if (false) {
     for (int y = 0; y < STRIDE * Y; y++) {
       for (int x_o = 0; x_o < (STRIDE * X) / 4; x_o++) {
         for (int x_i = 0; x_i < 4; x_i++) {  // 4 packed together
           for (int c = 0; c < C; c++) {
             int x = x_o * 4 + x_i;
-            int val = (int)*(tmpValuePtr++);
+            double val = *(tmpValuePtr++);
 
             int address = y * ((STRIDE * X) / 4) * 16 + x_o * 16 + x_i * 3 + c;
-            acceleratorMemory[params.INPUT_OFFSET + address] = val;
+            save_double(&acceleratorMemory[params.INPUT_OFFSET + address], val);
 
             address = y * (STRIDE * X) * C + x * C + c;
-            goldMemory[address] = val;
+            save_double(&goldMemory[address], val);
+            save_double(&universalGoldMemory[address], val);
           }
         }
       }
@@ -57,12 +81,13 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
     for (int y = 0; y < STRIDE * Y; y++) {
       for (int x = 0; x < STRIDE * X; x++) {
         for (int c = 0; c < C; c++) {
-          int val = (int)*(tmpValuePtr++);
+          double val = *(tmpValuePtr++);
 
           int address = y * (STRIDE * X) * C + x * C + c;
 
-          acceleratorMemory[params.INPUT_OFFSET + address] = val;
-          goldMemory[address] = val;
+          save_double(&acceleratorMemory[params.INPUT_OFFSET + address], val);
+          save_double(&goldMemory[address], val);
+          save_double(&universalGoldMemory[address], val);
         }
       }
     }
@@ -73,7 +98,8 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
 
 void load_weights(const SimplifiedParams& params, const std::string& filename,
                   bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
-                  INPUT_DATATYPE* goldMemory) {
+                  INPUT_DATATYPE* goldMemory,
+                  UniversalPosit* universalGoldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -90,29 +116,19 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
   }
 
   int size = FY * FX * C * K;
-  char* tmpValues = new char[size];
-  char* tmpValuePtr = tmpValues;
-
-  if (useDataFile) {
-    std::ifstream is(filename, std::ios::binary);
-    if (!is.good())
-      throw std::runtime_error("File \"" + filename + "\" does not exist");
-    is.read(tmpValues, size);
-  } else {
-    for (int i = 0; i < size; i++) {
-      tmpValues[i] = rand() % 128;
-    }
-  }
+  double* tmpValues = read_file_as_double(filename, size, useDataFile);
+  double* tmpValuePtr = tmpValues;
 
   for (int fy = 0; fy < FY; fy++) {
     for (int fx = 0; fx < FX; fx++) {
       for (int c = 0; c < C; c++) {
         for (int k = 0; k < K; k++) {
           int address = fy * FX * C * K + fx * C * K + c * K + k;
-          int val = (int)*(tmpValuePtr++);
+          double val = *(tmpValuePtr++);
 
-          acceleratorMemory[params.WEIGHT_OFFSET + address] = val;
-          goldMemory[address] = val;
+          save_double(&acceleratorMemory[params.WEIGHT_OFFSET + address], val);
+          save_double(&goldMemory[address], val);
+          save_double(&universalGoldMemory[address], val);
         }
       }
     }
@@ -123,7 +139,8 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
 
 void load_bias(const SimplifiedParams& params, const std::string& filename,
                bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
-               INPUT_DATATYPE* goldMemory) {
+               INPUT_DATATYPE* goldMemory,
+               UniversalPosit* universalGoldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -140,26 +157,15 @@ void load_bias(const SimplifiedParams& params, const std::string& filename,
   }
 
   int size = K;
-  char* tmpValues = new char[size];
-  char* tmpValuePtr = tmpValues;
-
-  if (useDataFile) {
-    std::ifstream is(filename, std::ios::binary);
-    if (!is.good())
-      throw std::runtime_error("File \"" + filename + "\" does not exist");
-    is.read(tmpValues, size);
-
-  } else {
-    for (int i = 0; i < size; i++) {
-      tmpValues[i] = rand() % 128;
-    }
-  }
+  double* tmpValues = read_file_as_double(filename, size, useDataFile);
+  double* tmpValuePtr = tmpValues;
 
   if (params.BIAS) {
     for (int k = 0; k < K; k++) {
-      int val = (int)*(tmpValuePtr++);
-      acceleratorMemory[params.BIAS_OFFSET + k] = val;
-      goldMemory[k] = val;
+      double val = *(tmpValuePtr++);
+      save_double(&acceleratorMemory[params.BIAS_OFFSET + k], val);
+      save_double(&goldMemory[k], val);
+      save_double(&universalGoldMemory[k], val);
     }
   }
 
@@ -168,7 +174,8 @@ void load_bias(const SimplifiedParams& params, const std::string& filename,
 
 void load_residual(const SimplifiedParams& params, const std::string& filename,
                    bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
-                   INPUT_DATATYPE* goldMemory) {
+                   INPUT_DATATYPE* goldMemory,
+                   UniversalPosit* universalGoldMemory) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -185,29 +192,18 @@ void load_residual(const SimplifiedParams& params, const std::string& filename,
   }
 
   int size = X * Y * K;
-  char* tmpValues = new char[size];
-  char* tmpValuePtr = tmpValues;
-
-  if (useDataFile) {
-    std::ifstream is(filename, std::ios::binary);
-    if (!is.good())
-      throw std::runtime_error("File \"" + filename + "\" does not exist");
-    is.read(tmpValues, size);
-
-  } else {
-    for (int i = 0; i < size; i++) {
-      tmpValues[i] = rand() % 128;
-    }
-  }
+  double* tmpValues = read_file_as_double(filename, size, useDataFile);
+  double* tmpValuePtr = tmpValues;
 
   for (int y = 0; y < Y; y++) {
     for (int x = 0; x < X; x++) {
       for (int k = 0; k < K; k++) {
-        int val = (int)*(tmpValuePtr++);
+        double val = *(tmpValuePtr++);
 
         int address = y * X * K + x * K + k;
-        acceleratorMemory[params.RESIDUAL_OFFSET + address] = val;
-        goldMemory[address] = val;
+        save_double(&acceleratorMemory[params.RESIDUAL_OFFSET + address], val);
+        save_double(&goldMemory[address], val);
+        save_double(&universalGoldMemory[address], val);
       }
     }
   }
@@ -215,8 +211,10 @@ void load_residual(const SimplifiedParams& params, const std::string& filename,
   delete[] tmpValues;
 }
 
-void load_datafile_outputs(const SimplifiedParams params, const std::string& filename,
-                           INPUT_DATATYPE* outputMatrix) {
+void load_datafile_outputs(const SimplifiedParams params,
+                           const std::string& filename,
+                           INPUT_DATATYPE* outputMatrix,
+                           UniversalPosit* universalOutputMatrix) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -241,21 +239,17 @@ void load_datafile_outputs(const SimplifiedParams params, const std::string& fil
   }
 
   int size = X * Y * K;
-  char* tmpValues = new char[size];
-  char* tmpValuePtr = tmpValues;
-
-  std::ifstream is(filename, std::ios::binary);
-  if (!is.good())
-    throw std::runtime_error("File \"" + filename + "\" does not exist");
-  is.read(tmpValues, size);
+  double* tmpValues = read_file_as_double(filename, size, true);
+  double* tmpValuePtr = tmpValues;
 
   for (int y = 0; y < Y; y++) {
     for (int x = 0; x < X; x++) {
       for (int k = 0; k < K; k++) {
-        int val = (int)*(tmpValuePtr++);
+        double val = *(tmpValuePtr++);
 
         int address = y * X * K + x * K + k;
-        outputMatrix[address] = val;
+        save_double(&outputMatrix[address], val);
+        save_double(&universalOutputMatrix[address], val);
       }
     }
   }
@@ -263,20 +257,20 @@ void load_datafile_outputs(const SimplifiedParams params, const std::string& fil
   delete[] tmpValues;
 }
 
-void load_wb(const SimplifiedParams& params, const std::string& dataDir,
-                 const Files& files, const MemoryMap& memoryMap,
-                 bool useDataFile, INPUT_DATATYPE* sramMemory,
-                 INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,
-                 INPUT_DATATYPE* matrixB, INPUT_DATATYPE* biasMatrix,
-                 INPUT_DATATYPE* residualMatrix, INPUT_DATATYPE* matrixC,
-                 INPUT_DATATYPE* dataFileOutput) {
-  load_weights(params, dataDir + files.weights_file, useDataFile,
-               memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB);
-  if (params.BIAS) {
-    load_bias(params, dataDir + files.bias_file, useDataFile,
-              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix);
-  }
-                 }
+// FIXME
+// void load_wb(const SimplifiedParams& params, const std::string& dataDir,
+//              const Files& files, const MemoryMap& memoryMap, bool
+//              useDataFile, INPUT_DATATYPE* sramMemory, INPUT_DATATYPE*
+//              rramMemory, INPUT_DATATYPE* matrixA, INPUT_DATATYPE* matrixB,
+//              INPUT_DATATYPE* biasMatrix, INPUT_DATATYPE* residualMatrix,
+//              INPUT_DATATYPE* matrixC, INPUT_DATATYPE* dataFileOutput) {
+//   load_weights(params, dataDir + files.weights_file, useDataFile,
+//                memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB);
+//   if (params.BIAS) {
+//     load_bias(params, dataDir + files.bias_file, useDataFile,
+//               memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix);
+//   }
+// }
 
 void load_memory(const SimplifiedParams& params, const std::string& dataDir,
                  const Files& files, const MemoryMap& memoryMap,
@@ -284,21 +278,31 @@ void load_memory(const SimplifiedParams& params, const std::string& dataDir,
                  INPUT_DATATYPE* rramMemory, INPUT_DATATYPE* matrixA,
                  INPUT_DATATYPE* matrixB, INPUT_DATATYPE* biasMatrix,
                  INPUT_DATATYPE* residualMatrix, INPUT_DATATYPE* matrixC,
-                 INPUT_DATATYPE* dataFileOutput) {
+                 INPUT_DATATYPE* dataFileOutput,
+                 UniversalPosit* universalMatrixA,
+                 UniversalPosit* universalMatrixB,
+                 UniversalPosit* universalBiasMatrix,
+                 UniversalPosit* universalResidualMatrix,
+                 UniversalPosit* universalMatrixC,
+                 UniversalPosit* universalDataFileOutput) {
   load_inputs(params, dataDir + files.inputs_file, useDataFile,
-              memoryMap.inputs == SRAM ? sramMemory : rramMemory, matrixA);
+              memoryMap.inputs == SRAM ? sramMemory : rramMemory, matrixA,
+              universalMatrixA);
   load_weights(params, dataDir + files.weights_file, useDataFile,
-               memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB);
+               memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB,
+               universalMatrixB);
   if (params.BIAS) {
     load_bias(params, dataDir + files.bias_file, useDataFile,
-              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix);
+              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix,
+              universalBiasMatrix);
   }
   if (params.RESIDUAL) {
     load_residual(params, dataDir + files.residual_file, useDataFile,
                   memoryMap.residual == SRAM ? sramMemory : rramMemory,
-                  residualMatrix);
+                  residualMatrix, universalResidualMatrix);
   }
   if (useDataFile) {
-    load_datafile_outputs(params, dataDir + files.outputs_file, dataFileOutput);
+    load_datafile_outputs(params, dataDir + files.outputs_file, dataFileOutput,
+                          universalDataFileOutput);
   }
 }

@@ -1,209 +1,24 @@
 #include "test/common/GoldModel.h"
 
 #include <algorithm>
+#include <cstring>
 
-// ACCUM_DATATYPE gold_fma(ACCUM_DATATYPE input, ACCUM_DATATYPE weight,
-//                    ACCUM_DATATYPE psum) {
-// #ifdef POSIT
-//   // INTERMEDIATE_DATATYPE intermediate_weight = weight;
-//   // INTERMEDIATE_DATATYPE intermediate_result =
-//   //     intermediate_weight.fma(input, psum);
-//   // ACCUM_DATATYPE result = intermediate_result;
-//   // return result;
-//   return fma(input, weight, psum);
-// #else
-//   return input * weight + psum;
-// #endif
-// }
+void run_custom_posit_gold_model(const SimplifiedParams params,
+                                 INPUT_DATATYPE *matrixA,
+                                 INPUT_DATATYPE *matrixB,
+                                 INPUT_DATATYPE *matrixC,
+                                 INPUT_DATATYPE *biasMatrix,
+                                 INPUT_DATATYPE *residualMatrix) {
+  run_gold_op<INPUT_DATATYPE, ACCUM_DATATYPE>(params, matrixA, matrixB, matrixC,
+                                              biasMatrix, residualMatrix);
+}
 
-void run_gold_op(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
-                 INPUT_DATATYPE *matrixB, OUTPUT_DATATYPE *matrixC,
-                 INPUT_DATATYPE *biasMatrix, OUTPUT_DATATYPE *residualMatrix) {
-  std::cout << "Running gold model " << std::endl;
-
-  if (params.SOFTMAX) {
-    // 2D softmax
-    for (int i = 0; i < params.loops[1][params.inputYLoopIndex[1]]; i++) {
-      // find max value
-      ACCUM_DATATYPE max = 0;
-      for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
-        int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
-        if (matrixA[index] > max) {
-          max = matrixA[index];
-        }
-      }
-
-      // subtract max, exp, and sum
-      ACCUM_DATATYPE sum = 0;
-      for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
-        int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
-        matrixC[index] = matrixA[index] - max;
-        matrixC[index].exp();
-        sum += matrixC[index];
-      }
-      sum.reciprocal();
-
-      // div
-      for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
-        int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
-        matrixC[index] = matrixC[index] * sum;
-      }
-    }
-  } else if (params.FC) {
-    // fully connected layer (matrix-vector)
-    int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
-    int K = params.loops[0][params.weightLoopIndex[0]] *
-            params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
-    for (int k = 0; k < K; k++) {
-      ACCUM_DATATYPE acc = 0;
-      for (int c = 0; c < C; c++) {
-        ACCUM_DATATYPE a = matrixA[c];
-        ACCUM_DATATYPE b = matrixB[c * K + k];
-
-        // FIXME!
-        // acc = fma(a, b, acc);
-      }
-
-      if (params.BIAS) {
-        acc += biasMatrix[k];
-      }
-
-      matrixC[k] = acc;
-    }
-  } else if (params.NO_NORM) {
-    // not yet implemented
-  } else {  // normal operation
-
-    int X = params.loops[0][params.inputXLoopIndex[0]] *
-            params.loops[1][params.inputXLoopIndex[1]];
-    int Y = params.loops[0][params.inputYLoopIndex[0]] *
-            params.loops[1][params.inputYLoopIndex[1]];
-    int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
-    int K = params.loops[0][params.weightLoopIndex[0]] *
-            params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
-    int FX = params.loops[1][params.fxIndex];
-    int FY = params.loops[1][params.fyIndex];
-    int STRIDE = params.STRIDE;
-
-    if (params.REPLICATION) {
-      FX = 7;
-      C = 3;
-    }
-
-    if (params.TRANSPOSE) {
-      std::cout << "Before Transpose:" << std::endl;
-      for (int c = 0; c < C; c++) {
-        for (int k = 0; k < K; k++) {
-          std::cout << matrixB[c * K + k] << " ";
-        }
-        std::cout << std::endl;
-      }
-      // create copy
-      INPUT_DATATYPE *tmpMatrixB = new INPUT_DATATYPE[C * K];
-      for (int c = 0; c < C; c++) {
-        for (int k = 0; k < K; k++) {
-          tmpMatrixB[c * K + k] = matrixB[k * C + c];
-        }
-      }
-      memcpy(matrixB, tmpMatrixB, sizeof(INPUT_DATATYPE) * C * K);
-
-      std::cout << "After Transpose:" << std::endl;
-      for (int c = 0; c < C; c++) {
-        for (int k = 0; k < K; k++) {
-          std::cout << matrixB[c * K + k] << " ";
-        }
-        std::cout << std::endl;
-      }
-    }
-
-    for (int x = 0; x < X; x++) {
-      for (int y = 0; y < Y; y++) {
-        for (int k = 0; k < K; k++) {
-          ACCUM_DATATYPE acc = 0;
-          for (int c = 0; c < C; c++) {
-            for (int fy = -(FY - 1) / 2; fy <= (FY - 1) / 2; fy++) {
-              for (int fx = -(FX - 1) / 2; fx <= (FX - 1) / 2; fx++) {
-                if (STRIDE * x + fx >= 0 && STRIDE * x + fx < STRIDE * X &&
-                    STRIDE * y + fy >= 0 &&
-                    STRIDE * y + fy < STRIDE * Y) {  // check if in bounds
-
-                  INPUT_DATATYPE a =
-                      matrixA[(STRIDE * y + fy) * STRIDE * X * C +
-                              (STRIDE * x + fx) * C + c];
-                  INPUT_DATATYPE b =
-                      matrixB[(fy + (FY - 1) / 2) * FX * C * K +
-                              (fx + (FX - 1) / 2) * C * K + c * K + k];
-
-                  acc = fma(a, b, acc);
-                }
-              }
-            }
-          }
-          if (params.BIAS) {
-            acc += biasMatrix[k];
-          }
-
-          if (params.RESIDUAL) {
-            acc += residualMatrix[y * X * K + x * K + k];
-          }
-
-          if (params.RELU) {
-#ifdef POSIT
-
-            acc.relu();
-#else
-            acc = std::max(0, (int)acc);
-#endif
-          }
-
-          matrixC[y * X * K + x * K + k] = acc;
-        }
-      }
-    }
-
-    if (params.MAXPOOL) {
-      // create copy
-      OUTPUT_DATATYPE *tmpMatrixC = new OUTPUT_DATATYPE[X * Y * K];
-      memcpy(tmpMatrixC, matrixC, sizeof(OUTPUT_DATATYPE) * X * Y * K);
-
-      for (int y = 0; y < Y / 2; y++) {
-        for (int x = 0; x < X / 2; x++) {
-          for (int k = 0; k < K; k++) {
-            std::vector<OUTPUT_DATATYPE> v;
-
-            for (int x_window = 0; x_window < 2; x_window++) {
-              for (int y_window = 0; y_window < 2; y_window++) {
-                int x_maxpool = x * 2 + x_window;
-                int y_maxpool = y * 2 + y_window;
-                v.push_back(tmpMatrixC[y_maxpool * X * K + x_maxpool * K + k]);
-              }
-            }
-
-            matrixC[y * (X / 2) * K + x * K + k] =
-                *std::max_element(v.begin(), v.end());
-          }
-        }
-      }
-
-      delete[] tmpMatrixC;
-    }
-
-    if (params.AVGPOOL) {
-      // create copy
-      OUTPUT_DATATYPE *tmpMatrixC = new OUTPUT_DATATYPE[X * Y * K];
-      memcpy(tmpMatrixC, matrixC, sizeof(OUTPUT_DATATYPE) * X * Y * K);
-
-      for (int k = 0; k < K; k++) {
-        OUTPUT_DATATYPE acc = 0;
-        for (int y = 0; y < Y; y++) {
-          for (int x = 0; x < X; x++) {
-            acc += tmpMatrixC[y * X * K + x * K + k];
-          }
-        }
-        matrixC[k] = acc / (Y * X);  // Average
-      }
-
-      delete[] tmpMatrixC;
-    }
-  }
+void run_universal_posit_gold_model(const SimplifiedParams params,
+                                    UniversalPosit *matrixA,
+                                    UniversalPosit *matrixB,
+                                    UniversalPosit *matrixC,
+                                    UniversalPosit *biasMatrix,
+                                    UniversalPosit *residualMatrix) {
+  run_gold_op<UniversalPosit, UniversalPositAccum>(
+      params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
 }

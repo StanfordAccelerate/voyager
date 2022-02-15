@@ -7,12 +7,15 @@
 
 #include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
-#include "test/common/Harness.h"
+#include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
 #include "test/mobilebert/params.h"
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
-#include "test/mobilebert/params.h"
+
+void run_op(const std::vector<SimplifiedParams> params_list,
+            INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
+            MemoryMap memoryMap);
 
 #define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
@@ -68,9 +71,9 @@ void validateMapping(SimplifiedParams params) {
 //   if (sramMemory == nullptr || rramMemory == nullptr)
 //     throw std::runtime_error("Failed to allocate accelerator memory");
 
-
 //   INPUT_DATATYPE* trash = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
-//   load_memory(resnetParams["conv1"], dataDir, resnetFiles["conv1"], resnetMemoryMap["conv1"], useDataFile, sramMemory,
+//   load_memory(resnetParams["conv1"], dataDir, resnetFiles["conv1"],
+//   resnetMemoryMap["conv1"], useDataFile, sramMemory,
 //               rramMemory, trash, trash, trash, trash, trash,
 //               trash);
 
@@ -78,16 +81,25 @@ void validateMapping(SimplifiedParams params) {
 //   for(const std::string& param_name : resnet_order)
 //   {
 //   validateMapping(resnetParams[param_name]);
-//   int X = resnetParams[param_name].loops[0][resnetParams[param_name].inputXLoopIndex[0]] *
+//   int X =
+//   resnetParams[param_name].loops[0][resnetParams[param_name].inputXLoopIndex[0]]
+//   *
 //           resnetParams[param_name].loops[1][resnetParams[param_name].inputXLoopIndex[1]];
-//   int Y = resnetParams[param_name].loops[0][resnetParams[param_name].inputYLoopIndex[0]] *
+//   int Y =
+//   resnetParams[param_name].loops[0][resnetParams[param_name].inputYLoopIndex[0]]
+//   *
 //           resnetParams[param_name].loops[1][resnetParams[param_name].inputYLoopIndex[1]];
-//   int C = resnetParams[param_name].loops[1][resnetParams[param_name].reductionLoopIndex[1]] * DIMENSION;
-//   int K = resnetParams[param_name].loops[0][resnetParams[param_name].weightLoopIndex[0]] *
-//           resnetParams[param_name].loops[1][resnetParams[param_name].weightLoopIndex[1]] * DIMENSION;
-//   int FX = resnetParams[param_name].loops[1][resnetParams[param_name].fxIndex];
-//   int FY = resnetParams[param_name].loops[1][resnetParams[param_name].fyIndex];
-//   int STRIDE = resnetParams[param_name].STRIDE;
+//   int C =
+//   resnetParams[param_name].loops[1][resnetParams[param_name].reductionLoopIndex[1]]
+//   * DIMENSION; int K =
+//   resnetParams[param_name].loops[0][resnetParams[param_name].weightLoopIndex[0]]
+//   *
+//           resnetParams[param_name].loops[1][resnetParams[param_name].weightLoopIndex[1]]
+//           * DIMENSION;
+//   int FX =
+//   resnetParams[param_name].loops[1][resnetParams[param_name].fxIndex]; int FY
+//   = resnetParams[param_name].loops[1][resnetParams[param_name].fyIndex]; int
+//   STRIDE = resnetParams[param_name].STRIDE;
 
 //   if (resnetParams[param_name].REPLICATION) {
 //     FX = 7;
@@ -104,7 +116,8 @@ void validateMapping(SimplifiedParams params) {
 //     Y = 1;
 //   }
 
-//   // INPUT_DATATYPE* matrixA = new INPUT_DATATYPE[(STRIDE * X) * (STRIDE * Y) * C];
+//   // INPUT_DATATYPE* matrixA = new INPUT_DATATYPE[(STRIDE * X) * (STRIDE * Y)
+//   * C];
 //   // INPUT_DATATYPE* matrixB = new INPUT_DATATYPE[FX * FY * C * K];
 //   // INPUT_DATATYPE* biasMatrix = new INPUT_DATATYPE[K];
 //   // INPUT_DATATYPE* residualMatrix = new INPUT_DATATYPE[X * Y * K];
@@ -117,22 +130,31 @@ void validateMapping(SimplifiedParams params) {
 //             << std::endl;
 
 //   // load_inputs(resnetParams["conv1"], "")
-//   load_wb(resnetParams[param_name], dataDir, resnetFiles[param_name], resnetMemoryMap[param_name], useDataFile, sramMemory,
+//   load_wb(resnetParams[param_name], dataDir, resnetFiles[param_name],
+//   resnetMemoryMap[param_name], useDataFile, sramMemory,
 //               rramMemory, trash, trash, trash, trash, trash,
 //               trash);
-//   run_gold_op(resnetParams[param_name], sramMemory + resnetParams[param_name].INPUT_OFFSET, rramMemory + resnetParams[param_name].WEIGHT_OFFSET, sramMemory + resnetParams[param_name].OUTPUT_OFFSET, rramMemory + resnetParams[param_name].BIAS_OFFSET, sramMemory + resnetParams[param_name].RESIDUAL_OFFSET);
+//   run_gold_op(resnetParams[param_name], sramMemory +
+//   resnetParams[param_name].INPUT_OFFSET, rramMemory +
+//   resnetParams[param_name].WEIGHT_OFFSET, sramMemory +
+//   resnetParams[param_name].OUTPUT_OFFSET, rramMemory +
+//   resnetParams[param_name].BIAS_OFFSET, sramMemory +
+//   resnetParams[param_name].RESIDUAL_OFFSET);
 
 // // if (param_name == "layer4_1_conv1") {
 //   if (param_name == "softmax"){
 //     continue;
 //   // if (false){
 //   OUTPUT_DATATYPE* dataFileOutput = new OUTPUT_DATATYPE[X * Y * K];
-//   load_datafile_outputs(resnetParams[param_name], "data/resnet/" + param_name + "_comp",
+//   load_datafile_outputs(resnetParams[param_name], "data/resnet/" + param_name
+//   + "_comp",
 //                            dataFileOutput);
 //   std::cout << "Gold vs. Pytorch" << std::endl;
-//   std::cout << "(reveals bugs in accelerator or memory placement)" << std::endl;
-//   std::string diffFile = "test_outputs/resnet."+ param_name + "gold_vs_pytorch.txt";
-//   int errors = compare_arrays(&sramMemory[resnetParams[param_name].OUTPUT_OFFSET], dataFileOutput,
+//   std::cout << "(reveals bugs in accelerator or memory placement)" <<
+//   std::endl; std::string diffFile = "test_outputs/resnet."+ param_name +
+//   "gold_vs_pytorch.txt"; int errors =
+//   compare_arrays(&sramMemory[resnetParams[param_name].OUTPUT_OFFSET],
+//   dataFileOutput,
 //                               X * Y * K, diffFile);
 
 //   delete[] dataFileOutput;
@@ -146,7 +168,8 @@ void validateMapping(SimplifiedParams params) {
 
 //   for (int i = 0; i< 1000; i++)
 //   {
-//     wf.write((char*)(sramMemory + resnetParams["fc"].OUTPUT_OFFSET + i * 4), sizeof(char));
+//     wf.write((char*)(sramMemory + resnetParams["fc"].OUTPUT_OFFSET + i * 4),
+//     sizeof(char));
 //   }
 //   wf.close();
 
@@ -196,9 +219,19 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
   OUTPUT_DATATYPE* matrixC = new OUTPUT_DATATYPE[X * Y * K];
   OUTPUT_DATATYPE* dataFileOutput = new OUTPUT_DATATYPE[X * Y * K];
 
+  UniversalPosit* universalMatrixA =
+      new UniversalPosit[(STRIDE * X) * (STRIDE * Y) * C];
+  UniversalPosit* universalMatrixB = new UniversalPosit[FX * FY * C * K];
+  UniversalPosit* universalBiasMatrix = new UniversalPosit[K];
+  UniversalPosit* universalResidualMatrix = new UniversalPosit[X * Y * K];
+  UniversalPosit* universalMatrixC = new UniversalPosit[X * Y * K];
+  UniversalPosit* universalDataFileOutput = new UniversalPosit[X * Y * K];
+
   load_memory(params, dataDir, files, memoryMap, useDataFile, sramMemory,
               rramMemory, matrixA, matrixB, biasMatrix, residualMatrix, matrixC,
-              dataFileOutput);
+              dataFileOutput, universalMatrixA, universalMatrixB,
+              universalBiasMatrix, universalResidualMatrix, universalMatrixC,
+              universalDataFileOutput);
 
   if (params.MAXPOOL) {
     X = X / 2;
@@ -211,22 +244,38 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
   }
 
   // run_op({params}, sramMemory, rramMemory, memoryMap);
-  run_gold_op(params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix);
+  run_custom_posit_gold_model(params, matrixA, matrixB, matrixC, biasMatrix,
+                              residualMatrix);
+  run_universal_posit_gold_model(params, universalMatrixA, universalMatrixB,
+                                 universalMatrixC, universalBiasMatrix,
+                                 universalResidualMatrix);
 
-  std::cout << "Accelerator vs. Gold Model" << std::endl;
+  std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
   std::cout << "(reveals bugs in accelerator or memory placement)" << std::endl;
-  std::string diffFile = fileOutputPrefix + "accel_vs_gold.txt";
+  std::string diffFile = fileOutputPrefix + "accel_vs_hlsgold.txt";
   int errors = compare_arrays(&sramMemory[params.OUTPUT_OFFSET], matrixC,
                               X * Y * K, diffFile);
 
+  std::cout << "HLS Posit Gold Model vs. Universal Posit Gold Model"
+            << std::endl;
+  std::cout << "(reveals bugs in implementation of custom HLS Posit operators)"
+            << std::endl;
+  diffFile = fileOutputPrefix + "hlsgold_vs_universalgold.txt";
+  errors += compare_arrays(matrixC, universalMatrixC, X * Y * K, diffFile);
+
   if (useDataFile) {
-    std::cout << "Gold Model vs. Pytorch" << std::endl;
+    std::cout << "HLS Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals bugs in mapping operations to accelerator)"
               << std::endl;
-    diffFile = fileOutputPrefix + "gold_vs_pytorch.txt";
+    diffFile = fileOutputPrefix + "hlsgold_vs_pytorch.txt";
     errors += compare_arrays(matrixC, dataFileOutput, X * Y * K, diffFile);
-  }
 
+    std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
+    std::cout << "(reveals issues in representing float as Posit)" << std::endl;
+    diffFile = fileOutputPrefix + "universalgold_vs_pytorch.txt";
+    errors += compare_arrays(universalMatrixC, universalDataFileOutput,
+                             X * Y * K, diffFile);
+  }
   // delete[] matrixA;
   // delete[] matrixB;
   // delete[] matrixC;
@@ -243,7 +292,7 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
   return errors;
 }
 
-int sc_main(int argc, char* argv[]) {
+extern "C" int sc_main(int argc, char* argv[]) {
   SimplifiedParams params;
 
   const char* groupName = std::getenv("GROUP");
@@ -325,5 +374,5 @@ int sc_main(int argc, char* argv[]) {
   }
 
   // run_complete(dataDir, files);
-  run_test(params, dataDir, files, memoryMap, useDataFiles, fullName);
+  return run_test(params, dataDir, files, memoryMap, useDataFiles, fullName);
 }

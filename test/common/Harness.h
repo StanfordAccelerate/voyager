@@ -87,7 +87,3 @@ SC_MODULE(Harness) {
   void waitForStart();
   void waitForDone();
 };
-
-void run_op(const std::vector<SimplifiedParams> params_list,
-            INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
-            MemoryMap memoryMap);

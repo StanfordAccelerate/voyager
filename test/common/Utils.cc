@@ -4,17 +4,20 @@
 #include <iostream>
 #include <string>
 
-int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
-                   size_t size, std::string &filename) {
+template <typename TA, typename TB>
+int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
+                            std::string &filename) {
   // buckets of <0.001, <0.01, <0.1, <1, >1
   int diff_buckets[5] = {0, 0, 0, 0, 0};
   int percent_diff_buckets[5] = {0, 0, 0, 0, 0};
 
   std::ofstream diffFile(filename);
   for (int index = 0; index < size; index++) {
-    diffFile << matrixA[index] << " vs. " << matrixB[index] << std::endl;
+    diffFile << (float)matrixA[index] << " vs. " << (float)matrixB[index]
+             << std::endl;
     float diff = abs(((float)matrixA[index] - (float)matrixB[index]));
-    // std::cerr << (float) matrixA[index] << '\t' << (float) matrixB[index] << std::endl;
+    // std::cerr << (float) matrixA[index] << '\t' << (float) matrixB[index] <<
+    // std::endl;
 
     if (diff < 0.001) {
       diff_buckets[0]++;
@@ -30,25 +33,25 @@ int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
     } else {
       diff_buckets[4]++;
     }
-    if (matrixA[index] != 0){
-    float percent_diff = abs(((float)matrixA[index] - (float)matrixB[index])) / (float)matrixA[index];
-    if (percent_diff < 0.001) {
-      percent_diff_buckets[0]++;
+    if (matrixA[index] != 0) {
+      float percent_diff =
+          abs(((float)matrixA[index] - (float)matrixB[index])) /
+          (float)matrixA[index];
+      if (percent_diff < 0.001) {
+        percent_diff_buckets[0]++;
+      }
+      if (percent_diff < 0.01) {
+        percent_diff_buckets[1]++;
+      }
+      if (percent_diff < 0.1) {
+        percent_diff_buckets[2]++;
+      }
+      if (percent_diff < 1) {
+        percent_diff_buckets[3]++;
+      } else {
+        percent_diff_buckets[4]++;
+      }
     }
-    if (percent_diff < 0.01) {
-      percent_diff_buckets[1]++;
-    }
-    if (percent_diff < 0.1) {
-      percent_diff_buckets[2]++;
-    }
-    if (percent_diff < 1) {
-      percent_diff_buckets[3]++;
-    } else {
-      percent_diff_buckets[4]++;
-
-    }
-    }
-
   }
 
   std::cout << "Difference Count:" << std::endl;
@@ -65,18 +68,41 @@ int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
 
   std::cout << "Percent Difference Count:" << std::endl;
   std::cout << "< 0.001: " << percent_diff_buckets[0] << "("
-            << (float)percent_diff_buckets[0] / (size)*100.0 << "%)" << std::endl;
+            << (float)percent_diff_buckets[0] / (size)*100.0 << "%)"
+            << std::endl;
   std::cout << "< 0.01: " << percent_diff_buckets[1] << "("
-            << (float)percent_diff_buckets[1] / (size)*100.0 << "%)" << std::endl;
+            << (float)percent_diff_buckets[1] / (size)*100.0 << "%)"
+            << std::endl;
   std::cout << "< 0.1: " << percent_diff_buckets[2] << "("
-            << (float)percent_diff_buckets[2] / (size)*100.0 << "%)" << std::endl;
+            << (float)percent_diff_buckets[2] / (size)*100.0 << "%)"
+            << std::endl;
   std::cout << "< 1: " << percent_diff_buckets[3] << "("
-            << (float)percent_diff_buckets[3] / (size)*100.0 << "%)" << std::endl;
+            << (float)percent_diff_buckets[3] / (size)*100.0 << "%)"
+            << std::endl;
   std::cout << "> 1: " << percent_diff_buckets[4] << "("
-            << (float)percent_diff_buckets[4] / (size)*100.0 << "%)" << std::endl;
+            << (float)percent_diff_buckets[4] / (size)*100.0 << "%)"
+            << std::endl;
   std::cout << std::endl;
 
   std::cout << std::endl;
 
   return diff_buckets[4];
+}
+
+int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
+                   size_t size, std::string &filename) {
+  return compare_arrays_internal<INPUT_DATATYPE, INPUT_DATATYPE>(
+      matrixA, matrixB, size, filename);
+}
+
+int compare_arrays(INPUT_DATATYPE *matrixA, UniversalPosit *matrixB,
+                   size_t size, std::string &filename) {
+  return compare_arrays_internal<INPUT_DATATYPE, UniversalPosit>(
+      matrixA, matrixB, size, filename);
+}
+
+int compare_arrays(UniversalPosit *matrixA, UniversalPosit *matrixB,
+                   size_t size, std::string &filename) {
+  return compare_arrays_internal<UniversalPosit, UniversalPosit>(
+      matrixA, matrixB, size, filename);
 }

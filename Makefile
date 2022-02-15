@@ -1,7 +1,7 @@
-CC = /cad/mentor/2021.1/Mgc_home/bin/g++
-CC17 = /opt/rh/devtoolset-10/root/bin/g++
-CPPFLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++11 -DCONNECTIONS_FAST_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_NAMING_ORIGINAL -O3
-POSIT_FLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Isrc/ -I. -std=c++17 -O3
+CC = /opt/rh/devtoolset-10/root/bin/g++
+BASEFLAGS = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Ilib/universal/include/ -Isrc/ -I. -DCONNECTIONS_FAST_SIM -DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_NAMING_ORIGINAL -O3 
+C11FLAGS = $(BASEFLAGS) -std=c++11
+C17FLAGS = $(BASEFLAGS) -std=c++17
 LDFLAGS = -lsystemc
 LDLIBS = -L/cad/mentor/2021.1/Mgc_home/shared/lib/
 TEST ?= simple
@@ -47,25 +47,25 @@ build/PositTest: build/PositTest.o
 	$(CC) -o $@ $^
 
 build/Accelerator.o: src/Accelerator.cc $(wildcard src/*.h)
-	$(CC) $(CPPFLAGS) -c -o $@ $< 
+	$(CC) $(C11FLAGS) -c -o $@ $< 
 
 build/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h) 
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(CC) $(C11FLAGS) -c -o $@ $<
 
 build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h src/ArchitectureParams.h
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/TestRunner.o: test/common/TestRunner.cc test/mobilebert/params.h test/simple/params.h test/resnet/params.h
-	$(CC) $(CPPFLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/PositTest.o: test/common/PositTest.cc src/PositTypes.h
-	$(CC17) $(POSIT_FLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
 .PHONY: clean rtl sim PositTest
 clean:
