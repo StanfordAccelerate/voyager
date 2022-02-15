@@ -1,0 +1,3 @@
+[submodule "lib/universal"]
+	path = lib/universal
+	url = https://github.com/stillwater-sc/universal.git
