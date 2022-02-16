@@ -263,10 +263,10 @@ std::string mobilebertDataDir = "data/mobilebert/";
 
 std::map<std::string, Files> mobilebertFiles {
     {"input_bottleneck", {
-        "mobilebert_embeddings",
-        "mobilebert_encoder_layer_0_bottleneck_input_dense_weight",
-        "mobilebert_encoder_layer_0_bottleneck_input_dense_bias",
-        "mobilebert_encoder_layer_0_bottleneck_input_dense"
+        "activations/mobilebert_embeddings",
+        "weights/mobilebert_encoder_layer_0_bottleneck_input_dense_weight",
+        "weights/mobilebert_encoder_layer_0_bottleneck_input_dense_bias",
+        "activations/mobilebert_encoder_layer_0_bottleneck_input_dense"
     }},
     {"input_no_norm", {
         "mobilebert_encoder_layer_0_bottleneck_input_dense",

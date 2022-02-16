@@ -18,14 +18,16 @@ void copy_(ac_int<W, false> src, ac_int<copy_W, false> &dst) {
   if (copy_W >= W) dst <<= copy_W - W;
 }
 
+template <int nbits>
+void twos_complement(ac_int<nbits, false> &value) {
+  value = static_cast<ac_int<nbits, false>>(value.bit_complement() + 1);
+}
+
 template <int nbits, int es, int fbits>
 void convert_(const bool sign, const int scale,
               const ac_int<fbits, false> fraction_in,
               ac_int<nbits, false> &bits) {
-  // TODO: handle infinity
-  if (scale == -127 || fraction_in == 0) {
-    bits = 0;
-  } else if ((scale >> es) > nbits - 2 || (scale >> es) < -(nbits - 2)) {
+  if ((scale >> es) > nbits - 2 || (scale >> es) < -(nbits - 2)) {
     bits = 0;
     if (scale > 0) {
       bits = bits.bit_complement();
@@ -46,13 +48,13 @@ void convert_(const bool sign, const int scale,
     exponent = (scale % esval + esval) % esval;
 
     int nf = max(0, nbits + 1 - (2 + run + es));
-    fraction = (fraction_in << 1) >> (fbits - min(fbits, nf));
+    fraction = fraction_in >> max(fbits - nf, 0);
     fraction <<= max(nf - fbits, 0);
 
     regime <<= es + nf + 1;
     exponent <<= nf + 1;
     fraction <<= 1;
-    sticky_bit = fraction_in << (nf + 1) ? 0x1 : 0x0;
+    sticky_bit = fraction_in << nf ? 0x1 : 0x0;
     pt_bits = regime | exponent | fraction | sticky_bit;
 
     int len = 1 + max(nbits + 1, 2 + run + es);
@@ -64,7 +66,7 @@ void convert_(const bool sign, const int scale,
     bits = pt_bits >> (len - nbits);
     if (rb) bits++;
   }
-  if (sign) bits = bits.bit_complement() + 1;
+  if (sign) twos_complement(bits);
 }
 
 template <int nbits, int es, int fbits>
@@ -76,12 +78,12 @@ void decode(ac_int<nbits, false> bits, bool &sign, int &scale,
     fraction = 0;
   } else {
     sign = bits[nbits - 1];
-    if (sign) bits = bits.bit_complement() + 1;  // convert to positive value
-    bits <<= 1;                                  // remove sign bit
+    if (sign) twos_complement(bits);  // convert to positive value
+    bits <<= 1;                       // remove sign bit
 
     bool leadingBit = bits[nbits - 1];
-    int run =
-        leadingBit ? bits.bit_complement().leading_sign() : bits.leading_sign();
+    int run = leadingBit ? bits.bit_complement().leading_sign()
+                         : bits.leading_sign();
     scale = leadingBit ? run - 1 : -run;
     scale *= (1 << es);
 
@@ -93,10 +95,7 @@ void decode(ac_int<nbits, false> bits, bool &sign, int &scale,
     }
 
     bits <<= run + 1 + es;
-
     copy_(bits, fraction);
-    fraction >>= 1;
-    fraction[fbits - 1] = 1;
   }
 }
 
@@ -115,15 +114,19 @@ template <int nbits, int es>
 class Posit {
  public:
   // static const definitions
-  static const unsigned int width = nbits;
-  static const unsigned int esbits = es;
-  static const size_t sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
-  static const size_t fbits = nbits - 2 - es;
+  static constexpr int width = nbits;
+  static constexpr int esbits = es;
+  static constexpr int sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
+  static constexpr int fbits = nbits - 3 - es;
   typedef PositFP<sbits, fbits> DecomposedPosit;
 
   ac_int<nbits, false> bits;
+
+
   Posit() {}
-  Posit(int i);
+#ifndef __SYNTHESIS__
+  Posit(const float f);
+#endif
 
   template <int nbits2, int es2>
   Posit(const Posit<nbits2, es2> &input);
@@ -131,17 +134,12 @@ class Posit {
   template <int fp_sbits, int fp_fbits>
   Posit(const PositFP<fp_sbits, fp_fbits> &input);
 
-#ifndef __SYNTHESIS__
-  Posit(const float f);
-#endif
-
+  void setbits(int i) { bits = i; }
   bool isZero() const { return bits == 0; }
 
-  void relu() {
-    if (bits[nbits - 1] == 1) bits = 0;
-  }
+  void relu() { if (bits[nbits - 1] == 1) bits = 0; }
 
-  void negate() { bits = bits.bit_complement() + 1; }
+  void negate() { twos_complement(bits); }
 
   void reciprocal() {
     ac_int<nbits, false> sub = (1 << (nbits - 1));
@@ -162,13 +160,15 @@ class Posit {
   Posit &operator+=(const Posit &rhs);
   Posit &operator-=(const Posit &rhs);
   Posit &operator*=(const Posit &rhs);
+
   bool operator<(const Posit &rhs) const;
+
+  // template <int nbits2, int es2, int sbits, int fbits>
+  // Posit &fma(const Posit<nbits2, es2> input, const PositFP<sbits, fbits> weight);
 
 #ifndef __SYNTHESIS__
   operator float() const;
-#endif
-
-#ifdef __SYNTHESIS__
+#else
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
     m &bits;
@@ -179,22 +179,15 @@ class Posit {
     sc_trace(tf, posit.bits, name + ".bits");
   }
 #endif
-
-  // inline friend std::ostream &operator<<(ostream &os, const Posit &posit) {
-  //   os << posit.bits << " ";
-
-  //   return os;
-  // }
 };
-
-template <int nbits, int es>
-Posit<nbits, es>::Posit(int i) {
-  bits = i;
-}
 
 template <int nbits, int es>
 template <int fp_sbits, int fp_fbits>
 Posit<nbits, es>::Posit(const PositFP<fp_sbits, fp_fbits> &input) {
+  if (input.isZero()) {
+    this->bits = 0;
+    return;
+  }
   convert_<nbits, es, fp_fbits>(input.sign, input.scale, input.fraction,
                                 this->bits);
 }
@@ -202,8 +195,6 @@ Posit<nbits, es>::Posit(const PositFP<fp_sbits, fp_fbits> &input) {
 template <int nbits, int es>
 template <int nbits2, int es2>
 Posit<nbits, es>::Posit(const Posit<nbits2, es2> &input) {
-  // constexpr size_t sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
-  // constexpr size_t fbits = nbits - 2 - es;
   PositFP<sbits, fbits> tmp(input);
   *this = tmp;
 }
@@ -211,13 +202,15 @@ Posit<nbits, es>::Posit(const Posit<nbits2, es2> &input) {
 #ifndef __SYNTHESIS__
 template <int nbits, int es>
 Posit<nbits, es>::Posit(const float f) {
+  if (f == 0) {
+    this->bits = 0;
+    return;
+  }
   union ufloat uf = {f};
   bool sign = f < 0;
   int scale = ((uf.u >> 23) & 0xFF) - 127;
-  ac_int<24, false> fraction =
-      uf.u;  // copy the least significant 23 (24) bits into fraction
-  fraction[23] = 1;
-  convert_<nbits, es, 24>(sign, scale, fraction, this->bits);
+  ac_int<23, false> fraction = uf.u;  // copy the least significant 23 bits into fraction
+  convert_<nbits, es, 23>(sign, scale, fraction, this->bits);
 }
 #endif
 
@@ -239,11 +232,13 @@ inline void Posit<nbits, es>::exp() {
   reciprocal();
   // std::cout << "reciprocal:\t" << bits.to_string(AC_BIN, false, true)
   //           << std::endl;
-  Posit one = 1 << (nbits - 1) - 1;
 
   DecomposedPosit op1 = *this;
-  DecomposedPosit op2 = one;
-  DecomposedPosit res = op1 - op2;
+  DecomposedPosit op2;
+  op2.sign = 1;
+  op2.scale = 0;
+  op2.fraction = 0;
+  DecomposedPosit res = (DecomposedPosit) (op1 + op2);
   *this = res;
   // std::cout << "final  :\t" << bits.to_string(AC_BIN, false, true)
   //           << std::endl;
@@ -252,44 +247,32 @@ inline void Posit<nbits, es>::exp() {
 template <int nbits, int es>
 template <int nbits2, int es2>
 Posit<nbits, es> Posit<nbits, es>::operator+(const Posit<nbits2, es2> &rhs) {
-  // constexpr size_t sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
-  // constexpr size_t fbits = nbits - 2 - es;
-  PositFP<sbits, fbits> op1 = *this;
-  PositFP<sbits, fbits> op2 = rhs;
+  PositFP<8, fbits> op1 = *this;
+  PositFP<8, fbits> op2 = rhs;
   return op1 + op2;
 }
 
 template <int nbits, int es>
 inline Posit<nbits, es> Posit<nbits, es>::operator*(
     const Posit<nbits, es> &rhs) {
-  // constexpr size_t sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
-  // constexpr size_t fbits = nbits - 2 - es;
-  PositFP<sbits, fbits> op1 = *this;
-  PositFP<sbits, fbits> op2 = rhs;
+  PositFP<8, fbits> op1 = *this;
+  PositFP<8, fbits> op2 = rhs;
   return op1 * op2;
 }
 
 template <int nbits, int es>
 inline Posit<nbits, es> &Posit<nbits, es>::operator+=(
     const Posit<nbits, es> &rhs) {
-  // constexpr size_t sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
-  // constexpr size_t fbits = nbits - 2 - es;
-  PositFP<sbits, fbits> op1 = *this;
-  PositFP<sbits, fbits> op2 = rhs;
-
-  *this = op1 + op2;
+  *this = *this + rhs;
   return *this;
 }
 
 template <int nbits, int es>
 inline Posit<nbits, es> &Posit<nbits, es>::operator-=(
     const Posit<nbits, es> &rhs) {
-  // constexpr size_t sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
-  // constexpr size_t fbits = nbits - 2 - es;
-  PositFP<sbits, fbits> op1 = *this;
-  PositFP<sbits, fbits> op2 = rhs;
-
-  *this = op1 - op2;
+  Posit<nbits, es> op2 = rhs;
+  op2.negate()
+  *this = *this + op2;
   return *this;
 }
 
@@ -306,21 +289,30 @@ inline bool Posit<nbits, es>::operator<(const Posit<nbits, es> &rhs) const {
   if (lhs_sign ^ rhs_sign) {
     return lhs_sign;
   } else {
-    ac_int<nbits, false> r1 = lhs_sign ? static_cast<ac_int<nbits, false> >(
-                                             this->bits.bit_complement() + 1)
-                                       : this->bits;
-    ac_int<nbits, false> r2 =
-        rhs_sign
-            ? static_cast<ac_int<nbits, false> >(rhs.bits.bit_complement() + 1)
-            : rhs.bits;
+    ac_int<nbits, false> r1 = this->bits, r2 = rhs.bits;
+    if (lhs_sign) twos_complement(r1);
+    if (rhs_sign) twos_complement(r2);
     return r1 < r2;
   }
 }
 
+// template <int nbits, int es>
+// template <int nbits2, int es2, int sbits, int fbits>
+// Posit<nbits, es> &Posit<nbits, es>::fma(const Posit<nbits2, es2> input, const PositFP<sbits, fbits> weight) {
+//   constexpr size_t fbits = nbits - 2 - es;
+//   constexpr size_t fbits2 = nbits2 - 2 - es2;
+//   PositFP<8, fbits2> a = input;
+//   PositFP<8, fbits2> b = (PositFP<8, fbits2>) weight;
+//   PositFP<8, 2 * fbits2> product = input * weight;
+//   PositFP<8, fbits> c = *this;
+//   *this = (PositFP<8, fbits>) product + c;
+//   return *this;
+// }
+
 #ifndef __SYNTHESIS__
 template <int nbits, int es>
 Posit<nbits, es>::operator float() const {
-  PositFP<8, 24> fp(*this);
+  PositFP<8, 23> fp(*this);
   return (float)fp;
 }
 #endif
@@ -331,9 +323,14 @@ Posit<nbits, es>::operator float() const {
 template <int sbits, int fbits>
 class PositFP {
  public:
+	static constexpr int fhbits  = fbits + 1;    // maximum number of fraction + one hidden bit
+	static constexpr int abits   = fhbits + 3;   // size of the addend
+	static constexpr int mbits   = 2 * fhbits;   // size of the multiplier output
+
   ac_int<1, false> sign;
   ac_int<sbits, true> scale;
   ac_int<fbits, false> fraction;
+  bool _zero = false;
 
   PositFP() {}
 
@@ -344,23 +341,24 @@ class PositFP {
 
   PositFP(const float f);
 
-  bool isZero() const { return !fraction; }
+  bool isZero() const { return _zero; }
 
-  void setZero() {
-    fraction = 0;
-    scale = 0;
+  void setZero() { _zero = true; }
+
+  ac_int<fhbits, false> get_fixed_point() const {
+    ac_int<fhbits, false> bits = fraction;
+    bits[fhbits - 1] = 1;
+    return bits;
   }
 
   void negate() { sign = !sign; }
+
   void relu() {
-    if (sign == 1) {
-      setZero();
-    }
+    if (sign == 1) setZero();
   }
 
-  PositFP<sbits, fbits + 5> operator+(const PositFP &op) const;
-  PositFP<sbits, 2 * fbits> operator*(const PositFP &op) const;
-  PositFP operator-(const PositFP &op) const;
+  PositFP<sbits, abits + 1> operator+(const PositFP &op) const;
+  PositFP<sbits, mbits> operator*(const PositFP &op) const;
   PositFP &operator+=(const PositFP &rhs);
   bool operator<(const PositFP &rhs) const;
 
@@ -370,16 +368,14 @@ class PositFP {
 
 #ifndef __SYNTHESIS__
   explicit operator float() const {
-    if (!fraction) return 0;
+    if (isZero()) return 0;
 
     union ufloat uf;
     uf.u = sign ? 1 << 31 : 0;
     uf.u += (scale + 127) << 23;
 
     ac_int<23, false> mantissa;
-    copy_(fraction << 1, mantissa);
-    // std::cerr << fraction.to_string(AC_BIN) << std::endl;
-    // std::cerr << mantissa.to_string(AC_BIN) << std::endl;
+    copy_(fraction, mantissa);
     uf.u += mantissa;
     return uf.f;
   }
@@ -388,6 +384,10 @@ class PositFP {
   template <int sbits2, int fbits2>
   explicit operator PositFP<sbits2, fbits2>() const {
     PositFP<sbits2, fbits2> fp;
+    if (isZero()) {
+      fp.setZero();
+      return fp;
+    }
     fp.sign = this->sign;
     fp.scale = this->scale;
     copy_(this->fraction, fp.fraction);
@@ -398,12 +398,14 @@ class PositFP {
 template <int sbits, int fbits>
 template <int nbits, int es>
 PositFP<sbits, fbits>::PositFP(const Posit<nbits, es> &input) {
+  if (input.isZero()) {
+    setZero();
+    return;
+  }
   bool sign;
   int scale;
   ac_int<fbits, false> fraction;
   decode<nbits, es, fbits>(input.bits, sign, scale, fraction);
-  // std::cerr << "ctor input: " << input.bits.to_string(AC_BIN) << std::endl;
-  // std::cerr << "ctor fraction: " << fraction.to_string(AC_BIN) << std::endl;
 
   this->sign = sign;
   this->scale = scale;
@@ -413,46 +415,52 @@ PositFP<sbits, fbits>::PositFP(const Posit<nbits, es> &input) {
 #ifndef __SYNTHESIS__
 template <int sbits, int fbits>
 PositFP<sbits, fbits>::PositFP(const float f) {
+  if (f == 0) {
+    setZero();
+    return;
+  }
   union ufloat uf = {f};
   this->sign = f < 0;
-  this->scale = ((uf.u >> 23) & 0xFF) - 127;
-  this->fraction = 0;
-
-  if (f) {
-    ac_int<23, false> mantissa =
-        uf.u;  // copy least significant 23 bits into mantissa
-    copy_(mantissa, this->fraction);
-    fraction >>= 1;
-    fraction[fbits - 1] = 1;
-  }
+  this->scale = ((uf.u >> 23) & 0xff) - 127;
+  ac_int<23, false> mantissa = uf.u;
+  copy_(mantissa, this->fraction);
 }
 #endif
 
+// TODO: scale overflow?
 template <int sbits, int fbits>
-PositFP<sbits, fbits + 5> PositFP<sbits, fbits>::operator+(
+PositFP<sbits, PositFP<sbits, fbits>::abits + 1> PositFP<sbits, fbits>::operator+(
     const PositFP<sbits, fbits> &op) const {
   PositFP<sbits, fbits> lhs = *this;
   PositFP<sbits, fbits> rhs = op;
+
+  if (lhs.isZero()) {
+    return (PositFP<sbits, PositFP<sbits, fbits>::abits + 1>) rhs;
+  }
+  if (rhs.isZero()) {
+    return (PositFP<sbits, PositFP<sbits, fbits>::abits + 1>) lhs;
+  }
 
   int lhs_scale = lhs.scale, rhs_scale = rhs.scale,
       scale_of_result = max(lhs_scale, rhs_scale);
 
   // align the fraction
-  ac_int<fbits + 4, false> r1 = lhs.fraction, r2 = rhs.fraction;
-  // std::cerr << "rhs.fraction: " << rhs.fraction.to_string(AC_BIN) <<
-  // std::endl;
-  r1 <<= lhs.scale - scale_of_result + 4;
-  r2 <<= rhs.scale - scale_of_result + 4;
+  ac_int<abits, false> lhs_fraction = lhs.get_fixed_point(), rhs_fraction = rhs.get_fixed_point();
+  ac_int<abits, false> r1 = lhs_fraction << (lhs_scale - scale_of_result + 3);
+  r1[0] = lhs_fraction << (abits - 1 + lhs_scale - scale_of_result + 3);  // uncertainty bit
+  ac_int<abits, false> r2 = rhs_fraction << (rhs_scale - scale_of_result + 3);
+  r2[0] = rhs_fraction << (abits - 1 + rhs_scale - scale_of_result + 3);
 
   bool r1_sign = lhs.sign, r2_sign = rhs.sign;
   bool signs_are_different = r1_sign != r2_sign;
+  bool lhs_slt_rhs = lhs_scale < rhs_scale || (lhs_scale == rhs_scale && r1 < r2);
 
-  if (signs_are_different && (lhs_scale < rhs_scale || r1 < r2)) {
+  if (signs_are_different && lhs_slt_rhs) {
     swap_(r1, r2);
     swap_(r1_sign, r2_sign);
   }
 
-  ac_int<fbits + 5, false> sum;
+  ac_int<abits + 1, false> sum;
   if (signs_are_different) {
     sum = r1 - r2;
   } else {
@@ -463,42 +471,40 @@ PositFP<sbits, fbits + 5> PositFP<sbits, fbits>::operator+(
   // std::cerr << "sum: " << sum.to_string(AC_BIN) << std::endl;
 
   int shift = sum.leading_sign() - 1;
-  // std::cerr << "shift: " << shift << std::endl;
 
-  PositFP<sbits, fbits + 5> result;
+  PositFP<sbits, abits + 1> result;
   result.sign = r1_sign;
   result.scale = scale_of_result - shift;
-  result.fraction = sum << (shift + 1);
-  // std::cerr << "fraction out: " << result.fraction.to_string(AC_BIN) <<
-  // std::endl;
+  result.fraction = sum << (shift + 2);
+  // std::cerr << "fraction: " << result.fraction.to_string(AC_BIN) << std::endl;
+  // std::cerr << "scale: " << result.scale << std::endl;
   return result;
 }
 
 template <int sbits, int fbits>
-PositFP<sbits, fbits> PositFP<sbits, fbits>::operator-(
-    const PositFP<sbits, fbits> &op) const {
-  PositFP<sbits, fbits> negOp = op;
-  negOp.sign = !negOp.sign;
-
-  return static_cast<PositFP<sbits, fbits> >(*this + negOp);
-}
-
-template <int sbits, int fbits>
-PositFP<sbits, 2 * fbits> PositFP<sbits, fbits>::operator*(
+PositFP<sbits, PositFP<sbits, fbits>::mbits> PositFP<sbits, fbits>::operator*(
     const PositFP<sbits, fbits> &op) const {
   PositFP<sbits, fbits> lhs = *this;
   PositFP<sbits, fbits> rhs = op;
-  PositFP<sbits, 2 * fbits> result;
+  PositFP<sbits, mbits> result;
+
+  if (lhs.isZero() || rhs.isZero()) {
+    result.setZero();
+    return result;
+  }
 
   result.sign = lhs.sign ^ rhs.sign;
   result.scale = lhs.scale + rhs.scale;
-  result.fraction = lhs.fraction * rhs.fraction;
+  result.fraction = lhs.get_fixed_point() * rhs.get_fixed_point();
 
-  if (result.fraction[2 * fbits - 1]) {
+  if (result.fraction[mbits - 1]) {
     result.scale++;
-  } else {
     result.fraction <<= 1;
+  } else {
+    result.fraction <<= 2;
   }
+  // std::cerr << "fraction: " << result.fraction.to_string(AC_BIN) << std::endl;
+  // std::cerr << "scale: " << result.scale << std::endl;
 
   return result;
 }
@@ -523,11 +529,11 @@ template <int sbits2, int fbits2>
 PositFP<sbits, fbits> &PositFP<sbits, fbits>::fma(
     const PositFP<sbits2, fbits2> &a, const PositFP<sbits2, fbits2> &b) {
   if (!a.isZero() && !b.isZero()) {
-    PositFP<sbits2 + 1, 2 *fbits2> product = a * b;
+    PositFP<8, 2 * fbits2> product = a * b;
     if (!isZero()) {
-      *this += (PositFP<sbits, fbits>)product;
+      *this += (PositFP<8, fbits>) product;
     } else {
-      *this = (PositFP<sbits, fbits>)product;
+      *this = (PositFP<8, fbits>) product;
     }
   }
   return *this;
