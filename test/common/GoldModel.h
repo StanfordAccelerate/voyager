@@ -101,8 +101,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         ACC_T a = matrixA[c];
         ACC_T b = matrixB[c * K + k];
 
-        // FIXME!
-        // acc = fma(a, b, acc);
+        acc = gold_fma(a, b, acc);
       }
 
       if (params.BIAS) {
