@@ -123,7 +123,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
      {
          401408,                                      // INPUT_OFFSET
          120000,                                      // WEIGHT_OFFSET
-         0,                                           // OUTPUT_OFFSET
+         1605632,                                           // OUTPUT_OFFSET
          false,                                       // TRANSPOSE
          {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},  // LOOPS
          {0, 5},                                      // INPUTX
@@ -149,7 +149,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
 
     {"layer2_0_downsample",
      {
-         0,                                           // INPUT_OFFSET
+         1605632,                                           // INPUT_OFFSET
          156864,                                      // WEIGHT_OFFSET
          802816,                                      // OUTPUT_OFFSET
          false,                                       // TRANSPOSE
@@ -177,7 +177,8 @@ std::map<std::string, SimplifiedParams> resnetParams{
 
     {"layer2_0_conv1",
      {
-         802816,                                    // INPUT_OFFSET
+        1605632,
+        //  802816,                                    // INPUT_OFFSET
          165056,                                    // WEIGHT_OFFSET
          401408,                                    // OUTPUT_OFFSET
          false,                                     // TRANSPOSE
@@ -261,7 +262,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
      {
          0,                                           // INPUT_OFFSET
          533696,                                      // WEIGHT_OFFSET
-         401408,                                      // OUTPUT_OFFSET
+         1605632,                                      // OUTPUT_OFFSET
          false,                                       // TRANSPOSE
          {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},  // LOOPS
          {0, 5},                                      // INPUTX
@@ -287,7 +288,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
 
     {"layer3_0_downsample",
      {
-         401408,                                    // INPUT_OFFSET
+         1605632,                                    // INPUT_OFFSET
          681152,                                    // WEIGHT_OFFSET
          802816,                                    // OUTPUT_OFFSET
          false,                                     // TRANSPOSE
@@ -315,7 +316,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
 
     {"layer3_0_conv1",
      {
-         802816,                                    // INPUT_OFFSET
+         1605632,                                    // INPUT_OFFSET
          713920,                                    // WEIGHT_OFFSET
          0,                                         // OUTPUT_OFFSET
          false,                                     // TRANSPOSE
@@ -399,7 +400,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
      {
          401408,                                     // INPUT_OFFSET
          2188480,                                    // WEIGHT_OFFSET
-         0,                                          // OUTPUT_OFFSET
+         1605632,                                          // OUTPUT_OFFSET
          false,                                      // TRANSPOSE
          {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},  // LOOPS
          {0, 5},                                     // INPUTX
@@ -424,7 +425,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
      }},
     {"layer4_0_downsample",
      {
-         0,                                           // INPUT_OFFSET
+         1605632,                                           // INPUT_OFFSET
          2778304,                                     // WEIGHT_OFFSET
          802816,                                      // OUTPUT_OFFSET
          false,                                       // TRANSPOSE
@@ -451,7 +452,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
      }},
     {"layer4_0_conv1",
      {
-         802816,                                     // INPUT_OFFSET
+         1605632,                                     // INPUT_OFFSET
          2909376,                                    // WEIGHT_OFFSET
          401408,                                     // OUTPUT_OFFSET
          false,                                      // TRANSPOSE
