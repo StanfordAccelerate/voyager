@@ -86,7 +86,7 @@ int main(int argc, char* argv[]) {
 
   Posit<16, 1> p16A, p16B, sum;
   Universal16 uni16A, uni16B, uniResult;
-  long diff_buckets[5] = {0, 0, 0, 0, 0};
+  double diff_buckets[5] = {0, 0, 0, 0, 0};
   for (int i = 0; i < 65536; i++) {
     for (int j = 0; j < 65536; j++) {
       if (i == 32768 || j == 32768) continue;
@@ -136,31 +136,24 @@ int main(int argc, char* argv[]) {
         printf("i: %d, j: %d\n", i, j);
         printf("a: %f, b: %f\n", a, b);
         printf("float: %f,  sum: %lf, universal: %lf\n",  gold, (float) sum, (float) uniResult);
+        printf("hlsDiff: %f, universalDiff: %f\n", hlsDiff, universalDiff);
         std::cerr << sum.bits.to_string(AC_BIN) << std::endl;
         std::cerr << uniResult.get() << std::endl;
         return -1;
       }
-
-      // if ((float) sum != gold && hlsDiff > universalDiff) {
-      //   printf("i: %d, j: %d\n", i, j);
-      //   printf("a: %f, b: %f\n", a, b);
-      //   printf("float: %f,  sum: %lf, universal: %lf\n",  gold, (float) sum, (float) uniResult);
-      //   printf("hlsDiff: %f, universalDiff: %f\n", hlsDiff, universalDiff);
-      //   return -1;
-      // }
     }
   }
 
-  float size = 65536l * 65536l;
+  double size = 65536l * 65536l;
   std::cout << "Percentage Difference Count:" << std::endl;
   std::cout << "< 0.001: " << diff_buckets[0] << "("
-            << (float)diff_buckets[0] / (size)*100.0 << "%)" << std::endl;
+            << diff_buckets[0] / size * 100.0 << "%)" << std::endl;
   std::cout << "< 0.01: " << diff_buckets[1] << "("
-            << (float)diff_buckets[1] / (size)*100.0 << "%)" << std::endl;
+            << diff_buckets[1] / size * 100.0 << "%)" << std::endl;
   std::cout << "< 0.1: " << diff_buckets[2] << "("
-            << (float)diff_buckets[2] / (size)*100.0 << "%)" << std::endl;
+            << diff_buckets[2] / size * 100.0 << "%)" << std::endl;
   std::cout << "< 1: " << diff_buckets[3] << "("
-            << (float)diff_buckets[3] / (size)*100.0 << "%)" << std::endl;
+            << diff_buckets[3] / size * 100.0 << "%)" << std::endl;
   std::cout << "> 1: " << diff_buckets[4] << "("
-            << (float)diff_buckets[4] / (size)*100.0 << "%)" << std::endl;
+            << diff_buckets[4] / size * 100.0 << "%)" << std::endl;
 }

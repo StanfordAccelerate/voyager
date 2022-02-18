@@ -45,6 +45,7 @@ def convertPosit(x, nbits=8, es=1):
 ''' @brief: Writes data of form torch.tensor dtype=float64 to binary data. '''
 def write_fp64(filename, data):
     # data = data.type(torch.float64)
+    data = data.astype(np.float64)
     with open(filename, 'wb') as f:
         floatlist = []
         

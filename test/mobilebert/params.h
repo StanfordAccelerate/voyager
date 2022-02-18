@@ -7,7 +7,7 @@
 std::map<std::string, SimplifiedParams> mobilebert{
     // (128 x 512) * (512 x 128)
     // (1x128x512) * (1x1x512x128)
-    {"input_bottleneck",
+    {"inputBottleneck",
      {
          0,                                           // INPUT_OFFSET
          0,                                           // WEIGHT_OFFSET
@@ -24,7 +24,7 @@ std::map<std::string, SimplifiedParams> mobilebert{
          1,                                           // stride
          false,                                       // replication
          false,                                       // RELU
-         false,                                       // bias
+         true,                                        // bias
          30 * 1024,                                   // BIAS_OFFSET
          false,                                       // residual
          40 * 1024,                                   // RESIDUAL_OFFSET
@@ -246,10 +246,10 @@ std::map<std::string, SimplifiedParams> mobilebert{
 };
 
 std::array<std::string, 11> mobilebert_order {
-    "input_bottleneck",
-    "input_no_norm",
-    "attention_bottleneck",
-    "attention_no_norm",
+    "inputBottleneck",
+    "inputLayerNorm",
+    "attentionBottleneck",
+    "attentionLayerNorm",
     "qkvProjection",
     "qkAttention",
     "vAttention",
@@ -262,17 +262,17 @@ std::array<std::string, 11> mobilebert_order {
 std::string mobilebertDataDir = "data/mobilebert/";
 
 std::map<std::string, Files> mobilebertFiles {
-    {"input_bottleneck", {
+    {"inputBottleneck", {
         "activations/mobilebert_embeddings",
         "weights/mobilebert_encoder_layer_0_bottleneck_input_dense_weight",
         "weights/mobilebert_encoder_layer_0_bottleneck_input_dense_bias",
         "activations/mobilebert_encoder_layer_0_bottleneck_input_dense"
     }},
-    {"input_no_norm", {
-        "mobilebert_encoder_layer_0_bottleneck_input_dense",
-        "mobilebert_encoder_layer_0_bottleneck_input_LayerNorm_weight",
-        "mobilebert_encoder_layer_0_bottleneck_input_LayerNorm_bias",
-        "mobilebert_encoder_layer_0_bottleneck_input_no_norm"
+    {"inputLayerNorm", {
+        "activations/mobilebert_encoder_layer_0_bottleneck_input_dense",
+        "weights/mobilebert_encoder_layer_0_bottleneck_input_LayerNorm_weight",
+        "weights/mobilebert_encoder_layer_0_bottleneck_input_LayerNorm_bias",
+        "activations/mobilebert_encoder_layer_0_bottleneck_input_LayerNorm"
     }},
     {"qkvProjection", {}},
     {"qkAttention", {}},
@@ -284,7 +284,7 @@ std::map<std::string, Files> mobilebertFiles {
 };
 
 std::map<std::string, MemoryMap> mobilebertMemoryMap {
-    {"input_bottleneck", {SRAM, RRAM, RRAM, SRAM, SRAM}},
+    {"inputBottleneck", {SRAM, RRAM, RRAM, SRAM, SRAM}},
     {"qkvProjection", {SRAM, RRAM, RRAM, SRAM, SRAM}},
     {"qkAttention", {SRAM, RRAM, RRAM, SRAM, SRAM}},
     {"vAttention", {SRAM, RRAM, RRAM, SRAM, SRAM}},
