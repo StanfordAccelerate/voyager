@@ -62,9 +62,7 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
   double* tmpValues = read_file_as_double(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
 
-  // if (params.REPLICATION) {
-  // TODO:WARNING:CHANGE: quick fix
-  if (false) {
+  if (params.REPLICATION) {
     for (int y = 0; y < STRIDE * Y; y++) {
       for (int x_o = 0; x_o < (STRIDE * X) / 4; x_o++) {
         for (int x_i = 0; x_i < 4; x_i++) {  // 4 packed together
