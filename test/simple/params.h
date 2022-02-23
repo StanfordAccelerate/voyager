@@ -85,7 +85,33 @@ std::map<std::string, SimplifiedParams> simple{
          false,                                     // FC
          false,                                     // NO_NORM
      }},
-
+    {"relu",
+     {
+         0,                                         // INPUT_OFFSET
+         0,                                         // WEIGHT_OFFSET
+         10 * 1024,                                 // OUTPUT_OFFSET
+         false,                                     // TRANSPOSE
+         {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
+         {0, 5},                                    // INPUTX
+         {1, 4},                                    // INPUTY
+         {2, 0},                                    // REDUCTION
+         {3, 1},                                    // WEIGHT
+         3,                                         // fxIndex
+         2,                                         // fyIndex
+         {4, 5},                                    // weightReuseIndex
+         1,                                         // stride
+         false,                                     // replication
+         true,                                      // RELU
+         false,                                     // bias
+         30 * 1024,                                 // BIAS_OFFSET
+         false,                                     // residual
+         40 * 1024,                                 // RESIDUAL_OFFSET
+         false,                                     // maxpool
+         false,                                     // avgpool
+         false,                                     // SOFTMAX
+         false,                                     // FC
+         false,                                     // NO_NORM
+     }},
     {"conv_with_replication",
      {
          0,                                          // INPUT_OFFSET
