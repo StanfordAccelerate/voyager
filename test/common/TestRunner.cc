@@ -468,6 +468,10 @@ extern "C" int sc_main(int argc, char* argv[]) {
     } else {
       throw std::runtime_error("Memory map for " + test + " not found");
     }
+  } else if (group == "simple") {
+    useDataFiles = false;
+
+    memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
   }
 
   // run_sequence(group, std::vector<std::string>(resnet_order.begin(),
