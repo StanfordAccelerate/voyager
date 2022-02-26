@@ -248,13 +248,13 @@ std::map<std::string, SimplifiedParams> simple{
          false,                                     // NO_NORM
      }},
     {"no_norm",  // elementwise product and addition for matrix of size:
-                 // 128 x 512
+                 // 64 x 64
      {
          0,                                          // INPUT_OFFSET
          0,                                          // WEIGHT_OFFSET
          10 * 1024,                                  // OUTPUT_OFFSET
          false,                                      // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 1}},  // LOOPS
+         {{1, 1, 1, 1, 1, 1}, {4, 1, 1, 1, 64, 1}},  // LOOPS
          {0, 5},                                     // INPUTX
          {1, 4},                                     // INPUTY
          {2, 0},                                     // REDUCTION

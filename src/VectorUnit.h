@@ -184,10 +184,12 @@ SC_MODULE(VectorOpUnit) {
         op3Src1 = reductionOpOutputSrc1.Pop();
       } else if (inst.vOp3Src1 == VectorInstructions::readNormalInterface) {
         Pack1D<IDTYPE, WIDTH> tmp = vectorFetch2Output.Pop();
+
 #pragma hls_unroll yes
         for (int i = 0; i < WIDTH; i++) {
           op3Src1[i] = tmp[i];
         }
+        DLOG("reading from vectorfetch2: " << op3Src1);
       }
 
       if (inst.vOp3 == VectorInstructions::vadd) {

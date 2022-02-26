@@ -350,12 +350,12 @@ int run_test(const SimplifiedParams params, const std::string& dataDir,
   int errors = compare_arrays(&sramMemory[params.OUTPUT_OFFSET], matrixC,
                               outputSize, diffFile);
 
-  std::cout << "HLS Posit Gold Model vs. Universal Posit Gold Model"
-            << std::endl;
-  std::cout << "(reveals bugs in implementation of custom HLS Posit operators)"
-            << std::endl;
-  diffFile = fileOutputPrefix + "hlsgold_vs_universalgold.txt";
-  errors += compare_arrays(matrixC, universalMatrixC, outputSize, diffFile);
+  // std::cout << "HLS Posit Gold Model vs. Universal Posit Gold Model"
+  //           << std::endl;
+  // std::cout << "(reveals bugs in implementation of custom HLS Posit operators)"
+  //           << std::endl;
+  // diffFile = fileOutputPrefix + "hlsgold_vs_universalgold.txt";
+  // errors += compare_arrays(matrixC, universalMatrixC, outputSize, diffFile);
 
   if (useDataFile) {
     std::cout << "HLS Posit Gold Model vs. Pytorch" << std::endl;
