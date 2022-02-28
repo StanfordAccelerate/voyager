@@ -38,9 +38,9 @@ comp_model.eval()
 comp_model = bn_folding.bn_folding_model(comp_model)
 
 # Evaluation header
-with open("imagenet_classes.txt", "r") as f:
+with open("../data/imagenet/imagenet_classes.txt", "r") as f:
     categories = [s.strip() for s in f.readlines()]
-with open("ILSVRC2012_validation_ground_truth.txt", "r") as f:
+with open("../data/imagenet/ILSVRC2012_validation_ground_truth.txt", "r") as f:
     labels = [s.strip() for s in f.readlines()]
 
 sample_size = 1

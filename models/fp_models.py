@@ -23,11 +23,11 @@ def arrange_data(name, tensor):
         K = np.shape(x)[0]
         C = np.shape(x)[1]
 
-        for c in range(C):
-            for k in range(K):
+        for k in range(K):
+            for c in range(C):
                 arr.append(x[k][c])
-            for i in range(8):
-                arr.append(0)
+                for i in range(8):
+                    arr.append(0)
         return np.array(arr)
 
     if (len(np.shape(x)) < 4):
