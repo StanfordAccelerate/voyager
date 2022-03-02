@@ -215,8 +215,21 @@ SC_MODULE(VectorFetchUnit) {
             }
           }
         }
-      } else {
-        // TODO: generic 2d tensor
+      } else {  // 2d tensor
+        DLOG("2d tensor for bias");
+#pragma hls_pipeline_init_interval 1
+        for (int i = 0; i < params.addressGen2Loops[0][0]; i++) {
+          for (int j = 0; j < params.addressGen2Loops[0][1]; j++) {
+            for (int k = 0; k < params.addressGen2Loops[0][2]; k++) {
+              int address =
+                  j * params.addressGen2Loops[0][2] * WIDTH + k * WIDTH;
+              DLOG("addressgen2 " << j << " " << k << " " << address);
+              MemoryRequest memRequest = {params.ADDRESS_GEN2_OFFSET + address,
+                                          WIDTH};
+              vectorFetch2AddressRequest.Push(memRequest);
+            }
+          }
+        }
       }
     }
   }
@@ -269,9 +282,15 @@ SC_MODULE(VectorFetchUnit) {
             }
           }
         }
-      } else {
-        // passthrough
-        // TODO
+      } else {  // pasthrough for a standard 2d tensor
+        for (int i = 0; i < params.addressGen2Loops[0][0]; i++) {
+          for (int j = 0; j < params.addressGen2Loops[0][1]; j++) {
+            for (int k = 0; k < params.addressGen2Loops[0][2]; k++) {
+              vectorFetch2DataResponseReplicated.Push(
+                  vectorFetch2DataResponse.Pop());
+            }
+          }
+        }
       }
     }
   }

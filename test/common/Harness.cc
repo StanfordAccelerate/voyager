@@ -124,7 +124,7 @@ void Harness::memAccessBurstVariable(
   while (true) {
     MemoryRequest memRequest = addressRequest->Pop();
     INPUT_DATATYPE *memory;
-    if (currentParams.FC) {
+    if (currentParams.FC || currentParams.NO_NORM) {
       memory = rramMemory;
     } else {
       memory = sramMemory;
@@ -361,7 +361,86 @@ void Harness::sendParams() {
       done.SyncPop();
       CCS_LOG("Accelerator Layer Finished.");
     } else if (params.NO_NORM) {
-      // TODO
+      // no matrix parameters
+      serialParamsIn.Push(0);
+
+      serialParamsIn.Push(1);
+      VectorParams vectorParams;
+      vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
+      vectorParams.addressGen0Enable = true;
+      vectorParams.addressGen0Loop[0] = 1;
+      vectorParams.addressGen0Loop[1] = Y;
+      vectorParams.addressGen0Loop[2] = C / DIMENSION;
+
+      // address gen 1 (weights)
+      vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
+      vectorParams.addressGen1Mode = 2;  // 2d tensor
+      vectorParams.addressGen1Loops[0][0] = Y;
+      vectorParams.addressGen1Loops[0][1] = 1;
+      vectorParams.addressGen1Loops[0][2] = C / DIMENSION;
+
+      vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
+      vectorParams.addressGen2Mode = 2;  // 2d tensor
+      vectorParams.addressGen2Loops[0][0] = Y;
+      vectorParams.addressGen2Loops[0][1] = 1;
+      vectorParams.addressGen2Loops[0][2] = C / DIMENSION;
+
+      vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+      vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+
+      vectorParams.scalarOutputCount = 0;
+      vectorParams.MAXPOOL = params.MAXPOOL;
+      vectorParams.AVGPOOL = params.AVGPOOL;
+
+      // output
+      for (int i = 0; i < 3; i++) {
+        vectorParams.outputLoops[0][i] = params.loops[0][i];
+      }
+      vectorParams.outputXLoopIndex[0] = params.inputXLoopIndex[0];
+      vectorParams.outputYLoopIndex[0] = params.inputYLoopIndex[0];
+      vectorParams.outputWeightLoopIndex[0] = params.weightLoopIndex[0];
+
+      vectorParams.outputLoops[1][0] = 1;
+      vectorParams.outputLoops[1][1] = Y;
+      vectorParams.outputLoops[1][2] = C / DIMENSION;
+      vectorParams.outputWeightLoopIndex[1] = 2;
+      vectorParams.outputYLoopIndex[1] = 1;
+      vectorParams.outputXLoopIndex[1] = 0;
+
+      sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
+
+      // create instruction stream
+      VectorInstructionConfig vectorInstructionConfig;
+
+      // inst 1- inputs x weights, send to reduce
+      vectorInstructionConfig.inst[0].instType = VectorInstructions::vector;
+      vectorInstructionConfig.inst[0].vInput =
+          VectorInstructions::readFromVectorFetch;
+      vectorInstructionConfig.inst[0].vAccumulatePush = VectorInstructions::nop;
+      vectorInstructionConfig.inst[0].vOp0Src1 =
+          VectorInstructions::readInterface;
+      vectorInstructionConfig.inst[0].vOp0 = VectorInstructions::vmult;
+      vectorInstructionConfig.inst[0].vOp1 = VectorInstructions::nop;
+      vectorInstructionConfig.inst[0].vOp2 = VectorInstructions::nop;
+      vectorInstructionConfig.inst[0].vOp3Src0 = VectorInstructions::nop;
+      vectorInstructionConfig.inst[0].vOp3Src1 =
+          VectorInstructions::readNormalInterface;
+      vectorInstructionConfig.inst[0].vOp3 = VectorInstructions::vadd;
+      vectorInstructionConfig.inst[0].vOp4 = params.RELU;
+      vectorInstructionConfig.inst[0].vDest = VectorInstructions::vWriteOut;
+      // C/DIMENSION to do the complete reduction
+      // DIMENSION to fill up the entire vector
+      vectorInstructionConfig.instCount[0] = Y * C / DIMENSION;
+
+      vectorInstructionConfig.instLen = 1;
+      vectorInstructionConfig.instLoopCount = 1;
+
+      sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
+                                                        &serialParamsIn);
+      serialParamsIn.Push(0);
+
+      done.SyncPop();
+      CCS_LOG("Accelerator Layer Finished.");
     } else {
       // matrix params
       serialParamsIn.Push(1);

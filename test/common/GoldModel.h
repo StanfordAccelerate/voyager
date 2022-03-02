@@ -54,6 +54,16 @@ inline void gold_relu(float &a) {
   }
 }
 
+inline void gold_exp(INPUT_DATATYPE &a) { a.exp(); }
+inline void gold_exp(float &a) { a = exp(a); }
+inline void gold_exp(UniversalPosit &a) {
+  // TODO
+}
+
+inline void gold_reciprocal(ACCUM_DATATYPE &a) { a.reciprocal(); }
+inline void gold_reciprocal(float &a) { a = 1.0 / a; }
+inline void gold_reciprocal(UniversalPositAccum &a) { a = 1 / a; }
+
 template <typename T, typename ACC_T>
 void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                  T *matrixC, T *biasMatrix, T *residualMatrix) {
@@ -77,12 +87,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
         int index = i * params.loops[1][params.inputXLoopIndex[1]] + j;
         matrixC[index] = static_cast<ACC_T>(matrixA[index]) - max;
-        // FIXME
-        // matrixC[index].exp();
+        gold_exp(matrixC[index]);
         sum += matrixC[index];
       }
-      // FIXME
-      // sum.reciprocal();
+
+      gold_reciprocal(sum);
 
       // div
       for (int j = 0; j < params.loops[1][params.inputXLoopIndex[1]]; j++) {
