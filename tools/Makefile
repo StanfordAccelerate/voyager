@@ -5,7 +5,5 @@ all:
 
 mobilebert:
 	rm -rf ../data/mobilebert/*
-	mkdir ../data/mobilebert/activations
-	mkdir ../data/mobilebert/weights
-	python3 pkl_parser_resnet.py -i ../data/mobilebert_activations.pkl -o ../data/mobilebert/activations/ -t posit8
-	python3 pkl_parser_resnet.py -i ../data/mobilebert_weights.pkl -o ../data/mobilebert/weights/ -t posit8
+	python3 pkl_parser_resnet.py -i ../data/mobilebert_activations.pkl -o ../data/mobilebert -t posit8
+	python3 pkl_parser_resnet.py -i ../data/mobilebert_weights.pkl -o ../data/mobilebert -t posit8

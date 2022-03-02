@@ -53,3 +53,11 @@ struct SimplifiedParams {
   bool FC;
   bool NO_NORM;
 };
+
+struct Offsets {
+  int INPUT_OFFSET;
+  int WEIGHT_OFFSET;
+  int OUTPUT_OFFSET;
+  int BIAS_OFFSET;
+  int RESIDUAL_OFFSET;
+};
