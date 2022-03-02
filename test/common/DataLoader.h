@@ -32,3 +32,9 @@ void load_wb(
     UniversalPosit* universalDataFileOutput, float* floatMatrixA,
     float* floatMatrixB, float* floatBiasMatrix, float* floatResidualMatrix,
     float* floatMatrixC, float* floatDataFileOutput);
+
+void load_datafile_outputs(const SimplifiedParams params,
+                           const std::string& filename,
+                           INPUT_DATATYPE* outputMatrix,
+                           UniversalPosit* universalOutputMatrix,
+                           float* floatOutputMatrix);

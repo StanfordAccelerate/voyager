@@ -4,7 +4,7 @@
 #include <iostream>
 #include <random>
 
-#define PIPE_INPUT 1
+#define PIPE_INPUT 0
 
 void save_double(INPUT_DATATYPE* array, double val) {
   float fval = (float)val;
@@ -302,21 +302,6 @@ void load_datafile_outputs(const SimplifiedParams params,
 
   delete[] tmpValues;
 }
-
-// FIXME
-// void load_wb(const SimplifiedParams& params, const std::string& dataDir,
-//              const Files& files, const MemoryMap& memoryMap, bool
-//              useDataFile, INPUT_DATATYPE* sramMemory, INPUT_DATATYPE*
-//              rramMemory, INPUT_DATATYPE* matrixA, INPUT_DATATYPE* matrixB,
-//              INPUT_DATATYPE* biasMatrix, INPUT_DATATYPE* residualMatrix,
-//              INPUT_DATATYPE* matrixC, INPUT_DATATYPE* dataFileOutput) {
-//   load_weights(params, dataDir + files.weights_file, useDataFile,
-//                memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB);
-//   if (params.BIAS) {
-//     load_bias(params, dataDir + files.bias_file, useDataFile,
-//               memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix);
-//   }
-// }
 
 void load_memory(
     const SimplifiedParams& params, const std::string& dataDir,
