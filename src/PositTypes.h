@@ -318,8 +318,7 @@ Posit<nbits, es>::operator float() const {
 template <int sbits, int fbits>
 class PositFP {
  public:
-  static constexpr int fhbits =
-      fbits + 1;  // maximum number of fraction + one hidden bit
+  static constexpr int fhbits = fbits + 1;  // size of fraction + hidden bit
   static constexpr int abits = fhbits + 3;  // size of the addend
   static constexpr int mbits = 2 * fhbits;  // size of the multiplier output
 
@@ -541,11 +540,11 @@ PositFP<sbits, fbits> &PositFP<sbits, fbits>::fma(
 template <int nbits, int es, int nbits2, int es2>
 Posit<nbits2, es2> fma(const Posit<nbits, es> &a, const Posit<nbits, es> &b,
                        const Posit<nbits2, es2> &c) {
-  constexpr size_t fbits = nbits - 2 - es;  // size of fraction + hidden bit
-  constexpr size_t mbits = 2 * fbits;       // size of the multiplier output
-  constexpr size_t fbits2 = nbits2 - 2 - es2;
-  // TODO: remove hidden bit from fraction. Universal uses 3 more bits for
-  // addend. We use 4 because of the extra hidden bit
+  constexpr size_t fbits = nbits - 3 - es;
+  constexpr size_t fhbits = fbits + 1;  // size of fraction + hidden bit
+  constexpr size_t mbits = 2 * fhbits;  // size of the multiplier output
+
+  constexpr size_t fbits2 = nbits2 - 3 - es2;
   constexpr size_t abits = fbits2 + 4;  // size of the addend
 
   PositFP<8, fbits> va(a), vb(b);
@@ -556,7 +555,8 @@ Posit<nbits2, es2> fma(const Posit<nbits, es> &a, const Posit<nbits, es> &b,
   if (a.isZero() || b.isZero()) {
     return Posit<nbits2, es2>(c);
   } else {
-    product = a * b;
+    product = va * vb;
+    // TODO: explore a * b behavior
     if (c.isZero()) {
       return Posit<nbits2, es2>(product);
     } else {

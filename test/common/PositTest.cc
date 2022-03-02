@@ -1,12 +1,13 @@
+#include "cmath"
 #include "src/PositTypes.h"
 #include "universal/number/posit/posit.hpp"
-#include "cmath"
 
 using Universal8 = sw::universal::posit<8, 1>;
-using Universal16 = sw::universal::posit<16, 1>;;
+using Universal16 = sw::universal::posit<16, 1>;
+;
 using Internal = sw::universal::value<15>;
 
-template<int nbits, int es, int sbits, int fbits>
+template <int nbits, int es, int sbits, int fbits>
 bool test(float f) {
   Posit<nbits, es> p = f;
   sw::universal::posit<nbits, es> ref = f;
@@ -20,10 +21,10 @@ bool test(float f) {
   }
 
   PositFP<sbits, fbits> fp(p);
-  if ((float) fp != (float) ref) {
-      std::cerr << "ERROR: incorrect decoded value produced!" << std::endl
-                << "gold: " << (float) ref << "  hls: " << (float) fp << std::endl;
-      return false;
+  if ((float)fp != (float)ref) {
+    std::cerr << "ERROR: incorrect decoded value produced!" << std::endl
+              << "gold: " << (float)ref << "  hls: " << (float)fp << std::endl;
+    return false;
   }
   return true;
 }
@@ -31,13 +32,14 @@ bool test(float f) {
 int main(int argc, char* argv[]) {
   // std::cerr << "Testing posit encoding and decoding." << std::endl;
 
-  // // precision test
+  // precision test
   // for (float f = 0; f < 10; f += 1e-6) {
   //   if (!test<8, 0, 8, 5>(f)) return -1;
   //   if (!test<8, 1, 8, 4>(f)) return -1;
   //   if (!test<16, 1, 8, 12>(f)) return -1;
   //   if (!test<32, 2, 8, 26>(f)) return -1;
   // }
+  // std::cerr << "Finished precision test." << std::endl;
 
   // // range test
   // for (float f = 1e-6; f < 1e6; f += 1) {
@@ -46,46 +48,51 @@ int main(int argc, char* argv[]) {
   //   if (!test<16, 1, 8, 12>(f)) return -1;
   //   if (!test<32, 2, 8, 27>(f)) return -1;
   // }
+  // std::cerr << "Finished range test." << std::endl;
 
-  // Posit<8, 1> pA, pB;
-  // Posit<16, 1> mul;
-  // Universal8 uniA, uniB, uniSum;
-  // for (int i = 0; i < 256; i++) {
-  //   for (int j = 0; j < 256; j++) {
-  //     if (i == 128 || j == 128) continue;
+  Posit<8, 1> pA, pB;
+  Posit<16, 1> pC;
+  Universal8 uniA, uniB, uniC;
+  for (int i = 0; i < 256; i++) {
+    for (int j = 0; j < 256; j++) {
+      if (i == 128 || j == 128) continue;
 
-  //     pA.setbits(i);
-  //     pB.setbits(j);
-  //     // mul = fma(pA, pB, 0);
-  //     mul = pA * pB;
+      pA.setbits(i);
+      pB.setbits(j);
+      pC.setbits(0);
+      pC = fma(pA, pB, pC);
+      // pC = pA * pB;
 
-  //     uniA.setbits(i);
-  //     uniB.setbits(j);
-  //     uniSum = uniA * uniB;
-  //     float a = (float) uniA;
-  //     float b = (float) uniB;
+      uniA.setbits(i);
+      uniB.setbits(j);
+      uniC = uniA * uniB;
 
-  //     if ((float) pA != a) {
-  //       printf("i: %d, a: %f,  pA: %f\n", i, a, (float) pA);
-  //       return -1;
-  //     }
-  //     if ((float) pB != b) {
-  //       printf("j: %d, b: %f,  pB: %f\n", j, b, (float) pB);
-  //       return -1;
-  //     }
-      
-  //     float gold = a * b;
-  //     if ((float) mul != (float) uniSum) {
-  //       printf("i: %d, j: %d\n", i, j);
-  //       printf("a: %f, b: %f\n", a, b);
-  //       printf("float: %f, posit: %f, universal: %f\n",  gold, (float) mul, (float) uniSum);
-  //       return -1;
-  //     }
-  //   }
-  // }
+      float a = (float)uniA;
+      float b = (float)uniB;
+      float gold = a * b;
 
-  Posit<16, 1> p16A, p16B, sum;
-  Universal16 uni16A, uni16B, uniResult;
+      if ((float)pA != a) {
+        printf("i: %d, a: %f,  pA: %f\n", i, a, (float)pA);
+        return -1;
+      }
+      if ((float)pB != b) {
+        printf("j: %d, b: %f,  pB: %f\n", j, b, (float)pB);
+        return -1;
+      }
+
+      if ((float)pC != gold) {
+        printf("i: %d, j: %d\n", i, j);
+        printf("a: %f, b: %f\n", a, b);
+        printf("float: %f, posit: %f, universal: %f\n", gold, (float)pC,
+               (float)uniC);
+        return -1;
+      }
+    }
+  }
+  std::cerr << "Finished multiplication test." << std::endl;
+
+  Posit<16, 1> p16A, p16B, p16C;
+  Universal16 uni16A, uni16B, uni16C;
   double diff_buckets[5] = {0, 0, 0, 0, 0};
   for (int i = 0; i < 65536; i++) {
     for (int j = 0; j < 65536; j++) {
@@ -95,27 +102,27 @@ int main(int argc, char* argv[]) {
 
       p16A.setbits(i);
       p16B.setbits(j);
-      sum = p16A + p16B;
+      p16C = p16A + p16B;
 
       uni16A.setbits(i);
       uni16B.setbits(j);
-      uniResult = uni16A + uni16B;
+      uni16C = uni16A + uni16B;
 
-      float a = (float) uni16A;
-      float b = (float) uni16B;
+      float a = (float)uni16A;
+      float b = (float)uni16B;
 
-      if ((float) p16A != a) {
-        printf("i: %d, a: %f,  p16A: %f\n", i, a, (float) p16A);
+      if ((float)p16A != a) {
+        printf("i: %d, a: %f,  p16A: %f\n", i, a, (float)p16A);
         return -1;
       }
-      if ((float) p16B != b) {
-        printf("j: %d, b: %f,  p16B: %f\n", j, b, (float) p16B);
+      if ((float)p16B != b) {
+        printf("j: %d, b: %f,  p16B: %f\n", j, b, (float)p16B);
         return -1;
       }
 
       float gold = a + b;
-      float hlsDiff = abs(((float) sum - gold) / gold);
-      float universalDiff = abs(((float) uniResult - gold) / gold);
+      float hlsDiff = abs(((float)p16C - gold) / gold);
+      float universalDiff = abs(((float)uni16C - gold) / gold);
 
       if (hlsDiff < 0.001) {
         diff_buckets[0]++;
@@ -132,13 +139,14 @@ int main(int argc, char* argv[]) {
         diff_buckets[4]++;
       }
 
-      if (sum.bits != uniResult.encoding() && hlsDiff > universalDiff) {
+      if (p16C.bits != uni16C.encoding() && hlsDiff > universalDiff) {
         printf("i: %d, j: %d\n", i, j);
         printf("a: %f, b: %f\n", a, b);
-        printf("float: %f,  sum: %lf, universal: %lf\n",  gold, (float) sum, (float) uniResult);
+        printf("float: %f,  hls: %lf, universal: %lf\n", gold, (float)p16C,
+               (float)uni16C);
         printf("hlsDiff: %f, universalDiff: %f\n", hlsDiff, universalDiff);
-        std::cerr << sum.bits.to_string(AC_BIN) << std::endl;
-        std::cerr << uniResult.get() << std::endl;
+        std::cerr << p16C.bits.to_string(AC_BIN) << std::endl;
+        std::cerr << uni16C.get() << std::endl;
         return -1;
       }
     }
