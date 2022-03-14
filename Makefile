@@ -19,19 +19,42 @@ TEST ?= simple
 
 export TEST := $(TEST)
 
-rtl: build/Catapult/Accelerator.v1/concat_rtl.v
+###########################################################
+# Catapult Synthesis
+###########################################################
+rtl: build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v
 
-build/Catapult/Accelerator.v1/concat_rtl.v: src/Accelerator.cc $(wildcard src/*.h) scripts/hls.tcl
-	catapult -shell -file scripts/hls.tcl
-	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/^`include/d' build/Catapult/Accelerator.v1/concat_rtl.v > build/Catapult/Accelerator.v1/concat_rtl_clean.v
+InputController: build/Catapult_InputController/InputController.v1/concat_rtl.v
+MatrixProcessor: build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v
+VectorUnit: build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
 
-debug_rtl: build/Catapult_debug/Accelerator.v1/concat_rtl.v
+build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v: InputController MatrixProcessor VectorUnit
+	catapult -shell -file scripts/Accelerator.tcl
+build/Catapult_InputController/InputController.v1/concat_rtl.v:
+	catapult -shell -file scripts/InputController.tcl
+build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v:
+	catapult -shell -file scripts/MatrixProcessor.tcl
+build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v:
+	catapult -shell -file scripts/VectorUnit.tcl
 
-build/Catapult_debug/Accelerator.v1/concat_rtl.v: export DEBUG=1
 
-build/Catapult_debug/Accelerator.v1/concat_rtl.v: src/Accelerator.cc $(wildcard src/*.h) scripts/hls.tcl
-	catapult -shell -file scripts/hls.tcl
+.PHONY: rtl InputController MatrixProcessor VectorUnit
+# rtl: build/Catapult/Accelerator.v1/concat_rtl.v
 
+# build/Catapult/Accelerator.v1/concat_rtl.v: src/Accelerator.cc $(wildcard src/*.h) scripts/hls.tcl
+# 	catapult -shell -file scripts/hls.tcl
+# 	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/^`include/d' build/Catapult/Accelerator.v1/concat_rtl.v > build/Catapult/Accelerator.v1/concat_rtl_clean.v
+
+# debug_rtl: build/Catapult_debug/Accelerator.v1/concat_rtl.v
+
+# build/Catapult_debug/Accelerator.v1/concat_rtl.v: export DEBUG=1
+
+# build/Catapult_debug/Accelerator.v1/concat_rtl.v: src/Accelerator.cc $(wildcard src/*.h) scripts/hls.tcl
+# 	catapult -shell -file scripts/hls.tcl
+
+###########################################################
+# C Simulations
+###########################################################
 sim: build/TestRunner
 	./build/TestRunner 
 
