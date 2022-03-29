@@ -242,7 +242,7 @@ SC_MODULE(MatrixProcessor) {
       while (step < totalOps + (NROWS - 1) + (NCOLS - 1) + latency) {
 #ifndef __SYNTHESIS__
         if (step % 10000 == 0) {
-          DLOG("step " << step << " out of " << totalOps);
+          CCS_LOG("step " << step << " out of " << totalOps);
         }
 #endif
 
