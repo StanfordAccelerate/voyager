@@ -99,7 +99,16 @@ void run_sequence(const std::string& group,
     mem_map = &resnetMemoryMap;
     param_map = &resnetParams;
     file_map = &resnetFiles;
-  } else {
+  } 
+  else if (group == "simple")
+  {
+    data_dir = resnetDataDir;
+    mem_map = &resnetMemoryMap;
+    param_map = &simple;
+    file_map = &resnetFiles;
+    use_data_file = false;
+  }
+  else {
     data_dir = mobilebertDataDir;
     mem_map = &mobilebertMemoryMap;
     param_map = &mobilebert;
@@ -253,6 +262,7 @@ void run_sequence(const std::string& group,
   float* fp_comp = new float[X * Y * K];
 
   std::string last_test = *(tests.end() - 1);
+  if (use_data_file)
   load_datafile_outputs((*param_map)[last_test],
                         data_dir + (*file_map)[last_test].outputs_file,
                         hls_comp, uni_comp, fp_comp);
