@@ -2,6 +2,11 @@ build
 pybuild
 data/resnet
 data/mobilebert
+data/mobilebert_scaled
+data/mobilebert_errors
+data/mobilebert*.pkl
 .direnv
 .vscode
 test_outputs/
+logs/
+models/mobilebert

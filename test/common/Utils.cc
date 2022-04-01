@@ -36,16 +36,16 @@ int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
   int diff_buckets[5] = {0, 0, 0, 0, 0};
   int percent_diff_buckets[5] = {0, 0, 0, 0, 0};
 
-  // std::ofstream diffFile(filename);
+  std::ofstream diffFile(filename);
   for (int index = 0; index < size; index++) {
-    // diffFile << (float)matrixA[index] << " vs. " << (float)matrixB[index]
-    //          << " ";
-    float diff = abs(((float)matrixA[index] - (float)matrixB[index]));
+    diffFile << (float)matrixA[index] << " vs. " << (float)matrixB[index]
+             << " ";
+    float diff = abs((float)matrixA[index] - (float)matrixB[index]);
 
-    // for (float i = 0.001; i < diff; i *= 10.0) {
-    //   diffFile << "*";
-    // }
-    // diffFile << std::endl;
+    for (float i = 0.001; i < diff; i *= 10.0) {
+      diffFile << "*";
+    }
+    diffFile << std::endl;
 
     if (diff < 0.001) {
       diff_buckets[0]++;
@@ -60,14 +60,10 @@ int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
       diff_buckets[3]++;
     } else {
       diff_buckets[4]++;
-      // std::cerr << (float)matrixA[index] << "\t" << (float)matrixB[index]
-      //           << std::endl;
     }
 
     if (matrixA[index] != 0) {
-      float percent_diff =
-          abs(((float)matrixA[index] - (float)matrixB[index])) /
-          (float)matrixA[index];
+      float percent_diff = abs(diff / (float)matrixA[index]);
       if (percent_diff < 0.001) {
         percent_diff_buckets[0]++;
       }

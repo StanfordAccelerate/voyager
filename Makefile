@@ -15,9 +15,6 @@ C11FLAGS = $(BASEFLAGS) -std=c++11 -Wno-deprecated-declarations
 C17FLAGS = $(BASEFLAGS) -std=c++17
 LDFLAGS = -lsystemc -lpython3.6m
 LDLIBS = -L/cad/mentor/2021.1/Mgc_home/shared/lib/
-TEST ?= simple
-
-export TEST := $(TEST)
 
 rtl: build/Catapult/Accelerator.v1/concat_rtl.v
 
@@ -34,6 +31,12 @@ build/Catapult_debug/Accelerator.v1/concat_rtl.v: src/Accelerator.cc $(wildcard 
 
 sim: build/TestRunner
 	./build/TestRunner 
+
+MobilebertTest: build/MobilebertTest
+	./build/MobilebertTest
+
+MobilebertUnitTest: build/MobilebertUnitTest
+	./build/MobilebertUnitTest
 
 PositTest: build/PositTest
 	./build/PositTest
@@ -54,6 +57,12 @@ gui:
 build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
+build/MobilebertTest: build/Accelerator.o build/Harness.o build/MobilebertTest.o build/GoldModel.o build/Utils.o build/DataLoader.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+build/MobilebertUnitTest: build/Accelerator.o build/Harness.o build/MobilebertTest.o build/GoldModel.o build/Utils.o build/DataLoader.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
 build/PositTest: build/PositTest.o
 	$(CC) -o $@ $^
 
@@ -72,7 +81,10 @@ build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
 build/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/TestRunner.o: test/common/TestRunner.cc test/mobilebert/params.h test/simple/params.h test/resnet/params.h
+build/TestRunner.o: test/common/TestRunner.cc test/simple/params.h test/resnet/params.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+build/MobilebertTest.o: test/mobilebert/TestRunner.cc test/mobilebert/params.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/PositTest.o: test/common/PositTest.cc src/PositTypes.h

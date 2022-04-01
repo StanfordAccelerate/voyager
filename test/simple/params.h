@@ -3,6 +3,8 @@
 #include <map>
 #include <string>
 
+#include "test/common/VerificationTypes.h"
+
 std::map<std::string, SimplifiedParams> simple{
     {"simple",
      {

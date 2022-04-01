@@ -52,6 +52,9 @@ struct SimplifiedParams {
   bool SOFTMAX;
   bool FC;
   bool NO_NORM;
+
+  bool WEIGHT;
+  bool ATTENTION_SCALING;
 };
 
 struct Offsets {
