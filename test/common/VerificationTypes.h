@@ -64,12 +64,24 @@ struct SimplifiedParams {
   bool SOFTMAX;
   bool FC;
   bool NO_NORM;
+
+  bool WEIGHT;
+  bool ATTENTION_SCALING;
+  bool INPUT_TRANSPOSE;
 };
 
-struct Offsets {
+struct MemoryOffsets {
   int INPUT_OFFSET;
   int WEIGHT_OFFSET;
   int OUTPUT_OFFSET;
   int BIAS_OFFSET;
   int RESIDUAL_OFFSET;
 };
+
+const int HEAD_SIZE = 128 * 32 + 32;
+const int HIDDEN_SIZE = 128 * 128 + 128;
+const int INTERMEDIATE_SIZE = 4 * HIDDEN_SIZE;
+const int PER_LAYER_HIDDEN_SIZE = 128 * 128 + 1;
+const int PER_LAYER_INTERMEDIATE_SIZE = 128 * 512 + 1;
+const int HIDDEN_BIAS_SIZE = 128 + 1;
+const int INTERMEDIATE_BIAS_SIZE = 512 + 1;

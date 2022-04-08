@@ -8,43 +8,10 @@ import os
 import struct
 
 
-def convertPosit(x, nbits=8, es=1):
-    sign = x < 0
-    n = np.abs(x).view(np.int32)
-    scale = (n >> 23) - 127
-    mantissa = (n & 0x7FFFFF).astype(np.int32)
-    
-    r = scale >= 0
-    run = np.where(r, 1 + (scale >> es), -(scale >> es))
-    regime = np.where(r, (1 << (run + 1)) - 1, 0)
-    regime ^= 0x1
-    
-    exponent = scale % (1 << es)
-    nf = np.maximum(0, nbits + 1 - (2 + run + es))
-    fraction = mantissa >> np.maximum(23 - nf, 0)
-    sb = (mantissa << (32 - (23 - nf))).astype(bool)
-    
-    regime <<= es + nf + 1
-    exponent <<= nf + 1
-    fraction <<= 1
-    sticky_bit = np.where(sb, 1, 0)
-    
-    pt_bits = (regime | exponent | fraction | sticky_bit).astype(np.int32)
-    len = 1 + np.maximum(nbits + 1, 2 + run + es)
-    blast = (pt_bits & (1 << (len - nbits))).astype(bool)
-    bafter = (pt_bits & (1 << (len - nbits - 1))).astype(bool)
-    bsticky = (pt_bits << (32 - (len - nbits - 1))).astype(bool)
-    rb = (blast & bafter) | (bafter & bsticky)
-
-    pt_bits >>= len - nbits
-    pt_bits[rb] += 1
-    pt_bits[sign] *= -1
-
-    return pt_bits
-
 ''' @brief: Writes data of form torch.tensor dtype=float64 to binary data. '''
 def write_fp64(filename, data):
     # data = data.type(torch.float64)
+    data = data.astype(np.float64)
     with open(filename, 'wb') as f:
         floatlist = []
         
@@ -117,19 +84,26 @@ if __name__ == "__main__":
     infile = open(inputfile,'rb')
     new_dict = pickle.load(infile)
 
-    if (datatype == 'int8' or datatype == 'posit8'):
+    if (datatype == 'int8'):
         for key, value in new_dict.items():
             filename = outputfolder + "/" + clean_name(key)
             print(filename)
-
-            if datatype == 'posit8':
-                value = convertPosit(value, 8, 1).astype(np.int8)
-
             with open(filename, 'wb') as f:
                 byte_list = []
+        
                 for i in np.nditer(value):
-                    byte_list.append(i + 256 if i < 0 else i)
+                    if (i < 0):
+                        byte_list.append(i + 256)
+                    else:
+                        byte_list.append(i)
 
                 f.write(bytearray(byte_list))
+    elif (datatype == 'posit8'):
+        for key, value in new_dict.items():
+            prefilename = outputfolder + "/" + "pre" + clean_name(key)
+            postfilename = outputfolder + "/" + clean_name(key)
+            write_fp64(postfilename, value)
+            #os.system("./tools/decode " + prefilename + " " + postfilename)
+            print(postfilename)
 
     infile.close()

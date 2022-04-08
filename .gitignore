@@ -5,3 +5,5 @@ data/mobilebert
 .direnv
 .vscode
 test_outputs/
+logs/
+models/mobilebert

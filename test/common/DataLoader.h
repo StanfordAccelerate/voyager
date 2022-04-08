@@ -12,6 +12,21 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
                  INPUT_DATATYPE* goldMemory,
                  UniversalPosit* universalGoldMemory, float* floatGoldMemory);
 
+void load_weights(const SimplifiedParams& params, const std::string& filename,
+                  bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
+                  INPUT_DATATYPE* goldMemory,
+                  UniversalPosit* universalGoldMemory, float* floatGoldMemory);
+
+void load_bias(const SimplifiedParams& params, const std::string& filename,
+               bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
+               INPUT_DATATYPE* goldMemory, UniversalPosit* universalGoldMemory,
+               float* floatGoldMemory);
+
+void load_residual(const SimplifiedParams& params, const std::string& filename,
+                   bool useDataFile, INPUT_DATATYPE* acceleratorMemory,
+                   INPUT_DATATYPE* goldMemory,
+                   UniversalPosit* universalGoldMemory, float* floatGoldMemory);
+
 void load_datafile_outputs(const SimplifiedParams params,
                            const std::string& filename,
                            INPUT_DATATYPE* outputMatrix,
@@ -46,13 +61,3 @@ void load_wb(const SimplifiedParams& params, const std::string& dataDir,
              float* floatMatrixB, float* floatBiasMatrix,
              float* floatResidualMatrix, float* floatMatrixC,
              float* floatDataFileOutput);
-
-void load_weight_and_bias(
-    const SimplifiedParams& params, const std::string& dataDir,
-    const Files& files, const MemoryMap& memoryMap, bool useDataFile,
-    INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
-    INPUT_DATATYPE* hlsWeightMatrix, INPUT_DATATYPE* hlsBiasMatrix,
-    INPUT_DATATYPE* dataFileOutput, UniversalPosit* universalWeightMatrix,
-    UniversalPosit* universalBiasMatrix,
-    UniversalPosit* universalDataFileOutput, float* floatWeightMatrix,
-    float* floatBiasMatrix, float* floatDataFileOutput);

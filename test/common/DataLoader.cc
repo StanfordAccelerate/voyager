@@ -4,8 +4,6 @@
 #include <iostream>
 #include <random>
 
-// #define PIPE_INPUT 1
-
 void save_double(INPUT_DATATYPE* array, double val) {
   float fval = (float)val;
   *array = INPUT_DATATYPE(fval);
@@ -146,10 +144,13 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
   if (params.NO_NORM) {
     FX = 1;
     FY = 1;
-    K = 1;
+    C = 1;
   }
 
   int size = FY * FX * C * K;
+#ifdef WEIGHT_SCALING
+  size++;
+#endif
   double* tmpValues = read_file_as_double(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
 
@@ -168,6 +169,14 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
       }
     }
   }
+
+#ifdef WEIGHT_SCALING
+  double val = *tmpValuePtr;
+  save_double(&acceleratorMemory[params.WEIGHT_OFFSET + size - 1], val);
+  save_double(&goldMemory[size - 1], val);
+  save_double(&universalGoldMemory[size - 1], val);
+  save_double(&floatGoldMemory[size - 1], val);
+#endif
 
   delete[] tmpValues;
 }
@@ -190,23 +199,29 @@ void load_bias(const SimplifiedParams& params, const std::string& filename,
     FX = 7;
     C = 3;
   }
-  if (params.NO_NORM) {
-    K = C;
-  }
 
   int size = K;
+#ifdef WEIGHT_SCALING
+  size++;
+#endif
   double* tmpValues = read_file_as_double(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
 
-  if (params.BIAS) {
-    for (int k = 0; k < K; k++) {
-      double val = *(tmpValuePtr++);
-      save_double(&acceleratorMemory[params.BIAS_OFFSET + k], val);
-      save_double(&goldMemory[k], val);
-      save_double(&universalGoldMemory[k], val);
-      save_double(&floatGoldMemory[k], val);
-    }
+  for (int k = 0; k < K; k++) {
+    double val = *(tmpValuePtr++);
+    save_double(&acceleratorMemory[params.BIAS_OFFSET + k], val);
+    save_double(&goldMemory[k], val);
+    save_double(&universalGoldMemory[k], val);
+    save_double(&floatGoldMemory[k], val);
   }
+
+#ifdef WEIGHT_SCALING
+  double val = *tmpValuePtr;
+  save_double(&acceleratorMemory[params.BIAS_OFFSET + size - 1], val);
+  save_double(&goldMemory[size - 1], val);
+  save_double(&universalGoldMemory[size - 1], val);
+  save_double(&floatGoldMemory[size - 1], val);
+#endif
 
   delete[] tmpValues;
 }
@@ -279,9 +294,6 @@ void load_datafile_outputs(const SimplifiedParams params,
     X = 1;
     Y = 1;
   }
-  if (params.NO_NORM) {
-    K = C;
-  }
   if (params.SOFTMAX) {
     K = 1;
   }
@@ -322,14 +334,16 @@ void load_memory(
   load_inputs(params, dataDir + files.inputs_file, useDataFile,
               memoryMap.inputs == SRAM ? sramMemory : rramMemory, matrixA,
               universalMatrixA, floatMatrixA);
-  // load_weights(params, dataDir + files.weights_file, useDataFile,
-  //              memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB,
-  //              universalMatrixB, floatMatrixB);
-  // if (params.BIAS) {
-  //   load_bias(params, dataDir + files.bias_file, useDataFile,
-  //             memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix,
-  //             universalBiasMatrix, floatBiasMatrix);
-  // }
+  if (params.WEIGHT) {
+    load_weights(params, dataDir + files.weights_file, useDataFile,
+                 memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB,
+                 universalMatrixB, floatMatrixB);
+  }
+  if (params.BIAS) {
+    load_bias(params, dataDir + files.bias_file, useDataFile,
+              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix,
+              universalBiasMatrix, floatBiasMatrix);
+  }
   if (params.RESIDUAL) {
     load_residual(params, dataDir + files.residual_file, useDataFile,
                   memoryMap.residual == SRAM ? sramMemory : rramMemory,
@@ -362,28 +376,5 @@ void load_wb(const SimplifiedParams& params, const std::string& dataDir,
     load_bias(params, dataDir + files.bias_file, useDataFile,
               memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix,
               universalBiasMatrix, floatBiasMatrix);
-  }
-}
-
-void load_weight_and_bias(
-    const SimplifiedParams& params, const std::string& dataDir,
-    const Files& files, const MemoryMap& memoryMap, bool useDataFile,
-    INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
-    INPUT_DATATYPE* hlsWeightMatrix, INPUT_DATATYPE* hlsBiasMatrix,
-    INPUT_DATATYPE* dataFileOutput, UniversalPosit* universalWeightMatrix,
-    UniversalPosit* universalBiasMatrix,
-    UniversalPosit* universalDataFileOutput, float* floatWeightMatrix,
-    float* floatBiasMatrix, float* floatDataFileOutput) {
-  load_weights(params, dataDir + files.weights_file, useDataFile,
-               memoryMap.weights == SRAM ? sramMemory : rramMemory,
-               hlsWeightMatrix, universalWeightMatrix, floatWeightMatrix);
-  if (params.BIAS) {
-    load_bias(params, dataDir + files.bias_file, useDataFile,
-              memoryMap.bias == SRAM ? sramMemory : rramMemory, hlsBiasMatrix,
-              universalBiasMatrix, floatBiasMatrix);
-  }
-  if (useDataFile) {
-    load_datafile_outputs(params, dataDir + files.outputs_file, dataFileOutput,
-                          universalDataFileOutput, floatDataFileOutput);
   }
 }

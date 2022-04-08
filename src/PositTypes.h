@@ -159,9 +159,11 @@ class Posit {
   template <int nbits2, int es2>
   Posit operator+(const Posit<nbits2, es2> &rhs);
   Posit operator*(const Posit &rhs);
+  Posit operator/(const Posit &rhs);
   Posit &operator+=(const Posit &rhs);
   Posit &operator-=(const Posit &rhs);
   Posit &operator*=(const Posit &rhs);
+  Posit &operator/=(const Posit &rhs);
 
   bool operator<(const Posit &rhs) const;
 
@@ -260,6 +262,19 @@ inline Posit<nbits, es> Posit<nbits, es>::operator*(
 }
 
 template <int nbits, int es>
+inline Posit<nbits, es> Posit<nbits, es>::operator/(
+    const Posit<nbits, es> &rhs) {
+#ifdef __SYNTHESIS__
+  return *this;
+#else
+  // TODO: make synthesisable
+  PositFP<8, fbits> op1 = *this;
+  PositFP<8, fbits> op2 = 1.0 / static_cast<float>(rhs);
+  return op1 * op2;
+#endif
+}
+
+template <int nbits, int es>
 inline Posit<nbits, es> &Posit<nbits, es>::operator+=(
     const Posit<nbits, es> &rhs) {
   *this = *this + rhs;
@@ -279,6 +294,13 @@ template <int nbits, int es>
 inline Posit<nbits, es> &Posit<nbits, es>::operator*=(
     const Posit<nbits, es> &rhs) {
   *this = *this * rhs;
+  return *this;
+}
+
+template <int nbits, int es>
+inline Posit<nbits, es> &Posit<nbits, es>::operator/=(
+    const Posit<nbits, es> &rhs) {
+  *this = *this / rhs;
   return *this;
 }
 
@@ -572,8 +594,7 @@ Posit<nbits2, es2> fma(const Posit<nbits, es> &a, const Posit<nbits, es> &b,
   if (a.isZero() || b.isZero()) {
     return Posit<nbits2, es2>(c);
   } else {
-    product = va * vb;
-    // TODO: explore a * b behavior
+    product = va * vb;  // a * b also works here
     if (c.isZero()) {
       return Posit<nbits2, es2>(product);
     } else {

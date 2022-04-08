@@ -63,14 +63,10 @@ int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
       diff_buckets[3]++;
     } else {
       diff_buckets[4]++;
-      // std::cerr << (float)matrixA[index] << "\t" << (float)matrixB[index]
-      //           << std::endl;
     }
 
     if (matrixA[index] != 0) {
-      float percent_diff =
-          abs(((float)matrixA[index] - (float)matrixB[index])) /
-          (float)matrixA[index];
+      float percent_diff = abs(diff / (float)matrixA[index]);
       if (percent_diff < 0.001) {
         percent_diff_buckets[0]++;
       }
