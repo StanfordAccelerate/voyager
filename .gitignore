@@ -2,7 +2,6 @@ build
 pybuild
 data/resnet
 data/mobilebert
-data/mobilebert*.pkl
 .direnv
 .vscode
 test_outputs/
