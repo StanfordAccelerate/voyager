@@ -110,11 +110,6 @@ int run_sequence(const std::string& group,
     param_map = &simple;
     file_map = &resnetFiles;
     use_data_file = false;
-  } else {
-    data_dir = mobilebertDataDir;
-    mem_map = &mobilebertMemoryMap;
-    param_map = &mobilebert;
-    file_map = &mobilebertFiles;
   }
 
   int error_count = 0;
