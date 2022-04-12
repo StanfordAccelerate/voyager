@@ -118,68 +118,41 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
     int K = params.loops[0][params.weightLoopIndex[0]] *
             params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+    // for (int c = 0; c < C; c++) {
+    //   ACC_T a = matrixA[c];
+    //   std::cout << a << " ";
+    // }
+    std::cout << std::endl << std::endl;
     for (int k = 0; k < K; k++) {
       ACC_T acc = 0;
-      for (int c = 0; c < C; c++) {
-        ACC_T a = matrixA[c];
-        std::cout << a << " ";
-      }
-      std::cout << " * ";
-      for (int c = 0; c < C; c++) {
-        ACC_T b = matrixB[c * K + k];
-        std::cout << b << " ";
-      }
-      std::cout << std::endl;
+      // for (int c = 0; c < C; c++) {
+      //   ACC_T b = matrixB[k * C + c];
+      //   std::cout << b << " ";
+      // }
+      // std::cout << std::endl;
 
       for (int c = 0; c < C; c++) {
         ACC_T a = matrixA[c];
         ACC_T b = matrixB[k * C + c];
-
+#ifdef INPUT_SCALING
+        a *= static_cast<ACC_T>(matrixA[C + c]);
+#endif
         acc = gold_fma(a, b, acc);
       }
+#ifdef WEIGHT_SCALING
+      acc *= static_cast<ACC_T>(matrixB[C * K]);
+#endif
 
       if (params.BIAS) {
-        acc += biasMatrix[k];
+        ACC_T bias = biasMatrix[k];
+#ifdef WEIGHT_SCALING
+        bias *= static_cast<ACC_T>(biasMatrix[K]);
+#endif
+        acc += bias;
       }
 
       matrixC[k] = acc;
     }
-    // TODO: Jeff figure out what is going on here
-
-    //     // TODO: Confirm FC support for weight transpose
-    //     if (params.TRANSPOSE) {
-    //       T tmpMatrixB[C * K];
-    //       for (int c = 0; c < C; c++) {
-    //         for (int k = 0; k < K; k++) {
-    //           tmpMatrixB[c * K + k] = matrixB[k * C + c];
-    //         }
-    //       }
-    //       memcpy(matrixB, tmpMatrixB, sizeof(T) * C * K);
-    //     }
-
-    //     for (int k = 0; k < K; k++) {
-    //       ACC_T acc = 0;
-    //       for (int c = 0; c < C; c++) {
-    //         ACC_T a = matrixA[c];
-    // #ifdef INPUT_SCALING
-    //         a *= static_cast<ACC_T>(matrixA[C + c]);
-    // #endif
-    //         ACC_T b = matrixB[c * K + k];
-    //         acc = gold_fma(a, b, acc);
-    //       }
-    // #ifdef WEIGHT_SCALING
-    //       acc *= static_cast<ACC_T>(matrixB[C * K]);
-    // #endif
-    //       if (params.BIAS) {
-    //         ACC_T bias = biasMatrix[k];
-    // #ifdef WEIGHT_SCALING
-    //         bias *= static_cast<ACC_T>(biasMatrix[K]);
-    // #endif
-    //         acc += bias;
-    //       }
-
-    //       matrixC[k] = acc;
-    //     }
   } else if (params.NO_NORM) {
     // elementwise multiplication and addition of matrices
     int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -244,6 +217,23 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     ACC_T columnSums[K];
     memset(columnSums, 0, sizeof(columnSums));
 #endif
+
+    if (params.CONCAT_HEAD) {
+      T tmpMatrixA[X * C + C];
+      int addr = 0;
+      for (int i = 0; i <= 128; i++) {
+        for (int j = 0; j < 4; j++) {
+          for (int k = 0; k < 32; k++) {
+#ifdef INPUT_SCALING
+            tmpMatrixA[addr++] = matrixA[(j * 129 + i) * 32 + k];
+#else
+            tmpMatrixA[addr++] = matrixA[(j * 128 + i) * 32 + k];
+#endif
+          }
+        }
+      }
+      memcpy(matrixA, tmpMatrixA, (X * C + C) * sizeof(T));
+    }
 
     if (params.INPUT_TRANSPOSE) {
       T tmpMatrixA[X * C];
@@ -344,6 +334,24 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       }
     }
 #endif
+
+    if (params.SPLIT_HEAD) {
+      T tmpMatrixC[X * K + K];
+      int addr = 0;
+      for (int i = 0; i < 4; i++) {
+#ifdef INPUT_SCALING
+        for (int j = 0; j <= 128; j++) {
+#else
+        for (int j = 0; j < 128; j++) {
+#endif
+          for (int k = 0; k < 32; k++) {
+            tmpMatrixC[addr++] = matrixC[j * 128 + i * 32 + k];
+          }
+        }
+      }
+      memcpy(matrixC, tmpMatrixC, (X * K + K) * sizeof(T));
+    }
+
     if (params.MAXPOOL) {
       // create copy
       T *tmpMatrixC = new T[X * Y * K];

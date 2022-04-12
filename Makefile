@@ -90,9 +90,6 @@ sim: build/TestRunner
 MobilebertTest: build/MobilebertTest
 	./build/MobilebertTest
 
-MobilebertUnitTest: build/MobilebertUnitTest
-	./build/MobilebertUnitTest
-
 PositTest: build/PositTest
 	./build/PositTest
 
@@ -113,9 +110,6 @@ build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/G
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/MobilebertTest: build/Accelerator.o build/Harness.o build/MobilebertTest.o build/GoldModel.o build/Utils.o build/DataLoader.o
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-build/MobilebertUnitTest: build/Accelerator.o build/Harness.o build/MobilebertTest.o build/GoldModel.o build/Utils.o build/DataLoader.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/PositTest: build/PositTest.o

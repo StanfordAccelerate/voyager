@@ -364,7 +364,7 @@ std::map<std::string, SimplifiedParams> trainingParams{
          0,                                          // INPUT_OFFSET
          0,                                          // WEIGHT_OFFSET
          10 * 1024,                                  // OUTPUT_OFFSET
-         true,                                       // TRANSPOSE
+         false,                                      // TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},  // LOOPS
          {0, 5},                                     // INPUTX
          {1, 4},                                     // INPUTY
@@ -557,8 +557,8 @@ std::map<std::string, MemoryOffsets> trainingMemOffsets{
          288 * PER_LAYER_INTERMEDIATE_SIZE + 168 * INTERMEDIATE_BIAS_SIZE +
              72 * PER_LAYER_HIDDEN_SIZE + 576 * HIDDEN_BIAS_SIZE,
          0,
-         288 * PER_LAYER_INTERMEDIATE_SIZE + 168 * INTERMEDIATE_BIAS_SIZE +
-             72 * PER_LAYER_HIDDEN_SIZE + 584 * HIDDEN_BIAS_SIZE,
+         288 * PER_LAYER_INTERMEDIATE_SIZE + 184 * INTERMEDIATE_BIAS_SIZE +
+             72 * PER_LAYER_HIDDEN_SIZE + 576 * HIDDEN_BIAS_SIZE,
      }},
     {"output_bottleneck_LayerNorm",
      {

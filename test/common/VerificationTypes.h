@@ -67,9 +67,11 @@ struct SimplifiedParams {
 
   bool WEIGHT;
   bool ATTENTION_SCALING;
-  bool INPUT_TRANSPOSE;
   bool STORE_IN_ACC;
   bool ACC_FROM_ACC;
+  bool INPUT_TRANSPOSE;
+  bool SPLIT_HEAD;
+  bool CONCAT_HEAD;
 };
 
 struct MemoryOffsets {

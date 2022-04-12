@@ -107,6 +107,44 @@ map<string, SimplifiedParams> inferenceParams{
          false,                                      // ATTENTION_SCALING
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
+         false,                                      // INPUT_TRANSPOSE
+         true,                                       // SPLIT_HEAD
+         false,                                      // CONCAT_HEAD
+     }},
+
+    {"vProjection",
+     {
+         0,                                           // INPUT_OFFSET
+         0,                                           // WEIGHT_OFFSET
+         131072,                                      // OUTPUT_OFFSET
+         false,                                       // TRANSPOSE
+         {{4, 1, 2, 1, 1, 1}, {32, 4, 1, 1, 1, 32}},  // LOOPS
+         {0, 5},                                      // INPUTX
+         {1, 4},                                      // INPUTY
+         {3, 0},                                      // REDUCTION
+         {2, 1},                                      // WEIGHT
+         3,                                           // fxIndex
+         2,                                           // fyIndex
+         {5, 5},                                      // weightReuseIndex
+         1,                                           // stride
+         false,                                       // replication
+         false,                                       // RELU
+         true,                                        // bias
+         30 * 1024,                                   // BIAS_OFFSET
+         false,                                       // residual
+         40 * 1024,                                   // RESIDUAL_OFFSET
+         false,                                       // maxpool
+         false,                                       // avgpool
+         false,                                       // SOFTMAX
+         false,                                       // FC
+         false,                                       // NO-NORM
+         true,                                        // weight
+         false,                                       // ATTENTION_SCALING
+         false,                                       // STORE_IN_ACC
+         false,                                       // ACC_FROM_ACC
+         false,                                       // INPUT_TRANSPOSE
+         true,                                        // SPLIT_HEAD
+         false,                                       // CONCAT_HEAD
      }},
 
     // Q x K
@@ -243,6 +281,9 @@ map<string, SimplifiedParams> inferenceParams{
          false,                                      // ATTENTION_SCALING
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
+         false,                                      // INPUT_TRANSPOSE
+         false,                                      // SPLIT_HEAD
+         true,                                       // CONCAT_HEAD
      }},
 
     // FFN 1
@@ -430,7 +471,7 @@ vector<pair<string, string>> inferenceOperations{
     {"attention_self_attention_probs_1", "softmax"},
     {"attention_self_attention_probs_2", "softmax"},
     {"attention_self_attention_probs_3", "softmax"},
-    {"attention_self_value", "inputBottleneck"},
+    {"attention_self_value", "vProjection"},
     {"attention_self_context_layer_0", "vAttention"},
     {"attention_self_context_layer_1", "vAttention"},
     {"attention_self_context_layer_2", "vAttention"},
@@ -737,8 +778,8 @@ map<string, MemoryOffsets> inferenceMemOffsets{
          288 * PER_LAYER_INTERMEDIATE_SIZE + 168 * INTERMEDIATE_BIAS_SIZE +
              72 * PER_LAYER_HIDDEN_SIZE + 576 * HIDDEN_BIAS_SIZE,
          4 * HIDDEN_SIZE,
-         288 * PER_LAYER_INTERMEDIATE_SIZE + 168 * INTERMEDIATE_BIAS_SIZE +
-             72 * PER_LAYER_HIDDEN_SIZE + 584 * HIDDEN_BIAS_SIZE,
+         288 * PER_LAYER_INTERMEDIATE_SIZE + 184 * INTERMEDIATE_BIAS_SIZE +
+             72 * PER_LAYER_HIDDEN_SIZE + 576 * HIDDEN_BIAS_SIZE,
      }},
 };
 
@@ -779,21 +820,21 @@ std::map<std::string, Files> inferenceTestFiles{
          "bottleneck_attention_LayerNorm",
          "attention_self_query_weight",
          "attention_self_query_bias",
-         "attention_self_query",
+         "attention_self_query_layer",
      }},
     {"attention_self_key",
      {
          "bottleneck_attention_LayerNorm",
          "attention_self_key_weight",
          "attention_self_key_bias",
-         "attention_self_key",
+         "attention_self_key_layer",
      }},
     {"attention_self_value",
      {
          "hidden_states",
          "attention_self_value_weight",
          "attention_self_value_bias",
-         "attention_self_value",
+         "attention_self_value_layer",
      }},
 
     // Multi-Head Self Attention
@@ -886,7 +927,7 @@ std::map<std::string, Files> inferenceTestFiles{
 
     {"attention_output_dense",
      {
-         "attention_self_context_layer",
+         "attention_self_context_layer_unskewed",
          "attention_output_dense_weight",
          "attention_output_dense_bias",
          "attention_output_residual",

@@ -16,7 +16,6 @@
 // #include "test/common/Harness.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
-#include "test/mobilebert/params.h"
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
 

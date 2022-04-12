@@ -41,9 +41,10 @@ int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
   std::cout << "Writing comparison to file: " << filename << std::endl;
   std::ofstream diffFile(filename);
   for (int index = 0; index < size; index++) {
-    diffFile << (float)matrixA[index] << " vs. " << (float)matrixB[index]
-             << " ";
-    float diff = abs(((float)matrixA[index] - (float)matrixB[index]));
+    float a = static_cast<float>(matrixA[index]);
+    float b = static_cast<float>(matrixB[index]);
+    diffFile << a << " vs. " << b << " ";
+    float diff = abs(a - b);
 
     for (float i = 0.001; i < diff; i *= 10.0) {
       diffFile << "*";
@@ -65,8 +66,8 @@ int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
       diff_buckets[4]++;
     }
 
-    if (matrixA[index] != 0) {
-      float percent_diff = abs(diff / (float)matrixA[index]);
+    if (a != 0) {
+      float percent_diff = abs(diff / a);
       if (percent_diff < 0.001) {
         percent_diff_buckets[0]++;
       }
