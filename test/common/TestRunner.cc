@@ -286,8 +286,8 @@ int run_sequence(const std::string& group,
                (comparisons[i + 1] == "customposit" &&
                 comparisons[i] == "file")) {
       error_count += compare_arrays(
-          acc_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET, hls_comp,
-          X * Y * K, diff_file);
+          hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
+          hls_comp, X * Y * K, diff_file);
     } else if ((comparisons[i] == "universal" &&
                 comparisons[i + 1] == "customposit") ||
                (comparisons[i + 1] == "universal" &&
