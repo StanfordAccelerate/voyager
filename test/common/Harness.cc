@@ -677,6 +677,8 @@ void Harness::sendParams() {
         }
       }
 
+      vectorParams.SPLIT_HEAD = params.SPLIT_HEAD;
+
       sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
 
       // create instruction stream
