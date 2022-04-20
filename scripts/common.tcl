@@ -45,6 +45,12 @@ go analyze
 
 solution design set $full_block_name -top
 
+if {$block == "Accelerator"} {
+  foreach mapped_block [list "InputController<$IO_DATATYPE, $DIMENSION>" "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION, 1024>" "VectorUnit<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION>" "WeightController<$IO_DATATYPE, $DIMENSION, $DIMENSION>"] {
+    solution design set $mapped_block -mapped
+  } 
+}
+
 go compile
 
 solution options set ComponentLibs/SearchPath {/home/shared/catapult/memories /home/shared/catapult/stdcells} -append
@@ -58,6 +64,6 @@ solution options set ComponentLibs/SearchPath /sim/kprabhu7/minotaur-accelerator
 if {[info exists env(DEBUG)]} {
   solution library add ccs_sample_mem
 } else {
-  solution library add ts1n40lpb1024x128m4fb_tt1p1v25c
+  solution library add TS1N40LPB1024X128M4F
   solution library add mem_1024x402
 }
