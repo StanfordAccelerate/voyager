@@ -74,6 +74,9 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
     FX = 7;
     C = 3;
   }
+  if (params.SOFTMAX_GRAD) {
+    C = 1;
+  }
 
   int size = STRIDE * Y * STRIDE * X * C;
 
@@ -241,6 +244,9 @@ void load_residual(const SimplifiedParams& params, const std::string& filename,
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
+  if (params.SOFTMAX_GRAD) {
+    K = 1;
+  }
   if (params.REPLICATION) {
     FX = 7;
     C = 3;
@@ -294,7 +300,7 @@ void load_datafile_outputs(const SimplifiedParams params,
     X = 1;
     Y = 1;
   }
-  if (params.SOFTMAX) {
+  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
     K = 1;
   }
 

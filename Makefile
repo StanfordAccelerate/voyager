@@ -77,7 +77,7 @@ sim_sysc:
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/GoldModel.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Utils.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/DataLoader.cc
-	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/TestRunner.cc
+	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/mobilebert/TestRunner.cc
 	vcs -full64 -sysc sc_main -kdb -debug_access+all -Mdir=$(build_folder) -o $(build_folder)/$(simv_name)
 	./$(build_folder)/$(simv_name) -verdi
 
@@ -115,6 +115,9 @@ build/MobilebertTest: build/Accelerator.o build/Harness.o build/MobilebertTest.o
 build/PositTest: build/PositTest.o
 	$(CC) -o $@ $^
 
+build/verification: build/verification.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
 build/Accelerator.o: src/Accelerator.cc $(wildcard src/*.h)
 	$(CC) $(C11FLAGS) -c -o $@ $< 
 
@@ -138,6 +141,17 @@ build/MobilebertTest.o: test/mobilebert/TestRunner.cc test/mobilebert/params.h t
 
 build/PositTest.o: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
+
+build/verification.o: test/mobilebert/verification.cc test/mobilebert/params.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+data/mobilebert: FORCE
+	rm -rf data/mobilebert/*
+	python3 tools/pkl_parser.py -i data/mobilebert_activations.pkl -o data/mobilebert/activations -t posit8
+	python3 tools/pkl_parser.py -i data/mobilebert_weights.pkl -o data/mobilebert/weights -t posit8
+	python3 tools/pkl_parser.py -i data/mobilebert_weights_scaled.pkl -o data/mobilebert/weights_scaled -t posit8
+	python3 tools/pkl_parser.py -i data/mobilebert_errors.pkl -o data/mobilebert/errors -t posit8
+	python3 tools/pkl_parser.py -i data/mobilebert_gradients.pkl -o data/mobilebert/gradients -t posit8
 
 .PHONY: clean rtl sim PositTest clean-catapult
 clean:

@@ -113,6 +113,27 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       }
     }
 #endif
+  } else if (params.SOFTMAX_GRAD) {
+    int X = params.loops[0][params.inputXLoopIndex[0]] *
+            params.loops[1][params.inputXLoopIndex[1]];
+    int Y = params.loops[0][params.inputYLoopIndex[0]] *
+            params.loops[1][params.inputYLoopIndex[1]];
+
+    for (int j = 0; j < Y; j++) {
+      for (int x = 0; x < X; x++) {
+        ACC_T acc = 0;
+        for (int y = 0; y < Y; y++) {
+          ACC_T prob_kj;
+          prob_kj = -residualMatrix[x * Y + y] * residualMatrix[x * Y + j];
+          if (y == j) {
+            prob_kj += residualMatrix[x * Y + j];
+          }
+          prob_kj *= matrixA[x * Y + y];
+          acc += prob_kj;
+        }
+        matrixC[x * Y + j] = static_cast<float>(acc) / sqrt(32);
+      }
+    }
   } else if (params.FC) {
     // fully connected layer (matrix-vector)
     int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
@@ -122,18 +143,19 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     //   ACC_T a = matrixA[c];
     //   std::cout << a << " ";
     // }
-    std::cout << std::endl << std::endl;
+    // std::cout << std::endl << std::endl;
     for (int k = 0; k < K; k++) {
       ACC_T acc = 0;
-      // for (int c = 0; c < C; c++) {
-      //   ACC_T b = matrixB[k * C + c];
-      //   std::cout << b << " ";
-      // }
-      // std::cout << std::endl;
+      for (int c = 0; c < C; c++) {
+        ACC_T b = matrixB[k * C + c];
+        std::cout << b << " ";
+      }
+      std::cout << std::endl;
 
       for (int c = 0; c < C; c++) {
         ACC_T a = matrixA[c];
         ACC_T b = matrixB[k * C + c];
+        // ACC_T b = matrixB[c * K + k];
 #ifdef INPUT_SCALING
         a *= static_cast<ACC_T>(matrixA[C + c]);
 #endif
@@ -221,7 +243,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     if (params.CONCAT_HEAD) {
       T tmpMatrixA[X * C + C];
       int addr = 0;
+#ifdef INPUT_SCALING
       for (int i = 0; i <= 128; i++) {
+#else
+      for (int i = 0; i < 128; i++) {
+#endif
         for (int j = 0; j < 4; j++) {
           for (int k = 0; k < 32; k++) {
 #ifdef INPUT_SCALING
@@ -232,7 +258,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
           }
         }
       }
+#ifdef INPUT_SCALING
       memcpy(matrixA, tmpMatrixA, (X * C + C) * sizeof(T));
+#else
+      memcpy(matrixA, tmpMatrixA, (X * C) * sizeof(T));
+#endif
     }
 
     if (params.INPUT_TRANSPOSE) {
@@ -349,7 +379,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
           }
         }
       }
+#ifdef INPUT_SCALING
       memcpy(matrixC, tmpMatrixC, (X * K + K) * sizeof(T));
+#else
+      memcpy(matrixC, tmpMatrixC, X * K * sizeof(T));
+#endif
     }
 
     if (params.MAXPOOL) {
