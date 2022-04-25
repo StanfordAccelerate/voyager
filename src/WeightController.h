@@ -17,8 +17,7 @@ SC_MODULE(WeightController) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<int> writeAddress[2];
-  Connections::Out<Pack1D<DTYPE, NCOLS> > writeData[2];
+  Connections::Out<BufferWriteRequest<DTYPE, NROWS> > writeRequest[2];
   Connections::Out<int> writeControl[2];
   Connections::Out<int> readAddress[2];
   Connections::Out<int> readControl[2];
@@ -188,10 +187,8 @@ SC_MODULE(WeightController) {
 
     writeControl[0].Reset();
     writeControl[1].Reset();
-    writeAddress[0].Reset();
-    writeAddress[1].Reset();
-    writeData[0].Reset();
-    writeData[1].Reset();
+    writeRequest[0].Reset();
+    writeRequest[1].Reset();
 
     wait();
 
@@ -282,8 +279,11 @@ SC_MODULE(WeightController) {
                           //     == loop_bounds[1][5] - 1);
 
                           // writeControl[bankSel].Push(!swapBank);
-                          writeAddress[bankSel].Push(address);
-                          writeData[bankSel].Push(data);
+                          BufferWriteRequest<DTYPE, NROWS> req;
+                          req.address = address;
+                          req.data = data;
+                          writeRequest[bankSel].Push(req);
+
                           if (c >= c0_bound - 1) {
                             break;
                           }

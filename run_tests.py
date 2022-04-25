@@ -57,6 +57,7 @@ passing_tests = []
 failing_tests = []
 
 for test in test_results:
+  test[1].communicate()
   if test[1].wait() == 0:
     print(test[0])
     file = 'test_outputs/'+test[0] + '.out'

@@ -108,6 +108,35 @@ class Pack1D<PositFP<sbits, fbits>, SIZE> {
   }
 };
 
+template <typename TYPE, size_t SIZE>
+struct BufferWriteRequest {
+  int address;
+  Pack1D<TYPE, SIZE> data;
+
+  static const unsigned int width = 32 + Pack1D<TYPE, SIZE>::width;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m &address;
+    m &data;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf,
+                              const BufferWriteRequest &bufWrite,
+                              const std::string &name) {
+    sc_trace(tf, bufWrite.address, name + ".address");
+    sc_trace(tf, bufWrite.data, name + ".data");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os,
+                                         const BufferWriteRequest &bufWrite) {
+    os << bufWrite.address << " ";
+    os << bufWrite.data << " ";
+
+    return os;
+  }
+};
+
 // template <typename TYPE, size_t SIZE>
 // class Wrapped<Pack1D<TYPE, SIZE> > {
 //  public:

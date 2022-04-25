@@ -132,18 +132,21 @@ int run_sequence(const std::string& group,
     throw std::runtime_error("Failed to allocate simulation memory");
 
   // Load first layer input
-  load_memory(
-      (*param_map)[tests[0]], data_dir, (*file_map)[tests[0]],
-      (*mem_map)[tests[0]], use_data_file, acc_sram_memory, acc_rram_memory,
-      hls_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
-      (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-      (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-      uni_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
-      (UniversalPosit*)trash, (UniversalPosit*)trash, (UniversalPosit*)trash,
-      (UniversalPosit*)trash, (UniversalPosit*)trash,
-      float_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
-      (float*)trash, (float*)trash, (float*)trash, (float*)trash,
-      (float*)trash);
+  load_memory((*param_map)[tests[0]], data_dir, (*file_map)[tests[0]],
+              (*mem_map)[tests[0]], use_data_file, acc_sram_memory,
+              acc_rram_memory,
+              hls_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
+              (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
+              hls_gold_sram_memory + (*param_map)[tests[0]].RESIDUAL_OFFSET,
+              (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
+              uni_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
+              (UniversalPosit*)trash, (UniversalPosit*)trash,
+              uni_gold_sram_memory + (*param_map)[tests[0]].RESIDUAL_OFFSET,
+              (UniversalPosit*)trash, (UniversalPosit*)trash,
+              float_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
+              (float*)trash, (float*)trash,
+              float_gold_sram_memory + (*param_map)[tests[0]].RESIDUAL_OFFSET,
+              (float*)trash, (float*)trash);
 
   // Load weights, biases, and comparisons
   for (const std::string& test : tests) {

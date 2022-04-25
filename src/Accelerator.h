@@ -21,7 +21,7 @@ SC_MODULE(Accelerator) {
   ParamsDeserializer CCS_INIT_S1(paramsDeserializer);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
 
-// clang-format off
+  // clang-format off
   #ifdef SIM_InputController  
   CCS_DESIGN((InputController<INPUT_DATATYPE, DIMENSION>)) CCS_INIT_S1(inputController);
   #else
@@ -34,9 +34,8 @@ SC_MODULE(Accelerator) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       inputDataResponse);
-  Connections::Combinational<int> inputBufferWriteAddress[2];
-  Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
-      inputBufferWriteData[2];
+  Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, DIMENSION> >
+      inputBufferWriteReq[2];
   Connections::Combinational<int> inputBufferWriteControl[2];
   Connections::Combinational<int> inputBufferReadAddress[2];
   Connections::Combinational<int> inputBufferReadControl[2];
@@ -58,9 +57,8 @@ SC_MODULE(Accelerator) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
-  Connections::Combinational<int> weightBufferWriteAddress[2];
-  Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> >
-      weightBufferWriteData[2];
+  Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, DIMENSION> >
+      weightBufferWriteReq[2];
   Connections::Combinational<int> weightBufferWriteControl[2];
   Connections::Combinational<int> weightBufferReadAddress[2];
   Connections::Combinational<int> weightBufferReadControl[2];
@@ -133,14 +131,12 @@ SC_MODULE(Accelerator) {
     inputBuffer.clk(clk);
     inputBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      inputController.writeAddress[i](inputBufferWriteAddress[i]);
-      inputController.writeData[i](inputBufferWriteData[i]);
+      inputController.writeRequest[i](inputBufferWriteReq[i]);
       inputController.writeControl[i](inputBufferWriteControl[i]);
       inputController.readAddress[i](inputBufferReadAddress[i]);
       inputController.readControl[i](inputBufferReadControl[i]);
 
-      inputBuffer.writeAddress[i](inputBufferWriteAddress[i]);
-      inputBuffer.writeData[i](inputBufferWriteData[i]);
+      inputBuffer.writeRequest[i](inputBufferWriteReq[i]);
       inputBuffer.writeControl[i](inputBufferWriteControl[i]);
       inputBuffer.readAddress[i](inputBufferReadAddress[i]);
       inputBuffer.readControl[i](inputBufferReadControl[i]);
@@ -156,14 +152,12 @@ SC_MODULE(Accelerator) {
     weightBuffer.clk(clk);
     weightBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      weightController.writeAddress[i](weightBufferWriteAddress[i]);
-      weightController.writeData[i](weightBufferWriteData[i]);
+      weightController.writeRequest[i](weightBufferWriteReq[i]);
       weightController.writeControl[i](weightBufferWriteControl[i]);
       weightController.readAddress[i](weightBufferReadAddress[i]);
       weightController.readControl[i](weightBufferReadControl[i]);
 
-      weightBuffer.writeAddress[i](weightBufferWriteAddress[i]);
-      weightBuffer.writeData[i](weightBufferWriteData[i]);
+      weightBuffer.writeRequest[i](weightBufferWriteReq[i]);
       weightBuffer.writeControl[i](weightBufferWriteControl[i]);
       weightBuffer.readAddress[i](weightBufferReadAddress[i]);
       weightBuffer.readControl[i](weightBufferReadControl[i]);

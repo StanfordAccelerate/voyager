@@ -219,8 +219,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
 
     {"layer2_0_conv1",
      {
-         1605632,
-         //  802816,                                    // INPUT_OFFSET
+         1605632,                                   // INPUT_OFFSET
          165056,                                    // WEIGHT_OFFSET
          401408,                                    // OUTPUT_OFFSET
          false,                                     // TRANSPOSE
@@ -249,7 +248,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                     // STORE_IN_ACC
          false,                                     // ACC_FROM_ACC
          false,                                     // INPUT_TRANSPOSE
-         true,                                      // SPLIT_HEAD
+         false,                                     // SPLIT_HEAD
          false,                                     // CONCAT_HEAD
      }},
 
@@ -387,7 +386,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                     // STORE_IN_ACC
          false,                                     // ACC_FROM_ACC
          false,                                     // INPUT_TRANSPOSE
-         true,                                      // SPLIT_HEAD
+         false,                                     // SPLIT_HEAD
          false,                                     // CONCAT_HEAD
      }},
 
@@ -422,7 +421,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                     // STORE_IN_ACC
          false,                                     // ACC_FROM_ACC
          false,                                     // INPUT_TRANSPOSE
-         true,                                      // SPLIT_HEAD
+         false,                                     // SPLIT_HEAD
          false,                                     // CONCAT_HEAD
      }},
 
@@ -457,7 +456,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
     {"layer3_1_conv1",
@@ -491,7 +490,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
     {"layer3_1_conv2",
@@ -525,7 +524,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
     {"layer4_0_downsample",
@@ -593,7 +592,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
     {"layer4_0_conv2",
@@ -627,7 +626,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
     {"layer4_1_conv1",
@@ -661,7 +660,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
     {"layer4_1_conv2",
@@ -695,7 +694,7 @@ std::map<std::string, SimplifiedParams> resnetParams{
          false,                                      // STORE_IN_ACC
          false,                                      // ACC_FROM_ACC
          false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
+         false,                                      // SPLIT_HEAD
          false,                                      // CONCAT_HEAD
      }},
 
@@ -792,7 +791,7 @@ std::array<std::string, 22> resnet_order{"conv1",
                                          "fc",
                                          "softmax"};
 
-std::string resnetDataDir = "data/resnet/";
+std::string resnetDataDir = "/sim2/shared/MINOTAUR/nn_data/resnet/";
 
 std::map<std::string, Files> resnetFiles{
     {"conv1", {"conv1_input", "conv1_weight", "conv1_bias", "conv1_comp"}},

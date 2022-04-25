@@ -13,8 +13,7 @@ SC_MODULE(DoubleBuffer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> writeAddress[2];
-  Connections::In<Pack1D<DTYPE, WIDTH> > writeData[2];
+  Connections::In<BufferWriteRequest<DTYPE, WIDTH> > writeRequest[2];
   Connections::In<int> writeControl[2];
 
   Connections::Combinational<Pack1D<DTYPE, WIDTH> > readData[2];
@@ -39,8 +38,7 @@ SC_MODULE(DoubleBuffer) {
   }
 
   void mem0Run() {
-    writeAddress[0].Reset();
-    writeData[0].Reset();
+    writeRequest[0].Reset();
     writeControl[0].Reset();
 
     readData[0].ResetWrite();
@@ -57,7 +55,9 @@ SC_MODULE(DoubleBuffer) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (int i = 0; i < wsize; i++) {
-        int address = writeAddress[0].Pop();
+        BufferWriteRequest<DTYPE, WIDTH> req = writeRequest[0].Pop();
+
+        int address = req.address;
 
 #ifndef __SYNTHESIS__
         if (address > BUFFER_SIZE) {
@@ -66,7 +66,7 @@ SC_MODULE(DoubleBuffer) {
         }
 #endif
 
-        Pack1D<DTYPE, WIDTH> data = writeData[0].Pop();
+        Pack1D<DTYPE, WIDTH> data = req.data;
         mem0[address] = data;
 
         if (i >= wsize - 1) {
@@ -101,8 +101,7 @@ SC_MODULE(DoubleBuffer) {
   }
 
   void mem1Run() {
-    writeAddress[1].Reset();
-    writeData[1].Reset();
+    writeRequest[1].Reset();
     writeControl[1].Reset();
 
     readData[1].ResetWrite();
@@ -119,8 +118,11 @@ SC_MODULE(DoubleBuffer) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (int i = 0; i < wsize; i++) {
-        int address = writeAddress[1].Pop();
-        Pack1D<DTYPE, WIDTH> data = writeData[1].Pop();
+        BufferWriteRequest<DTYPE, WIDTH> req = writeRequest[1].Pop();
+
+        int address = req.address;
+
+        Pack1D<DTYPE, WIDTH> data = req.data;
         mem1[address] = data;
 
         if (i >= wsize - 1) {

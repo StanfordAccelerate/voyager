@@ -15,8 +15,7 @@ SC_MODULE(InputController) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<int> writeAddress[2];
-  Connections::Out<Pack1D<DTYPE, NROWS> > writeData[2];
+  Connections::Out<BufferWriteRequest<DTYPE, NROWS> > writeRequest[2];
   Connections::Out<int> writeControl[2];
   Connections::Out<int> readAddress[2];
   Connections::Out<int> readControl[2];
@@ -193,6 +192,10 @@ SC_MODULE(InputController) {
                           if (params.REPLICATION) {
                             baseAddress = y * (X / 4) * 16 + (x / 4) * 16 + c;
                           }
+                          if (params.CONCAT_HEAD) {
+                            baseAddress =
+                                ((c / 32) * X * 32) + (x * 32) + (c % 32);
+                          }
 
                           memRequest = {params.INPUT_OFFSET + baseAddress,
                                         burstSize};
@@ -250,10 +253,8 @@ SC_MODULE(InputController) {
 
     writeControl[0].Reset();
     writeControl[1].Reset();
-    writeAddress[0].Reset();
-    writeAddress[1].Reset();
-    writeData[0].Reset();
-    writeData[1].Reset();
+    writeRequest[0].Reset();
+    writeRequest[1].Reset();
 
     wait();
 
@@ -406,8 +407,10 @@ SC_MODULE(InputController) {
                               (x >> 2);
 
                           // writeControl[bankSel].Push(1);
-                          writeAddress[bankSel].Push(address);
-                          writeData[bankSel].Push(data);
+                          BufferWriteRequest<DTYPE, NROWS> req;
+                          req.address = address;
+                          req.data = data;
+                          writeRequest[bankSel].Push(req);
 
                           if ((full_y < 0) ||
                               (full_y >= (params.STRIDE * Y0 * Y1))) {
@@ -467,8 +470,10 @@ SC_MODULE(InputController) {
                             (y0) * (((params.STRIDE * X0) >> 2) + 2) + (x >> 2);
 
                         // writeControl[bankSel].Push(1);
-                        writeAddress[bankSel].Push(address);
-                        writeData[bankSel].Push(data);
+                        BufferWriteRequest<DTYPE, NROWS> req;
+                        req.address = address;
+                        req.data = data;
+                        writeRequest[bankSel].Push(req);
 
                         if ((full_x < 0) || (full_y < 0) ||
                             (full_x >= (X1 * params.STRIDE * X0)) ||
@@ -503,8 +508,9 @@ SC_MODULE(InputController) {
                             (loop_counters[1][3] == loop_bounds[1][3] - 1) &&
                             (loop_counters[1][4] == loop_bounds[1][4] - 1);
                         // writeControl[bankSel].Push(!swapBank);
-                        writeAddress[bankSel].Push(next_address);
-                        writeData[bankSel].Push(data);
+                        req.address = next_address;
+                        req.data = data;
+                        writeRequest[bankSel].Push(req);
 
                         if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
                           break;
@@ -620,8 +626,10 @@ SC_MODULE(InputController) {
                               (loop_counters[1][4] == loop_bounds[1][4] - 1) &&
                               (loop_counters[1][5] == loop_bounds[1][5] - 1);
                           // writeControl[bankSel].Push(!swapBank);
-                          writeAddress[bankSel].Push(address);
-                          writeData[bankSel].Push(data);
+                          BufferWriteRequest<DTYPE, NROWS> req;
+                          req.address = address;
+                          req.data = data;
+                          writeRequest[bankSel].Push(req);
                           if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                             break;
                           }

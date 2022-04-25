@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <cstring>
-
+#include <vector>
 #ifndef NO_UNIVERSAL
 inline UniversalPositAccum gold_fma(UniversalPosit a, UniversalPosit b,
                                     UniversalPositAccum c) {

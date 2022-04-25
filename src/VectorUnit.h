@@ -237,6 +237,7 @@ SC_MODULE(VectorOpUnit) {
     wait();
 
 #pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
     while (true) {
       VectorInstructions inst = accumulationOpUnitInstructions.Pop();
 
@@ -263,8 +264,6 @@ SC_MODULE(VectorOpUnit) {
     }
   }
 
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
   void reductionOpRun() {
     scalarOpUnitOutput.Reset();
     reductionOpUnitInstructions.Reset();
@@ -276,6 +275,7 @@ SC_MODULE(VectorOpUnit) {
     wait();
 
 #pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
     while (true) {
       VectorInstructions inst = reductionOpUnitInstructions.Pop();
 
