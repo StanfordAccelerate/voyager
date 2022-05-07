@@ -25,6 +25,7 @@ SC_MODULE(SystolicArray) {
   Connections::In<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(weights);
   Connections::In<ODTYPE> psums[NCOLS];
   Connections::Out<ODTYPE> outputs[NCOLS];
+  Connections::SyncOut CCS_INIT_S1(weightSwapDone);
 
   SC_CTOR(SystolicArray) {
     ProcessingElement<IDTYPE, ODTYPE> *pe[NROWS * NCOLS];
@@ -69,6 +70,10 @@ SC_MODULE(SystolicArray) {
     SC_THREAD(tieoff);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+
+    SC_THREAD(checkSwapDone);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
   }
 
   // void sendWeightSwap() {
@@ -93,6 +98,20 @@ SC_MODULE(SystolicArray) {
   //   }
   // }
 
+  void checkSwapDone() {
+    weightSwap[NROWS - 1][NCOLS].ResetRead();
+    weightSwapDone.Reset();
+
+    wait();
+
+    while (true) {
+      ac_int<1, false> swap = weightSwap[NROWS - 1][NCOLS].Pop();
+      if (swap) {
+        weightSwapDone.SyncPush();
+      }
+    }
+  }
+
   void tieoff() {
     // Reset all the unused Connections
     for (int i = 0; i < NROWS; i++) {
@@ -114,7 +133,7 @@ SC_MODULE(SystolicArray) {
       weightSwap[i][0].ResetRead();
     }
 
-    for (int i = 0; i < NROWS; i++) {
+    for (int i = 0; i < NROWS - 1; i++) {
       weightSwap[i][NCOLS].ResetRead();
     }
 
@@ -127,7 +146,7 @@ SC_MODULE(SystolicArray) {
         inputConnection[i][NCOLS].PopNB(unusedInput);
       }
 #pragma hls_unroll yes
-      for (int i = 0; i < NROWS; i++) {
+      for (int i = 0; i < NROWS - 1; i++) {
         ac_int<1, false> unusedSwap;
         weightSwap[i][NCOLS].PopNB(unusedSwap);
       }

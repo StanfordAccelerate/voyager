@@ -92,6 +92,7 @@ SC_MODULE(MatrixProcessor) {
       systolicArray.outputs[i](outputsFromSystolicArray[i]);
     }
     systolicArray.weights(weightsToSystolicArray);
+    systolicArray.weightSwapDone(weightSwapDone);
 
     SC_THREAD(process_weights);
     sensitive << clk.pos();
@@ -136,7 +137,6 @@ SC_MODULE(MatrixProcessor) {
     outputsChannel.Reset();
     // weightSwapToSystolicArray.ResetWrite();
     psumOutSkewerDout.ResetRead();
-    weightSwapDone.ResetWrite();
     weightSwapSkewerDin.ResetWrite();
 
     bool toggle = false;
@@ -251,11 +251,6 @@ SC_MODULE(MatrixProcessor) {
         }
 
         psumInSkewerDin.Push(psum);
-
-        swapDoneCount++;
-        if (swapDoneCount == NROWS + NCOLS) {
-          weightSwapDone.SyncPush();
-        }
 
         Pack1D<ODTYPE, NCOLS> outputs;
         if (psumOutSkewerDout.PopNB(outputs)) {
