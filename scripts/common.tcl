@@ -35,7 +35,7 @@ directive set -CLOCK_OVERHEAD 0
 go new
 
 solution file add ./src/Accelerator.cc
-solution file add ./test/common/TestRunner.cc -exclude true
+solution file add ./test/mobilebert/TestRunner.cc -exclude true
 solution file add ./test/common/Harness.cc -exclude true
 solution file add ./test/common/Utils.cc -exclude true
 solution file add ./test/common/GoldModel.cc -exclude true

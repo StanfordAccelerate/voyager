@@ -74,7 +74,7 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
     FX = 7;
     C = 3;
   }
-  if (params.SOFTMAX_GRAD) {
+  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
     C = 1;
   }
 

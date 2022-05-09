@@ -32,63 +32,10 @@ std::string errorDataDir = "/sim/jeffreyy/accelerator/data/mobilebert/errors/";
 std::string gradientDataDir =
     "/sim/jeffreyy/accelerator/data/mobilebert/gradients/";
 
+void validateMapping(SimplifiedParams params);
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
             MemoryMap memoryMap);
-
-std::vector<std::string> parse_csv(std::string& csv) {
-  // Remove spaces
-  std::remove(csv.begin(), csv.end(), ' ');
-
-  std::stringstream ss(csv);
-  std::string token;
-  std::vector<std::string> result;
-
-  // Tokenize
-  while (std::getline(ss, token, ',')) {
-    result.push_back(token);
-  }
-
-  return result;
-}
-
-void validateMapping(SimplifiedParams params) {
-  int x0 = params.loops[1][params.inputXLoopIndex[1]];
-  int y0 = params.loops[1][params.inputYLoopIndex[1]];
-  int c0 = params.loops[1][params.reductionLoopIndex[1]];
-  int k0 = params.loops[1][params.weightLoopIndex[1]];
-  int fx = params.loops[1][params.fxIndex];
-  int fy = params.loops[1][params.fyIndex];
-  int stride = params.STRIDE;
-
-  if (params.FC || params.SOFTMAX || params.SOFTMAX_GRAD ||
-      params.NO_NORM) {  // don't check for vector ops
-    return;
-  }
-
-  // Input buffer
-  int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy - 1);
-  if (params.REPLICATION) {
-    // don't check temporarily
-    input_buffer_tile_size = 1;
-  }
-  if (input_buffer_tile_size > INPUT_BUFFER_SIZE) {
-    std::cout << "[ERROR] Input buffer tile size violation." << std::endl;
-    std::terminate();
-  }
-
-  // Weight buffer
-  if (fx * fy * k0 > WEIGHT_BUFFER_SIZE) {
-    std::cout << "[ERROR] Weight buffer tile size violation." << std::endl;
-    std::terminate();
-  }
-
-  if (x0 * y0 * k0 > ACCUMULATION_BUFFER_SIZE) {
-    std::cout << "[ERROR] Accumulation buffer tile size violation."
-              << std::endl;
-    std::terminate();
-  }
-}
 
 int runMbUnitTest(const SimplifiedParams params, const Files files,
                   const MemoryMap memoryMap, const std::string dataDir,
@@ -655,31 +602,8 @@ int runMobilebert(
   return 0;
 }
 
-extern "C" int sc_main(int argc, char* argv[]) {
-  const char* testName = std::getenv("TESTS");
-  const char* compNames = std::getenv("GROUPS");
-  const char* taskName = std::getenv("TASK");
-
-  if (!testName) {
-    std::cout << "INFO: No test specified! Running all tests。" << std::endl;
-    testName = "all";
-  }
-
-  if (!compNames) {
-    std::cout << "INFO: No group specified! Running all groups." << std::endl;
-    compNames = "accelerator,hlsposit,universal,fp32";
-  }
-
-  if (!taskName) {
-    std::cout << "INFO: No task specified! Running inference." << std::endl;
-    taskName = "inference";
-  }
-
-  std::string test(testName);
-  std::string comps(compNames);
-  std::string task(taskName);
-
-  std::vector<std::string> compList = parse_csv(comps);
+int runMbTest(std::string task, std::string test,
+              std::vector<std::string> compList) {
   std::string outfilePrefix = "test_outputs/";
 
   std::vector<std::pair<std::string, std::string>> operations;

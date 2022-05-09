@@ -268,9 +268,14 @@ inline Posit<nbits, es> Posit<nbits, es>::operator/(
   return *this;
 #else
   // TODO: make synthesisable
-  PositFP<8, fbits> op1 = *this;
-  PositFP<8, fbits> op2 = 1.0 / static_cast<float>(rhs);
-  return op1 * op2;
+  // PositFP<8, fbits> op1 = *this;
+  // PositFP<8, fbits> op2 = 1.0 / static_cast<float>(rhs);
+  // std::cerr << (float)op1 << "\t" << (float)op2 << "\t";
+  // return op1 * op2;
+  float op1 = static_cast<float>(*this);
+  float op2 = static_cast<float>(rhs);
+  float result = op1 / op2;
+  return result;
 #endif
 }
 
@@ -540,8 +545,6 @@ PositFP<sbits, PositFP<sbits, fbits>::mbits> PositFP<sbits, fbits>::operator*(
   } else {
     result.fraction <<= 2;
   }
-  // std::cerr << "fraction: " << result.fraction.to_string(AC_BIN) <<
-  // std::endl; std::cerr << "scale: " << result.scale << std::endl;
 
   return result;
 }

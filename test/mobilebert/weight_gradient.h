@@ -915,23 +915,6 @@ std::map<std::string, MemoryOffsets> trainingMemOffsets{
 };
 
 std::map<std::string, Files> trainingTestFiles{
-    // Weight gradient files
-    {"classifier_grad",
-     {
-         "mobilebert_classifier",
-         "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm",
-         "",
-         "classifier_weight",
-     }},
-     {"output_bottleneck_dense_grad",
-     {
-         "output_bottleneck_LayerNorm",
-         "output_bottleneck_residual",
-         "",
-         "output_bottleneck_LayerNorm_weight",
-     }},
-
-     // Activation gradient files
     {"classifier",
      {
          "mobilebert_classifier",
@@ -1264,4 +1247,9 @@ std::map<std::string, Files> trainingTestFiles{
          "",
          "hidden_states",
      }},
-};
+
+    // Weight gradient files
+    {"classifier_grad",
+     {"mobilebert_classifier",
+      "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm", "",
+      "mobilebert_classifier_weight"}}};

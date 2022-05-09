@@ -16,6 +16,7 @@
 // #include "test/common/Harness.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
+#include "test/mobilebert/mobilebert.h"
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
 
@@ -368,6 +369,12 @@ extern "C" int sc_main(int argc, char* argv[]) {
 
   if (group != "simple" && group != "mobilebert" && group != "resnet") {
     throw std::runtime_error("Group: " + group + " not found");
+  }
+
+  if (group == "mobilebert") {
+    for (auto test : testList) {
+      return runMbTest("inference", test, compList);
+    }
   }
 
   // Get sequence to run
