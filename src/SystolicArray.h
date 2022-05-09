@@ -10,11 +10,12 @@
 template <typename IDTYPE, typename ODTYPE, int NROWS, int NCOLS>
 SC_MODULE(SystolicArray) {
  private:
-  Connections::Combinational<IDTYPE> inputConnection[NROWS][NCOLS + 1];
-  Connections::Combinational<ODTYPE> psumConnection[NROWS][NCOLS];
+  Connections::Combinational<IDTYPE> inputConnection[NROWS][NCOLS];
+  Connections::Combinational<ODTYPE> psumConnection[NROWS - 1][NCOLS];
   sc_signal<IDTYPE> weightConnection[NROWS + 1][NCOLS];
   sc_signal<bool> weightValid;
-  Connections::Combinational<ac_int<1, false> > weightSwap[NROWS][NCOLS + 1];
+  Connections::Combinational<ac_int<1, false> > weightSwap[NROWS * NCOLS - 1];
+  Connections::Combinational<ac_int<1, false> > weightSwapFinal;
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
@@ -38,27 +39,31 @@ SC_MODULE(SystolicArray) {
         if (j == 0) {
           pe[i * NCOLS + j]->inputIn(inputs[i]);
         } else {
-          pe[i * NCOLS + j]->inputIn(inputConnection[i][j]);
+          pe[i * NCOLS + j]->inputIn(inputConnection[i][j - 1]);
         }
         pe[i * NCOLS + j]->weightIn(weightConnection[i][j]);
         pe[i * NCOLS + j]->weightValid(weightValid);
         if (i == 0) {
           pe[i * NCOLS + j]->psumIn(psums[j]);
         } else {
-          pe[i * NCOLS + j]->psumIn(psumConnection[i][j]);
+          pe[i * NCOLS + j]->psumIn(psumConnection[i - 1][j]);
         }
         if (j == 0) {
           pe[i * NCOLS + j]->weightSwapIn(swapWeights[i]);
         } else {
-          pe[i * NCOLS + j]->weightSwapIn(weightSwap[i][j]);
+          pe[i * NCOLS + j]->weightSwapIn(weightSwap[i * NCOLS + j - 1]);
         }
-        pe[i * NCOLS + j]->weightSwapOut(weightSwap[i][j + 1]);
-        pe[i * NCOLS + j]->inputOut(inputConnection[i][j + 1]);
+        if (i == NROWS - 1 && j == NCOLS - 1) {
+          pe[i * NCOLS + j]->weightSwapOut(weightSwapFinal);
+        } else {
+          pe[i * NCOLS + j]->weightSwapOut(weightSwap[i * NCOLS + j]);
+        }
+        pe[i * NCOLS + j]->inputOut(inputConnection[i][j]);
         pe[i * NCOLS + j]->weightOut(weightConnection[i + 1][j]);
         if (i == NROWS - 1) {
           pe[i * NCOLS + j]->psumOut(outputs[j]);
         } else {
-          pe[i * NCOLS + j]->psumOut(psumConnection[i + 1][j]);
+          pe[i * NCOLS + j]->psumOut(psumConnection[i][j]);
         }
       }
     }
@@ -99,13 +104,15 @@ SC_MODULE(SystolicArray) {
   // }
 
   void checkSwapDone() {
-    weightSwap[NROWS - 1][NCOLS].ResetRead();
+    weightSwapFinal.ResetRead();
     weightSwapDone.Reset();
 
     wait();
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
     while (true) {
-      ac_int<1, false> swap = weightSwap[NROWS - 1][NCOLS].Pop();
+      ac_int<1, false> swap = weightSwapFinal.Pop();
       if (swap) {
         weightSwapDone.SyncPush();
       }
@@ -115,40 +122,27 @@ SC_MODULE(SystolicArray) {
   void tieoff() {
     // Reset all the unused Connections
     for (int i = 0; i < NROWS; i++) {
-      inputConnection[i][0].ResetWrite();
-      inputConnection[i][0].ResetRead();
-    }
-
-    for (int i = 0; i < NROWS; i++) {
-      inputConnection[i][NCOLS].ResetRead();
-    }
-
-    for (int j = 0; j < NCOLS; j++) {
-      psumConnection[0][j].ResetWrite();
-      psumConnection[0][j].ResetRead();
-    }
-
-    for (int i = 0; i < NROWS; i++) {
-      weightSwap[i][0].ResetWrite();
-      weightSwap[i][0].ResetRead();
+      inputConnection[i][NCOLS - 1].ResetRead();
     }
 
     for (int i = 0; i < NROWS - 1; i++) {
-      weightSwap[i][NCOLS].ResetRead();
+      weightSwap[i * NCOLS + NCOLS - 1].ResetRead();
     }
 
     wait();
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
     while (true) {
 #pragma hls_unroll yes
       for (int i = 0; i < NROWS; i++) {
         IDTYPE unusedInput;
-        inputConnection[i][NCOLS].PopNB(unusedInput);
+        inputConnection[i][NCOLS - 1].PopNB(unusedInput);
       }
 #pragma hls_unroll yes
       for (int i = 0; i < NROWS - 1; i++) {
         ac_int<1, false> unusedSwap;
-        weightSwap[i][NCOLS].PopNB(unusedSwap);
+        weightSwap[i * NCOLS + NCOLS - 1].PopNB(unusedSwap);
       }
       wait();
     }
@@ -164,6 +158,8 @@ SC_MODULE(SystolicArray) {
 
     wait();
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
     while (true) {
       Pack1D<IDTYPE, NCOLS> arrayWeights;
       if (weights.PopNB(arrayWeights)) {
