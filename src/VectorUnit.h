@@ -6,6 +6,7 @@
 #include "AccelTypes.h"
 #include "MaxpoolUnit.h"
 #include "OutputAddressGenerator.h"
+#include "ParamsDeserializer.h"
 #include "VectorFetch.h"
 #include "VectorOps.h"
 
@@ -356,8 +357,7 @@ SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::In<VectorInstructionConfig> CCS_INIT_S1(vectorInstructionsIn);
+  Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(systolicArrayOutput);
 
@@ -400,7 +400,18 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(
       reduceOpInstructions);
 
+  VectorParamsDeserializer CCS_INIT_S1(paramsDeserializer);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(vectorParamsIn);
+  Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
+      vectorInstructionsIn);
+
   SC_CTOR(VectorUnit) {
+    paramsDeserializer.clk(clk);
+    paramsDeserializer.rstn(rstn);
+    paramsDeserializer.serialParamsIn(serialParamsIn);
+    paramsDeserializer.vectorParamsOut(vectorParamsIn);
+    paramsDeserializer.vectorInstructionsOut(vectorInstructionsIn);
+
     vectorFetch.clk(clk);
     vectorFetch.rstn(rstn);
     vectorFetch.paramsIn(vectorFetchParams);
@@ -446,7 +457,7 @@ SC_MODULE(VectorUnit) {
   }
 
   void read_params() {
-    paramsIn.Reset();
+    vectorParamsIn.ResetRead();
     vectorFetchParams.ResetWrite();
     maxpoolUnitParams.ResetWrite();
     outputAddressGenParams.ResetWrite();
@@ -454,7 +465,7 @@ SC_MODULE(VectorUnit) {
     wait();
 
     while (true) {
-      VectorParams params = paramsIn.Pop();
+      VectorParams params = vectorParamsIn.Pop();
 
       vectorFetchParams.Push(params);
       maxpoolUnitParams.Push(params);
@@ -466,7 +477,7 @@ SC_MODULE(VectorUnit) {
     vectorOpInstructions.ResetWrite();
     reduceOpInstructions.ResetWrite();
     accumulationOpInstructions.ResetWrite();
-    vectorInstructionsIn.Reset();
+    vectorInstructionsIn.ResetRead();
 
     wait();
 

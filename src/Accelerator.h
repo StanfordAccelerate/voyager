@@ -18,8 +18,9 @@ SC_MODULE(Accelerator) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
-  ParamsDeserializer CCS_INIT_S1(paramsDeserializer);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  ParamsRouter CCS_INIT_S1(paramsRouter);
+  Connections::Combinational<int> serialMatrixParams[3];
+  Connections::Combinational<int> serialVectorParams;
 
   // clang-format off
   #ifdef SIM_InputController  
@@ -41,7 +42,6 @@ SC_MODULE(Accelerator) {
   Connections::Combinational<int> inputBufferReadControl[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       inputsToWindowBuffer);
-  Connections::Combinational<MatrixParams> inputControllerParams;
 
 #ifdef SIM_WeightController
   // clang-format off
@@ -62,7 +62,6 @@ SC_MODULE(Accelerator) {
   Connections::Combinational<int> weightBufferWriteControl[2];
   Connections::Combinational<int> weightBufferReadAddress[2];
   Connections::Combinational<int> weightBufferReadControl[2];
-  Connections::Combinational<MatrixParams> weightControllerParams;
 
 #ifdef SIM_MatrixProcessor
   // clang-format off
@@ -79,7 +78,6 @@ SC_MODULE(Accelerator) {
       weightsToSystolicArray);
   Connections::Combinational<Pack1D<ACCUM_DATATYPE, DIMENSION> > CCS_INIT_S1(
       outputsFromSystolicArray);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(matrixProcessorParams);
 
 #ifdef SIM_VectorUnit
   // clang-format off
@@ -105,26 +103,24 @@ SC_MODULE(Accelerator) {
       scalarUnitOutput);
   Connections::Out<int> CCS_INIT_S1(scalarOutputAddress);
 
-  Connections::Combinational<VectorParams> CCS_INIT_S1(vectorUnitParams);
-  Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
-      vectorInstructionConfig);
-
   Connections::SyncOut startSignal;
   Connections::SyncOut doneSignal;
 
   SC_CTOR(Accelerator) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.paramsOut(paramsIn);
-    paramsDeserializer.vectorParamsOut(vectorUnitParams);
-    paramsDeserializer.vectorInstructionsOut(vectorInstructionConfig);
+    paramsRouter.clk(clk);
+    paramsRouter.rstn(rstn);
+    paramsRouter.serialParamsIn(serialParamsIn);
+    for (int i = 0; i < 3; i++) {
+      paramsRouter.serialMatrixParams[i](serialMatrixParams[i]);
+    }
+    paramsRouter.serialVectorParams(serialVectorParams);
+    paramsRouter.startSignal(startSignal);
 
     inputController.clk(clk);
     inputController.rstn(rstn);
     inputController.addressRequest(inputAddressRequest);
     inputController.dataResponse(inputDataResponse);
-    inputController.paramsIn(inputControllerParams);
+    inputController.serialParamsIn(serialMatrixParams[0]);
     inputController.windowBufferIn(inputsToWindowBuffer);
     inputController.windowBufferOut(inputsToSystolicArray);
 
@@ -147,7 +143,7 @@ SC_MODULE(Accelerator) {
     weightController.rstn(rstn);
     weightController.addressRequest(weightAddressRequest);
     weightController.dataResponse(weightDataResponse);
-    weightController.paramsIn(weightControllerParams);
+    weightController.serialParamsIn(serialMatrixParams[1]);
 
     weightBuffer.clk(clk);
     weightBuffer.rstn(rstn);
@@ -169,12 +165,11 @@ SC_MODULE(Accelerator) {
     matrixProcessor.inputsChannel(inputsToSystolicArray);
     matrixProcessor.weightsChannel(weightsToSystolicArray);
     matrixProcessor.outputsChannel(outputsFromSystolicArray);
-    matrixProcessor.paramsIn(matrixProcessorParams);
+    matrixProcessor.serialParamsIn(serialMatrixParams[2]);
 
     vectorUnit.clk(clk);
     vectorUnit.rstn(rstn);
-    vectorUnit.paramsIn(vectorUnitParams);
-    vectorUnit.vectorInstructionsIn(vectorInstructionConfig);
+    vectorUnit.serialParamsIn(serialVectorParams);
     vectorUnit.systolicArrayOutput(outputsFromSystolicArray);
     vectorUnit.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
     vectorUnit.vectorFetch0DataResponse(vectorFetch0DataResponse);

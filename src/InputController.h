@@ -4,13 +4,14 @@
 #include <systemc.h>
 
 #include "AccelTypes.h"
+#include "ParamsDeserializer.h"
 
 template <typename DTYPE, int NROWS>
 SC_MODULE(InputController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<MatrixParams> paramsIn;
+  Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
@@ -23,12 +24,20 @@ SC_MODULE(InputController) {
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferIn);
   Connections::Out<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferOut);
 
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(windowBufferParams);
 
+  MatrixParamsDeserializer CCS_INIT_S1(paramsDeserializer);
+
   SC_CTOR(InputController) {
+    paramsDeserializer.clk(clk);
+    paramsDeserializer.rstn(rstn);
+    paramsDeserializer.serialParamsIn(serialParamsIn);
+    paramsDeserializer.paramsOut(paramsIn);
+
     SC_THREAD(read_params);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -909,7 +918,7 @@ SC_MODULE(InputController) {
   }
 
   void read_params() {
-    paramsIn.Reset();
+    paramsIn.ResetRead();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();

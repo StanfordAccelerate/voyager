@@ -3,6 +3,7 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include "ParamsDeserializer.h"
 #include "SystolicArray.h"
 
 template <typename IDTYPE, typename ODTYPE, int NROWS, int NCOLS,
@@ -30,6 +31,8 @@ SC_MODULE(MatrixProcessor) {
 
   SystolicArray<IDTYPE, ODTYPE, NROWS, NCOLS> CCS_INIT_S1(systolicArray);
 
+  MatrixParamsDeserializer CCS_INIT_S1(paramsDeserializer);
+
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -38,8 +41,9 @@ SC_MODULE(MatrixProcessor) {
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(weightsChannel);
   Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(outputsChannel);
 
-  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<IDTYPE> inputsToSystolicArray[NROWS];
   Connections::Combinational<ac_int<1, false> >
       weightSwapToSystolicArray[NROWS];
@@ -49,6 +53,11 @@ SC_MODULE(MatrixProcessor) {
       weightsToSystolicArray);
 
   SC_CTOR(MatrixProcessor) {
+    paramsDeserializer.clk(clk);
+    paramsDeserializer.rstn(rstn);
+    paramsDeserializer.serialParamsIn(serialParamsIn);
+    paramsDeserializer.paramsOut(paramsIn);
+
     inputSkewer.clk(clk);
     inputSkewer.rstn(rstn);
     inputSkewer.din(inputSkewerDin);
@@ -128,7 +137,7 @@ SC_MODULE(MatrixProcessor) {
   }
 
   void run() {
-    paramsIn.Reset();
+    paramsIn.ResetRead();
 
     inputSkewerDin.ResetWrite();
     inputsChannel.Reset();
