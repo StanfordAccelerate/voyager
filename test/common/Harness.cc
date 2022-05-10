@@ -499,19 +499,19 @@ void Harness::sendParams() {
       vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
       vectorParams.addressGen0Enable = true;
       vectorParams.addressGen0Loop[0] = 1;
-      vectorParams.addressGen0Loop[1] = Y;
+      vectorParams.addressGen0Loop[1] = X;
       vectorParams.addressGen0Loop[2] = C / DIMENSION;
 
       // address gen 1 (weights)
       vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
       vectorParams.addressGen1Mode = 2;  // 2d tensor
-      vectorParams.addressGen1Loops[0][0] = Y;
+      vectorParams.addressGen1Loops[0][0] = X;
       vectorParams.addressGen1Loops[0][1] = 1;
       vectorParams.addressGen1Loops[0][2] = C / DIMENSION;
 
       vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
       vectorParams.addressGen2Mode = 2;  // 2d tensor
-      vectorParams.addressGen2Loops[0][0] = Y;
+      vectorParams.addressGen2Loops[0][0] = X;
       vectorParams.addressGen2Loops[0][1] = 1;
       vectorParams.addressGen2Loops[0][2] = C / DIMENSION;
 
@@ -521,6 +521,7 @@ void Harness::sendParams() {
       vectorParams.scalarOutputCount = 0;
       vectorParams.MAXPOOL = params.MAXPOOL;
       vectorParams.AVGPOOL = params.AVGPOOL;
+      vectorParams.SPLIT_HEAD = params.SPLIT_HEAD;
 
       // output
       for (int i = 0; i < 3; i++) {
@@ -531,18 +532,18 @@ void Harness::sendParams() {
       vectorParams.outputWeightLoopIndex[0] = params.weightLoopIndex[0];
 
       vectorParams.outputLoops[1][0] = 1;
-      vectorParams.outputLoops[1][1] = Y;
+      vectorParams.outputLoops[1][1] = X;
       vectorParams.outputLoops[1][2] = C / DIMENSION;
       vectorParams.outputWeightLoopIndex[1] = 2;
-      vectorParams.outputYLoopIndex[1] = 1;
-      vectorParams.outputXLoopIndex[1] = 0;
+      vectorParams.outputYLoopIndex[1] = 0;
+      vectorParams.outputXLoopIndex[1] = 1;
 
       sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
 
       // create instruction stream
       VectorInstructionConfig vectorInstructionConfig;
 
-      // inst 1- inputs x weights, send to reduce
+      // inst 1- (inputs x weights) + bias
       VectorInstructions vInst0;
       vInst0.instType = VectorInstructions::vector;
       vInst0.vInput = VectorInstructions::readFromVectorFetch;
@@ -560,7 +561,7 @@ void Harness::sendParams() {
 
       // C/DIMENSION to do the complete reduction
       // DIMENSION to fill up the entire vector
-      vectorInstructionConfig.instCount[0] = Y * C / DIMENSION;
+      vectorInstructionConfig.instCount[0] = X * C / DIMENSION;
 
       vectorInstructionConfig.instLen = 1;
       vectorInstructionConfig.instLoopCount = 1;
