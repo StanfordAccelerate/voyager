@@ -33,6 +33,7 @@ void register_interface(
     std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
         *scalarUnitOutput,
     std::deque<sc_lv<Wrapped<int>::width> > *scalarOutputAddress);
+void copy_output(void* sram, int size, int data_size);
 #endif
 
 Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
@@ -831,6 +832,7 @@ void Harness::sendParams() {
       CCS_LOG("Accelerator Layer Finished.");
     }
 #ifdef SOC_COSIM
+    copy_output(sramMemory, sizeof(INPUT_DATATYPE)*2*1024*1024, sizeof(INPUT_DATATYPE));
     syscDone = true;
 #else
     sc_stop();

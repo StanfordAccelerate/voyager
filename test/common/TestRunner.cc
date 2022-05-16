@@ -331,8 +331,8 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::cout << "ex: " << argv[0] << std::endl;
   SimplifiedParams params;
 
-  const char* groupName = std::getenv("GROUP");
-  const char* testNames = std::getenv("TESTS");
+  const char* groupName = std::getenv("NETWORK");
+  const char* testNames = std::getenv("LAYER");
   const char* compNames = std::getenv("SIMS");
 
   if (!(testNames && groupName && compNames)) {
