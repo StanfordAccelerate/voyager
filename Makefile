@@ -1,19 +1,15 @@
 CC = /opt/rh/devtoolset-10/root/bin/g++
 INC = -I/cad/mentor/2021.1/Mgc_home/shared/include/ -Ilib/ -Ilib/universal/include/ -Isrc/ -I. -I/usr/include/python3.6m
-BASEFLAGS = $(INC) -DSC_INCLUDE_DYNAMIC_PROCESSES -DCONNECTIONS_NAMING_ORIGINAL
+BASEFLAGS = $(INC) -DSC_INCLUDE_DYNAMIC_PROCESSES -O3
 DEBUGFLAGS = -DDEBUG_LOG -g
-FASTFLAGS = -O3
+FASTFLAGS = -DCONNECTIONS_FAST_SIM
 
 ifeq ($(DEBUG), 1)
     BASEFLAGS += $(DEBUGFLAGS)
-else
-    BASEFLAGS += $(FASTFLAGS)
 endif
 
 ifeq ($(FAST), 1)
-    BASEFLAGS += $(DEBUGFLAGS) -DCONNECTIONS_FAST_SIM
-else
-    BASEFLAGS += $(FASTFLAGS)
+    BASEFLAGS += $(FASTFLAGS) 
 endif
 
 
@@ -34,7 +30,7 @@ VectorUnit: build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
 
 build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v: InputController WeightController MatrixProcessor VectorUnit
 	catapult -shell -file scripts/Accelerator.tcl
-	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N/,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g' build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
+	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N/,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/module VectorUnit_rtl/module VectorUnit/g' build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
 
 build/Catapult_InputController/InputController.v1/concat_rtl.v:
 	catapult -shell -file scripts/InputController.tcl

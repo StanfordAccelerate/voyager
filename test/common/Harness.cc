@@ -46,7 +46,8 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
       memoryMap(memoryMap) {
   accelerator.clk(clk);
   accelerator.rstn(rstn);
-  accelerator.serialParamsIn(serialParamsIn);
+  accelerator.serialMatrixParamsIn(serialMatrixParamsIn);
+  accelerator.serialVectorParamsIn(serialVectorParamsIn);
 
   accelerator.inputAddressRequest(inputAddressRequest);
   accelerator.inputDataResponse(inputDataResponse);
@@ -266,7 +267,8 @@ void sendSerializedParams(T params,
 
 void Harness::sendParams() {
   done.ResetRead();
-  serialParamsIn.ResetWrite();
+  serialMatrixParamsIn.ResetWrite();
+  serialVectorParamsIn.ResetWrite();
 
   wait();
 
@@ -286,10 +288,6 @@ void Harness::sendParams() {
 
     // create Matrix and Vector Params from SimplifiedParams
     if (params.SOFTMAX) {
-      // no matrix parameters
-      serialParamsIn.Push(0);
-
-      serialParamsIn.Push(1);
       VectorParams vectorParams;
       vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
       vectorParams.addressGen0Enable = true;
@@ -332,7 +330,8 @@ void Harness::sendParams() {
       vectorParams.outputYLoopIndex[1] = 1;
       vectorParams.outputXLoopIndex[1] = 0;
 
-      sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
+      sendSerializedParams<VectorParams, 32>(vectorParams,
+                                             &serialVectorParamsIn);
 
       // create instruction stream
       VectorInstructionConfig vectorInstructionConfig;
@@ -365,16 +364,11 @@ void Harness::sendParams() {
       vectorInstructionConfig.instLoopCount = 1;
 
       sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
-                                                        &serialParamsIn);
-      serialParamsIn.Push(0);
+                                                        &serialVectorParamsIn);
 
       done.SyncPop();
       CCS_LOG("Accelerator Layer Finished.");
     } else if (params.FC) {
-      // no matrix parameters
-      serialParamsIn.Push(0);
-
-      serialParamsIn.Push(1);
       VectorParams vectorParams;
       vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
       vectorParams.addressGen0Enable = true;
@@ -428,7 +422,8 @@ void Harness::sendParams() {
         }
       }
 
-      sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
+      sendSerializedParams<VectorParams, 32>(vectorParams,
+                                             &serialVectorParamsIn);
 
       // create instruction stream
       VectorInstructionConfig vectorInstructionConfig;
@@ -485,16 +480,11 @@ void Harness::sendParams() {
       vectorInstructionConfig.instLoopCount = K / DIMENSION;
 
       sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
-                                                        &serialParamsIn);
-      serialParamsIn.Push(0);
+                                                        &serialVectorParamsIn);
 
       done.SyncPop();
       CCS_LOG("Accelerator Layer Finished.");
     } else if (params.NO_NORM) {
-      // no matrix parameters
-      serialParamsIn.Push(0);
-
-      serialParamsIn.Push(1);
       VectorParams vectorParams;
       vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
       vectorParams.addressGen0Enable = true;
@@ -538,7 +528,8 @@ void Harness::sendParams() {
       vectorParams.outputYLoopIndex[1] = 0;
       vectorParams.outputXLoopIndex[1] = 1;
 
-      sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
+      sendSerializedParams<VectorParams, 32>(vectorParams,
+                                             &serialVectorParamsIn);
 
       // create instruction stream
       VectorInstructionConfig vectorInstructionConfig;
@@ -567,15 +558,12 @@ void Harness::sendParams() {
       vectorInstructionConfig.instLoopCount = 1;
 
       sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
-                                                        &serialParamsIn);
-      serialParamsIn.Push(0);
+                                                        &serialVectorParamsIn);
 
       done.SyncPop();
       CCS_LOG("Accelerator Layer Finished.");
     } else {
       // matrix params
-      serialParamsIn.Push(1);
-
       MatrixParams matrixParams;
       matrixParams.INPUT_OFFSET = params.INPUT_OFFSET;
       matrixParams.WEIGHT_OFFSET = params.WEIGHT_OFFSET;
@@ -618,11 +606,9 @@ void Harness::sendParams() {
       matrixParams.ACC_FROM_ACC = params.ACC_FROM_ACC;
       matrixParams.CONCAT_HEAD = params.CONCAT_HEAD;
 
-      sendSerializedParams<MatrixParams, 32>(matrixParams, &serialParamsIn);
+      sendSerializedParams<MatrixParams, 32>(matrixParams,
+                                             &serialMatrixParamsIn);
 
-      serialParamsIn.Push(0);
-
-      serialParamsIn.Push(1);
       VectorParams vectorParams;
       memset(&vectorParams, 0, sizeof(vectorParams));
 
@@ -726,7 +712,8 @@ void Harness::sendParams() {
 
       vectorParams.SPLIT_HEAD = params.SPLIT_HEAD;
 
-      sendSerializedParams<VectorParams, 32>(vectorParams, &serialParamsIn);
+      sendSerializedParams<VectorParams, 32>(vectorParams,
+                                             &serialVectorParamsIn);
 
       // create instruction stream
       VectorInstructionConfig vectorInstructionConfig;
@@ -823,9 +810,7 @@ void Harness::sendParams() {
         vectorInstructionConfig.instLoopCount = 1;
       }
       sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
-                                                        &serialParamsIn);
-
-      serialParamsIn.Push(0);
+                                                        &serialVectorParamsIn);
 
       done.SyncPop();
       CCS_LOG("Accelerator Layer Finished.");

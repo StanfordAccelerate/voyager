@@ -111,17 +111,16 @@ SC_MODULE(VectorParamsDeserializer) {
   }
 };
 
-SC_MODULE(ParamsRouter) {
+SC_MODULE(MatrixParamsRouter) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
   Connections::Out<int> serialMatrixParams[3];
-  Connections::Out<int> CCS_INIT_S1(serialVectorParams);
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
 
-  SC_CTOR(ParamsRouter) {
+  SC_CTOR(MatrixParamsRouter) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -134,39 +133,19 @@ SC_MODULE(ParamsRouter) {
     for (int i = 0; i < 3; i++) {
       serialMatrixParams[i].Reset();
     }
-    serialVectorParams.Reset();
 
     wait();
     while (true) {
       // Matrix Params
-      while (serialParamsIn.Pop() == 1) {
-        for (int i = 0; i < (((MatrixParams::width + 32 - 1) / 32) * 32) / 32;
-             i++) {
-          int serialParam = serialParamsIn.Pop();
+      for (int i = 0; i < (((MatrixParams::width + 32 - 1) / 32) * 32) / 32;
+           i++) {
+        int serialParam = serialParamsIn.Pop();
 #pragma hls_unroll yes
-          for (int i = 0; i < 3; i++) {
-            serialMatrixParams[i].Push(serialParam);
-          }
-          CCS_LOG("writing " << i);
-        }
-        startSignal.SyncPush();
-      }
-
-      // Vector Unit Params
-      while (serialParamsIn.Pop() == 1) {
-        for (int i = 0; i < (((VectorParams::width + 32 - 1) / 32) * 32) / 32;
-             i++) {
-          int serialParam = serialParamsIn.Pop();
-          serialVectorParams.Push(serialParam);
-        }
-
-        for (int i = 0;
-             i < (((VectorInstructionConfig::width + 32 - 1) / 32) * 32) / 32;
-             i++) {
-          int serialParam = serialParamsIn.Pop();
-          serialVectorParams.Push(serialParam);
+        for (int i = 0; i < 3; i++) {
+          serialMatrixParams[i].Push(serialParam);
         }
       }
+      startSignal.SyncPush();
     }
   }
 };
