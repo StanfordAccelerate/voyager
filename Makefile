@@ -75,7 +75,7 @@ sim_sysc:
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/GoldModel.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Utils.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/DataLoader.cc
-	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/mobilebert/TestRunner.cc
+	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/TestRunner.cc
 	vcs -full64 -sysc sc_main -kdb -debug_access+all -Mdir=$(build_folder) -o $(build_folder)/$(simv_name)
 	./$(build_folder)/$(simv_name) -ucli -i dump_fsdb.tcl
 
