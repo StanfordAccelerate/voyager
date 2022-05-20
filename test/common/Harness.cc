@@ -597,6 +597,95 @@ void Harness::sendParams() {
       }
       matrixParams.fxIndex = params.fxIndex;
       matrixParams.fyIndex = params.fyIndex;
+
+      // set outer loop values
+      for (int j = 0; j < 5; j++) {
+        matrixParams.weightAddressGenLoops[0][j] = params.loops[0][j];
+      }
+      matrixParams.weightAddressGenInputXLoopIndex = params.inputXLoopIndex[0];
+      matrixParams.weightAddressGenInputYLoopIndex = params.inputYLoopIndex[0];
+      matrixParams.weightAddressGenWeightLoopIndex[0] =
+          params.weightLoopIndex[0];
+
+      // set inner loop values
+      if (params.TRANSPOSE) {
+        // for tranpose, we need to enforce that the innermost loop is the
+        // unrolled reduction loop
+        // we can just use the following loop nest:
+        // C1, K, FY, FX, C0
+        matrixParams.weightAddressGenLoops[1][4] = DIMENSION;
+        matrixParams.weightAddressGenReductionLoopIndex[1] = 4;
+        matrixParams.weightAddressGenLoops[1][3] =
+            params.loops[1][params.fxIndex];
+        matrixParams.weightAddressGenFxIndex = 3;
+        matrixParams.weightAddressGenLoops[1][2] =
+            params.loops[1][params.fyIndex];
+        matrixParams.weightAddressGenFyIndex = 2;
+        matrixParams.weightAddressGenLoops[1][1] =
+            params.loops[1][params.weightLoopIndex[1]];
+        matrixParams.weightAddressGenWeightLoopIndex[1] = 2;
+        matrixParams.weightAddressGenLoops[1][0] =
+            params.loops[1][params.reductionLoopIndex[1]];
+        matrixParams.weightAddressGenReductionLoopIndex[0] = 0;
+      } else {  // if not tranpose, then we have freedom to pick any loop order
+        // for efficient memory accesses, addresses should be consecutive
+        // or least, not multiples of 4, due to interleaving.
+        // given that weights are arranged as: FY,FX,C,K
+        // the following loop nest should work:
+        // C1, C0, FX, FY, K
+        // int index = 0;
+        // for (int j = 0; j < 6; j++) {
+        //   if (j == matrixParams.inputXLoopIndex[1] ||
+        //       j == matrixParams.inputYLoopIndex[1]) {
+        //     continue;
+        //   }
+        //   matrixParams.weightAddressGenLoops[1][index] = params.loops[1][j];
+
+        //   if (j == matrixParams.reductionLoopIndex[1]) {
+        //     matrixParams.weightAddressGenReductionLoopIndex[0] = index;
+        //   }
+        //   if (j == matrixParams.fxIndex) {
+        //     matrixParams.weightAddressGenFxIndex = index;
+        //   }
+        //   if (j == matrixParams.fyIndex) {
+        //     matrixParams.weightAddressGenFyIndex = index;
+        //   }
+        //   if (j == matrixParams.weightLoopIndex[1]) {
+        //     matrixParams.weightAddressGenWeightLoopIndex[1] = index;
+        //   }
+
+        //   index++;
+        // }
+        // matrixParams.weightAddressGenLoops[1][4] = DIMENSION;
+        // matrixParams.weightAddressGenReductionLoopIndex[1] = 4;
+
+        matrixParams.weightAddressGenLoops[1][4] =
+            params.loops[1][params.weightLoopIndex[1]];
+        matrixParams.weightAddressGenWeightLoopIndex[1] = 4;
+
+        matrixParams.weightAddressGenLoops[1][3] =
+            params.loops[1][params.fyIndex];
+        matrixParams.weightAddressGenFyIndex = 3;
+
+        matrixParams.weightAddressGenLoops[1][2] =
+            params.loops[1][params.fxIndex];
+        if (params.REPLICATION) {
+          matrixParams.weightAddressGenLoops[1][2] = 7;
+        }
+        matrixParams.weightAddressGenFxIndex = 2;
+
+        if (params.REPLICATION) {
+          matrixParams.weightAddressGenLoops[1][1] = 3;
+          matrixParams.weightAddressGenReductionLoopIndex[1] = 1;
+        } else {
+          matrixParams.weightAddressGenLoops[1][1] = DIMENSION;
+          matrixParams.weightAddressGenReductionLoopIndex[1] = 1;
+        }
+        matrixParams.weightAddressGenLoops[1][0] =
+            params.loops[1][params.reductionLoopIndex[1]];
+        matrixParams.weightAddressGenReductionLoopIndex[0] = 0;
+      }
+
       matrixParams.matMul = false;  // unused
       matrixParams.STRIDE = params.STRIDE;
       matrixParams.HEAD_SIZE_LG2 = 0;

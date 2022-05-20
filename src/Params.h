@@ -11,6 +11,7 @@ struct MatrixParams {
   int VEC_SCALE_OFFSET;
   int VEC_SUB_OFFSET;
 
+  // systolic array loop
   int loops[2][6];
   int inputXLoopIndex[2];
   int inputYLoopIndex[2];
@@ -19,6 +20,19 @@ struct MatrixParams {
   int fxIndex;
   int fyIndex;
   int weightReuseIndex[2];
+
+  // weight address generator loop
+  int weightAddressGenLoops[2][5];
+  // in the inner loop, there are actually 2 reduction loops: the
+  // standard reduction loop and the reduction that is parallelized in
+  // the systolic array
+  int weightAddressGenReductionLoopIndex[2];
+  int weightAddressGenWeightLoopIndex[2];
+  int weightAddressGenFxIndex;
+  int weightAddressGenFyIndex;
+  int weightAddressGenInputXLoopIndex;  // only care about outer X and Y loops
+  int weightAddressGenInputYLoopIndex;
+
   int STRIDE;
   int BIAS_OFFSET;
   int RESIDUAL_OFFSET;
@@ -42,7 +56,8 @@ struct MatrixParams {
   bool ACC_FROM_ACC;
   bool CONCAT_HEAD;
 
-  static const unsigned int width = 13 * 32 + 12 * 32 + 10 * 32 + 17 * 1;
+  static const unsigned int width =
+      13 * 32 + 12 * 32 + 10 * 32 + 17 * 1 + 18 * 32;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
@@ -75,6 +90,21 @@ struct MatrixParams {
     for (int i = 0; i < 2; i++) {
       m& weightReuseIndex[i];
     }
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 5; j++) {
+        m& weightAddressGenLoops[i][j];
+      }
+    }
+    for (int i = 0; i < 2; i++) {
+      m& weightAddressGenReductionLoopIndex[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      m& weightAddressGenWeightLoopIndex[i];
+    }
+    m& weightAddressGenFxIndex;
+    m& weightAddressGenFyIndex;
+    m& weightAddressGenInputXLoopIndex;
+    m& weightAddressGenInputYLoopIndex;
     m& STRIDE;
     m& BIAS_OFFSET;
     m& RESIDUAL_OFFSET;

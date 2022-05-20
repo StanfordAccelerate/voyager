@@ -12,6 +12,6 @@ directive set -CLOCKS $clocks
 
 go assembly
 
-directive set /$weight_controller_stripped/$weight_controller_stripped:transposer/transposer/while:if#1:transposeBuffer.bits:rsc -MAP_TO_MODULE {[Register]}
+directive set /$weight_controller_stripped/$weight_controller_stripped:transposer/transposer/while:if:transposeBuffer.bits:rsc -MAP_TO_MODULE {[Register]}
 
 go extract
