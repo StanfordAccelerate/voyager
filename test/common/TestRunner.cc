@@ -16,12 +16,18 @@
 // #include "test/common/Harness.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
-#include "test/mobilebert/mobilebert.h"
+#include "test/mobilebert/MobileBertSequence.h"
+#include "test/mobilebert/MobileBertUnitTest.h"
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
 
+#ifndef SRAM_MEMORY_SIZE
 #define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
+#endif
+
+#ifndef RRAM_MEMORY_SIZE
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
+#endif
 
 void validateMapping(SimplifiedParams params);
 void run_sequence(const std::string& group,
@@ -60,7 +66,7 @@ void validateMapping(SimplifiedParams params) {
   int fy = params.loops[1][params.fyIndex];
   int stride = params.STRIDE;
 
-  if (params.FC || params.SOFTMAX ||
+  if (params.FC || params.SOFTMAX || params.SOFTMAX_GRAD ||
       params.NO_NORM) {  // don't check for vector ops
     return;
   }
@@ -213,7 +219,8 @@ int run_sequence(const std::string& group,
           hls_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
           hls_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
           hls_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          hls_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET);
+          hls_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, false,
+          false);
     }
     if (std::find(comparisons.begin(), comparisons.end(), "universal") !=
         comparisons.end()) {
@@ -223,7 +230,8 @@ int run_sequence(const std::string& group,
           uni_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
           uni_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
           uni_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          uni_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET);
+          uni_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, false,
+          false);
     }
     if (std::find(comparisons.begin(), comparisons.end(), "fp32") !=
         comparisons.end()) {
@@ -233,7 +241,8 @@ int run_sequence(const std::string& group,
           float_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
           float_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
           float_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          float_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET);
+          float_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, false,
+          false);
     }
   }
 
@@ -331,28 +340,30 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::cout << "ex: " << argv[0] << std::endl;
   SimplifiedParams params;
 
-  const char* groupName = std::getenv("GROUP");
-  const char* testNames = std::getenv("TESTS");
-  const char* compNames = std::getenv("SIMS");
+  const char* env_group = std::getenv("GROUP");
+  const char* env_test = std::getenv("TESTS");
+  const char* env_sims = std::getenv("SIMS");
+  const char* env_task = std::getenv("TASK");
+  const char* env_datapath = std::getenv("DATA_PATH");
 
-  if (!(testNames && groupName && compNames)) {
+  if (!(env_test && env_group && env_sims)) {
     std::cout << "Warning! No group/test specified! Please set the environment "
                  "variables GROUP and TESTS"
               << std::endl;
     // return -1;
     std::cout << "Continuing with simple convolution...";
-    groupName = "simple";
-    testNames = "simple";
-    compNames = "accelerator,customposit";
+    env_group = "simple";
+    env_test = "simple";
+    env_sims = "accelerator,customposit";
   }
 
-  if (!compNames) {
+  if (!env_sims) {
     std::cout << "You must set the environment variable SIMS" << std::endl;
   }
 
-  std::string group(groupName);
-  std::string tests(testNames);
-  std::string comps(compNames);
+  std::string group(env_group);
+  std::string tests(env_test);
+  std::string comps(env_sims);
 
   std::vector<std::string> testList = parse_csv(tests);
   std::vector<std::string> compList = parse_csv(comps);
@@ -372,13 +383,31 @@ extern "C" int sc_main(int argc, char* argv[]) {
   }
 
   if (group == "mobilebert") {
-    if (tests == "all") {
-      return runMbTest("inference", "all", compList);
+    if (!env_task) {
+      env_task = "inference";
     }
 
+    if (!env_datapath) {
+      env_datapath = "/sim/jeffreyy/accelerator/data/mobilebert/datafile/";
+    }
+
+    std::string task(env_task);
+    std::string datapath(env_datapath);
+
     int error = 0;
+    if (tests == "inference") {
+      error = allocateMemory();
+
+      std::string weightDataDir = datapath + "weights/";
+      loadWeights(weightDataDir);
+
+      return runInference(datapath, compList);
+
+      deleteMemory();
+    }
+
     for (auto test : testList) {
-      error |= runMbTest("inference", test, compList);
+      error += runMobileBertUnitTest(task, test, compList, datapath);
     }
     return error;
   }

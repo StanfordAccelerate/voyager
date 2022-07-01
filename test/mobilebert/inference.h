@@ -6,9 +6,85 @@
 
 #include "test/common/VerificationTypes.h"
 
-using namespace std;
+std::vector<std::string> inferenceOrder{
+    "bottleneck_input_dense",
+    "bottleneck_input_LayerNorm",
+    "bottleneck_attention_dense",
+    "bottleneck_attention_LayerNorm",
+    "attention_self_query",
+    "attention_self_key",
+    "attention_self_attention_scores_0",
+    "attention_self_attention_scores_1",
+    "attention_self_attention_scores_2",
+    "attention_self_attention_scores_3",
+    "attention_self_attention_probs_0",
+    "attention_self_attention_probs_1",
+    "attention_self_attention_probs_2",
+    "attention_self_attention_probs_3",
+    "attention_self_value",
+    "attention_self_context_layer_0",
+    "attention_self_context_layer_1",
+    "attention_self_context_layer_2",
+    "attention_self_context_layer_3",
+    "attention_output_dense",
+    "attention_output_LayerNorm",
+    "ffn_0_intermediate_dense",
+    "ffn_0_output_dense",
+    "ffn_0_output_LayerNorm",
+    "ffn_1_intermediate_dense",
+    "ffn_1_output_dense",
+    "ffn_1_output_LayerNorm",
+    "ffn_2_intermediate_dense",
+    "ffn_2_output_dense",
+    "ffn_2_output_LayerNorm",
+    "intermediate_dense",
+    "output_dense",
+    "output_LayerNorm",
+    "output_bottleneck_dense",
+    "output_bottleneck_LayerNorm",
+    "classifier",
+};
 
-map<string, SimplifiedParams> inferenceParams{
+std::map<std::string, std::string> inferenceParamsMapping{
+    {"bottleneck_input_dense", "inputBottleneck"},
+    {"bottleneck_input_LayerNorm", "bottleneckLayerNorm"},
+    {"bottleneck_attention_dense", "inputBottleneck"},
+    {"bottleneck_attention_LayerNorm", "bottleneckLayerNorm"},
+    {"attention_self_query", "qkProjection"},
+    {"attention_self_key", "qkProjection"},
+    {"attention_self_value", "vProjection"},
+    {"attention_self_attention_scores_0", "qkAttention"},
+    {"attention_self_attention_scores_1", "qkAttention"},
+    {"attention_self_attention_scores_2", "qkAttention"},
+    {"attention_self_attention_scores_3", "qkAttention"},
+    {"attention_self_attention_probs_0", "softmax"},
+    {"attention_self_attention_probs_1", "softmax"},
+    {"attention_self_attention_probs_2", "softmax"},
+    {"attention_self_attention_probs_3", "softmax"},
+    {"attention_self_context_layer_0", "vAttention"},
+    {"attention_self_context_layer_1", "vAttention"},
+    {"attention_self_context_layer_2", "vAttention"},
+    {"attention_self_context_layer_3", "vAttention"},
+    {"attention_output_dense", "outputAttention"},
+    {"attention_output_LayerNorm", "bottleneckLayerNorm"},
+    {"ffn_0_intermediate_dense", "ffn1"},
+    {"ffn_0_output_dense", "ffn2"},
+    {"ffn_0_output_LayerNorm", "bottleneckLayerNorm"},
+    {"ffn_1_intermediate_dense", "ffn1"},
+    {"ffn_1_output_dense", "ffn2"},
+    {"ffn_1_output_LayerNorm", "bottleneckLayerNorm"},
+    {"ffn_2_intermediate_dense", "ffn1"},
+    {"ffn_2_output_dense", "ffn2"},
+    {"ffn_2_output_LayerNorm", "bottleneckLayerNorm"},
+    {"intermediate_dense", "ffn1"},
+    {"output_dense", "ffn2"},
+    {"output_LayerNorm", "bottleneckLayerNorm"},
+    {"output_bottleneck_dense", "outputBottleneck"},
+    {"output_bottleneck_LayerNorm", "outputLayerNorm"},
+    {"classifier", "classifier"},
+};
+
+std::map<std::string, SimplifiedParams> inferenceParams{
     // (128 x 512) * (512 x 128)
     {"inputBottleneck",
      {
@@ -486,328 +562,291 @@ map<string, SimplifiedParams> inferenceParams{
      }},
 };
 
-vector<pair<string, string>> inferenceOperations{
-    {"bottleneck_input_dense", "inputBottleneck"},
-    {"bottleneck_input_LayerNorm", "bottleneckLayerNorm"},
-    {"bottleneck_attention_dense", "inputBottleneck"},
-    {"bottleneck_attention_LayerNorm", "bottleneckLayerNorm"},
-    {"attention_self_query", "qkProjection"},
-    {"attention_self_key", "qkProjection"},
-    {"attention_self_attention_scores_0", "qkAttention"},
-    {"attention_self_attention_scores_1", "qkAttention"},
-    {"attention_self_attention_scores_2", "qkAttention"},
-    {"attention_self_attention_scores_3", "qkAttention"},
-    {"attention_self_attention_probs_0", "softmax"},
-    {"attention_self_attention_probs_1", "softmax"},
-    {"attention_self_attention_probs_2", "softmax"},
-    {"attention_self_attention_probs_3", "softmax"},
-    {"attention_self_value", "vProjection"},
-    {"attention_self_context_layer_0", "vAttention"},
-    {"attention_self_context_layer_1", "vAttention"},
-    {"attention_self_context_layer_2", "vAttention"},
-    {"attention_self_context_layer_3", "vAttention"},
-    {"attention_output_dense", "outputAttention"},
-    {"attention_output_LayerNorm", "bottleneckLayerNorm"},
-    {"ffn_0_intermediate_dense", "ffn1"},
-    {"ffn_0_output_dense", "ffn2"},
-    {"ffn_0_output_LayerNorm", "bottleneckLayerNorm"},
-    {"ffn_1_intermediate_dense", "ffn1"},
-    {"ffn_1_output_dense", "ffn2"},
-    {"ffn_1_output_LayerNorm", "bottleneckLayerNorm"},
-    {"ffn_2_intermediate_dense", "ffn1"},
-    {"ffn_2_output_dense", "ffn2"},
-    {"ffn_2_output_LayerNorm", "bottleneckLayerNorm"},
-    {"intermediate_dense", "ffn1"},
-    {"output_dense", "ffn2"},
-    {"output_LayerNorm", "bottleneckLayerNorm"},
-    {"output_bottleneck_dense", "outputBottleneck"},
-    {"output_bottleneck_LayerNorm", "outputLayerNorm"},
-    {"classifier", "classifier"},
-};
-
-map<string, MemoryOffsets> inferenceMemOffsets{
+std::map<std::string, MemoryOffsets> inferenceMemOffsets{
     {"bottleneck_input_dense",
      {
          0,
          0,
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE,
          WEIGHT_INTERMEDIATE_SIZE,
      }},
     {"bottleneck_input_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE,
          WEIGHT_INTERMEDIATE_SIZE + BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 3 * HIDDEN_SIZE,
          WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_HIDDEN_SIZE,
      }},
     {"bottleneck_attention_dense",
      {
          0,
          WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
      }},
     {"bottleneck_attention_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_HIDDEN_SIZE,
      }},
     {"attention_self_query",
      {
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + 6 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
              6 * BIAS_HIDDEN_SIZE,
      }},
     {"attention_self_key",
      {
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
              7 * BIAS_HIDDEN_SIZE,
-         7 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE,
          2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
              7 * BIAS_HIDDEN_SIZE,
      }},
     {"attention_self_attention_scores_0",
      {
-         4 * HIDDEN_SIZE,
-         7 * HIDDEN_SIZE,
-         8 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 7 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_scores_1",
      {
-         4 * HIDDEN_SIZE + HEAD_SIZE,
-         7 * HIDDEN_SIZE + HEAD_SIZE,
-         9 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE + HEAD_SIZE,
+         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE + HEAD_SIZE,
+         INTERMEDIATE_SIZE + 8 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_scores_2",
      {
-         4 * HIDDEN_SIZE + 2 * HEAD_SIZE,
-         7 * HIDDEN_SIZE + 2 * HEAD_SIZE,
-         10 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE + 2 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE + 2 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 9 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_scores_3",
      {
-         4 * HIDDEN_SIZE + 3 * HEAD_SIZE,
-         7 * HIDDEN_SIZE + 3 * HEAD_SIZE,
-         11 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE + 3 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE + 3 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 10 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_probs_0",
      {
-         8 * HIDDEN_SIZE,
-         -1,
-         12 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 7 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 11 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_probs_1",
      {
-         9 * HIDDEN_SIZE,
-         -1,
-         13 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 8 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 12 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_probs_2",
      {
-         10 * HIDDEN_SIZE,
-         -1,
-         14 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 9 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 13 * HIDDEN_SIZE,
      }},
     {"attention_self_attention_probs_3",
      {
-         11 * HIDDEN_SIZE,
-         -1,
-         15 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 10 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 14 * HIDDEN_SIZE,
      }},
     {"attention_self_value",
      {
          0,
          2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
              8 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE,
          3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
              8 * BIAS_HIDDEN_SIZE,
      }},
     {"attention_self_context_layer_0",
      {
-         12 * HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 11 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE,
      }},
     {"attention_self_context_layer_1",
      {
-         13 * HIDDEN_SIZE,
-         4 * HIDDEN_SIZE + 1 * HEAD_SIZE,
-         6 * HIDDEN_SIZE + 1 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 12 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE + 1 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE + 1 * HEAD_SIZE,
      }},
     {"attention_self_context_layer_2",
      {
-         14 * HIDDEN_SIZE,
-         4 * HIDDEN_SIZE + 2 * HEAD_SIZE,
-         6 * HIDDEN_SIZE + 2 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 13 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE + 2 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE + 2 * HEAD_SIZE,
      }},
     {"attention_self_context_layer_3",
      {
-         15 * HIDDEN_SIZE,
-         4 * HIDDEN_SIZE + 3 * HEAD_SIZE,
-         6 * HIDDEN_SIZE + 3 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 14 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE + 3 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE + 3 * HEAD_SIZE,
      }},
     {"attention_output_dense",
      {
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE,
          3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
              9 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 16 * HIDDEN_SIZE,
          3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
              9 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 3 * HIDDEN_SIZE,
      }},
     {"attention_output_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 16 * HIDDEN_SIZE,
          3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
              10 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
          3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
              11 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_0_intermediate_dense",
      {
-         5 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
          3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
              12 * BIAS_HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
          4 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
              12 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_0_output_dense",
      {
-         6 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
          4 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
          5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
      }},
     {"ffn_0_output_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
          5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 13 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
          5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 14 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_1_intermediate_dense",
      {
-         5 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
          5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
          6 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_1_output_dense",
      {
-         6 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
          6 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
          7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
      }},
     {"ffn_1_output_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
          7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 16 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 21 * HIDDEN_SIZE,
          7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 17 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_2_intermediate_dense",
      {
-         5 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 21 * HIDDEN_SIZE,
          7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
          8 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_2_output_dense",
      {
-         6 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
          8 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
          9 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 21 * HIDDEN_SIZE,
      }},
     {"ffn_2_output_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
          9 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 19 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 23 * HIDDEN_SIZE,
          9 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 20 * BIAS_HIDDEN_SIZE,
      }},
     {"intermediate_dense",
      {
-         5 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 23 * HIDDEN_SIZE,
          9 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 21 * BIAS_HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 24 * HIDDEN_SIZE,
          10 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 21 * BIAS_HIDDEN_SIZE,
      }},
     {"output_dense",
      {
-         6 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 24 * HIDDEN_SIZE,
          10 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 21 * BIAS_HIDDEN_SIZE,
-         4 * HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + 24 * HIDDEN_SIZE,
          11 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 21 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 23 * HIDDEN_SIZE,
      }},
     {"output_LayerNorm",
      {
-         4 * HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + 24 * HIDDEN_SIZE,
          11 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 22 * BIAS_HIDDEN_SIZE,
-         5 * HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + 25 * HIDDEN_SIZE,
          11 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 23 * BIAS_HIDDEN_SIZE,
      }},
     {"output_bottleneck_dense",
      {
-         5 * HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + 25 * HIDDEN_SIZE,
          11 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
-         6 * HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
          12 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
          0,
      }},
     {"output_bottleneck_LayerNorm",
      {
-         6 * HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
          12 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
-         0,
+         6 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
          12 * WEIGHT_INTERMEDIATE_SIZE + 6 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
      }},
     {"classifier",
      {
-         0,
-         0,
-         4 * HIDDEN_SIZE,
-         16 * BIAS_INTERMEDIATE_SIZE,
+         6 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 7 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
+         7 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
      }},
 };
 
@@ -955,7 +994,7 @@ std::map<std::string, Files> inferenceTestFiles{
 
     {"attention_output_dense",
      {
-         "attention_self_context_layer_unskewed",
+         "attention_self_context_layer",
          "attention_output_dense_weight",
          "attention_output_dense_bias",
          "attention_output_residual",

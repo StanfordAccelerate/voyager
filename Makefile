@@ -99,6 +99,9 @@ sim_sysc_gui:
 sim: build/TestRunner
 	./build/TestRunner 
 
+mb_sim: build/MbTestRunner
+	./build/MbTestRunner 
+
 PositTest: build/PositTest
 	./build/PositTest
 
@@ -116,6 +119,9 @@ gui:
 	catapult build/Catapult_debug
 
 build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+build/MbTestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/PositTest: build/PositTest.o
@@ -143,22 +149,22 @@ build/TestRunner.o: test/common/TestRunner.cc test/simple/params.h test/resnet/p
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/PositTest.o: test/common/PositTest.cc src/PositTypes.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -DNO_SYSC -c -o $@ $<
 
 build/verification.o: test/mobilebert/verification.cc test/mobilebert/params.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-data/mobilebert: FORCE
-	rm -rf data/mobilebert/*
-	python3 tools/pkl_parser.py -i data/mobilebert_activations.pkl -o data/mobilebert/activations -t posit8
-	python3 tools/pkl_parser.py -i data/mobilebert_weights.pkl -o data/mobilebert/weights -t posit8
-	python3 tools/pkl_parser.py -i data/mobilebert_weights_scaled.pkl -o data/mobilebert/weights_scaled -t posit8
-	python3 tools/pkl_parser.py -i data/mobilebert_errors.pkl -o data/mobilebert/errors -t posit8
-	python3 tools/pkl_parser.py -i data/mobilebert_gradients.pkl -o data/mobilebert/gradients -t posit8
+datafile:
+	mkdir -p data/$(model)/datafile
+	rm -rf data/$(model)/datafile/*
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_activations.pkl -o data/$(model)/datafile/activations
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_weights.pkl -o data/$(model)/datafile/weights
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_errors.pkl -o data/$(model)/datafile/errors
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_gradients.pkl -o data/$(model)/datafile/gradients
 
 .PHONY: clean rtl sim PositTest clean-catapult
 clean:
-	rm -rf build/*.o
+	rm -rf build/*.o test_outputs/*
 
 clean-catapult:
 	rm -rf build/Catapult_*

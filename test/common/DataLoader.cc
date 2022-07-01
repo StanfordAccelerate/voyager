@@ -9,10 +9,20 @@ void save_double(INPUT_DATATYPE* array, double val) {
   *array = INPUT_DATATYPE(fval);
 }
 
+void save_bias(ACCUM_DATATYPE* array, double val) {
+  float fval = (float)val;
+  *array = ACCUM_DATATYPE(fval);
+}
+
 #ifndef NO_UNIVERSAL
 void save_double(UniversalPosit* array, double val) {
   float fval = (float)val;
   *array = fval;
+}
+
+void save_bias(UniversalPositAccum* array, double val) {
+  float fval = (float)val;
+  *array = UniversalPositAccum(fval);
 }
 #endif
 
@@ -210,21 +220,16 @@ void load_bias(const SimplifiedParams& params, const std::string& filename,
   double* tmpValues = read_file_as_double(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
 
-  for (int k = 0; k < K; k++) {
+  for (int k = 0; k < size; k++) {
     double val = *(tmpValuePtr++);
-    save_double(&acceleratorMemory[params.BIAS_OFFSET + k], val);
-    save_double(&goldMemory[k], val);
-    save_double(&universalGoldMemory[k], val);
+    save_bias(reinterpret_cast<ACCUM_DATATYPE*>(
+                  &acceleratorMemory[params.BIAS_OFFSET + k]),
+              val);
+    save_bias(reinterpret_cast<ACCUM_DATATYPE*>(&goldMemory[k]), val);
+    save_bias(reinterpret_cast<UniversalPositAccum*>(&universalGoldMemory[k]),
+              val);
     save_double(&floatGoldMemory[k], val);
   }
-
-#ifdef WEIGHT_SCALING
-  double val = *tmpValuePtr;
-  save_double(&acceleratorMemory[params.BIAS_OFFSET + size - 1], val);
-  save_double(&goldMemory[size - 1], val);
-  save_double(&universalGoldMemory[size - 1], val);
-  save_double(&floatGoldMemory[size - 1], val);
-#endif
 
   delete[] tmpValues;
 }
@@ -303,20 +308,32 @@ void load_datafile_outputs(const SimplifiedParams params,
   if (params.SOFTMAX || params.SOFTMAX_GRAD) {
     K = 1;
   }
+  if (params.NO_NORM_GRAD) {
+    X = 1;
+    Y = 1;
+  }
 
-  int size = X * Y * K;
+  int size = params.NO_NORM_GRAD ? C : X * Y * K;
   double* tmpValues = read_file_as_double(filename, size, true);
   double* tmpValuePtr = tmpValues;
 
-  for (int y = 0; y < Y; y++) {
-    for (int x = 0; x < X; x++) {
-      for (int k = 0; k < K; k++) {
-        double val = *(tmpValuePtr++);
-
-        int address = y * X * K + x * K + k;
-        save_double(&outputMatrix[address], val);
-        save_double(&universalOutputMatrix[address], val);
-        save_double(&floatOutputMatrix[address], val);
+  if (params.NO_NORM_GRAD) {
+    for (int c = 0; c < C; c++) {
+      double val = *(tmpValuePtr++);
+      save_double(&outputMatrix[c], val);
+      save_double(&universalOutputMatrix[c], val);
+      save_double(&floatOutputMatrix[c], val);
+    }
+  } else {
+    for (int y = 0; y < Y; y++) {
+      for (int x = 0; x < X; x++) {
+        for (int k = 0; k < K; k++) {
+          double val = *(tmpValuePtr++);
+          int address = y * X * K + x * K + k;
+          save_double(&outputMatrix[address], val);
+          save_double(&universalOutputMatrix[address], val);
+          save_double(&floatOutputMatrix[address], val);
+        }
       }
     }
   }
