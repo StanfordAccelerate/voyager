@@ -29,6 +29,9 @@ SC_MODULE(InputController) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(windowBufferParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
+
+  Connections::Combinational<Pack1D<DTYPE, NROWS> > transposeOut;
 
   MatrixParamsDeserializer<0> CCS_INIT_S1(paramsDeserializer);
 
@@ -55,6 +58,10 @@ SC_MODULE(InputController) {
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(windowBuffer);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(transposer);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -217,9 +224,20 @@ SC_MODULE(InputController) {
                           if (params.REPLICATION) {
                             baseAddress = y * (X / 4) * 16 + (x / 4) * 16 + c;
                           }
-                          if (params.CONCAT_HEAD) {
+                          if (params.CONCAT_HEAD && params.TRANPOSE_INPUTS) {
                             baseAddress =
-                                ((c / 32) * X * 32) + (x * 32) + (c % 32);
+                                (c + (x % 16)) * 32 +
+                                (((x / 16) * DIMENSION) / 32 * C * 32) +
+                                (((x / 16) * DIMENSION) % 32);
+                          } else {
+                            if (params.CONCAT_HEAD) {
+                              baseAddress =
+                                  ((c / 32) * X * 32) + (x * 32) + (c % 32);
+                            }
+                            if (params.TRANPOSE_INPUTS) {
+                              baseAddress =
+                                  (c + (x % 16)) * X + (x / 16) * DIMENSION;
+                            }
                           }
 
                           memRequest = {params.INPUT_OFFSET + baseAddress,
@@ -274,7 +292,7 @@ SC_MODULE(InputController) {
 
   void writer() {
     writerParams.ResetRead();
-    dataResponse.Reset();
+    transposeOut.ResetRead();
 
     writeControl[0].Reset();
     writeControl[1].Reset();
@@ -391,7 +409,7 @@ SC_MODULE(InputController) {
                         // if not outside boundary, write the words using
                         // offsets
                         else {
-                          temp = dataResponse.Pop();
+                          temp = transposeOut.Pop();
 
 #pragma hls_unroll yes
                           for (int word = 0; word < 3; word++) {
@@ -420,7 +438,7 @@ SC_MODULE(InputController) {
                               data.value[index].setZero();
                             }
                           } else {
-                            temp = dataResponse.Pop();
+                            temp = transposeOut.Pop();
 
 #pragma hls_unroll yes
                             for (int i = 0; i < 3; i++) {
@@ -484,7 +502,7 @@ SC_MODULE(InputController) {
                             data.value[index].setZero();
                           }
                         } else {
-                          temp = dataResponse.Pop();
+                          temp = transposeOut.Pop();
 
 #pragma hls_unroll yes
                           for (int i = 0; i < 3; i++) {
@@ -656,7 +674,7 @@ SC_MODULE(InputController) {
                               data[dims].setZero();
                             }
                           } else {
-                            data = dataResponse.Pop();
+                            data = transposeOut.Pop();
                           }
 
                           int address = (y0) * (STRIDE * X0 + FX - 1) + (x0);
@@ -955,12 +973,114 @@ SC_MODULE(InputController) {
     }
   }
 
+  void transposer() {
+    transposerParams.ResetRead();
+    dataResponse.Reset();
+    transposeOut.ResetWrite();
+
+    wait();
+
+    while (true) {
+      MatrixParams params = transposerParams.Pop();
+
+      int loop_counters[2][6];
+      int loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.weightLoopIndex[1]] = 1;
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex] = 1;
+
+      if (params.TRANPOSE_INPUTS) {
+        INPUT_DATATYPE transposeBuffer[NROWS][NROWS];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              // inner memory
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        // innermost loop must be X0, and must be a multiple of
+                        // NROWS
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5] / NROWS;
+                             loop_counters[1][5]++) {
+                          for (int c0 = 0; c0 < NROWS; c0++) {
+                            Pack1D<DTYPE, NROWS> originalValue =
+                                dataResponse.Pop();
+#pragma hls_unroll yes
+                            for (int dim = 0; dim < NROWS; dim++) {
+                              transposeBuffer[dim][c0] = originalValue[dim];
+                            }
+                          }
+
+                          // Write out from tranposeBuffer
+                          for (int c0 = 0; c0 < NROWS; c0++) {
+                            Pack1D<DTYPE, NROWS> transposedValue;
+
+#pragma hls_unroll yes
+                            for (int dim = 0; dim < NROWS; dim++) {
+                              transposedValue[dim] = transposeBuffer[c0][dim];
+                            }
+                            transposeOut.Push(transposedValue);
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {  // passthrough
+        int total_values =
+            loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
+            loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
+            loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (int i = 0; i < total_values; i++) {
+          transposeOut.Push(dataResponse.Pop());
+        }
+      }
+    }
+  }
+
   void read_params() {
     paramsIn.ResetRead();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();
     windowBufferParams.ResetWrite();
+    transposerParams.ResetWrite();
 
     wait();
 
@@ -971,6 +1091,7 @@ SC_MODULE(InputController) {
       writerParams.Push(params);
       readerParams.Push(params);
       windowBufferParams.Push(params);
+      transposerParams.Push(params);
     }
   }
 };

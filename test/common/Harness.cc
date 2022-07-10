@@ -699,6 +699,8 @@ void Harness::sendParams() {
       matrixParams.STORE_IN_ACC = params.STORE_IN_ACC;
       matrixParams.ACC_FROM_ACC = params.ACC_FROM_ACC;
       matrixParams.CONCAT_HEAD = params.CONCAT_HEAD;
+      matrixParams.CONCAT_HEAD_WEIGHTS = params.WEIGHT_PERMUTE;
+      matrixParams.TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
 
       sendSerializedParams<MatrixParams, 32>(matrixParams,
                                              &serialMatrixParamsIn);

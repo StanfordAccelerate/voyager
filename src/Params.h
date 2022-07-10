@@ -55,9 +55,11 @@ struct MatrixParams {
   bool STORE_IN_ACC;
   bool ACC_FROM_ACC;
   bool CONCAT_HEAD;
+  bool CONCAT_HEAD_WEIGHTS;
+  bool TRANPOSE_INPUTS;
 
   static const unsigned int width =
-      13 * 32 + 12 * 32 + 10 * 32 + 17 * 1 + 18 * 32;
+      13 * 32 + 12 * 32 + 10 * 32 + 19 * 1 + 18 * 32;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
@@ -126,6 +128,8 @@ struct MatrixParams {
     m& STORE_IN_ACC;
     m& ACC_FROM_ACC;
     m& CONCAT_HEAD;
+    m& CONCAT_HEAD_WEIGHTS;
+    m& TRANPOSE_INPUTS;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,

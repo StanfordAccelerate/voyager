@@ -139,6 +139,8 @@ SC_MODULE(WeightController) {
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
                       if (params.TRANSPOSE) {
                         baseAddress = (k + c0) * C + c1 * DIMENSION;
+                      } else if (params.CONCAT_HEAD_WEIGHTS) {
+                        baseAddress = ((k / 32) * C * 32) + (c * 32) + (k % 32);
                       }
                       int burstSize = NCOLS;
 
