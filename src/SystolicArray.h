@@ -8,12 +8,13 @@
 #include "Skewer.h"
 #include "Tieoff.h"
 
-template <typename IDTYPE, typename ODTYPE, int NROWS, int NCOLS>
+template <typename IDTYPE, typename WDTYPE, typename ODTYPE, int NROWS,
+          int NCOLS>
 SC_MODULE(SystolicArray) {
  private:
   Connections::Combinational<IDTYPE> inputConnection[NROWS][NCOLS];
   Connections::Combinational<ODTYPE> psumConnection[NROWS - 1][NCOLS];
-  sc_signal<IDTYPE> weightConnection[NROWS + 1][NCOLS];
+  sc_signal<WDTYPE> weightConnection[NROWS + 1][NCOLS];
   sc_signal<bool> weightValid;
   Connections::Combinational<ac_int<1, false> > weightSwap[NROWS * NCOLS - 1];
   Connections::Combinational<ac_int<1, false> > weightSwapFinal;
@@ -24,16 +25,16 @@ SC_MODULE(SystolicArray) {
 
   Connections::In<IDTYPE> inputs[NROWS];
   Connections::In<ac_int<1, false> > swapWeights[NROWS];
-  Connections::In<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(weights);
+  Connections::In<Pack1D<WDTYPE, NCOLS> > CCS_INIT_S1(weights);
   Connections::In<ODTYPE> psums[NCOLS];
   Connections::Out<ODTYPE> outputs[NCOLS];
   Connections::SyncOut CCS_INIT_S1(weightSwapDone);
 
   SC_CTOR(SystolicArray) {
-    ProcessingElement<IDTYPE, ODTYPE> *pe[NROWS * NCOLS];
+    ProcessingElement<IDTYPE, WDTYPE, ODTYPE> *pe[NROWS * NCOLS];
     for (int i = 0; i < NROWS; i++) {
       for (int j = 0; j < NCOLS; j++) {
-        pe[i * NCOLS + j] = new ProcessingElement<IDTYPE, ODTYPE>(
+        pe[i * NCOLS + j] = new ProcessingElement<IDTYPE, WDTYPE, ODTYPE>(
             sc_gen_unique_name("pe_inst"));
         pe[i * NCOLS + j]->clk(clk);
         pe[i * NCOLS + j]->rstn(rstn);
@@ -140,7 +141,7 @@ SC_MODULE(SystolicArray) {
 
   void sendWeights() {
     for (int j = 0; j < NCOLS; j++) {
-      weightConnection[0][j].write(IDTYPE());
+      weightConnection[0][j].write(WDTYPE());
     }
     weightValid.write(false);
 
@@ -151,7 +152,7 @@ SC_MODULE(SystolicArray) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      Pack1D<IDTYPE, NCOLS> arrayWeights;
+      Pack1D<WDTYPE, NCOLS> arrayWeights;
       if (weights.PopNB(arrayWeights)) {
         weightValid.write(true);
       } else {

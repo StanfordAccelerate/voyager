@@ -5,23 +5,22 @@
 
 #include "AccelTypes.h"
 
-template <typename IDTYPE, typename ODTYPE>
+template <typename IDTYPE, typename WDTYPE, typename ODTYPE>
 SC_MODULE(ProcessingElement) {
  private:
-  sc_signal<IDTYPE> updatedWeight;
+  sc_signal<WDTYPE> updatedWeight;
 
-  IDTYPE weight_reg;  // FIXME: use decoded Posit form so that we aren't
-                      // decoding over and over again
-  IDTYPE weight_fifo;
+  IDTYPE weight_reg;
+  WDTYPE weight_fifo;
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  sc_in<IDTYPE> CCS_INIT_S1(weightIn);
+  sc_in<WDTYPE> CCS_INIT_S1(weightIn);
   sc_in<bool> CCS_INIT_S1(weightValid);
 
-  sc_out<IDTYPE> CCS_INIT_S1(weightOut);
+  sc_out<WDTYPE> CCS_INIT_S1(weightOut);
 
   Connections::In<ac_int<1, false> > CCS_INIT_S1(weightSwapIn);
   Connections::Out<ac_int<1, false> > CCS_INIT_S1(weightSwapOut);
@@ -43,7 +42,7 @@ SC_MODULE(ProcessingElement) {
   }
 
   void weights() {
-    weightOut.write(IDTYPE());
+    weightOut.write(WDTYPE());
 
     wait();
 
@@ -83,7 +82,8 @@ SC_MODULE(ProcessingElement) {
       ac_int<1, false> weightSwap = weightSwapIn.Pop();
 
       if (weightSwap) {
-        weight_reg = updatedWeight;
+        typename WDTYPE::DecomposedPosit decodedWeight(updatedWeight.read());
+        weight_reg = decodedWeight;
       }
 
       ODTYPE output = pe_fma(input, weight_reg, psum);
@@ -100,9 +100,8 @@ SC_MODULE(ProcessingElement) {
     return input * weight + psum;
   }
 
-  ODTYPE pe_fma(IDTYPE input, IDTYPE weight, ODTYPE psum) {
+  ODTYPE pe_fma(IDTYPE input, WDTYPE weight, ODTYPE psum) {
     // CCS_LOG(input << " * " << weight << " + " << psum);
-    return fma<IDTYPE::width, IDTYPE::esbits, ODTYPE::width, ODTYPE::esbits>(
-        input, weight, psum);
+    return decomposed_fma<8, 1, 16, 1>(input, weight, psum);
   }
 };

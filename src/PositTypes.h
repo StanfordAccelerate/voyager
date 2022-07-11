@@ -431,6 +431,20 @@ class PositFP {
     copy_(this->fraction, fp.fraction);
     return fp;
   }
+
+  // SystemC is not compatible with C++11
+#ifndef NO_SYSC
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m &sign;
+    m &scale;
+    m &fraction;
+    m &_zero;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf, const PositFP &posit,
+                              const std::string &name) {}
+#endif
 };
 
 template <int sbits, int fbits>
@@ -577,6 +591,35 @@ PositFP<sbits, fbits> &PositFP<sbits, fbits>::fma(
     }
   }
   return *this;
+}
+
+template <int nbits, int es, int nbits2, int es2>
+typename Posit<nbits2, es2>::DecomposedPosit decomposed_fma(
+    const typename Posit<nbits, es>::DecomposedPosit &a,
+    const typename Posit<nbits, es>::DecomposedPosit &b,
+    const typename Posit<nbits2, es2>::DecomposedPosit &c) {
+  constexpr size_t fbits = nbits - 3 - es;
+  constexpr size_t fhbits = fbits + 1;  // size of fraction + hidden bit
+  constexpr size_t mbits = 2 * fhbits;  // size of the multiplier output
+
+  constexpr size_t fbits2 = nbits2 - 3 - es2;
+  constexpr size_t abits = fbits2 + 4;  // size of the addend
+
+  PositFP<8, mbits> product;
+  PositFP<8, abits + 1> sum;
+
+  if (a.isZero() || b.isZero()) {
+    return c;
+  } else {
+    product = (PositFP<8, mbits>)(a * b);
+    if (c.isZero()) {
+      return typename Posit<nbits2, es2>::DecomposedPosit(product);
+    } else {
+      sum = PositFP<8, abits + 1>(product + PositFP<8, mbits>(c));
+
+      return typename Posit<nbits2, es2>::DecomposedPosit(sum);
+    }
+  }
 }
 
 template <int nbits, int es, int nbits2, int es2>
