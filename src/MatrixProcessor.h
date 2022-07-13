@@ -13,8 +13,7 @@ SC_MODULE(MatrixProcessor) {
   Connections::SyncChannel CCS_INIT_S1(weightLoadDone);
   Connections::SyncChannel CCS_INIT_S1(weightSwapDone);
 
-  SerializedSkewer<IDTYPE, typename IDTYPE::DecomposedPosit, NROWS> CCS_INIT_S1(
-      inputSkewer);
+  SerializedSkewer<IDTYPE, P8D, NROWS> CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(
       inputSkewerDin);
 
@@ -23,19 +22,15 @@ SC_MODULE(MatrixProcessor) {
   Connections::Combinational<Pack1D<ac_int<1, false>, NROWS> > CCS_INIT_S1(
       weightSwapSkewerDin);
 
-  SerializedSkewer<ODTYPE, typename ODTYPE::DecomposedPosit, NROWS> CCS_INIT_S1(
-      psumInSkewer);
+  SerializedSkewer<ODTYPE, P16D, NROWS> CCS_INIT_S1(psumInSkewer);
   Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumInSkewerDin);
 
-  DeserializedSkewer<typename ODTYPE::DecomposedPosit, ODTYPE, NROWS>
-      CCS_INIT_S1(psumOutSkewer);
+  DeserializedSkewer<P16D, ODTYPE, NROWS> CCS_INIT_S1(psumOutSkewer);
   Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumOutSkewerDout);
 
-  SystolicArray<typename IDTYPE::DecomposedPosit, IDTYPE,
-                typename ODTYPE::DecomposedPosit, NROWS, NCOLS>
-      CCS_INIT_S1(systolicArray);
+  SystolicArray<P8D, IDTYPE, P16D, NROWS, NCOLS> CCS_INIT_S1(systolicArray);
 
   MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
 
@@ -50,14 +45,11 @@ SC_MODULE(MatrixProcessor) {
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<typename IDTYPE::DecomposedPosit>
-      inputsToSystolicArray[NROWS];
+  Connections::Combinational<P8D> inputsToSystolicArray[NROWS];
   Connections::Combinational<ac_int<1, false> >
       weightSwapToSystolicArray[NROWS];
-  Connections::Combinational<typename ODTYPE::DecomposedPosit>
-      psumsToSystolicArray[NCOLS];
-  Connections::Combinational<typename ODTYPE::DecomposedPosit>
-      outputsFromSystolicArray[NCOLS];
+  Connections::Combinational<P16D> psumsToSystolicArray[NCOLS];
+  Connections::Combinational<P16D> outputsFromSystolicArray[NCOLS];
   Connections::Combinational<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(
       weightsToSystolicArray);
 
