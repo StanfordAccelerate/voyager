@@ -120,7 +120,7 @@ class Posit {
   static constexpr int esbits = es;
   static constexpr int sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
   static constexpr int fbits = nbits - 3 - es;
-  typedef PositFP<sbits, fbits> DecomposedPosit;
+  typedef PositFP<8, fbits> DecomposedPosit;
 
   ac_int<nbits, false> bits;
 
@@ -500,11 +500,10 @@ PositFP<sbits, fbits>::operator+(const PositFP<sbits, fbits> &op) const {
   // align the fraction
   ac_int<abits, false> lhs_fraction = lhs.get_fixed_point(),
                        rhs_fraction = rhs.get_fixed_point();
-  ac_int<abits, false> r1 = lhs_fraction << (lhs_scale - scale_of_result + 3);
-  r1[0] = (bool)(lhs_fraction << (abits - 1 + lhs_scale - scale_of_result +
-                                  3));  // uncertainty bit
-  ac_int<abits, false> r2 = rhs_fraction << (rhs_scale - scale_of_result + 3);
-  r2[0] = (bool)(rhs_fraction << (abits - 1 + rhs_scale - scale_of_result + 3));
+  ac_int<abits, false> r1 = lhs_fraction << (3 + lhs_scale - scale_of_result);
+  r1[0] = (lhs_fraction << (abits + 2 + lhs_scale - scale_of_result)).or_reduce();
+  ac_int<abits, false> r2 = rhs_fraction << (3 + rhs_scale - scale_of_result);
+  r2[0] = (rhs_fraction << (abits + 2 + rhs_scale - scale_of_result)).or_reduce();
 
   bool r1_sign = lhs.sign, r2_sign = rhs.sign;
   bool signs_are_different = r1_sign != r2_sign;
@@ -611,12 +610,11 @@ typename Posit<nbits2, es2>::DecomposedPosit decomposed_fma(
   if (a.isZero() || b.isZero()) {
     return c;
   } else {
-    product = (PositFP<8, mbits>)(a * b);
+    product = a * b;
     if (c.isZero()) {
       return typename Posit<nbits2, es2>::DecomposedPosit(product);
     } else {
-      sum = PositFP<8, abits + 1>(product + PositFP<8, mbits>(c));
-
+      sum = (PositFP<8, 12>)product + c;
       return typename Posit<nbits2, es2>::DecomposedPosit(sum);
     }
   }

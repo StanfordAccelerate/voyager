@@ -50,6 +50,43 @@ int main(int argc, char* argv[]) {
   // }
   // std::cerr << "Finished range test." << std::endl;
 
+  // PositFP Test
+  // Posit<8, 1> pA, pB;
+  // Posit<16, 1> pC;
+  // Universal8 uniA, uniB, uniC;
+  // for (int i = 0; i < 256; i++) {
+  //   for (int j = 0; j < 256; j++) {
+  //     if (i == 128 || j == 128) continue;
+  //     pA.setbits(1);
+  //     pB.setbits(1);
+  //     pC.setbits(0);
+
+  //     typename Posit<8, 1>::DecomposedPosit decomposed_pA =
+  //         typename Posit<8, 1>::DecomposedPosit(pA);
+  //     typename Posit<8, 1>::DecomposedPosit decomposed_pB =
+  //         typename Posit<8, 1>::DecomposedPosit(pB);
+  //     typename Posit<16, 1>::DecomposedPosit decomposed_pC =
+  //         typename Posit<16, 1>::DecomposedPosit(pC);
+        
+  //     printf("PositFP A: %f\n", (float)decomposed_pA);
+  //     printf("PositFP B: %f\n", (float)decomposed_pB);
+  //     printf("PositFP C: %f\n", (float)decomposed_pC);
+
+  //     pC = fma(pA, pB, pC);
+  //     decomposed_pC = decomposed_fma<8, 1, 16, 1>(decomposed_pA, decomposed_pB,
+  //                                                 decomposed_pC);
+
+  //     typename Posit<16, 1>::DecomposedPosit ref_pC =
+  //         typename Posit<16, 1>::DecomposedPosit(pC);
+
+  //     if ((float)ref_pC != (float)decomposed_pC) {
+  //       printf("received: %f != %f\n", (float)decomposed_pC, (float)ref_pC);
+  //       return -1;
+  //     }
+  //   }
+  // }
+
+
   Posit<8, 1> pA, pB;
   Posit<16, 1> pC;
   Universal8 uniA, uniB, uniC;
