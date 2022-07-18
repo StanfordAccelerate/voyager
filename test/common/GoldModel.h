@@ -1,7 +1,9 @@
 #pragma once
 #define NO_SYSC
-#include "src/ArchitectureParams.h"
+// clang-format off
 #include "src/PositTypes.h"
+// clang-format on
+#include "src/ArchitectureParams.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/VerificationTypes.h"
 

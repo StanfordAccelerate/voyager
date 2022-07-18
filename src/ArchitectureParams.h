@@ -1,7 +1,6 @@
 #define POSIT
 
 #ifdef POSIT
-#include "src/PositTypes.h"
 
 using P8 = Posit<8, 1>;
 using P16 = Posit<16, 1>;
