@@ -758,7 +758,7 @@ void Harness::sendParams() {
         matrixParams.weightAddressGenFyIndex = 2;
         matrixParams.weightAddressGenLoops[1][1] =
             params.loops[1][params.weightLoopIndex[1]];
-        matrixParams.weightAddressGenWeightLoopIndex[1] = 2;
+        matrixParams.weightAddressGenWeightLoopIndex[1] = 1;
         matrixParams.weightAddressGenLoops[1][0] =
             params.loops[1][params.reductionLoopIndex[1]];
         matrixParams.weightAddressGenReductionLoopIndex[0] = 0;
