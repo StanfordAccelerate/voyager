@@ -84,7 +84,7 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = addressGen1Params.Pop();
 
-      if (params.addressGen2Mode == 1) {
+      if (params.addressGen1Mode == 1) {
         int loop_counters[2][3];
         int loop_bounds[2][3];
 
@@ -329,8 +329,8 @@ SC_MODULE(VectorFetchUnit) {
               Pack1D<ODTYPE, WIDTH> originalVec = vectorFetch2DataResponse.Pop();
               Pack1D<ACC_DTYPE, WIDTH> castedVec;
               #pragma hls_unroll yes
-              for(int i = 0; i < WIDTH; i++){
-                castedVec[i] = static_cast<ACC_DTYPE>(originalVec[i]);
+              for(int dim = 0; dim < WIDTH; dim++){
+                castedVec[dim] = static_cast<ACC_DTYPE>(originalVec[dim]);
               }
 
 

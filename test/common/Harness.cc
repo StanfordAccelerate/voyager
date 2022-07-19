@@ -521,10 +521,17 @@ void Harness::sendParams() {
       vectorParams.addressGen1Loops[1][2] = C / DIMENSION;
 
       vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-      vectorParams.addressGen2Mode = 2;  // 2d tensor
+      vectorParams.addressGen2Mode = 1;  // use bias mode
       vectorParams.addressGen2Loops[0][0] = X;
       vectorParams.addressGen2Loops[0][1] = 1;
-      vectorParams.addressGen2Loops[0][2] = C / DIMENSION;
+      vectorParams.addressGen2Loops[0][2] = 1;
+      vectorParams.addressGen2Loops[1][0] = C / DIMENSION;
+      vectorParams.addressGen2Loops[1][1] = 1;
+      vectorParams.addressGen2Loops[1][2] = 1;
+      vectorParams.addressGen2InputXLoopIndex[1] = 2;
+      vectorParams.addressGen2InputYLoopIndex[1] = 1;
+      vectorParams.addressGen2WeightLoopIndex[1] = 0;
+      vectorParams.addressGen2WeightLoopIndex[0] = 2;
 
       vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
       vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
