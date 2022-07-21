@@ -245,8 +245,9 @@ struct VectorInstructions {
   static const unsigned int vdiv = 2;
 
   // Stage 4: relu
-  ac_int<1, false> vOp4;
+  ac_int<2, false> vOp4;
   static const unsigned int vrelu = 1;
+  static const unsigned int vrelumask = 2;
 
   ac_int<1, false> vAccumulatePush;
 
@@ -269,7 +270,7 @@ struct VectorInstructions {
   ac_int<8, false> immediate0;
   ac_int<8, false> immediate1;
 
-  static const unsigned int width = 50;
+  static const unsigned int width = 51;
   VectorInstructions() {}
   VectorInstructions(const int a) {
     ac_int<width, false> val = a;

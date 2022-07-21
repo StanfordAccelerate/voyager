@@ -25,7 +25,7 @@ void vmult(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
 #pragma hls_design ccore
 #pragma ccore_type combinational
 template <typename ACC_DTYPE, int WIDTH>
-void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
+void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH> mask, bool useMask, Pack1D<ACC_DTYPE, WIDTH>& res) {
   Pack1D<ACC_DTYPE, WIDTH> tmp;
 
 #pragma hls_unroll yes
@@ -33,9 +33,16 @@ void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
     tmp[i] = op0[i];
   }
 
+  if (useMask) {
 #pragma hls_unroll yes
-  for (int i = 0; i < WIDTH; i++) {
-    tmp[i].relu();
+    for (int i = 0; i < WIDTH; i++) {
+      tmp[i].masked_relu(mask[i]);
+    }
+  } else {
+#pragma hls_unroll yes
+    for (int i = 0; i < WIDTH; i++) {
+      tmp[i].relu();
+    }
   }
 
 #pragma hls_unroll yes

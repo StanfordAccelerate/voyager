@@ -395,6 +395,10 @@ class PositFP {
     if (sign == 1) setZero();
   }
 
+  void masked_relu(const PositFP &mask){
+    if(mask.sign == 1) setZero();
+  }
+
   PositFP<sbits, abits + 1> operator+(const PositFP &op) const;
   PositFP<sbits, mbits> operator*(const PositFP &op) const;
   PositFP &operator+=(const PositFP &rhs);

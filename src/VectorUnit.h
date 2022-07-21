@@ -236,8 +236,9 @@ SC_MODULE(VectorOpUnit) {
       /*
        * Stage 4: relu
        */
-      if (inst.vOp4 == VectorInstructions::vrelu) {
-        vrelu<typename ACC_DTYPE::DecomposedPosit, WIDTH>(res3, res4);
+      if (inst.vOp4 == VectorInstructions::vrelu || inst.vOp4 == VectorInstructions::vrelumask ) {
+        bool useMask = inst.vOp4 == VectorInstructions::vrelumask;
+        vrelu<typename ACC_DTYPE::DecomposedPosit, WIDTH>(res3, op3Src1, useMask, res4);
       } else {
         res4 = res3;
       }
