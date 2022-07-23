@@ -51,13 +51,24 @@ SC_MODULE(VectorFetchUnit) {
       VectorParams params = addressGen0Params.Pop();
 
 #pragma hls_pipeline_init_interval 1
-      for (int i = 0; i < params.addressGen0Loop[0]; i++) {
-        for (int j = 0; j < params.addressGen0Loop[1]; j++) {
-          for (int k = 0; k < params.addressGen0Loop[2]; k++) {
-            int address = j * params.addressGen0Loop[2] * WIDTH + k * WIDTH;
-            // DLOG("addressgen0 " << j << " " << k << " " << address);
-            MemoryRequest memRequest = {params.VECTOR_OFFSET + address, WIDTH};
-            vectorFetch0AddressRequest.Push(memRequest);
+      for (int i0 = 0; i0 < params.addressGen0Loop[0][0]; i0++) {
+        for (int j0 = 0; j0 < params.addressGen0Loop[0][1]; j0++) {
+          for (int k0 = 0; k0 < params.addressGen0Loop[0][2]; k0++) {
+            for (int i1 = 0; i1 < params.addressGen0Loop[1][0]; i1++) {
+              for (int j1 = 0; j1 < params.addressGen0Loop[1][1]; j1++) {
+                for (int k1 = 0; k1 < params.addressGen0Loop[1][2]; k1++) {
+                  int j = j0 * params.addressGen0Loop[1][1] + j1;
+                  int k = k0 * params.addressGen0Loop[1][2] * WIDTH + k1 * WIDTH;
+                  int K = params.addressGen0Loop[0][2] * params.addressGen0Loop[1][2] * WIDTH;
+
+                  int address = j * K + k;
+
+                  // DLOG("addressgen0 " << j << " " << k << " " << address);
+                  MemoryRequest memRequest = {params.VECTOR_OFFSET + address, WIDTH};
+                  vectorFetch0AddressRequest.Push(memRequest);
+                }
+              }
+            }
           }
         }
       }
@@ -73,7 +84,7 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = addressGen1Params.Pop();
 
-      if (params.addressGen2Mode == 1) {
+      if (params.addressGen1Mode == 1) {
         int loop_counters[2][3];
         int loop_bounds[2][3];
 
@@ -146,15 +157,24 @@ SC_MODULE(VectorFetchUnit) {
         }
       } else {  // 2d tensor
 #pragma hls_pipeline_init_interval 1
-        for (int i = 0; i < params.addressGen1Loops[0][0]; i++) {
-          for (int j = 0; j < params.addressGen1Loops[0][1]; j++) {
-            for (int k = 0; k < params.addressGen1Loops[0][2]; k++) {
-              int address =
-                  j * params.addressGen1Loops[0][2] * WIDTH + k * WIDTH;
-              DLOG("addressgen1 " << j << " " << k << " " << address);
-              MemoryRequest memRequest = {params.ADDRESS_GEN1_OFFSET + address,
-                                          WIDTH};
-              vectorFetch1AddressRequest.Push(memRequest);
+        for (int i0 = 0; i0 < params.addressGen1Loops[0][0]; i0++) {
+          for (int j0 = 0; j0 < params.addressGen1Loops[0][1]; j0++) {
+            for (int k0 = 0; k0 < params.addressGen1Loops[0][2]; k0++) {
+              for (int i1 = 0; i1 < params.addressGen1Loops[1][0]; i1++) {
+                for (int j1 = 0; j1 < params.addressGen1Loops[1][1]; j1++) {
+                  for (int k1 = 0; k1 < params.addressGen1Loops[1][2]; k1++) {
+                    int j = j0 * params.addressGen1Loops[1][1] + j1;
+                    int k = k0 * params.addressGen1Loops[1][2] * WIDTH + k1 * WIDTH;
+                    int K = params.addressGen1Loops[0][2] * params.addressGen1Loops[1][2] * WIDTH;
+
+                    int address = j * K + k;
+
+                    DLOG("addressgen1 " << j << " " << k << " " << address);
+                    MemoryRequest memRequest = {params.ADDRESS_GEN1_OFFSET + address, WIDTH};
+                    vectorFetch1AddressRequest.Push(memRequest);
+                  }
+                }
+              }
             }
           }
         }
@@ -309,8 +329,8 @@ SC_MODULE(VectorFetchUnit) {
               Pack1D<ODTYPE, WIDTH> originalVec = vectorFetch2DataResponse.Pop();
               Pack1D<ACC_DTYPE, WIDTH> castedVec;
               #pragma hls_unroll yes
-              for(int i = 0; i < WIDTH; i++){
-                castedVec[i] = static_cast<ACC_DTYPE>(originalVec[i]);
+              for(int dim = 0; dim < WIDTH; dim++){
+                castedVec[dim] = static_cast<ACC_DTYPE>(originalVec[dim]);
               }
 
 

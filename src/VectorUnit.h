@@ -112,10 +112,6 @@ SC_MODULE(VectorOpUnit) {
         op0Src0 = accumulationOpOutput.Pop();
       }
 
-      if (inst.vAccumulatePush) {
-        accumulationOpInput.Push(op0Src0);
-      }
-
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> op0Src1;
       if (inst.vOp0Src1 == VectorInstructions::readInterface) {
         Pack1D<IDTYPE, WIDTH> tmp = vectorFetch1Output.Pop();
@@ -244,6 +240,10 @@ SC_MODULE(VectorOpUnit) {
         vrelu<typename ACC_DTYPE::DecomposedPosit, WIDTH>(res3, res4);
       } else {
         res4 = res3;
+      }
+
+      if (inst.vAccumulatePush) {
+        accumulationOpInput.Push(res4);
       }
 
       // DLOG("res4: " << res4);

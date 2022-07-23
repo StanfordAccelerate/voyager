@@ -211,8 +211,6 @@ struct VectorInstructions {
   static const unsigned int readFromVectorFetch = 2;
   static const unsigned int readFromAccumulation = 3;
 
-  ac_int<1, false> vAccumulatePush;
-
   // src0 refers to lhs and src1 refers to rhs
 
   // Stage 0: add, mult
@@ -249,6 +247,8 @@ struct VectorInstructions {
   // Stage 4: relu
   ac_int<1, false> vOp4;
   static const unsigned int vrelu = 1;
+
+  ac_int<1, false> vAccumulatePush;
 
   // Vector Unit write out
   ac_int<1, false> vDest;
@@ -342,7 +342,7 @@ struct VectorParams {
 
   // Address Gen 0 (vector input)
   int VECTOR_OFFSET;
-  int addressGen0Loop[3];  // 2d tensor
+  int addressGen0Loop[2][3];  // tiled 2d tensor
 
   // Address Gen 1 (residual/op0src1)
   int ADDRESS_GEN1_OFFSET;
@@ -376,14 +376,15 @@ struct VectorParams {
   bool MAXPOOL;
   bool AVGPOOL;
 
-  static const unsigned int width = 10 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 32 * 36;
+  static const unsigned int width = 13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 32 * 36;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m& VECTOR_OFFSET;
-    for (int i = 0; i < 3; i++) {
-      m& addressGen0Loop[i];
-    }
+    for(int i = 0; i < 2; i++){
+    for (int j = 0; j < 3; j++) {
+      m& addressGen0Loop[i][j];
+    }}
     m& ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
