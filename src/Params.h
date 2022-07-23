@@ -372,6 +372,8 @@ struct VectorParams {
   int FULL_HEAD_SIZE;
   bool SPLIT_HEAD;
 
+  bool DP_OUTPUT;
+
   bool addressGen0Enable;
   bool addressGen0Broadcast;
   int addressGen0BroadcastCount;
@@ -381,7 +383,7 @@ struct VectorParams {
   bool MAXPOOL;
   bool AVGPOOL;
 
-  static const unsigned int width = 13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2;
+  static const unsigned int width = 13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
@@ -440,6 +442,7 @@ struct VectorParams {
     }
     m& FULL_HEAD_SIZE;
     m& SPLIT_HEAD;
+    m& DP_OUTPUT;
     m& addressGen0Enable;
     m& addressGen0Broadcast;
     m& addressGen0BroadcastCount;

@@ -25,7 +25,7 @@ SC_MODULE(VectorOpUnit) {
   Connections::In<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1Output);
   Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(vectorFetch2Output);
 
-  Connections::Out<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(vectorOpUnitOutput);
+  Connections::Out<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> > CCS_INIT_S1(vectorOpUnitOutput);
   Connections::Out<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(scalarOpUnitOutput);
 
   Connections::Combinational<
@@ -255,15 +255,7 @@ SC_MODULE(VectorOpUnit) {
       // DLOG("res4: " << res4);
 
       if (inst.vDest == VectorInstructions::vWriteOut) {
-        // convert to Posit8 and write out
-        Pack1D<IDTYPE, WIDTH> tmp;
-#pragma hls_unroll yes
-        for (int i = 0; i < WIDTH; i++) {
-          tmp[i] = static_cast<IDTYPE>(res4[i]);
-        }
-        DLOG("vector unit output: " << tmp);
-
-        vectorOpUnitOutput.Push(tmp);
+        vectorOpUnitOutput.Push(res4);
       }
     }
   }
@@ -414,7 +406,7 @@ SC_MODULE(VectorUnit) {
 
   Connections::Out<int> CCS_INIT_S1(vectorOutputAddress);
   Connections::Out<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(finalVectorOutput);
-  Connections::Combinational<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> > CCS_INIT_S1(
       vectorOpUnitOutput);
 
   Connections::SyncOut CCS_INIT_S1(start);
@@ -425,7 +417,7 @@ SC_MODULE(VectorUnit) {
 
   VectorOpUnit<ODTYPE, ACC_DTYPE, WIDTH> CCS_INIT_S1(vectorOpUnit);
 
-  MaxpoolUnit<ODTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
+  MaxpoolUnit<ACC_DTYPE, ODTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
   Connections::Combinational<VectorParams> CCS_INIT_S1(maxpoolUnitParams);
 
   OutputAddressGenerator<WIDTH> CCS_INIT_S1(outputAddressGenerator);

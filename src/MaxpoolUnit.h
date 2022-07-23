@@ -3,13 +3,14 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename DTYPE, int WIDTH>
+template <typename ACC_DTYPE, typename DTYPE, int WIDTH>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(tensorIn);
+  Connections::In<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
+      CCS_INIT_S1(tensorIn);
   Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
 
   Connections::SyncOut CCS_INIT_S1(doneSignal);
@@ -47,8 +48,6 @@ SC_MODULE(MaxpoolUnit) {
         loop_bounds[1][params.outputYLoopIndex[1]] = 1;
       }
 
-      Pack1D<DTYPE, WIDTH> bias;
-      Pack1D<DTYPE, WIDTH> avgpool;
       Pack1D<DTYPE, WIDTH> maxpool_comparator[16];  // row buffer for maxpool
 
 #pragma hls_pipeline_init_interval 1
@@ -91,7 +90,13 @@ SC_MODULE(MaxpoolUnit) {
                   int y = y0 + y1 * Y0;
                   int Y = Y0 * Y1;
 
-                  Pack1D<DTYPE, WIDTH> outputPixel = tensorIn.Pop();
+                  Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH>
+                      uncastedOutputPixel = tensorIn.Pop();
+                  Pack1D<DTYPE, WIDTH> outputPixel;
+
+                  for (int i = 0; i < WIDTH; i++) {
+                    outputPixel[i] = static_cast<DTYPE>(uncastedOutputPixel[i]);
+                  }
 
                   if (params.MAXPOOL) {
                     if (x0 % 2 == 0 && y0 % 2 == 0) {
@@ -133,7 +138,28 @@ SC_MODULE(MaxpoolUnit) {
                       tensorOut.Push(maxpool_comparator[(x0 - 1) / 2]);
                     }
                   } else {
-                    tensorOut.Push(outputPixel);
+                    if (params.DP_OUTPUT) {
+                      Pack1D<ACC_DTYPE, WIDTH> dpOutputPixel;
+#pragma hls_unroll yes
+                      for (int i = 0; i < WIDTH; i++) {
+                        dpOutputPixel[i] =
+                            static_cast<ACC_DTYPE>(uncastedOutputPixel[i]);
+                      }
+
+                      for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
+                        Pack1D<DTYPE, WIDTH> dpHalfVec;
+#pragma hls_unroll yes
+                        for (int i = 0; i < WIDTH / 2; i++) {
+#pragma hls_unroll yes
+                          for (int byte = 0; byte < 2; byte++) {
+                            dpHalfVec[i * 2 + byte].setbits(dpOutputPixel[vecSlice*(WIDTH/2) + i ].bits.template slc<8>(byte*8));
+                          }
+                          tensorOut.Push(dpHalfVec);
+                        }
+                      }
+                    } else {
+                      tensorOut.Push(outputPixel);
+                    }
                   }
 
                   if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {

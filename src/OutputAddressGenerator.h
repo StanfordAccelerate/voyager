@@ -126,6 +126,9 @@ SC_MODULE(OutputAddressGenerator) {
                       params.outputLoops[1][params.outputWeightLoopIndex[1]];
                   int k = k2 * K1 * WIDTH + k1 * WIDTH;
                   int K = K2 * K1 * WIDTH;
+                  if (params.DP_OUTPUT) {
+                    K = K * 2;
+                  }
 
                   int x = x0 + x1 * X0;
                   int X = X0 * X1;
@@ -139,7 +142,13 @@ SC_MODULE(OutputAddressGenerator) {
                   }
 
                   int address = params.VECTOR_OUTPUT_OFFSET + baseAddress;
-                  vectorOutputAddress.Push(address);
+                  if (params.DP_OUTPUT) {
+                    for (int precision = 0; precision < 2; precision++) {
+                      vectorOutputAddress.Push(address + precision);
+                    }
+                  } else {
+                    vectorOutputAddress.Push(address);
+                  }
 
                   if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                     break;
