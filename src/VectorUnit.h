@@ -348,6 +348,10 @@ SC_MODULE(VectorOpUnit) {
           }
         }
 
+        if (inst.rInvSqrt) {
+          prevResult = prevResult.inv_sqrt();
+        }
+
         if (inst.rDuplicate) {  // Duplicate the scalar result into a vector
 #pragma hls_unroll yes
           for (int i = 0; i < WIDTH; i++) {

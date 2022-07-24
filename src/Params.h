@@ -261,6 +261,7 @@ struct VectorInstructions {
   static const unsigned int radd = 1;
   static const unsigned int rmax = 2;
 
+  ac_int<1, false> rInvSqrt;
   ac_int<1, false> rDuplicate;
 
   ac_int<2, false> rDest;
@@ -271,7 +272,7 @@ struct VectorInstructions {
   ac_int<8, false> immediate0;
   ac_int<8, false> immediate1;
 
-  static const unsigned int width = 51;
+  static const unsigned int width = 52;
   VectorInstructions() {}
   VectorInstructions(const int a) {
     ac_int<width, false> val = a;
@@ -304,6 +305,7 @@ struct VectorInstructions {
     m& vDest;
     m& rCount;
     m& rOp;
+    m& rInvSqrt;
     m& rDuplicate;
     m& rDest;
     m& immediate0;

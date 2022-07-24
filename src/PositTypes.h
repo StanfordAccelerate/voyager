@@ -1,6 +1,8 @@
 #pragma once
 
+#include <ac_float.h>
 #include <ac_int.h>
+#include <ac_math/ac_inverse_sqrt_pwl.h>
 
 inline int max(int a, int b) { return a > b ? a : b; }
 inline int min(int a, int b) { return a < b ? a : b; }
@@ -365,6 +367,11 @@ class PositFP {
   static constexpr int mbits = 2 * fhbits;  // size of the multiplier output
   static const unsigned int width = 1 + sbits + fbits + 1;
 
+  // ac_float<W,I,E>- mantissa: ac_fixed<W,I,true> exp: ac_int<E,true>
+  typedef ac_float<fbits + 2, 2, sbits> ac_float_rep;
+
+  // typedef ac_std_float<fbits + sbits, sbits> ac_std_float_rep;
+
   ac_int<1, false> sign;
   ac_int<sbits, true> scale;
   ac_int<fbits, false> fraction;
@@ -422,6 +429,50 @@ class PositFP {
     return uf.f;
   }
 #endif
+
+  PositFP(ac_float_rep ac_f) {
+    // only works when ac_f > 1
+    _zero = false;
+    sign = 0;
+    scale = ac_f.exp();
+
+    ac_fixed<fbits + 1, 1, false> mantissa = ac_f.m;
+    ac_fixed<fbits, 0, false> mantissa_hidden = mantissa;
+    fraction = mantissa_hidden.template slc<fbits>(0);
+
+    // std::cout << ac_f.to_float() << " -> " << (float)(*this) << std::endl;
+  }
+
+  explicit operator ac_float_rep() const {
+    // std::cout << "PositFP to ac_float " << std::endl;
+    ac_fixed<fbits, 0, false> mantissa_hidden;
+    mantissa_hidden.set_slc(0, fraction);
+
+    ac_fixed<fbits + 1, 1, false> mantissa_abs = mantissa_hidden;
+    if (!_zero) {
+      mantissa_abs = mantissa_abs + 1;
+    }
+    ac_fixed<fbits + 2, 2, true> mantissa;
+    if (sign) {
+      mantissa = mantissa_abs * (-1);
+    } else {
+      mantissa = mantissa_abs;
+    }
+
+    // std::cout << (float)(*this ) << " -> " <<
+    // ac_float_rep(mantissa,scale).to_float() << std::endl;
+
+    return ac_float_rep(mantissa, scale);
+  }
+
+  PositFP inv_sqrt() {
+    ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
+    ac_float_rep ac_f_inv_sqrt;
+
+    ac_math::ac_inverse_sqrt_pwl(ac_f, ac_f_inv_sqrt);
+
+    return PositFP(ac_f_inv_sqrt);
+  }
 
   template <int sbits2, int fbits2>
   explicit operator PositFP<sbits2, fbits2>() const {
