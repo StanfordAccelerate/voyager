@@ -69,11 +69,25 @@ SC_MODULE(VectorFetchUnit) {
                   int k = k0 * params.addressGen0Loop[1][2] * WIDTH + k1 * WIDTH;
                   int K = params.addressGen0Loop[0][2] * params.addressGen0Loop[1][2] * WIDTH;
 
-                  int address = j * K + k;
+                  if (params.DP_VEC0) {
+                    K = K * 2;
+                    for (int precision = 0; precision < 2; precision++) {
+                      int address = j * K + k + precision;
+                      // DLOG("addressgen0 " << j << " " << k << " " <<
+                      // address);
+                      MemoryRequest memRequest = {
+                          params.VECTOR_OFFSET + address, WIDTH};
+                      vectorFetch0AddressRequest.Push(memRequest);
+                    }
 
-                  // DLOG("addressgen0 " << j << " " << k << " " << address);
-                  MemoryRequest memRequest = {params.VECTOR_OFFSET + address, WIDTH};
-                  vectorFetch0AddressRequest.Push(memRequest);
+                  } else {
+                    int address = j * K + k;
+
+                    // DLOG("addressgen0 " << j << " " << k << " " << address);
+                    MemoryRequest memRequest = {params.VECTOR_OFFSET + address,
+                                                WIDTH};
+                    vectorFetch0AddressRequest.Push(memRequest);
+                  }
                 }
               }
             }
@@ -152,15 +166,38 @@ SC_MODULE(VectorFetchUnit) {
               for (int i1 = 0; i1 < params.addressGen0Loop[1][0]; i1++) {
                 for (int j1 = 0; j1 < params.addressGen0Loop[1][1]; j1++) {
                   for (int k1 = 0; k1 < params.addressGen0Loop[1][2]; k1++) {
-                    // cast up to 16b
-                    Pack1D<ODTYPE, WIDTH> originalVec = vectorFetch0DataResponse.Pop();
-                    Pack1D<ACC_DTYPE, WIDTH> castedVec;
-#pragma hls_unroll yes
-                    for (int dim = 0; dim < WIDTH; dim++) {
-                      castedVec[dim] = static_cast<ACC_DTYPE>(originalVec[dim]);
-                    }
+                    if (params.DP_VEC0) {
+                      // convert 2 8b bias into 1 16b bias
+                      Pack1D<ACC_DTYPE, WIDTH> fullPrecisionVec;
 
-                    vectorFetch0DataResponseBroadcasted.Push(castedVec);
+                      for (int precision = 0; precision < 2; precision++) {
+                        Pack1D<ODTYPE, WIDTH> bias =
+                            vectorFetch2DataResponse.Pop();
+
+#pragma hls_unroll yes
+                        for (int i = 0; i < WIDTH / 2; i++) {
+                          ac_int<16, false> temp;
+#pragma hls_unroll yes
+                          for (int byte = 0; byte < 2; byte++) {
+                            temp.set_slc(byte * 8, bias[i * 2 + byte].bits);
+                          }
+                          fullPrecisionVec[precision * (WIDTH / 2) + i].setbits(
+                              temp);
+                        }
+                      }
+                    } else {
+                      // cast up to 16b
+                      Pack1D<ODTYPE, WIDTH> originalVec =
+                          vectorFetch0DataResponse.Pop();
+                      Pack1D<ACC_DTYPE, WIDTH> castedVec;
+#pragma hls_unroll yes
+                      for (int dim = 0; dim < WIDTH; dim++) {
+                        castedVec[dim] =
+                            static_cast<ACC_DTYPE>(originalVec[dim]);
+                      }
+
+                      vectorFetch0DataResponseBroadcasted.Push(castedVec);
+                    }
                   }
                 }
               }

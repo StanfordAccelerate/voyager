@@ -345,6 +345,7 @@ struct VectorParams {
   // Address Gen 0 (vector input)
   int VECTOR_OFFSET;
   int addressGen0Loop[2][3];  // tiled 2d tensor
+  bool DP_VEC0;
 
   // Address Gen 1 (residual/op0src1)
   int ADDRESS_GEN1_OFFSET;
@@ -383,7 +384,7 @@ struct VectorParams {
   bool MAXPOOL;
   bool AVGPOOL;
 
-  static const unsigned int width = 13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1;
+  static const unsigned int width = 13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
@@ -392,6 +393,7 @@ struct VectorParams {
     for (int j = 0; j < 3; j++) {
       m& addressGen0Loop[i][j];
     }}
+    m& DP_VEC0;
     m& ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
