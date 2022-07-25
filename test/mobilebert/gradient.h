@@ -10,399 +10,237 @@ std::map<std::string, std::string> gradientParamsMapping{
     {"classifier_weight", "classifier_weight"},
     {"classifier_bias", ""},
     {"output_bottleneck_LayerNorm_weight", "outputLayerNorm"},
-    {"output_bottleneck_LayerNorm_bias", ""},
+    {"output_bottleneck_LayerNorm_bias", "hiddenReduction"},
     {"output_bottleneck_dense_weight", "outputBottleneck"},
-    {"output_bottleneck_dense_bias", ""},
+    {"output_bottleneck_dense_bias", "hiddenReduction"},
     {"output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"output_LayerNorm_bias", ""},
+    {"output_LayerNorm_bias", "bottleneckReduction"},
     {"output_dense_weight", "ffn2"},
-    {"output_dense_bias", ""},
+    {"output_dense_bias", "bottleneckReduction"},
     {"intermediate_dense_weight", "outputBottleneck"},
-    {"intermediate_dense_bias", ""},
+    {"intermediate_dense_bias", "hiddenReduction"},
     {"ffn_2_output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"ffn_2_output_LayerNorm_bias", ""},
+    {"ffn_2_output_LayerNorm_bias", "bottleneckReduction"},
     {"ffn_2_output_dense_weight", "ffn2"},
-    {"ffn_2_output_dense_bias", ""},
+    {"ffn_2_output_dense_bias", "bottleneckReduction"},
     {"ffn_2_intermediate_dense_weight", "outputBottleneck"},
-    {"ffn_2_intermediate_dense_bias", ""},
+    {"ffn_2_intermediate_dense_bias", "hiddenReduction"},
     {"ffn_1_output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"ffn_1_output_LayerNorm_bias", ""},
+    {"ffn_1_output_LayerNorm_bias", "bottleneckReduction"},
     {"ffn_1_output_dense_weight", "ffn2"},
-    {"ffn_1_output_dense_bias", ""},
+    {"ffn_1_output_dense_bias", "bottleneckReduction"},
     {"ffn_1_intermediate_dense_weight", "outputBottleneck"},
-    {"ffn_1_intermediate_dense_bias", ""},
+    {"ffn_1_intermediate_dense_bias", "hiddenReduction"},
     {"ffn_0_output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"ffn_0_output_LayerNorm_bias", ""},
+    {"ffn_0_output_LayerNorm_bias", "bottleneckReduction"},
     {"ffn_0_output_dense_weight", "ffn2"},
-    {"ffn_0_output_dense_bias", ""},
+    {"ffn_0_output_dense_bias", "bottleneckReduction"},
     {"ffn_0_intermediate_dense_weight", "outputBottleneck"},
-    {"ffn_0_intermediate_dense_bias", ""},
+    {"ffn_0_intermediate_dense_bias", "hiddenReduction"},
     {"attention_output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"attention_output_LayerNorm_bias", ""},
+    {"attention_output_LayerNorm_bias", "bottleneckReduction"},
     {"attention_output_dense_weight", "outputAttention"},
-    {"attention_output_dense_bias", ""},
+    {"attention_output_dense_bias", "bottleneckReduction"},
     {"attention_self_value_weight", "vProjection"},
-    {"attention_self_value_bias", ""},
+    {"attention_self_value_bias", "qkvBias"},
     {"attention_self_query_weight", "qkProjection"},
-    {"attention_self_query_bias", ""},
+    {"attention_self_query_bias", "qkvBias"},
     {"attention_self_key_weight", "qkProjection"},
-    {"attention_self_key_bias", ""},
+    {"attention_self_key_bias", "qkvBias"},
     {"bottleneck_attention_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"bottleneck_attention_LayerNorm_bias", ""},
+    {"bottleneck_attention_LayerNorm_bias", "bottleneckReduction"},
     {"bottleneck_attention_dense_weight", "inputBottleneck"},
-    {"bottleneck_attention_dense_bias", ""},
+    {"bottleneck_attention_dense_bias", "bottleneckReduction"},
     {"bottleneck_input_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"bottleneck_input_LayerNorm_bias", ""},
+    {"bottleneck_input_LayerNorm_bias", "bottleneckReduction"},
     {"bottleneck_input_dense_weight", "inputBottleneck"},
-    {"bottleneck_input_dense_bias", ""},
+    {"bottleneck_input_dense_bias", "bottleneckReduction"},
 };
 
 std::map<std::string, SimplifiedParams> gradientParams{
-    // FIXME: This should be a FC or matmul?
     // (16 x 1) * (1 x 512)
     {"classifier_weight",
      {
-         0,                                          // INPUT_OFFSET
-         0,                                          // WEIGHT_OFFSET
-         10 * 1024,                                  // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO_NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
-         false,                                      // SOFTMAX_GRAD
-         false,                                      // NO_NORM_GRAD
-         false,                                      // RELU_GRAD
-         false,                                      // WEIGHT_PERMUTE
-         false,                                      // WEIGHT_ADDITION,
-         false,                                      // CROSS_ENTROPY_LOSS_GRAD
-         false,                                      // MSE_LOSS_GRAD
-         false,                                      // BCE_LOGITS_LOSS_GRAD
-         false,                                      // GRADIENT_CLIPPING
+         .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
      }},
 
-    // elementwise multiplication of matrices of size:
+    // elementwise multiplication of matrices
     // (128 x 512) * (128 x 512)
     {"outputLayerNorm",
      {
-         0,                                           // INPUT_OFFSET
-         0,                                           // WEIGHT_OFFSET
-         10 * 1024,                                   // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{4, 1, 1, 8, 1, 1}, {32, 1, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {2, 0},                                      // REDUCTION
-         {3, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {4, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         false,                                       // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         false,                                       // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         false,                                       // NO_NORM
-         false,                                       // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         false,                                       // INPUT_TRANSPOSE
-         false,                                       // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD,
-         false,                                       // SOFTMAX_GRAD
-         true,                                        // NO_NORM_GRAD
+         .loops = {{8, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 16}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .NO_NORM_GRAD = true,
      }},
 
-    // output bottleneck
     // (128 x 128) x (128 x 512)
     {"outputBottleneck",
      {
-         131072,                                     // INPUT_OFFSET
-         225280,                                     // WEIGHT_OFFSET
-         0,                                          // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{8, 1, 8, 1, 1, 1}, {8, 4, 1, 1, 1, 16}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         true,                                       // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{8, 1, 8, 1, 1, 1}, {8, 4, 1, 1, 1, 16}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .INPUT_TRANSPOSE = true,
      }},
 
-    // FFN 2
     // (512 x 128) x (128 x 128)
     {"ffn2",
      {
-         0,                                           // INPUT_OFFSET
-         159744,                                      // WEIGHT_OFFSET
-         131072,                                      // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {3, 0},                                      // REDUCTION
-         {2, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {5, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         false,                                       // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         false,                                       // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         false,                                       // NO-NORM
-         false,                                       // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         true,                                        // INPUT_TRANSPOSE
-         false,                                       // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD
+         .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .INPUT_TRANSPOSE = true,
      }},
 
+    // (128 x 128) x (128 x 128)
     {"outputAttention",
      {
-         0,                                          // INPUT_OFFSET
-         77824,                                      // WEIGHT_OFFSET
-         131072,                                     // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         true,                                       // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
-         false,                                      // SOFTMAX_GRAD;
-         false,                                      // NO_NORM_GRAD;
-         false,                                      // RELU_GRAD;
-         true,                                       // WEIGHT_PERMUTE;
+         .loops = {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .INPUT_TRANSPOSE = true,
+         .CONCAT_HEAD = true,
      }},
 
-    // (128 x 128) * (128 x 512)
+    // (512 x 128) * (128 x 128)
     {"vProjection",
      {
-         0,                                          // INPUT_OFFSET
-         0,                                          // WEIGHT_OFFSET
-         131072,                                     // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         true,                                       // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         true,                                       // CONCAT_HEAD
+         .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .INPUT_TRANSPOSE = true,
+         .WEIGHT_PERMUTE = true,
      }},
 
-    // TODO: Add unit test (no head concatenation)
-    // Self-attention output
     // (128 x 128) x (128 x 128)
     {"qkProjection",
      {
-         0,                                          // INPUT_OFFSET
-         77824,                                      // WEIGHT_OFFSET
-         131072,                                     // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         true,                                       // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         true,                                       // CONCAT_HEAD
+         .loops = {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .INPUT_TRANSPOSE = true,
+         .WEIGHT_PERMUTE = true,
      }},
 
-    // elementwise multiplication of matrices of size:
+    // elementwise multiplication of matrices
     // (128 x 128) * (128 x 128)
     {"bottleneckLayerNorm",
      {
-         0,                                           // INPUT_OFFSET
-         0,                                           // WEIGHT_OFFSET
-         10 * 1024,                                   // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 128}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {2, 0},                                      // REDUCTION
-         {3, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {4, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         false,                                       // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         false,                                       // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         false,                                       // NO_NORM
-         false,                                       // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         false,                                       // INPUT_TRANSPOSE
-         false,                                       // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD
-         false,                                       // SOFTMAX_GRAD
-         true,                                        // NO_NORM_GRAD
+         .loops = {{8, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 16}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .NO_NORM_GRAD = true,
      }},
 
-    // (128 x 128) * (128 x 512)
+    // (512 x 128) * (128 x 128)
     {"inputBottleneck",
      {
-         0,                                          // INPUT_OFFSET
-         0,                                          // WEIGHT_OFFSET
-         131072,                                     // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         true,                                       // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .INPUT_TRANSPOSE = true,
+     }},
+
+    // (128 x 128)
+    {"bottleneckReduction",
+     {
+         .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS_GRAD = true,
+     }},
+
+    // (128 x 128)
+    {"qkvBias",
+     {
+         .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .WEIGHT_PERMUTE = true,
+         .BIAS_GRAD = true,
+     }},
+
+    // (128 x 512)
+    {"hiddenReduction",
+     {
+         .loops = {{1, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 1}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS_GRAD = true,
      }},
 };
 
@@ -492,6 +330,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
          10 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 21 * BIAS_HIDDEN_SIZE,
      }},
+
     {"ffn_2_output_LayerNorm_weight",
      {
          4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
@@ -534,6 +373,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
          8 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
      }},
+
     {"ffn_1_output_LayerNorm_weight",
      {
          3 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
@@ -557,7 +397,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      }},
     {"ffn_1_output_dense_bias",
      {
-         0,
+         0,  // unused
          0,
          6 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
@@ -571,98 +411,182 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      }},
     {"ffn_1_intermediate_dense_bias",
      {
-         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
+         0,  // unused
          0,
          5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
      }},
+
     {"ffn_0_output_LayerNorm_weight",
      {
-         0,
          2 * INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
-     }},
-    {"ffn_0_output_dense",
-     {
          0,
+         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 13 * BIAS_HIDDEN_SIZE,
+     }},
+    {"ffn_0_output_LayerNorm_bias",
+     {
+         0,  // unused
+         0,
+         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 14 * BIAS_HIDDEN_SIZE,
+     }},
+    {"ffn_0_output_dense_weight",
+     {
          INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
-     }},
-    {"ffn_0_intermediate_dense",
-     {
          0,
+         4 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
+     }},
+    {"ffn_0_output_dense_bias",
+     {
+         0,  // unused
+         0,
+         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
+     }},
+    {"ffn_0_intermediate_dense_weight",
+     {
          INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
+         0,
+         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
+             12 * BIAS_HIDDEN_SIZE,
+     }},
+    {"ffn_0_intermediate_dense_bias",
+     {
+         0,  // unused
+         0,
+         4 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
+             12 * BIAS_HIDDEN_SIZE,
      }},
 
-    {"attention_output_LayerNorm",
+    {"attention_output_LayerNorm_weight",
      {
-         0,
          INTERMEDIATE_SIZE + 16 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
-     }},
-    {"attention_output_dense",
-     {
          0,
+         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
+             10 * BIAS_HIDDEN_SIZE,
+     }},
+    {"attention_output_LayerNorm_bias",
+     {
+         0,  // unused
+         0,
+         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
+             11 * BIAS_HIDDEN_SIZE,
+     }},
+    {"attention_output_dense_weight",
+     {
          INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
+         0,
+         3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
+             9 * BIAS_HIDDEN_SIZE,
+     }},
+    {"attention_output_dense_bias",
+     {
+         0,  // unused
+         0,
+         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
+             9 * BIAS_HIDDEN_SIZE,
      }},
 
-    {"attention_self_value_layer_0",
+    {"attention_self_value_weight",
      {
          0,
          0,
-         INTERMEDIATE_SIZE,
+         2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
+             8 * BIAS_HIDDEN_SIZE,
      }},
-    {"attention_self_key_layer_0",
+    {"attention_self_value_bias",
      {
          0,
+         0,
+         3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
+             8 * BIAS_HIDDEN_SIZE,
+     }},
+    {"attention_self_key_weight",
+     {
          INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
+         0,
+         2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
+             7 * BIAS_HIDDEN_SIZE,
      }},
-    {"attention_self_query_layer_0",
+    {"attention_self_key_bias",
      {
          0,
+         0,
+         2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
+             7 * BIAS_HIDDEN_SIZE,
+     }},
+    {"attention_self_query_weight",
+     {
          INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
+         0,
+         2 * WEIGHT_INTERMEDIATE_SIZE + 6 * BIAS_HIDDEN_SIZE,
      }},
-    {"bottleneck_attention_LayerNorm_1",
+    {"attention_self_query_bias",
      {
          0,
+         0,
+         2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
+             6 * BIAS_HIDDEN_SIZE,
+     }},
+
+    {"bottleneck_attention_LayerNorm_weight",
+     {
          INTERMEDIATE_SIZE + HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
+         0,
+         2 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_HIDDEN_SIZE,
      }},
-    {"bottleneck_attention_dense",
+    {"bottleneck_attention_LayerNorm_bias",
+     {
+
+         0,
+         0,
+         2 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_HIDDEN_SIZE,
+     }},
+    {"bottleneck_attention_dense_weight",
      {
          0,
          0,
-         INTERMEDIATE_SIZE,
+         WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
      }},
-    {"bottleneck_input_LayerNorm",
-     {
-         0,
-         INTERMEDIATE_SIZE,
-         INTERMEDIATE_SIZE,
-     }},
-    {"bottleneck_input_dense",
+    {"bottleneck_attention_dense_bias",
      {
          0,
          0,
-         INTERMEDIATE_SIZE,
+         2 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
      }},
-    {"hidden_states_2",
+    {"bottleneck_input_LayerNorm_weight",
+     {
+         INTERMEDIATE_SIZE,
+         0,
+         WEIGHT_INTERMEDIATE_SIZE + BIAS_HIDDEN_SIZE,
+     }},
+    {"bottleneck_input_LayerNorm_bias",
+     {
+         INTERMEDIATE_SIZE,
+         0,
+         WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_HIDDEN_SIZE,
+     }},
+    {"bottleneck_input_dense_weight",
      {
          0,
-         5 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE,
+         0,
+         0,
+     }},
+    {"bottleneck_input_dense_bias",
+     {
+         0,
+         0,
+         WEIGHT_INTERMEDIATE_SIZE,
      }},
 };
 
 std::map<std::string, Files> gradientTestFiles{
     {"classifier_weight",
      {
-         "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm",
          "mobilebert_logits",
+         "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm",
          "",
          "classifier_weight",
      }},
@@ -831,99 +755,176 @@ std::map<std::string, Files> gradientTestFiles{
          "ffn_1_intermediate_dense_bias",
      }},
 
-    {"ffn_0_output_LayerNorm",
+    {"ffn_0_output_LayerNorm_weight",
      {
-         "ffn_0_output_LayerNorm",
          "ffn_0_output_residual",
+         "ffn_0_output_LayerNorm",
          "",
          "ffn_0_output_LayerNorm_weight",
      }},
-    {"ffn_0_output_dense",
+    {"ffn_0_output_LayerNorm_bias",
      {
-         "ffn_0_output_dense",
+         "",
+         "ffn_0_output_LayerNorm",
+         "",
+         "ffn_0_output_LayerNorm_bias",
+     }},
+    {"ffn_0_output_dense_weight",
+     {
          "ffn_0_intermediate_intermediate_act_fn",
+         "ffn_0_output_dense",
          "",
          "ffn_0_output_dense_weight",
      }},
-    {"ffn_0_intermediate_dense",
+    {"ffn_0_output_dense_bias",
      {
-         "ffn_0_intermediate_dense",
+         "",
+         "ffn_0_output_dense",
+         "",
+         "ffn_0_output_dense_bias",
+     }},
+    {"ffn_0_intermediate_dense_weight",
+     {
          "attention_output_LayerNorm",
+         "ffn_0_intermediate_dense",
          "",
          "ffn_0_intermediate_dense_weight",
      }},
-
-    {"attention_output_LayerNorm",
+    {"ffn_0_intermediate_dense_bias",
      {
-         "attention_output_LayerNorm",
+         "",
+         "ffn_0_intermediate_dense",
+         "",
+         "ffn_0_intermediate_dense_bias",
+     }},
+
+    {"attention_output_LayerNorm_weight",
+     {
          "attention_output_residual",
+         "attention_output_LayerNorm",
          "",
          "attention_output_LayerNorm_weight",
      }},
-    {"attention_output_dense",
+    {"attention_output_LayerNorm_bias",
      {
+         "",
+         "attention_output_LayerNorm",
+         "",
+         "attention_output_LayerNorm_bias",
+     }},
+    {"attention_output_dense_weight",
+     {
+         "attention_self_context_layer",
          "attention_output_dense",
-         "attention_self_context_layer_permuted",
          "",
          "attention_output_dense_weight",
      }},
-
-    {"attention_self_value_layer_0",
+    {"attention_output_dense_bias",
      {
-         "attention_self_value",
+         "",
+         "attention_output_dense",
+         "",
+         "attention_output_dense_bias",
+     }},
+
+    {"attention_self_value_weight",
+     {
          "hidden_states",
+         "attention_self_value_layer",
          "",
          "attention_self_value_weight",
      }},
-    {"attention_self_query_layer_0",
+    {"attention_self_value_bias",
      {
-         "attention_self_query_layer",
+         "",
+         "attention_self_value_layer",
+         "",
+         "attention_self_value_bias",
+     }},
+    {"attention_self_query_weight",
+     {
          "bottleneck_attention_LayerNorm",
+         "attention_self_query_layer",
          "",
          "attention_self_query_weight",
      }},
-    {"attention_self_key_layer_0",
+    {"attention_self_query_bias",
      {
-         "attention_self_key_layer",
+         "",
+         "attention_self_query_layer",
+         "",
+         "attention_self_query_bias",
+     }},
+    {"attention_self_key_weight",
+     {
          "bottleneck_attention_LayerNorm",
+         "attention_self_key_layer",
          "",
          "attention_self_key_weight",
      }},
-
-    {"bottleneck_attention_LayerNorm_1",
+    {"attention_self_key_bias",
      {
-         "bottleneck_attention_LayerNorm",
+         "",
+         "attention_self_key_layer",
+         "",
+         "attention_self_key_bias",
+     }},
+
+    {"bottleneck_attention_LayerNorm_weight",
+     {
          "bottleneck_attention_dense",
+         "bottleneck_attention_LayerNorm",
          "",
          "bottleneck_attention_LayerNorm_weight",
      }},
-    {"bottleneck_attention_dense",
+    {"bottleneck_attention_LayerNorm_bias",
      {
-         "bottleneck_attention_dense",
+         "",
+         "bottleneck_attention_LayerNorm",
+         "",
+         "bottleneck_attention_LayerNorm_bias",
+     }},
+    {"bottleneck_attention_dense_weight",
+     {
          "hidden_states",
+         "bottleneck_attention_dense",
          "",
          "bottleneck_attention_dense_weight",
      }},
-
-    {"bottleneck_input_LayerNorm",
+    {"bottleneck_attention_dense_bias",
      {
-         "bottleneck_input_LayerNorm",
+         "",
+         "bottleneck_attention_dense",
+         "",
+         "bottleneck_attention_dense_bias",
+     }},
+
+    {"bottleneck_input_LayerNorm_weight",
+     {
          "bottleneck_input_dense",
+         "bottleneck_input_LayerNorm",
          "",
          "bottleneck_input_LayerNorm_weight",
      }},
-    {"bottleneck_input_dense",
+    {"bottleneck_input_LayerNorm_bias",
      {
-         "bottleneck_input_dense",
+         "",
+         "bottleneck_input_LayerNorm",
+         "",
+         "bottleneck_input_LayerNorm_bias",
+     }},
+    {"bottleneck_input_dense_weight",
+     {
          "hidden_states",
+         "bottleneck_input_dense",
          "",
          "bottleneck_input_dense_weight",
      }},
-    {"hidden_states_2",
+    {"bottleneck_input_dense_bias",
      {
-         "output_bottleneck_LayerNorm",
-         "output_bottleneck_residual",
          "",
-         "output_bottleneck_LayerNorm_weight",
+         "bottleneck_input_dense",
+         "",
+         "bottleneck_input_dense_bias",
      }},
 };

@@ -101,8 +101,10 @@ int runOperation(const SimplifiedParams params, const Files files,
   float* floatDataFileOutput = new float[outputSize];
 
   std::string datafile = inputDataDir + layerName + files.inputs_file;
-  load_inputs(params, datafile, true, sramMemory, matrixA, universalMatrixA,
-              floatMatrixA);
+  if (!files.inputs_file.empty()) {
+    load_inputs(params, datafile, true, sramMemory, matrixA, universalMatrixA,
+                floatMatrixA);
+  }
 
   if (!files.weights_file.empty()) {
     datafile = weightDataDir + layerName + files.weights_file;

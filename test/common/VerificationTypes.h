@@ -79,12 +79,11 @@ struct SimplifiedParams {
 
   bool WEIGHT_ADDITION;
   bool BIAS_GRAD;
+  bool GRADIENT_CLIPPING;
 
-  // Special vector operations
   bool CROSS_ENTROPY_LOSS_GRAD;
   bool MSE_LOSS_GRAD;
   bool BCE_LOGITS_LOSS_GRAD;
-  bool GRADIENT_CLIPPING;
 };
 
 struct MemoryOffsets {

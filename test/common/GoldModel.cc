@@ -221,31 +221,32 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     // elementwise multiplication and addition of matrices
     int X = params.loops[0][params.inputXLoopIndex[0]] *
             params.loops[1][params.inputXLoopIndex[1]];
-    int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+    int K = params.loops[0][params.weightLoopIndex[0]] *
+            params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
 
-    ACC_T accumMatrix[C];
+    ACC_T accumMatrix[K];
     memset(accumMatrix, 0, sizeof(accumMatrix));
 
-    for (int x = 0; x < X; x++) {
-      for (int c = 0; c < C; c++) {
-        ACC_T a = matrixA[x * C + c];
-        ACC_T b = matrixB[x * C + c];
+    for (int i = 0; i < X; i++) {
+      for (int j = 0; j < K; j++) {
+        ACC_T a = matrixA[i * K + j];
+        ACC_T b = matrixB[i * K + j];
         ACC_T acc = a * b;
 
         if (inputScaling) {
-          acc *= static_cast<ACC_T>(matrixA[X * C + c]);
+          acc *= static_cast<ACC_T>(matrixA[X * K + j]);
         }
 
         if (weightScaling) {
-          acc *= static_cast<ACC_T>(matrixB[X * C + c]);
+          acc *= static_cast<ACC_T>(matrixB[X * K + j]);
         }
 
-        accumMatrix[c] += acc;
+        accumMatrix[j] += acc;
       }
     }
 
-    for (int c = 0; c < C; c++) {
-      matrixC[c] = accumMatrix[c];
+    for (int i = 0; i < K; i++) {
+      matrixC[i] = accumMatrix[i];
     }
     // Cross Entropy Loss
   } else if (params.CROSS_ENTROPY_LOSS_GRAD) {
@@ -298,6 +299,44 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     ACC_T divisor = 1 / X;
     for (int i = 0; i < X; i++) {
       matrixC[i] = static_cast<ACC_T>(matrixA[i] - matrixB[i]) * divisor;
+    }
+  } else if (params.BIAS_GRAD) {
+    int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+    int K = params.loops[0][params.weightLoopIndex[0]] *
+            params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+
+    ACC_T accumMatrix[K];
+    memset(accumMatrix, 0, sizeof(accumMatrix));
+
+    T permuteMatrixB[C * K];
+    memcpy(permuteMatrixB, matrixB, sizeof(permuteMatrixB));
+
+    // TODO: Add input/weight tranpose/permute to all operations
+    if (params.WEIGHT_PERMUTE) {
+      for (int i = 0; i < C; i++) {
+        for (int j = 0; j < 4; j++) {
+          for (int k = 0; k < K / 4; k++) {
+            permuteMatrixB[i * K + j * K / 4 + k] =
+                matrixB[(i + j * C) * K / 4 + k];
+          }
+        }
+      }
+    }
+
+    for (int i = 0; i < K; i++) {
+      for (int j = 0; j < C; j++) {
+        ACC_T acc = permuteMatrixB[j * K + i];
+
+        if (inputScaling) {
+          acc *= static_cast<ACC_T>(matrixB[C * K + i]);
+        }
+
+        accumMatrix[i] += acc;
+      }
+    }
+
+    for (int i = 0; i < K; i++) {
+      matrixC[i] = accumMatrix[i];
     }
   } else {  // normal operation
     int X = params.loops[0][params.inputXLoopIndex[0]] *
