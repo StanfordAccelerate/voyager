@@ -244,10 +244,10 @@ Posit<nbits, es> posit_exp(Posit<nbits, es> val) {
   // std::cout << "reciprocal:\t" << bits.to_string(AC_BIN, false, true)
   //           << std::endl;
 
-  Posit<16, 0> one;
-  one.bits = (1 << (16 - 1 - 1));
+  Posit<16, 0> neg_one;
+  neg_one.bits = (1 << (16-1)) | (1 << (16 - 1 - 1));
 
-  return static_cast<Posit<nbits, es>>(es0Posit - one);
+  return static_cast<Posit<nbits, es>>(es0Posit + neg_one);
   // typename Posit<16, 0>::DecomposedPosit op1(val);
   // typename Posit<16, 0>::DecomposedPosit op2;
   // op2.sign = 1;
