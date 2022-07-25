@@ -98,11 +98,11 @@ SC_MODULE(InputController) {
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
-      for (loop_counters[0][0] = 0; loop_counters[0][0] < 256;
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0; loop_counters[0][1] < 256;
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
              loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0; loop_counters[0][2] < 256;
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
                loop_counters[0][2]++) {
             // fetching border pixels is a little tricky
             // for the outer tiles, we don't fetch borders (they are known to be
@@ -153,21 +153,21 @@ SC_MODULE(InputController) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
             for (loop_counters[1][0] = 0;
-                 loop_counters[1][0] < 256;
+                 loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
               for (loop_counters[1][1] = 0;
-                   loop_counters[1][1] < 256;
+                   loop_counters[1][1] < loop_bounds[1][1];
                    loop_counters[1][1]++) {
                 for (loop_counters[1][2] = 0;
-                     loop_counters[1][2] < 256;
+                     loop_counters[1][2] < loop_bounds[1][2];
                      loop_counters[1][2]++) {
                   for (loop_counters[1][3] = 0;
-                       loop_counters[1][3] < 256;
+                       loop_counters[1][3] < loop_bounds[1][3];
                        loop_counters[1][3]++) {
                     for (loop_counters[1][4] = 0;
-                         loop_counters[1][4] < 256;
+                         loop_counters[1][4] < loop_bounds[1][4];
                          loop_counters[1][4]++) {
-                      for (loop_counters[1][5] = 0; loop_counters[1][5] < 256;
+                      for (loop_counters[1][5] = 0; loop_counters[1][5] < loop_bounds[1][5];
                            params.REPLICATION ? loop_counters[1][5] += 4 : loop_counters[1][5]++) {
                         int x0 = loop_counters[1][params.inputXLoopIndex[1]];
                         int x1 = loop_counters[0][params.inputXLoopIndex[0]];
@@ -310,12 +310,12 @@ SC_MODULE(InputController) {
       int Y1 = params.loops[0][params.inputYLoopIndex[0]];
 
       if (params.REPLICATION) {
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < 256;
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
              loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < 256;
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
                loop_counters[0][1]++) {
             for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < 256;
+                 loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
               // reset loop bounds
               loop_bounds[1][params.inputXLoopIndex[1]] =
@@ -330,7 +330,7 @@ SC_MODULE(InputController) {
 
               // inner memory
               for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < 256;
+                   loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
                 // TODO: make this dynamic
                 int total_writes = (loop_bounds[1][1] * loop_bounds[1][2] *
@@ -339,16 +339,16 @@ SC_MODULE(InputController) {
 
                 writeControl[bankSel].Push(total_writes);
                 for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < 256;
+                     loop_counters[1][1] < loop_bounds[1][1];
                      loop_counters[1][1]++) {
                   for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < 256;
+                       loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
                     for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < 256;
+                         loop_counters[1][3] < loop_bounds[1][3];
                          loop_counters[1][3]++) {
                       for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < 256;
+                           loop_counters[1][4] < loop_bounds[1][4];
                            loop_counters[1][4]++) {
                         Pack1D<DTYPE, NROWS> data;
                         Pack1D<DTYPE, NROWS> temp;
@@ -567,12 +567,12 @@ SC_MODULE(InputController) {
       } else {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < 256;
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
              loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < 256;
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
                loop_counters[0][1]++) {
             for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < 256;
+                 loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
               int STRIDE = params.STRIDE;
               if (isDownsample) {
@@ -593,7 +593,7 @@ SC_MODULE(InputController) {
 
               // inner memory
               for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < 256;
+                   loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
                 // TODO: make this dynamic
                 int total_writes = (loop_bounds[1][1] * loop_bounds[1][2] *
@@ -602,19 +602,19 @@ SC_MODULE(InputController) {
 
                 writeControl[bankSel].Push(total_writes);
                 for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < 256;
+                     loop_counters[1][1] < loop_bounds[1][1];
                      loop_counters[1][1]++) {
                   for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < 256;
+                       loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
                     for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < 256;
+                         loop_counters[1][3] < loop_bounds[1][3];
                          loop_counters[1][3]++) {
                       for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < 256;
+                           loop_counters[1][4] < loop_bounds[1][4];
                            loop_counters[1][4]++) {
                         for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < 256;
+                             loop_counters[1][5] < loop_bounds[1][5];
                              loop_counters[1][5]++) {
                           int x0 = loop_counters[1][params.inputXLoopIndex[1]];
                           int x1 = loop_counters[0][params.inputXLoopIndex[0]];
@@ -739,33 +739,33 @@ SC_MODULE(InputController) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (loop_counters[0][0] = 0; loop_counters[0][0] < 256;
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0; loop_counters[0][1] < 256;
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
              loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0; loop_counters[0][2] < 256;
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
                loop_counters[0][2]++) {
             // inner memory
             for (loop_counters[1][0] = 0;
-                 loop_counters[1][0] < 256;
+                 loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
               readControl[bankSel].Push(loop_bounds[1][1] * loop_bounds[1][2] *
                                         loop_bounds[1][3] * loop_bounds[1][4] *
                                         loop_bounds[1][5]);
               for (loop_counters[1][1] = 0;
-                   loop_counters[1][1] < 256;
+                   loop_counters[1][1] < loop_bounds[1][1];
                    loop_counters[1][1]++) {
                 for (loop_counters[1][2] = 0;
-                     loop_counters[1][2] < 256;
+                     loop_counters[1][2] < loop_bounds[1][2];
                      loop_counters[1][2]++) {
                   for (loop_counters[1][3] = 0;
-                       loop_counters[1][3] < 256;
+                       loop_counters[1][3] < loop_bounds[1][3];
                        loop_counters[1][3]++) {
                     for (loop_counters[1][4] = 0;
-                         loop_counters[1][4] < 256;
+                         loop_counters[1][4] < loop_bounds[1][4];
                          loop_counters[1][4]++) {
                       for (loop_counters[1][5] = 0;
-                           loop_counters[1][5] < 256;
+                           loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
                         int x0 = loop_counters[1][params.inputXLoopIndex[1]];
                         int X0 = params.loops[1][params.inputXLoopIndex[1]];
