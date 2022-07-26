@@ -117,7 +117,7 @@ int compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
 
   std::cout << std::endl;
 
-  return diff_buckets[4];
+  return percent_diff_buckets[4];
 }
 
 int compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,

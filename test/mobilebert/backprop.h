@@ -77,10 +77,10 @@ std::map<std::string, std::string> backpropParamsMapping{
     {"attention_self_value_layer_1", "vAttention"},
     {"attention_self_value_layer_2", "vAttention"},
     {"attention_self_value_layer_3", "vAttention"},
-    {"attention_self_attention_probs_0", "context"},
-    {"attention_self_attention_probs_1", "context"},
-    {"attention_self_attention_probs_2", "context"},
-    {"attention_self_attention_probs_3", "context"},
+    {"attention_self_attention_probs_0", "attentionProbs"},
+    {"attention_self_attention_probs_1", "attentionProbs"},
+    {"attention_self_attention_probs_2", "attentionProbs"},
+    {"attention_self_attention_probs_3", "attentionProbs"},
     {"attention_self_attention_scores_0", "softmax"},
     {"attention_self_attention_scores_1", "softmax"},
     {"attention_self_attention_scores_2", "softmax"},
@@ -114,10 +114,10 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
-         .CROSS_ENTROPY_LOSS_GRAD = true,
+         .CROSS_ENTROPY_GRAD = true,
      }},
 
-    // (1 x 16) * (16 x 512)
+    // (1 x 16) x (16 x 512)
     {"classifier",
      {
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},
@@ -144,14 +144,14 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
-         .NO_NORM = true,
          .WEIGHT = true,
+         .NO_NORM = true,
      }},
 
     // (128 x 512) x (512 x 128)
     {"outputBottleneck",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -167,7 +167,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
     // (128 x 128) x (128 x 512)
     {"ffn2",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -181,10 +181,10 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .RELU_GRAD = true,
      }},
 
-    // (128 x 512) * (512 x 128)
+    // (128 x 512) x (512 x 128)
     {"ffn1",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -201,7 +201,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
     // (128 x 128) x (128 x 128)
     {"outputAttention",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -212,13 +212,13 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .WEIGHT = true,
-         .SPLIT_HEAD = true,
+         .SPLIT_OUTPUT = true,
      }},
 
     // (128 x 32) * (32 x 128)
-    {"context",
+    {"attentionProbs",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {2, 8, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -230,7 +230,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
      }},
 
-    // (128 x 128) * (128 x 32)
+    // (128 x 128) x (128 x 32)
     {"vAttention",
      {
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 16}},
@@ -245,10 +245,10 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .INPUT_TRANSPOSE = true,
      }},
 
-    // (128 x 128) * (128 x 512)
+    // (128 x 128) x (128 x 512)
     {"vProjection",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -260,7 +260,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .RESIDUAL = true,
          .WEIGHT = true,
-         .CONCAT_HEAD = true,
+         .CONCAT_INPUT = true,
      }},
 
     // (128 x 128)
@@ -278,7 +278,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .SOFTMAX_GRAD = true,
      }},
 
-    // (128 x 128) * (128 x 32)
+    // (128 x 128) x (128 x 32)
     {"qAttention",
      {
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 16}},
@@ -295,7 +295,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
     // (128 x 128) x (128 x 128)
     {"qProjection",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -306,7 +306,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {5, 5},
          .STRIDE = 1,
          .WEIGHT = true,
-         .CONCAT_HEAD = true,
+         .CONCAT_INPUT = true,
      }},
 
     // (128 x 128) * (128 x 32)
@@ -327,7 +327,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
     // (128 x 128) x (128 x 128)
     {"kProjection",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
@@ -339,7 +339,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .RESIDUAL = true,
          .WEIGHT = true,
-         .CONCAT_HEAD = true,
+         .CONCAT_INPUT = true,
      }},
 
     // (128 x 128) * 128
@@ -354,14 +354,14 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
-         .NO_NORM = true,
          .WEIGHT = true,
+         .NO_NORM = true,
      }},
 
-    // (128 x 128) * (128 x 512)
+    // (128 x 128) x (128 x 512)
     {"inputBottleneck",
      {
-         .TRANSPOSE = true,
+         .WEIGHT_TRANSPOSE = true,
          .loops = {{8, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},

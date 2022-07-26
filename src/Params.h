@@ -39,7 +39,7 @@ struct MatrixParams {
   int HEAD_SIZE_LG2;
 
   bool SOFTMAX;
-  bool TRANSPOSE;
+  bool WEIGHT_TRANSPOSE;
   bool VEC_OP;
   bool VEC_SUB;
   bool VEC_SQUARE;
@@ -54,7 +54,7 @@ struct MatrixParams {
   bool AVGPOOL;
   bool STORE_IN_ACC;
   bool ACC_FROM_ACC;
-  bool CONCAT_HEAD;
+  bool CONCAT_INPUT;
 
   static const unsigned int width =
       13 * 32 + 12 * 32 + 10 * 32 + 17 * 1 + 18 * 32;
@@ -110,7 +110,7 @@ struct MatrixParams {
     m& RESIDUAL_OFFSET;
     m& HEAD_SIZE_LG2;
     m& SOFTMAX;
-    m& TRANSPOSE;
+    m& WEIGHT_TRANSPOSE;
     m& VEC_OP;
     m& VEC_SUB;
     m& VEC_SQUARE;
@@ -125,7 +125,7 @@ struct MatrixParams {
     m& AVGPOOL;
     m& STORE_IN_ACC;
     m& ACC_FROM_ACC;
-    m& CONCAT_HEAD;
+    m& CONCAT_INPUT;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,
@@ -140,7 +140,7 @@ struct MatrixParams {
     os << "OUTPUT_OFFSET: " << params.OUTPUT_OFFSET << std::endl;
     os << "SOFTMAX: " << params.SOFTMAX << std::endl;
     os << "SCALE: " << params.SCALE << std::endl;
-    os << "TRANSPOSE: " << params.TRANSPOSE << std::endl;
+    os << "WEIGHT_TRANSPOSE: " << params.WEIGHT_TRANSPOSE << std::endl;
     os << "VECTOR_OFFSET: " << params.VECTOR_OFFSET << std::endl;
     os << "VEC_OP: " << params.VEC_OP << std::endl;
     os << "VEC_SUB: " << params.VEC_SUB << std::endl;
@@ -368,7 +368,7 @@ struct VectorParams {
   int outputYLoopIndex[2];
   int outputWeightLoopIndex[2];
   int FULL_HEAD_SIZE;
-  bool SPLIT_HEAD;
+  bool SPLIT_OUTPUT;
 
   bool addressGen0Enable;
   ac_int<2, false> addressGen1Mode;  // 1- residual, 2- 2dtensor
@@ -381,10 +381,11 @@ struct VectorParams {
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m& VECTOR_OFFSET;
-    for(int i = 0; i < 2; i++){
-    for (int j = 0; j < 3; j++) {
-      m& addressGen0Loop[i][j];
-    }}
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        m& addressGen0Loop[i][j];
+      }
+    }
     m& ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -434,7 +435,7 @@ struct VectorParams {
       m& outputWeightLoopIndex[i];
     }
     m& FULL_HEAD_SIZE;
-    m& SPLIT_HEAD;
+    m& SPLIT_OUTPUT;
     m& addressGen0Enable;
     m& addressGen1Mode;
     m& addressGen2Mode;

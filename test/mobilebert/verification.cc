@@ -42,7 +42,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
            << "    " << params.INPUT_OFFSET << ", // INPUT_OFFSET\n"
            << "    " << params.WEIGHT_OFFSET << ", // WEIGHT_OFFSET\n"
            << "    " << params.OUTPUT_OFFSET << ", // OUTPUT_OFFSET\n"
-           << "    " << params.TRANSPOSE << ", // TRANSPOSE\n"
+           << "    " << params.WEIGHT_TRANSPOSE << ", // WEIGHT_TRANSPOSE\n"
            << "    "
            << "{" << array_to_string(params.loops[0], 6) << ", "
            << array_to_string(params.loops[1], 6) << "}, // LOOPS\n"
@@ -79,10 +79,10 @@ extern "C" int sc_main(int argc, char* argv[]) {
            << "    false, // ACC_FROM_ACC\n"
            << "    " << (params.INPUT_TRANSPOSE ? "true" : "false")
            << ", // INPUT_TRANSPOSE\n"
-           << "    " << (params.SPLIT_HEAD ? "true" : "false")
-           << ", // SPLIT_HEAD\n"
-           << "    " << (params.CONCAT_HEAD ? "true" : "false")
-           << ", // CONCAT_HEAD\n"
+           << "    " << (params.SPLIT_OUTPUT ? "true" : "false")
+           << ", // SPLIT_OUTPUT\n"
+           << "    " << (params.CONCAT_INPUT ? "true" : "false")
+           << ", // CONCAT_INPUT\n"
            << "};\n\n";
   }
 

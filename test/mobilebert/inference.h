@@ -61,10 +61,10 @@ std::map<std::string, std::string> inferenceParamsMapping{
     {"attention_self_attention_probs_1", "softmax"},
     {"attention_self_attention_probs_2", "softmax"},
     {"attention_self_attention_probs_3", "softmax"},
-    {"attention_self_context_layer_0", "vAttention"},
-    {"attention_self_context_layer_1", "vAttention"},
-    {"attention_self_context_layer_2", "vAttention"},
-    {"attention_self_context_layer_3", "vAttention"},
+    {"attention_self_context_layer_0", "context"},
+    {"attention_self_context_layer_1", "context"},
+    {"attention_self_context_layer_2", "context"},
+    {"attention_self_context_layer_3", "context"},
     {"attention_output_dense", "outputAttention"},
     {"attention_output_LayerNorm", "bottleneckLayerNorm"},
     {"ffn_0_intermediate_dense", "ffn1"},
@@ -88,477 +88,216 @@ std::map<std::string, SimplifiedParams> inferenceParams{
     // (128 x 512) * (512 x 128)
     {"inputBottleneck",
      {
-         0,                                           // INPUT_OFFSET
-         0,                                           // WEIGHT_OFFSET
-         131072,                                      // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{4, 1, 2, 1, 1, 1}, {32, 4, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {3, 0},                                      // REDUCTION
-         {2, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {5, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         true,                                        // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         false,                                       // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         false,                                       // NO-NORM
-         true,                                        // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         false,                                       // INPUT_TRANSPOSE
-         false,                                       // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .WEIGHT = true,
      }},
 
-    // elementwise product and addition for matrix of size:
     // (128 x 128) * 128
     {"bottleneckLayerNorm",
      {
-         0,                                           // INPUT_OFFSET
-         0,                                           // WEIGHT_OFFSET
-         10 * 1024,                                   // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 128}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {2, 0},                                      // REDUCTION
-         {3, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {4, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         true,                                        // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         false,                                       // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         true,                                        // NO_NORM
-         true,                                        // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         false,                                       // INPUT_TRANSPOSE
-         false,                                       // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD
+         .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 128}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .WEIGHT = true,
+         .NO_NORM = true,
      }},
 
     // (128 x 128) x (128 x 128)
     {"qkProjection",
      {
-         131072,                                     // INPUT_OFFSET
-         65536,                                      // WEIGHT_OFFSET
-         0,                                          // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         true,                                       // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         true,                                       // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         true,                                       // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .WEIGHT = true,
+         .SPLIT_OUTPUT = true,
      }},
 
+    // (128 x 512) x (512 x 128)
     {"vProjection",
      {
-         0,                                           // INPUT_OFFSET
-         0,                                           // WEIGHT_OFFSET
-         131072,                                      // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{4, 1, 2, 1, 1, 1}, {32, 4, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {3, 0},                                      // REDUCTION
-         {2, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {5, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         true,                                        // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         false,                                       // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         false,                                       // NO-NORM
-         true,                                        // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         false,                                       // INPUT_TRANSPOSE
-         true,                                        // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .WEIGHT = true,
+         .SPLIT_OUTPUT = true,
      }},
 
-    // Q x K
-    // (128 x 32) * (32 x 128)
+    // (128 x 32) x (32 x 128)
     {"qkAttention",
      {
-         0,                                          // INPUT_OFFSET
-         69632,                                      // WEIGHT_OFFSET
-         131072,                                     // OUTPUT_OFFSET
-         true,                                       // TRANSPOSE
-         {{4, 1, 2, 1, 1, 1}, {2, 4, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         true,                                       // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .WEIGHT_TRANSPOSE = true,
+         .loops = {{4, 1, 2, 1, 1, 1}, {2, 4, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .ATTENTION_SCALING = true,
      }},
 
-    // Attention probability
     // (128 x 128)
     {"softmax",
      {
-         0,                                             // INPUT_OFFSET
-         0,                                             // WEIGHT_OFFSET
-         128 * 32,                                      // OUTPUT_OFFSET
-         false,                                         // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},  // LOOPS
-         {0, 5},                                        // INPUTX
-         {1, 4},                                        // INPUTY
-         {3, 0},                                        // REDUCTION
-         {2, 1},                                        // WEIGHT
-         3,                                             // fxIndex
-         2,                                             // fyIndex
-         {5, 5},                                        // weightReuseIndex
-         1,                                             // stride
-         false,                                         // replication
-         false,                                         // RELU
-         false,                                         // bias
-         30 * 1024,                                     // BIAS_OFFSET
-         false,                                         // residual
-         40 * 1024,                                     // RESIDUAL_OFFSET
-         false,                                         // maxpool
-         false,                                         // avgpool
-         true,                                          // SOFTMAX
-         false,                                         // FC
-         false,                                         // NO-NORM
-         false,                                         // weight
-         false,                                         // ATTENTION_SCALING
-         false,                                         // STORE_IN_ACC
-         false,                                         // ACC_FROM_ACC
-         false,                                         // INPUT_TRANSPOSE
-         false,                                         // SPLIT_HEAD
-         false,                                         // CONCAT_HEAD
+         .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .SOFTMAX = true,
      }},
 
-    // QK x V
-    // (128 x 128) * (128 x 32)
-    {"vAttention",
+    // (128 x 128) x (128 x 32)
+    {"context",
      {
-         131072,                                     // INPUT_OFFSET
-         73728,                                      // WEIGHT_OFFSET
-         0,                                          // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         false,                                      // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         false,                                      // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
      }},
 
-    // Self-attention output
     // (128 x 128) x (128 x 128)
     {"outputAttention",
      {
-         0,                                          // INPUT_OFFSET
-         77824,                                      // WEIGHT_OFFSET
-         131072,                                     // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         true,                                       // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         true,                                       // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         true,                                       // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         true,                                       // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .RESIDUAL = true,
+         .WEIGHT = true,
+         .CONCAT_INPUT = true,
      }},
 
-    // FFN 1
-    // (128 x 128) * (128 x 512)
+    // (128 x 128) x (128 x 512)
     {"ffn1",
      {
-         131072,                                     // INPUT_OFFSET
-         94208,                                      // WEIGHT_OFFSET
-         0,                                          // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 8, 1, 1, 1}, {8, 4, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         true,                                       // RELU
-         true,                                       // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         true,                                       // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .RELU = true,
+         .BIAS = true,
+         .WEIGHT = true,
      }},
 
-    // FFN 2
     // (128 x 512) x (512 x 128)
     {"ffn2",
      {
-         0,                                           // INPUT_OFFSET
-         159744,                                      // WEIGHT_OFFSET
-         131072,                                      // OUTPUT_OFFSET
-         false,                                       // TRANSPOSE
-         {{4, 1, 4, 1, 1, 1}, {32, 2, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                      // INPUTX
-         {1, 4},                                      // INPUTY
-         {3, 0},                                      // REDUCTION
-         {2, 1},                                      // WEIGHT
-         3,                                           // fxIndex
-         2,                                           // fyIndex
-         {5, 5},                                      // weightReuseIndex
-         1,                                           // stride
-         false,                                       // replication
-         false,                                       // RELU
-         true,                                        // bias
-         30 * 1024,                                   // BIAS_OFFSET
-         true,                                        // residual
-         40 * 1024,                                   // RESIDUAL_OFFSET
-         false,                                       // maxpool
-         false,                                       // avgpool
-         false,                                       // SOFTMAX
-         false,                                       // FC
-         false,                                       // NO-NORM
-         true,                                        // weight
-         false,                                       // ATTENTION_SCALING
-         false,                                       // STORE_IN_ACC
-         false,                                       // ACC_FROM_ACC
-         false,                                       // INPUT_TRANSPOSE
-         false,                                       // SPLIT_HEAD
-         false,                                       // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .RESIDUAL = true,
+         .WEIGHT = true,
      }},
 
-    // output bottleneck
     // (128 x 128) x (128 x 512)
     {"outputBottleneck",
      {
-         131072,                                     // INPUT_OFFSET
-         225280,                                     // WEIGHT_OFFSET
-         0,                                          // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{4, 1, 8, 1, 1, 1}, {8, 4, 1, 1, 1, 32}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         true,                                       // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         true,                                       // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         false,                                      // FC
-         false,                                      // NO-NORM
-         true,                                       // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .RESIDUAL = true,
+         .WEIGHT = true,
      }},
 
-    // elementwise product and addition for matrix of size:
-    // 128 x 512
+    // (128 x 512) * 512
     {"outputLayerNorm",
      {
-         0,                                             // INPUT_OFFSET
-         0,                                             // WEIGHT_OFFSET
-         10 * 1024,                                     // OUTPUT_OFFSET
-         false,                                         // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 128}},  // LOOPS
-         {0, 5},                                        // INPUTX
-         {1, 4},                                        // INPUTY
-         {2, 0},                                        // REDUCTION
-         {3, 1},                                        // WEIGHT
-         3,                                             // fxIndex
-         2,                                             // fyIndex
-         {4, 5},                                        // weightReuseIndex
-         1,                                             // stride
-         false,                                         // replication
-         false,                                         // RELU
-         true,                                          // bias
-         30 * 1024,                                     // BIAS_OFFSET
-         false,                                         // residual
-         40 * 1024,                                     // RESIDUAL_OFFSET
-         false,                                         // maxpool
-         false,                                         // avgpool
-         false,                                         // SOFTMAX
-         false,                                         // FC
-         true,                                          // NO_NORM
-         true,                                          // weight
-         false,                                         // ATTENTION_SCALING
-         false,                                         // STORE_IN_ACC
-         false,                                         // ACC_FROM_ACC
-         false,                                         // INPUT_TRANSPOSE
-         false,                                         // SPLIT_HEAD
-         false,                                         // CONCAT_HEAD
+         .loops = {{4, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 32}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .WEIGHT = true,
+         .NO_NORM = true,
      }},
 
-    // (1 x 512) * (512 x 2)
+    // (1 x 512) x (512 x 16)
     {"classifier",
      {
-         0,                                          // INPUT_OFFSET
-         0,                                          // WEIGHT_OFFSET
-         10 * 1024,                                  // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
-         {{1, 1, 1, 1, 1, 1}, {32, 1, 1, 1, 1, 1}},  // LOOPS
-         {0, 5},                                     // INPUTX
-         {1, 4},                                     // INPUTY
-         {3, 0},                                     // REDUCTION
-         {2, 1},                                     // WEIGHT
-         3,                                          // fxIndex
-         2,                                          // fyIndex
-         {5, 5},                                     // weightReuseIndex
-         1,                                          // stride
-         false,                                      // replication
-         false,                                      // RELU
-         true,                                       // bias
-         30 * 1024,                                  // BIAS_OFFSET
-         false,                                      // residual
-         40 * 1024,                                  // RESIDUAL_OFFSET
-         false,                                      // maxpool
-         false,                                      // avgpool
-         false,                                      // SOFTMAX
-         true,                                       // FC
-         false,                                      // NO_NORM
-         true,                                       // weight
-         false,                                      // ATTENTION_SCALING
-         false,                                      // STORE_IN_ACC
-         false,                                      // ACC_FROM_ACC
-         false,                                      // INPUT_TRANSPOSE
-         false,                                      // SPLIT_HEAD
-         false,                                      // CONCAT_HEAD
+         .loops = {{1, 1, 1, 1, 1, 1}, {32, 1, 1, 1, 1, 1}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .BIAS = true,
+         .WEIGHT = true,
+         .FC = true,
      }},
 };
 

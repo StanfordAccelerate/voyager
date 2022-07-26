@@ -68,7 +68,7 @@ int runOperation(const SimplifiedParams params, const Files files,
   int outputSize = X * Y * K;
   if (params.NO_NORM_GRAD) {
     outputSize = C;
-  } else if (params.CROSS_ENTROPY_LOSS_GRAD) {
+  } else if (params.CROSS_ENTROPY_GRAD) {
     outputSize = X;
   }
 
@@ -254,7 +254,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::string activationDataDir = datapath + "activations/";
   std::string weightDataDir = datapath + "weights/";
   std::string errorDataDir = datapath + "errors/";
-  std::string gradientDataDir = datapath + "gradients/";
+  std::string gradientDataDir = datapath + "clipped_gradients/";
   std::string outfilePrefix = "test_outputs/";
 
   std::map<std::string, std::string> paramsMapping;
@@ -289,7 +289,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   SimplifiedParams params = mobileBertParams.at(paramsName);
   Files files = mobileBertTestFiles.at(test);
   MemoryOffsets offsets = mobileBertMemOffsets.at(test);
-  std::string layerName = "mobilebert_encoder_layer_0_";
+  std::string layerName = "mobilebert_encoder_layer_23_";
 
   if (test.find("classifier") != std::string::npos ||
       (task == "backprop" && test == "output_bottleneck_LayerNorm")) {
@@ -332,7 +332,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
       return runOperation(params, files, memoryMap, errorDataDir, weightDataDir,
                           errorDataDir, activationDataDir, layerName,
                           outfilePrefix, compList, false, false);
-    } else if (params.CROSS_ENTROPY_LOSS_GRAD) {
+    } else if (params.CROSS_ENTROPY_GRAD) {
       return runOperation(params, files, memoryMap, activationDataDir,
                           activationDataDir, errorDataDir, activationDataDir,
                           layerName, outfilePrefix, compList, false, false);

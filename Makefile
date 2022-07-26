@@ -153,11 +153,12 @@ build/verification.o: test/mobilebert/verification.cc test/mobilebert/params.h
 datafile:
 	mkdir -p data/$(model)/datafile
 	rm -rf data/$(model)/datafile/*
-	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_activations1.pkl -o data/$(model)/datafile/activations
-	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_activations2.pkl -o data/$(model)/datafile/activations2
-	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_weights.pkl -o data/$(model)/datafile/weights
-	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_errors.pkl -o data/$(model)/datafile/errors
-	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_gradients.pkl -o data/$(model)/datafile/gradients
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_activations1.pkl      -o data/$(model)/datafile/activations
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_activations2.pkl      -o data/$(model)/datafile/activations2
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_weights.pkl           -o data/$(model)/datafile/weights
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_errors.pkl            -o data/$(model)/datafile/errors
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_gradients.pkl         -o data/$(model)/datafile/gradients
+	python3 tools/pkl_parser.py -t posit8 -i data/$(model)/mobilebert_clipped_gradients.pkl -o data/$(model)/datafile/clipped_gradients
 
 .PHONY: clean rtl sim PositTest clean-catapult
 clean:

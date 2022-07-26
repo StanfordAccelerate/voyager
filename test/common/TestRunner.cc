@@ -412,7 +412,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
       loadWeights(weightDataDir);
 
       // For debug purpose
-      std::string activationDataDir = datapath + "activations1/";
+      std::string activationDataDir = datapath + "activations/";
       loadActivation(activationDataDir);
 
       // errors += runInference(datapath, compList);

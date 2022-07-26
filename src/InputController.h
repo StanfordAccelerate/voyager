@@ -217,7 +217,7 @@ SC_MODULE(InputController) {
                           if (params.REPLICATION) {
                             baseAddress = y * (X / 4) * 16 + (x / 4) * 16 + c;
                           }
-                          if (params.CONCAT_HEAD) {
+                          if (params.CONCAT_INPUT) {
                             baseAddress =
                                 ((c / 32) * X * 32) + (x * 32) + (c % 32);
                           }

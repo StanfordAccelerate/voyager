@@ -8,7 +8,6 @@
 
 std::map<std::string, std::string> gradientParamsMapping{
     {"classifier_weight", "classifier_weight"},
-    {"classifier_bias", ""},
     {"output_bottleneck_LayerNorm_weight", "outputLayerNorm"},
     {"output_bottleneck_LayerNorm_bias", "hiddenReduction"},
     {"output_bottleneck_dense_weight", "outputBottleneck"},
@@ -58,7 +57,7 @@ std::map<std::string, std::string> gradientParamsMapping{
 };
 
 std::map<std::string, SimplifiedParams> gradientParams{
-    // (16 x 1) * (1 x 512)
+    // (16 x 1) x (1 x 512)
     {"classifier_weight",
      {
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},
@@ -70,9 +69,9 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
+         .GRAD_CLIPPING = true,
      }},
 
-    // elementwise multiplication of matrices
     // (128 x 512) * (128 x 512)
     {"outputLayerNorm",
      {
@@ -86,6 +85,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .NO_NORM_GRAD = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -101,6 +101,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (512 x 128) x (128 x 128)
@@ -116,6 +117,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -131,10 +133,11 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
-         .CONCAT_HEAD = true,
+         .CONCAT_INPUT = true,
+         .GRAD_CLIPPING = true,
      }},
 
-    // (512 x 128) * (128 x 128)
+    // (512 x 128) x (128 x 128)
     {"vProjection",
      {
          .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
@@ -147,7 +150,8 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
-         .WEIGHT_PERMUTE = true,
+         .CONCAT_WEIGHT = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -163,10 +167,10 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
-         .WEIGHT_PERMUTE = true,
+         .CONCAT_WEIGHT = true,
+         .GRAD_CLIPPING = true,
      }},
 
-    // elementwise multiplication of matrices
     // (128 x 128) * (128 x 128)
     {"bottleneckLayerNorm",
      {
@@ -180,9 +184,10 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .NO_NORM_GRAD = true,
+         .GRAD_CLIPPING = true,
      }},
 
-    // (512 x 128) * (128 x 128)
+    // (512 x 128) x (128 x 128)
     {"inputBottleneck",
      {
          .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
@@ -195,6 +200,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (128 x 128)
@@ -210,6 +216,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .BIAS_GRAD = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (128 x 128)
@@ -224,8 +231,9 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
-         .WEIGHT_PERMUTE = true,
          .BIAS_GRAD = true,
+         .CONCAT_WEIGHT = true,
+         .GRAD_CLIPPING = true,
      }},
 
     // (128 x 512)
@@ -241,6 +249,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .BIAS_GRAD = true,
+         .GRAD_CLIPPING = true,
      }},
 };
 

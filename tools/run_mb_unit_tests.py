@@ -139,10 +139,10 @@ gradient_tests = [
     "bottleneck_input_LayerNorm_bias"
 ]
 
-def run_test(results_folder, test, task):
+def run_test(results_folder, groups, task, test):
     env_vars = os.environ.copy()
     env_vars['GROUP'] = "mobilebert"
-    env_vars['SIMS'] = "fp32,customposit,universal"
+    env_vars['SIMS'] = groups
     env_vars['TASK'] = task
     env_vars['TESTS'] = test
 
@@ -173,6 +173,12 @@ if __name__ == '__main__':
         default="inference",
         help="Group of tests to run.",
     )
+    parser.add_argument(
+        "--groups",
+        type=str,
+        default="customposit,universal,fp32,accelerator",
+        help="Models to run the tests.",
+    )
     args = parser.parse_args()
 
     # Create directory with current time
@@ -193,7 +199,7 @@ if __name__ == '__main__':
         raise SystemError("Unknown task: ", task)
 
     for test in tests:
-        pool.apply_async(run_test, (results_folder, test, args.task))
+        pool.apply_async(run_test, (results_folder, args.groups, args.task, test))
 
     pool.close()
     pool.join()

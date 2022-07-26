@@ -11,7 +11,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                          // INPUT_OFFSET
          0,                                          // WEIGHT_OFFSET
          10 * 1024,                                  // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
+         false,                                      // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 2, 1, 1, 1, 32}},  // LOOPS
          {0, 5},                                     // INPUTX
          {1, 4},                                     // INPUTY
@@ -38,7 +38,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                          // INPUT_OFFSET
          0,                                          // WEIGHT_OFFSET
          10 * 1024,                                  // OUTPUT_OFFSET
-         true,                                       // TRANSPOSE
+         true,                                       // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {2, 2, 1, 1, 1, 32}},  // LOOPS
          {0, 5},                                     // INPUTX
          {1, 4},                                     // INPUTY
@@ -65,7 +65,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY
@@ -92,7 +92,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY
@@ -119,7 +119,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                          // INPUT_OFFSET
          0,                                          // WEIGHT_OFFSET
          10 * 1024,                                  // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
+         false,                                      // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 7, 2, 8, 32}},  // LOOPS
          {0, 5},                                     // INPUTX
          {1, 4},                                     // INPUTY
@@ -146,7 +146,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY
@@ -173,7 +173,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY
@@ -200,7 +200,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY
@@ -227,7 +227,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 3, 3, 8, 8}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY
@@ -255,7 +255,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                          // INPUT_OFFSET
          0,                                          // WEIGHT_OFFSET
          10 * 1024,                                  // OUTPUT_OFFSET
-         false,                                      // TRANSPOSE
+         false,                                      // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {4, 1, 1, 1, 64, 1}},  // LOOPS
          {0, 5},                                     // INPUTX
          {1, 4},                                     // INPUTY
@@ -282,7 +282,7 @@ std::map<std::string, SimplifiedParams> simple{
          0,                                         // INPUT_OFFSET
          0,                                         // WEIGHT_OFFSET
          10 * 1024,                                 // OUTPUT_OFFSET
-         false,                                     // TRANSPOSE
+         false,                                     // WEIGHT_TRANSPOSE
          {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1}},  // LOOPS
          {0, 5},                                    // INPUTX
          {1, 4},                                    // INPUTY

@@ -92,7 +92,7 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
     FX = 7;
     C = 3;
   }
-  if (params.SOFTMAX || params.SOFTMAX_GRAD || params.CROSS_ENTROPY_LOSS_GRAD) {
+  if (params.SOFTMAX || params.SOFTMAX_GRAD || params.CROSS_ENTROPY_GRAD) {
     C = 1;
   }
 
@@ -162,7 +162,7 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
     FX = 7;
     C = 3;
   }
-  if (params.NO_NORM || params.CROSS_ENTROPY_LOSS_GRAD) {
+  if (params.NO_NORM || params.CROSS_ENTROPY_GRAD) {
     FX = 1;
     FY = 1;
     C = 1;
@@ -312,7 +312,7 @@ void load_datafile_outputs(const SimplifiedParams params,
   if (params.SOFTMAX || params.SOFTMAX_GRAD) {
     K = 1;
   }
-  if (params.NO_NORM_GRAD || params.CROSS_ENTROPY_LOSS_GRAD) {
+  if (params.NO_NORM_GRAD || params.CROSS_ENTROPY_GRAD) {
     X = 1;
     Y = 1;
   }

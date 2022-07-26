@@ -92,7 +92,7 @@ SC_MODULE(OutputAddressGenerator) {
         loop_bounds[1][params.outputYLoopIndex[1]] = 1;
       }
 
-      if (params.SPLIT_HEAD) DLOG("splitting heads");
+      if (params.SPLIT_OUTPUT) DLOG("splitting heads");
 
 #pragma hls_pipeline_init_interval 1
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -134,7 +134,7 @@ SC_MODULE(OutputAddressGenerator) {
                   int Y = Y0 * Y1;
 
                   int baseAddress = y * X * K + x * K + k;
-                  if (params.SPLIT_HEAD) {
+                  if (params.SPLIT_OUTPUT) {
                     baseAddress = ((k / 32) * X * 32) + (x * 32) + (k % 32);
                   }
 

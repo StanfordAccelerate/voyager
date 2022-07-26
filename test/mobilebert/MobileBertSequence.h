@@ -255,7 +255,7 @@ int runOperation(const SimplifiedParams params,
   return 0;
 #else
 
-  if (params.SPLIT_HEAD) return 0;
+  if (params.SPLIT_OUTPUT) return 0;
 
   INPUT_DATATYPE hlsDataFileOutput[outputSize];
   UniversalPosit uniDataFileOutput[outputSize];
@@ -351,7 +351,7 @@ int runInference(std::string datapath, std::vector<std::string> groups) {
       datafile = activationDataDir + layerName + files.outputs_file;
       errors += runOperation(params, datafile, outfilePrefix, test, groups);
 
-      if (errors) return 1;
+      // if (errors) return 1;
     }
   }
 
@@ -359,8 +359,6 @@ int runInference(std::string datapath, std::vector<std::string> groups) {
     std::cout << (float)hls_sram_memory[params.OUTPUT_OFFSET + i] << "\t"
               << float_sram_memory[params.OUTPUT_OFFSET + i] << std::endl;
   }
-
-  // TODO: Compute cross entropy gradient
 
   return errors;
 }
@@ -375,15 +373,17 @@ int runBackprop(std::string datapath, std::vector<std::string> groups) {
   std::string operation = backpropOrder[0];
   SimplifiedParams params = paramsLookup(operation, "backprop");
   Files files = backpropTestFiles.at(operation);
-  std::string datafile = errorDataDir + "mobilebert_classifier";
+  std::string datafile = errorDataDir + "mobilebert_logits";
   bool useDataFile = true;
 
-  // params.INPUT_OFFSET += ACTIVATION_OFFSET;
+  params.INPUT_OFFSET += ACTIVATION_OFFSET;
 
-  // load_inputs(params, datafile, useDataFile, acc_sram_memory,
-  //             hls_sram_memory + params.INPUT_OFFSET,
-  //             uni_sram_memory + params.INPUT_OFFSET,
-  //             float_sram_memory + params.INPUT_OFFSET);
+  load_inputs(params, datafile, useDataFile, acc_sram_memory,
+              hls_sram_memory + params.INPUT_OFFSET,
+              uni_sram_memory + params.INPUT_OFFSET,
+              float_sram_memory + params.INPUT_OFFSET);
+
+  // TODO: Compute cross entropy gradient
 
   // Perform back propagation
   for (int layer = 23; layer >= 0; layer--) {
@@ -422,9 +422,10 @@ int runBackprop(std::string datapath, std::vector<std::string> groups) {
 
       outfilePrefix = "test_outputs/" + test + "_error_";
       datafile = errorDataDir + layerName + files.outputs_file;
-      errors += runOperation(params, datafile, outfilePrefix, test, groups);
+      std::string testName = "layer " + std::to_string(layer) + " " + test;
+      errors += runOperation(params, datafile, outfilePrefix, testName, groups);
 
-      if (errors) return 1;
+      // if (errors) return 1;
 
       // Gradient compute
       if (gradientParamsMapping.find(test) != gradientParamsMapping.end()) {
@@ -447,7 +448,7 @@ int runBackprop(std::string datapath, std::vector<std::string> groups) {
         errors += runOperation(params, datafile, outfilePrefix,
                                test + "_gradient", groups);
 
-        if (errors) return 1;
+        // if (errors) return 1;
 
         // TODO: Gradient norm clipping
 

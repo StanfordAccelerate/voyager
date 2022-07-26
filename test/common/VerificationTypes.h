@@ -36,7 +36,7 @@ struct SimplifiedParams {
   int INPUT_OFFSET;
   int WEIGHT_OFFSET;
   int OUTPUT_OFFSET;
-  bool TRANSPOSE;
+  bool WEIGHT_TRANSPOSE;
 
   // tiling
   int loops[2][6];
@@ -60,30 +60,33 @@ struct SimplifiedParams {
   bool MAXPOOL;
   bool AVGPOOL;
 
+  bool WEIGHT;
+
+  bool STORE_IN_ACC;
+  bool ACC_FROM_ACC;
+
   // special vector ops
   bool SOFTMAX;
   bool FC;
   bool NO_NORM;
 
-  bool WEIGHT;
   bool ATTENTION_SCALING;
-  bool STORE_IN_ACC;
-  bool ACC_FROM_ACC;
-  bool INPUT_TRANSPOSE;
-  bool SPLIT_HEAD;
-  bool CONCAT_HEAD;
   bool SOFTMAX_GRAD;
   bool NO_NORM_GRAD;
   bool RELU_GRAD;
-  bool WEIGHT_PERMUTE;
-
-  bool WEIGHT_ADDITION;
   bool BIAS_GRAD;
-  bool GRADIENT_CLIPPING;
+  bool CROSS_ENTROPY_GRAD;
+  bool MSE_GRAD;
+  bool BCE_WITH_LOGITS_GRAD;
 
-  bool CROSS_ENTROPY_LOSS_GRAD;
-  bool MSE_LOSS_GRAD;
-  bool BCE_LOGITS_LOSS_GRAD;
+  // permutation ops
+  bool INPUT_TRANSPOSE;
+  bool CONCAT_INPUT;
+  bool CONCAT_WEIGHT;
+  bool SPLIT_OUTPUT;
+
+  bool GRAD_CLIPPING;
+  bool WEIGHT_RESIDUAL;
 };
 
 struct MemoryOffsets {
