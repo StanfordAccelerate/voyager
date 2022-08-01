@@ -188,6 +188,7 @@ SC_MODULE(MaxpoolUnit) {
                         uncastedOutputPixel = tensorIn.Pop();
                     Pack1D<DTYPE, WIDTH> outputPixel;
 
+#pragma hls_unroll yes
                     for (int i = 0; i < WIDTH; i++) {
                       outputPixel[i] =
                           static_cast<DTYPE>(uncastedOutputPixel[i]);
