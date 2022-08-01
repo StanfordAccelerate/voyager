@@ -154,19 +154,14 @@ SC_MODULE(MatrixProcessor) {
     startSignal.Reset();
     doneSignal.Reset();
 
-    bool toggle = false;
-    bool weightFillToggle = false;
-
-    int swapDoneCount = 0;
-
     wait();
 
     while (true) {
-      MatrixParams params = paramsIn.Pop();
+      const MatrixParams params = paramsIn.Pop();
       startSignal.SyncPush();
 
-      int loop_counters[2][6];
-      int loop_counters_out[2][6];
+      ac_int<8,false> loop_counters[2][6];
+      ac_int<8,false> loop_counters_out[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -177,29 +172,15 @@ SC_MODULE(MatrixProcessor) {
         }
       }
 
-      int totalOps = 1;
-#pragma hls_unroll yes
-      for (int i = 0; i < 2; i++) {
-#pragma hls_unroll yes
-        for (int j = 0; j < 6; j++) {
-          totalOps *= params.loops[i][j];
-        }
-      }
+      ac_int<32,false> totalOps =
+          params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
+          params.loops[1][0] * params.loops[1][1] * params.loops[1][2] *
+          params.loops[1][3] * params.loops[1][4] * params.loops[1][5];
 
       Pack1D<ODTYPE, NCOLS> accumulation_buffer[BUFFER_SIZE];
 
-      int step = 0;
-      int outputStep = 0;
-      int outputCounter = 0;
-
-// TODO: figure out why this is the case
-#ifdef __SYNTHESIS__
-      const int latency = 0;
-#elif CONNECTIONS_FAST_SIM
-      const int latency = 0;
-#else
-      const int latency = 0;
-#endif
+      ac_int<32,false> step = 0;
+      ac_int<32,false> outputStep = 0;
 
       // Push inputs and psums into the array
       // Pipelined across tiles
@@ -219,8 +200,6 @@ SC_MODULE(MatrixProcessor) {
         if (newWeights && step < totalOps) {
           // wait for weight loading to finish
           weightLoadDone.SyncPop();
-
-          swapDoneCount = 0;
 
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
@@ -253,11 +232,11 @@ SC_MODULE(MatrixProcessor) {
             loop_counters[1][params.fyIndex] == 0;
 
         if ((!firstAccumulation || params.ACC_FROM_ACC) && step < totalOps) {
-          int readAddress = loop_counters[1][params.weightLoopIndex[1]] *
+          int readAddress = static_cast<ac_int<10,false> >(loop_counters[1][params.weightLoopIndex[1]] *
                                 params.loops[1][params.inputXLoopIndex[1]] *
-                                params.loops[1][params.inputYLoopIndex[1]] +
-                            loop_counters[1][params.inputYLoopIndex[1]] *
-                                params.loops[1][params.inputXLoopIndex[1]] +
+                                params.loops[1][params.inputYLoopIndex[1]]) +
+                            static_cast<ac_int<10,false> >(loop_counters[1][params.inputYLoopIndex[1]] *
+                                params.loops[1][params.inputXLoopIndex[1]]) +
                             loop_counters[1][params.inputXLoopIndex[1]];
 #ifdef __SYNTHESIS__
         READ_ACC_BUFFER:
@@ -285,11 +264,11 @@ SC_MODULE(MatrixProcessor) {
             DLOG("matrix processor output: " << outputs);
             // std::cout << "Output: " << outputs << std::endl;
           } else {
-            int writeAddress = loop_counters_out[1][params.weightLoopIndex[1]] *
+            int writeAddress = static_cast<ac_int<10,false> >(loop_counters_out[1][params.weightLoopIndex[1]] *
                                    params.loops[1][params.inputXLoopIndex[1]] *
-                                   params.loops[1][params.inputYLoopIndex[1]] +
-                               loop_counters_out[1][params.inputYLoopIndex[1]] *
-                                   params.loops[1][params.inputXLoopIndex[1]] +
+                                   params.loops[1][params.inputYLoopIndex[1]]) +
+                               static_cast<ac_int<10,false> >(loop_counters_out[1][params.inputYLoopIndex[1]] *
+                                   params.loops[1][params.inputXLoopIndex[1]]) +
                                loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__
@@ -359,11 +338,11 @@ SC_MODULE(MatrixProcessor) {
             DLOG("matrix processor output: " << outputs);
             // std::cout << "Output: " << outputs << std::endl;
           } else {
-            int writeAddress = loop_counters_out[1][params.weightLoopIndex[1]] *
+            int writeAddress = static_cast<ac_int<10,false> >(loop_counters_out[1][params.weightLoopIndex[1]] *
                                    params.loops[1][params.inputXLoopIndex[1]] *
-                                   params.loops[1][params.inputYLoopIndex[1]] +
-                               loop_counters_out[1][params.inputYLoopIndex[1]] *
-                                   params.loops[1][params.inputXLoopIndex[1]] +
+                                   params.loops[1][params.inputYLoopIndex[1]]) +
+                               static_cast<ac_int<10,false> >(loop_counters_out[1][params.inputYLoopIndex[1]] *
+                                   params.loops[1][params.inputXLoopIndex[1]]) +
                                loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__
