@@ -69,6 +69,7 @@ struct SimplifiedParams {
   bool SOFTMAX;
   bool FC;
   bool NO_NORM;
+  bool OUTER_PRODUCT;
 
   bool ATTENTION_SCALING;
   bool SOFTMAX_GRAD;
@@ -87,7 +88,7 @@ struct SimplifiedParams {
 
   bool GRAD_CLIPPING;
 
-  bool GRADIENT_ACCUMULATION;
+  bool WEIGHT_SPLITTING;
   int WEIGHT_GRADIENT_OFFSET;
   int BIAS_GRADIENT_OFFSET;
   float learningRate;

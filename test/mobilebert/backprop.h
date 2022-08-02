@@ -7,6 +7,7 @@
 #include "test/common/VerificationTypes.h"
 
 std::vector<std::string> backpropOrder{
+    "classifier",
     "output_bottleneck_LayerNorm",
     "output_bottleneck_dense",
     "output_LayerNorm",
@@ -380,13 +381,16 @@ std::map<std::string, MemoryOffsets> backpropMemOffsets{
     {"classifier",
      {
          0,
-         0,
-         0,
+         7 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE +
+             24 * BIAS_HIDDEN_SIZE,  // classfier bias gradient offset
          0,
      }},
     {"output_bottleneck_LayerNorm",
      {
-         0,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
          12 * WEIGHT_INTERMEDIATE_SIZE + 7 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
          INTERMEDIATE_SIZE,
@@ -738,8 +742,8 @@ std::map<std::string, MemoryOffsets> backpropMemOffsets{
 std::map<std::string, Files> backpropTestFiles{
     {"classifier",
      {
-         "mobilebert_logits",
          "mobilebert_labels",
+         "mobilebert_logits",
          "",
          "mobilebert_logits",
      }},

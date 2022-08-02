@@ -323,7 +323,7 @@ int run_sequence(const std::string& group,
     } else if ((comparisons[i] == "customposit" &&
                 comparisons[i + 1] == "fp32") ||
                (comparisons[i] == "fp32" &&
-                comparisons[i+1] == "customposit")) {
+                comparisons[i + 1] == "customposit")) {
       error_count += compare_arrays(
           hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
           float_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
@@ -415,8 +415,19 @@ extern "C" int sc_main(int argc, char* argv[]) {
       std::string activationDataDir = datapath + "activations/";
       loadActivation(activationDataDir);
 
-      // errors += runInference(datapath, compList);
       errors += runBackprop(datapath, compList);
+      // errors += verifyGradients(datapath, "test_outputs/");
+
+      deleteMemory();
+    } else if (tests == "e2e") {
+      errors = allocateMemory();
+
+      std::string weightDataDir = datapath + "weights/";
+      loadWeights(weightDataDir);
+
+      errors += runInference(datapath, compList);
+      errors += runBackprop(datapath, compList);
+      errors += verifyGradients(datapath, "test_outputs/");
 
       deleteMemory();
     } else {

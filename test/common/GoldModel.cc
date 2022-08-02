@@ -127,27 +127,6 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         }
       }
     }
-  } else if (params.SOFTMAX_GRAD) {
-    int X = params.loops[0][params.inputXLoopIndex[0]] *
-            params.loops[1][params.inputXLoopIndex[1]];
-    int Y = params.loops[0][params.inputYLoopIndex[0]] *
-            params.loops[1][params.inputYLoopIndex[1]];
-
-    for (int x = 0; x < X; x++) {
-      for (int y = 0; y < Y; y++) {
-        ACC_T acc = 0;
-        for (int k = 0; k < Y; k++) {
-          ACC_T prob_kj;
-          prob_kj = -residualMatrix[x * Y + k] * residualMatrix[x * Y + y];
-          if (k == y) {
-            prob_kj += residualMatrix[x * Y + y];
-          }
-          prob_kj *= matrixA[x * Y + k];
-          acc += prob_kj;
-        }
-        matrixC[x * Y + y] = static_cast<float>(acc) / sqrt(32);
-      }
-    }
   } else if (params.FC) {
     // fully connected layer (matrix-vector)
     int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
@@ -162,7 +141,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         ACC_T b = matrixB[k * C + c];
         acc = gold_fma(a, b, acc);
 
-        if (params.GRADIENT_ACCUMULATION) {
+        if (params.WEIGHT_SPLITTING) {
           b = weightGradMatrix[k * C + c];
           acc += learningRate * a * b;
         }
@@ -178,7 +157,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
       if (params.BIAS) {
         acc += biasMatrix[k];
-        if (params.GRADIENT_ACCUMULATION) {
+        if (params.WEIGHT_SPLITTING) {
           acc += learningRate * biasGradMatrix[k];
         }
       }
@@ -202,14 +181,14 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         ACC_T b = matrixB[k];
         ACC_T acc = a * b;
 
-        if (params.GRADIENT_ACCUMULATION) {
+        if (params.WEIGHT_SPLITTING) {
           b = weightGradMatrix[k];
           acc += learningRate * a * b;
         }
 
         if (params.BIAS) {
           acc += biasMatrix[k];
-          if (params.GRADIENT_ACCUMULATION) {
+          if (params.WEIGHT_SPLITTING) {
             acc += learningRate * biasGradMatrix[k];
           }
         }
@@ -243,6 +222,57 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         }
       }
     }
+  } else if (params.OUTER_PRODUCT) {
+    int X = params.loops[0][params.inputXLoopIndex[0]] *
+            params.loops[1][params.inputXLoopIndex[1]];
+    int K = params.loops[0][params.weightLoopIndex[0]] *
+            params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+
+    ACC_T outputMatrix[X * K + K];
+    memset(outputMatrix, 0, sizeof(outputMatrix));
+
+    for (int x = 0; x < X; x++) {
+      for (int k = 0; k < K; k++) {
+        outputMatrix[x * K + k] = matrixA[x] * matrixB[k];
+      }
+    }
+
+    if (params.GRAD_CLIPPING) {
+      ACC_T acc = 0;
+      for (int i = 0; i < X * K; i++) {
+        acc = gold_fma(outputMatrix[i], outputMatrix[i], acc);
+      }
+
+      acc = std::min(1.0f / std::sqrt(static_cast<float>(acc)), 1.0f);
+      for (int i = 0; i < X * K; i++) {
+        outputMatrix[i] *= acc;
+      }
+    }
+
+    for (int i = 0; i < X * K; i++) {
+      matrixC[i] = outputMatrix[i];
+    }
+  } else if (params.SOFTMAX_GRAD) {
+    int X = params.loops[0][params.inputXLoopIndex[0]] *
+            params.loops[1][params.inputXLoopIndex[1]];
+    int Y = params.loops[0][params.inputYLoopIndex[0]] *
+            params.loops[1][params.inputYLoopIndex[1]];
+
+    for (int x = 0; x < X; x++) {
+      for (int y = 0; y < Y; y++) {
+        ACC_T acc = 0;
+        for (int k = 0; k < Y; k++) {
+          ACC_T prob_kj;
+          prob_kj = -residualMatrix[x * Y + k] * residualMatrix[x * Y + y];
+          if (k == y) {
+            prob_kj += residualMatrix[x * Y + y];
+          }
+          prob_kj *= matrixA[x * Y + k];
+          acc += prob_kj;
+        }
+        matrixC[x * Y + y] = static_cast<float>(acc) / sqrt(32);
+      }
+    }
   } else if (params.NO_NORM_GRAD) {
     // elementwise multiplication and addition of matrices
     int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -257,17 +287,16 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       for (int j = 0; j < K; j++) {
         ACC_T a = matrixA[i * K + j];
         ACC_T b = matrixB[i * K + j];
-        ACC_T acc = a * b;
 
         if (inputScaling) {
-          acc *= static_cast<ACC_T>(matrixA[X * K + j]);
+          a *= static_cast<ACC_T>(matrixA[X * K + j]);
         }
 
         if (weightScaling) {
-          acc *= static_cast<ACC_T>(matrixB[X * K + j]);
+          b *= static_cast<ACC_T>(matrixB[X * K + j]);
         }
 
-        outputMatrix[j] += acc;
+        outputMatrix[j] = gold_fma(a, b, outputMatrix[j]);
       }
     }
 
@@ -277,13 +306,9 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         acc = gold_fma(outputMatrix[i], outputMatrix[i], acc);
       }
 
-      // TODO: implement posit square root
-      acc = 1.0f / std::sqrt(static_cast<float>(acc));
-
-      if (static_cast<float>(acc) < 1) {
-        for (int i = 0; i < K; i++) {
-          outputMatrix[i] *= acc;
-        }
+      acc = std::min(1.0f / std::sqrt(static_cast<float>(acc)), 1.0f);
+      for (int i = 0; i < K; i++) {
+        outputMatrix[i] *= acc;
       }
     }
 
@@ -291,57 +316,6 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       matrixC[i] = outputMatrix[i];
     }
     // Cross Entropy Loss
-  } else if (params.CROSS_ENTROPY_GRAD) {
-    // matrix A: logits
-    // matrix B: one-hot encoded targets
-    int X = params.loops[0][params.inputXLoopIndex[0]] *
-            params.loops[1][params.inputXLoopIndex[1]];
-
-    ACC_T outputMatrix[X];
-    memset(outputMatrix, 0, sizeof(outputMatrix));
-
-    for (int i = 0; i < X; i++) {
-      outputMatrix[i] = matrixA[i];
-      if (inputScaling) {
-        outputMatrix[i] *= static_cast<ACC_T>(matrixA[X + i]);
-      }
-    }
-
-    ACC_T max = 0;
-    ACC_T sum = 0;
-
-    for (int i = 0; i < X; i++) {
-      if (outputMatrix[i] > max) {
-        max = outputMatrix[i];
-      }
-    }
-
-    for (int i = 0; i < X; i++) {
-      outputMatrix[i] = exp(static_cast<float>(outputMatrix[i] - max));
-      sum += outputMatrix[i];
-    }
-
-    for (int i = 0; i < X; i++) {
-      outputMatrix[i] /= sum;
-      outputMatrix[i] -= matrixB[i];
-      matrixC[i] = outputMatrix[i];
-    }
-  } else if (params.MSE_GRAD) {
-    int X = params.loops[0][params.inputXLoopIndex[0]] *
-            params.loops[1][params.inputXLoopIndex[1]];
-
-    ACC_T divisor = 2 / X;
-    for (int i = 0; i < X; i++) {
-      matrixC[i] = static_cast<ACC_T>(matrixA[i] - matrixB[i]) * divisor;
-    }
-  } else if (params.BCE_WITH_LOGITS_GRAD) {
-    int X = params.loops[0][params.inputXLoopIndex[0]] *
-            params.loops[1][params.inputXLoopIndex[1]];
-
-    ACC_T divisor = 1 / X;
-    for (int i = 0; i < X; i++) {
-      matrixC[i] = static_cast<ACC_T>(matrixA[i] - matrixB[i]) * divisor;
-    }
   } else if (params.BIAS_GRAD) {
     int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
     int K = params.loops[0][params.weightLoopIndex[0]] *
@@ -366,13 +340,13 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     for (int i = 0; i < K; i++) {
       for (int j = 0; j < C; j++) {
-        ACC_T acc = inputMatrixB[j * K + i];
+        ACC_T b = inputMatrixB[j * K + i];
 
         if (inputScaling) {
-          acc *= static_cast<ACC_T>(matrixB[C * K + i]);
+          b *= static_cast<ACC_T>(matrixB[C * K + i]);
         }
 
-        outputMatrix[i] += acc;
+        outputMatrix[i] += b;
       }
     }
 
@@ -382,18 +356,60 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         acc = gold_fma(outputMatrix[i], outputMatrix[i], acc);
       }
 
-      // TODO: implement posit square root
-      acc = 1.0f / std::sqrt(static_cast<float>(acc));
-
-      if (static_cast<float>(acc) < 1) {
-        for (int i = 0; i < K; i++) {
-          outputMatrix[i] *= acc;
-        }
+      acc = std::min(1.0f / std::sqrt(static_cast<float>(acc)), 1.0f);
+      for (int i = 0; i < K; i++) {
+        outputMatrix[i] *= acc;
       }
     }
 
     for (int i = 0; i < K; i++) {
       matrixC[i] = outputMatrix[i];
+    }
+  } else if (params.CROSS_ENTROPY_GRAD) {
+    // matrix A: one-hot encoded targets
+    // matrix B: output logits
+    int X = params.loops[0][params.inputXLoopIndex[0]] *
+            params.loops[1][params.inputXLoopIndex[1]];
+
+    ACC_T outputMatrix[X];
+    memset(outputMatrix, 0, sizeof(outputMatrix));
+
+    for (int i = 0; i < X; i++) {
+      outputMatrix[i] = matrixB[i];
+      if (inputScaling) {
+        outputMatrix[i] *= static_cast<ACC_T>(matrixB[X + i]);
+      }
+    }
+
+    ACC_T max = 0;
+    for (int i = 0; i < X; i++) {
+      max = outputMatrix[i] > max ? outputMatrix[i] : max;
+    }
+
+    ACC_T sum = 0;
+    for (int i = 0; i < X; i++) {
+      outputMatrix[i] = exp(static_cast<float>(outputMatrix[i] - max));
+      sum += outputMatrix[i];
+    }
+
+    for (int i = 0; i < X; i++) {
+      matrixC[i] = outputMatrix[i] / sum - static_cast<ACC_T>(matrixA[i]);
+    }
+  } else if (params.MSE_GRAD) {
+    int X = params.loops[0][params.inputXLoopIndex[0]] *
+            params.loops[1][params.inputXLoopIndex[1]];
+
+    ACC_T divisor = 2 / X;
+    for (int i = 0; i < X; i++) {
+      matrixC[i] = static_cast<ACC_T>(matrixA[i] - matrixB[i]) * divisor;
+    }
+  } else if (params.BCE_WITH_LOGITS_GRAD) {
+    int X = params.loops[0][params.inputXLoopIndex[0]] *
+            params.loops[1][params.inputXLoopIndex[1]];
+
+    ACC_T divisor = 1 / X;
+    for (int i = 0; i < X; i++) {
+      matrixC[i] = static_cast<ACC_T>(matrixA[i] - matrixB[i]) * divisor;
     }
   } else {  // normal operation
     int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -488,7 +504,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
                   acc = gold_fma(a, b, acc);
 
-                  if (params.GRADIENT_ACCUMULATION) {
+                  if (params.WEIGHT_SPLITTING) {
                     b = weightGradMatrix[(fy + (FY - 1) / 2) * FX * C * K +
                                          (fx + (FX - 1) / 2) * C * K + c * K +
                                          k];
@@ -518,7 +534,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
           if (params.BIAS) {
             acc += biasMatrix[k];
 
-            if (params.GRADIENT_ACCUMULATION) {
+            if (params.WEIGHT_SPLITTING) {
               acc += learningRate * biasGradMatrix[k];
             }
           }
@@ -556,12 +572,9 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       }
 
       // TODO: implement posit reciprocal square root
-      acc = 1.0f / std::sqrt(static_cast<float>(acc));
-
-      if (static_cast<float>(acc) < 1) {
-        for (int i = 0; i < X * K; i++) {
-          outputMatrix[i] *= acc;
-        }
+      acc = std::min(1.0f / std::sqrt(static_cast<float>(acc)), 1.0f);
+      for (int i = 0; i < X * K; i++) {
+        outputMatrix[i] *= acc;
       }
     }
 

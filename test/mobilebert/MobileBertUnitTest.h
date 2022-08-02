@@ -133,13 +133,13 @@ int runOperation(const SimplifiedParams params, const Files files,
                   universalResidualMatrix, floatResidualMatrix);
   }
 
-  if (params.GRADIENT_ACCUMULATION && !files.weights_file.empty()) {
+  if (params.WEIGHT_SPLITTING && !files.weights_file.empty()) {
     datafile = gradDataDir + layerName + files.weights_file;
     load_weights(params, datafile, true, sramMemory, weightGradMatrix,
                  universalWeightGradMatrix, floatWeightGradMatrix);
   }
 
-  if (params.GRADIENT_ACCUMULATION && params.BIAS) {
+  if (params.WEIGHT_SPLITTING && params.BIAS) {
     datafile = gradDataDir + layerName + files.bias_file;
     load_bias(params, datafile, true, sramMemory, biasGradMatrix,
               universalBiasGradMatrix, floatBiasGradMatrix);

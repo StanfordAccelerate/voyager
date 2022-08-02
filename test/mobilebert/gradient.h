@@ -70,6 +70,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
+         .OUTER_PRODUCT = true,
          .GRAD_CLIPPING = true,
      }},
 
@@ -237,6 +238,24 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .GRAD_CLIPPING = true,
      }},
 
+    // (128 x 128)
+    // {"keyBias",
+    //  {
+    //      .WEIGHT_TRANSPOSE = true,
+    //      .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
+    //      .inputXLoopIndex = {0, 5},
+    //      .inputYLoopIndex = {1, 4},
+    //      .reductionLoopIndex = {3, 0},
+    //      .weightLoopIndex = {2, 1},
+    //      .fxIndex = 3,
+    //      .fyIndex = 2,
+    //      .weightReuseIndex = {4, 5},
+    //      .STRIDE = 1,
+    //      .BIAS_GRAD = true,
+    //      .CONCAT_WEIGHT = true,
+    //      .GRAD_CLIPPING = true,
+    //  }},
+
     // (128 x 512)
     {"hiddenReduction",
      {
@@ -257,16 +276,10 @@ std::map<std::string, SimplifiedParams> gradientParams{
 std::map<std::string, MemoryOffsets> gradientMemOffsets{
     {"classifier_weight",
      {
-         0,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
          6 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
          12 * WEIGHT_INTERMEDIATE_SIZE + 7 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
-     }},
-    {"classifier_bias",
-     {
-         0,  // unused
-         0,
-         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
      }},
     {"output_bottleneck_LayerNorm_weight",
@@ -414,7 +427,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      }},
     {"ffn_1_intermediate_dense_weight",
      {
-         0,
+         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
          0,
          5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
@@ -599,13 +612,6 @@ std::map<std::string, Files> gradientTestFiles{
          "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm",
          "",
          "classifier_weight",
-     }},
-    {"classifier_bias",
-     {
-         "",
-         "mobilebert_logits",
-         "",
-         "classifier_bias",
      }},
     {"output_bottleneck_LayerNorm_weight",
      {
