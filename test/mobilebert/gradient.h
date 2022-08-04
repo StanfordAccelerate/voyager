@@ -238,24 +238,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .GRAD_CLIPPING = true,
      }},
 
-    // (128 x 128)
-    // {"keyBias",
-    //  {
-    //      .WEIGHT_TRANSPOSE = true,
-    //      .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
-    //      .inputXLoopIndex = {0, 5},
-    //      .inputYLoopIndex = {1, 4},
-    //      .reductionLoopIndex = {3, 0},
-    //      .weightLoopIndex = {2, 1},
-    //      .fxIndex = 3,
-    //      .fyIndex = 2,
-    //      .weightReuseIndex = {4, 5},
-    //      .STRIDE = 1,
-    //      .BIAS_GRAD = true,
-    //      .CONCAT_WEIGHT = true,
-    //      .GRAD_CLIPPING = true,
-    //  }},
-
     // (128 x 512)
     {"hiddenReduction",
      {
@@ -307,7 +289,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      {
          0,  // unused
          0,
-         11 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
+         12 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
      }},
 
@@ -422,7 +404,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      {
          0,  // unused
          0,
-         6 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
+         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
      }},
     {"ffn_1_intermediate_dense_weight",
@@ -436,7 +418,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      {
          0,  // unused
          0,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
+         6 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
      }},
 
@@ -587,7 +569,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      }},
     {"bottleneck_input_LayerNorm_bias",
      {
-         INTERMEDIATE_SIZE,
+         0,
          0,
          WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_HIDDEN_SIZE,
      }},

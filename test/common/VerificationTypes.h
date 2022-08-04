@@ -67,6 +67,7 @@ struct SimplifiedParams {
 
   // special vector ops
   bool SOFTMAX;
+  bool ATTENTION_MASK;
   bool FC;
   bool NO_NORM;
   bool OUTER_PRODUCT;

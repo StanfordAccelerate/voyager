@@ -276,7 +276,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::string activationDataDir = datapath + "activations/";
   std::string weightDataDir = datapath + "weights/";
   std::string errorDataDir = datapath + "errors/";
-  std::string gradientDataDir = datapath + "clipped_gradients/";
+  std::string gradientDataDir = datapath + "gradients/";
   std::string outfilePrefix = "test_outputs/" + test + ".";
 
   std::map<std::string, std::string> paramsMapping;

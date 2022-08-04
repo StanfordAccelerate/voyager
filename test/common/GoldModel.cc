@@ -83,14 +83,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     for (int x = 0; x < X; x++) {
       ACC_T max = 0;
-      ACC_T sum = 0;
-
       for (int y = 0; y < Y; y++) {
-        if (outputMatrix[x * Y + y] > max) {
-          max = outputMatrix[x * Y + y];
-        }
+        max = outputMatrix[x * Y + y] > max ? outputMatrix[x * Y + y] : max;
       }
 
+      ACC_T sum = 0;
       for (int y = 0; y < Y; y++) {
         ACC_T adjustedVal = outputMatrix[x * Y + y] - max;
         gold_exp(adjustedVal);
