@@ -219,8 +219,8 @@ int run_sequence(const std::string& group,
           hls_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
           hls_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
           hls_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          hls_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, false,
-          false);
+          hls_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, nullptr,
+          nullptr, false, false);
     }
     if (std::find(comparisons.begin(), comparisons.end(), "universal") !=
         comparisons.end()) {
@@ -230,8 +230,8 @@ int run_sequence(const std::string& group,
           uni_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
           uni_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
           uni_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          uni_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, false,
-          false);
+          uni_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, nullptr,
+          nullptr, false, false);
     }
     if (std::find(comparisons.begin(), comparisons.end(), "fp32") !=
         comparisons.end()) {
@@ -241,8 +241,8 @@ int run_sequence(const std::string& group,
           float_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
           float_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
           float_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          float_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, false,
-          false);
+          float_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, nullptr,
+          nullptr, false, false);
     }
   }
 
@@ -323,7 +323,7 @@ int run_sequence(const std::string& group,
     } else if ((comparisons[i] == "customposit" &&
                 comparisons[i + 1] == "fp32") ||
                (comparisons[i] == "fp32" &&
-                comparisons[i+1] == "customposit")) {
+                comparisons[i + 1] == "customposit")) {
       error_count += compare_arrays(
           hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
           float_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
@@ -415,8 +415,19 @@ extern "C" int sc_main(int argc, char* argv[]) {
       std::string activationDataDir = datapath + "activations/";
       loadActivation(activationDataDir);
 
-      // errors += runInference(datapath, compList);
       errors += runBackprop(datapath, compList);
+      // errors += verifyGradients(datapath, "test_outputs/");
+
+      deleteMemory();
+    } else if (tests == "e2e") {
+      errors = allocateMemory();
+
+      std::string weightDataDir = datapath + "weights/";
+      loadWeights(weightDataDir);
+
+      errors += runInference(datapath, compList);
+      errors += runBackprop(datapath, compList);
+      errors += verifyGradients(datapath, "test_outputs/");
 
       deleteMemory();
     } else {

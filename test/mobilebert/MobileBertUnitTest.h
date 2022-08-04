@@ -37,7 +37,8 @@ int runOperation(const SimplifiedParams params, const Files files,
                  const MemoryMap memoryMap, const std::string inputDataDir,
                  const std::string weightDataDir,
                  const std::string outputDataDir,
-                 const std::string residualDataDir, const std::string layerName,
+                 const std::string residualDataDir,
+                 const std::string gradDataDir, const std::string layerName,
                  const std::string outfilePrefix,
                  const std::vector<std::string> groups, bool inputScaling,
                  bool weightScaling) {
@@ -82,6 +83,8 @@ int runOperation(const SimplifiedParams params, const Files files,
   INPUT_DATATYPE* matrixB = new INPUT_DATATYPE[FX * FY * C * K];
   INPUT_DATATYPE* biasMatrix = new INPUT_DATATYPE[K];
   INPUT_DATATYPE* residualMatrix = new INPUT_DATATYPE[outputSize];
+  INPUT_DATATYPE* weightGradMatrix = new INPUT_DATATYPE[FX * FY * C * K];
+  INPUT_DATATYPE* biasGradMatrix = new INPUT_DATATYPE[K];
   OUTPUT_DATATYPE* matrixC = new OUTPUT_DATATYPE[outputSize];
   OUTPUT_DATATYPE* dataFileOutput = new OUTPUT_DATATYPE[outputSize];
 
@@ -90,6 +93,9 @@ int runOperation(const SimplifiedParams params, const Files files,
   UniversalPosit* universalMatrixB = new UniversalPosit[FX * FY * C * K];
   UniversalPosit* universalBiasMatrix = new UniversalPosit[K];
   UniversalPosit* universalResidualMatrix = new UniversalPosit[outputSize];
+  UniversalPosit* universalWeightGradMatrix =
+      new UniversalPosit[FX * FY * C * K];
+  UniversalPosit* universalBiasGradMatrix = new UniversalPosit[K];
   UniversalPosit* universalMatrixC = new UniversalPosit[outputSize];
   UniversalPosit* universalDataFileOutput = new UniversalPosit[outputSize];
 
@@ -97,6 +103,8 @@ int runOperation(const SimplifiedParams params, const Files files,
   float* floatMatrixB = new float[FX * FY * C * K];
   float* floatBiasMatrix = new float[K];
   float* floatResidualMatrix = new float[outputSize];
+  float* floatWeightGradMatrix = new float[FX * FY * C * K];
+  float* floatBiasGradMatrix = new float[K];
   float* floatMatrixC = new float[outputSize];
   float* floatDataFileOutput = new float[outputSize];
 
@@ -125,6 +133,18 @@ int runOperation(const SimplifiedParams params, const Files files,
                   universalResidualMatrix, floatResidualMatrix);
   }
 
+  if (params.WEIGHT_SPLITTING && !files.weights_file.empty()) {
+    datafile = gradDataDir + layerName + files.weights_file;
+    load_weights(params, datafile, true, sramMemory, weightGradMatrix,
+                 universalWeightGradMatrix, floatWeightGradMatrix);
+  }
+
+  if (params.WEIGHT_SPLITTING && params.BIAS) {
+    datafile = gradDataDir + layerName + files.bias_file;
+    load_bias(params, datafile, true, sramMemory, biasGradMatrix,
+              universalBiasGradMatrix, floatBiasGradMatrix);
+  }
+
   datafile = outputDataDir + layerName + files.outputs_file;
   load_datafile_outputs(params, datafile, dataFileOutput,
                         universalDataFileOutput, floatDataFileOutput);
@@ -143,19 +163,21 @@ int runOperation(const SimplifiedParams params, const Files files,
 
   if (customposit) {
     run_custom_posit_gold_model(params, matrixA, matrixB, matrixC, biasMatrix,
-                                residualMatrix, inputScaling, weightScaling);
+                                residualMatrix, weightGradMatrix,
+                                biasGradMatrix, inputScaling, weightScaling);
   }
 
   if (universal) {
-    run_universal_posit_gold_model(params, universalMatrixA, universalMatrixB,
-                                   universalMatrixC, universalBiasMatrix,
-                                   universalResidualMatrix, inputScaling,
-                                   weightScaling);
+    run_universal_posit_gold_model(
+        params, universalMatrixA, universalMatrixB, universalMatrixC,
+        universalBiasMatrix, universalResidualMatrix, universalWeightGradMatrix,
+        universalBiasGradMatrix, inputScaling, weightScaling);
   }
 
   if (fp32) {
     run_fp_gold_model(params, floatMatrixA, floatMatrixB, floatMatrixC,
-                      floatBiasMatrix, floatResidualMatrix, inputScaling,
+                      floatBiasMatrix, floatResidualMatrix,
+                      floatWeightGradMatrix, floatBiasGradMatrix, inputScaling,
                       weightScaling);
   }
 
@@ -289,7 +311,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   SimplifiedParams params = mobileBertParams.at(paramsName);
   Files files = mobileBertTestFiles.at(test);
   MemoryOffsets offsets = mobileBertMemOffsets.at(test);
-  std::string layerName = "mobilebert_encoder_layer_23_";
+  std::string layerName = "mobilebert_encoder_layer_0_";
 
   if (test.find("classifier") != std::string::npos ||
       (task == "backprop" && test == "output_bottleneck_LayerNorm")) {
@@ -312,43 +334,49 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::cout << "operation name: " << paramsName << std::endl;
 
   if (task == "inference") {
+    activationDataDir = datapath + "activations2/";
     return runOperation(params, files, memoryMap, activationDataDir,
                         params.WEIGHT ? weightDataDir : activationDataDir,
-                        activationDataDir, activationDataDir, layerName,
-                        outfilePrefix, compList, false, false);
+                        activationDataDir, activationDataDir, gradientDataDir,
+                        layerName, outfilePrefix, compList, false, false);
   } else if (task == "backprop") {
     if (test.find("attention_self_value_layer") != std::string::npos) {
       return runOperation(params, files, memoryMap, activationDataDir,
-                          errorDataDir, errorDataDir, errorDataDir, layerName,
-                          outfilePrefix, compList, false, false);
+                          errorDataDir, errorDataDir, errorDataDir,
+                          gradientDataDir, layerName, outfilePrefix, compList,
+                          false, false);
     } else if (test.find("attention_self_query_layer") != std::string::npos ||
                test.find("attention_self_key_layer") != std::string::npos ||
                test.find("attention_self_attention_probs") !=
                    std::string::npos) {
       return runOperation(params, files, memoryMap, errorDataDir,
                           activationDataDir, errorDataDir, errorDataDir,
-                          layerName, outfilePrefix, compList, false, false);
+                          gradientDataDir, layerName, outfilePrefix, compList,
+                          false, false);
     } else if (params.SOFTMAX_GRAD || params.RELU_GRAD) {
       return runOperation(params, files, memoryMap, errorDataDir, weightDataDir,
-                          errorDataDir, activationDataDir, layerName,
-                          outfilePrefix, compList, false, false);
+                          errorDataDir, activationDataDir, gradientDataDir,
+                          layerName, outfilePrefix, compList, false, false);
     } else if (params.CROSS_ENTROPY_GRAD) {
       return runOperation(params, files, memoryMap, activationDataDir,
                           activationDataDir, errorDataDir, activationDataDir,
-                          layerName, outfilePrefix, compList, false, false);
+                          gradientDataDir, layerName, outfilePrefix, compList,
+                          false, false);
     }
     return runOperation(params, files, memoryMap, errorDataDir, weightDataDir,
-                        errorDataDir, errorDataDir, layerName, outfilePrefix,
-                        compList, false, false);
+                        errorDataDir, errorDataDir, gradientDataDir, layerName,
+                        outfilePrefix, compList, false, false);
   } else if (task == "gradient") {
     if (test.find("classifier_weight") != std::string::npos) {
       return runOperation(params, files, memoryMap, errorDataDir,
                           activationDataDir, gradientDataDir, gradientDataDir,
-                          layerName, outfilePrefix, compList, false, false);
+                          gradientDataDir, layerName, outfilePrefix, compList,
+                          false, false);
     }
     return runOperation(params, files, memoryMap, activationDataDir,
                         errorDataDir, gradientDataDir, gradientDataDir,
-                        layerName, outfilePrefix, compList, false, false);
+                        gradientDataDir, layerName, outfilePrefix, compList,
+                        false, false);
   }
 
   return 1;

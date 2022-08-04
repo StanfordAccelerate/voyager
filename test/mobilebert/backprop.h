@@ -7,6 +7,7 @@
 #include "test/common/VerificationTypes.h"
 
 std::vector<std::string> backpropOrder{
+    "classifier",
     "output_bottleneck_LayerNorm",
     "output_bottleneck_dense",
     "output_LayerNorm",
@@ -37,14 +38,14 @@ std::vector<std::string> backpropOrder{
     "attention_self_attention_scores_1",
     "attention_self_attention_scores_2",
     "attention_self_attention_scores_3",
-    "attention_self_query_layer_0",
-    "attention_self_query_layer_1",
-    "attention_self_query_layer_2",
     "attention_self_query_layer_3",
-    "attention_self_key_layer_0",
-    "attention_self_key_layer_1",
-    "attention_self_key_layer_2",
+    "attention_self_query_layer_2",
+    "attention_self_query_layer_1",
+    "attention_self_query_layer_0",
     "attention_self_key_layer_3",
+    "attention_self_key_layer_2",
+    "attention_self_key_layer_1",
+    "attention_self_key_layer_0",
     "bottleneck_attention_LayerNorm_0",
     "bottleneck_attention_LayerNorm_1",
     "bottleneck_attention_dense",
@@ -380,13 +381,16 @@ std::map<std::string, MemoryOffsets> backpropMemOffsets{
     {"classifier",
      {
          0,
-         0,
-         0,
+         7 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE +
+             24 * BIAS_HIDDEN_SIZE,  // classfier bias gradient offset
          0,
      }},
     {"output_bottleneck_LayerNorm",
      {
-         0,
+         12 * WEIGHT_INTERMEDIATE_SIZE + 23 * BIAS_INTERMEDIATE_SIZE +
+             3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
          12 * WEIGHT_INTERMEDIATE_SIZE + 7 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE,
          INTERMEDIATE_SIZE,
@@ -738,8 +742,8 @@ std::map<std::string, MemoryOffsets> backpropMemOffsets{
 std::map<std::string, Files> backpropTestFiles{
     {"classifier",
      {
-         "mobilebert_logits",
          "mobilebert_labels",
+         "mobilebert_logits",
          "",
          "mobilebert_logits",
      }},
