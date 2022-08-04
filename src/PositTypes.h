@@ -755,7 +755,7 @@ Posit<nbits2, es2> fma(const Posit<nbits, es> &a, const Posit<nbits, es> &b,
 
   PositFP<8, fbits> va(a), vb(b);
   PositFP<8, mbits> product;
-  // PositFP<8, fbits> product;
+  // PositFP<8, fbits> product; // product for log posit
   PositFP<8, fbits2> vc(c);
   PositFP<8, abits + 1> sum;
 

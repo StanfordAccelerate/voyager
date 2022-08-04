@@ -99,6 +99,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .STRIDE = 1,
          .BIAS = true,
          .WEIGHT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 128) * 128
@@ -116,6 +118,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .NO_NORM = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -133,6 +137,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .SPLIT_OUTPUT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 512) x (512 x 128)
@@ -150,6 +156,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .SPLIT_OUTPUT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 32) x (32 x 128)
@@ -213,6 +221,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .RESIDUAL = true,
          .WEIGHT = true,
          .CONCAT_INPUT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -230,6 +240,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .RELU = true,
          .BIAS = true,
          .WEIGHT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 512) x (512 x 128)
@@ -247,6 +259,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .RESIDUAL = true,
          .WEIGHT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -264,6 +278,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .RESIDUAL = true,
          .WEIGHT = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (128 x 512) * 512
@@ -281,6 +297,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .NO_NORM = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 
     // (1 x 512) x (512 x 16)
@@ -298,6 +316,8 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .FC = true,
+         .WEIGHT_SPLITTING = true,
+         .learningRate = -2e-2,
      }},
 };
 

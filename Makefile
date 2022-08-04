@@ -21,17 +21,16 @@ LDLIBS = -L/cad/mentor/2021.1/Mgc_home/shared/lib/
 ###########################################################
 # Catapult Synthesis
 ###########################################################
-rtl=build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v
-
-InputController=build/Catapult_InputController/InputController.v1/concat_rtl.v
-WeightController=build/Catapult_WeightController/WeightController.v1/concat_rtl.v
-MatrixProcessor=build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v
-ProcessingElement=build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v
-VectorUnit=build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
-MaxpoolUnit=build/Catapult_MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v
-OutputAddressGenerator=build/Catapult_OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v
-VectorFetchUnit=build/Catapult_VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v
-VectorOpUnit=build/Catapult_VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
+rtl: build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v
+InputController: build/Catapult_InputController/InputController.v1/concat_rtl.v
+WeightController: build/Catapult_WeightController/WeightController.v1/concat_rtl.v
+MatrixProcessor: build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v
+ProcessingElement: build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v
+VectorUnit: build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
+MaxpoolUnit: build/Catapult_MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v
+OutputAddressGenerator: build/Catapult_OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v
+VectorFetchUnit: build/Catapult_VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v
+VectorOpUnit: build/Catapult_VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
 
 
 build/Catapult_InputController/InputController.v1/concat_rtl.v: src/InputController.h
@@ -40,9 +39,9 @@ build/Catapult_WeightController/WeightController.v1/concat_rtl.v: src/WeightCont
 	catapult -shell -file scripts/WeightController.tcl
 build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v: src/ProcessingElement.h
 	catapult -shell -file scripts/ProcessingElement.tcl
-build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: ProcessingElement
+build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v
 	catapult -shell -file scripts/MatrixProcessor.tcl
-build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v: MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
+build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v: build/Catapult_MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v build/Catapult_OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v build/Catapult_VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v build/Catapult_VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
 	catapult -shell -file scripts/VectorUnit.tcl
 build/Catapult_MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v: src/MaxpoolUnit.h
 	catapult -shell -file scripts/MaxpoolUnit.tcl
@@ -52,8 +51,7 @@ build/Catapult_VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v: src/VectorFetch.
 	catapult -shell -file scripts/VectorFetchUnit.tcl
 build/Catapult_VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.h
 	catapult -shell -file scripts/VectorOpUnit.tcl
-
-build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v: InputController WeightController MatrixProcessor VectorUnit
+build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v: build/Catapult_InputController/InputController.v1/concat_rtl.v build/Catapult_WeightController/WeightController.v1/concat_rtl.v build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
 	catapult -shell -file scripts/Accelerator.tcl
 	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
 
