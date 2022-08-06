@@ -1,6 +1,8 @@
 #pragma once
 
+#ifndef NO_SYSC
 #include "TypeToBits.h"
+#endif
 
 struct MatrixParams {
   int INPUT_OFFSET;
@@ -43,6 +45,7 @@ struct MatrixParams {
   static const unsigned int width =
       13 * 32 + 12 * 32 + 10 * 32 + 7 * 1 + 11 * 32;
 
+  #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m& INPUT_OFFSET;
@@ -99,6 +102,7 @@ struct MatrixParams {
                               const std::string& name) {
     // TODO
   }
+  #endif
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const MatrixParams& params) {
@@ -222,6 +226,8 @@ struct VectorInstructions {
 
   static const unsigned int width = 52;
   VectorInstructions() {}
+
+  #ifndef NO_SYSC
   VectorInstructions(const int a) {
     ac_int<width, false> val = a;
     sc_lv<width> valLV;
@@ -265,6 +271,7 @@ struct VectorInstructions {
                               const std::string& name) {
     // TODO
   }
+  #endif
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorInstructions& params) {
@@ -337,6 +344,7 @@ struct VectorParams {
   static const unsigned int width =
       13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1;
 
+  #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m& VECTOR_OFFSET;
@@ -411,6 +419,7 @@ struct VectorParams {
                               const std::string& name) {
     // TODO
   }
+  #endif
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorParams& params) {
@@ -428,6 +437,7 @@ struct VectorInstructionConfig {
   static const unsigned int width =
       VectorInstructions::width * 8 + 32 * 8 + 32 + 32;
 
+  #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     for (int j = 0; j < 8; j++) {
@@ -500,6 +510,7 @@ struct VectorInstructionConfig {
                               const std::string& name) {
     // TODO
   }
+  #endif
 
   inline friend std::ostream& operator<<(
       ostream& os, const VectorInstructionConfig& params) {
