@@ -41,6 +41,7 @@ solution file add ./test/common/Harness.cc -exclude true
 solution file add ./test/common/Utils.cc -exclude true
 solution file add ./test/common/GoldModel.cc -exclude true
 solution file add ./test/common/DataLoader.cc -exclude true
+solution file add ./test/toolchain/MapOperation.cc -exclude true
 
 go analyze
 
