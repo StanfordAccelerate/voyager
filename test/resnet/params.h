@@ -10,6 +10,7 @@ const SimplifiedParams conv1_params = {
     .INPUT_OFFSET = 45056,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 847872,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, 2, 16, 16}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -28,6 +29,8 @@ const SimplifiedParams conv1_params = {
     .MAXPOOL = true,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -35,6 +38,7 @@ const SimplifiedParams layer1_0_conv1_params = {
     .INPUT_OFFSET = 847872,
     .WEIGHT_OFFSET = 9472,
     .OUTPUT_OFFSET = 45056,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -53,6 +57,8 @@ const SimplifiedParams layer1_0_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -60,6 +66,7 @@ const SimplifiedParams layer1_0_conv2_params = {
     .INPUT_OFFSET = 45056,
     .WEIGHT_OFFSET = 46400,
     .OUTPUT_OFFSET = 1249280,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -78,6 +85,8 @@ const SimplifiedParams layer1_0_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -85,6 +94,7 @@ const SimplifiedParams layer1_1_conv1_params = {
     .INPUT_OFFSET = 1249280,
     .WEIGHT_OFFSET = 83328,
     .OUTPUT_OFFSET = 446464,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -103,6 +113,8 @@ const SimplifiedParams layer1_1_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -110,6 +122,7 @@ const SimplifiedParams layer1_1_conv2_params = {
     .INPUT_OFFSET = 446464,
     .WEIGHT_OFFSET = 120256,
     .OUTPUT_OFFSET = 1650688,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -128,6 +141,8 @@ const SimplifiedParams layer1_1_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -135,6 +150,7 @@ const SimplifiedParams layer2_0_downsample_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 157184,
     .OUTPUT_OFFSET = 847872,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 2, 1, 1, 14, 14}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -153,6 +169,8 @@ const SimplifiedParams layer2_0_downsample_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -160,6 +178,7 @@ const SimplifiedParams layer2_0_conv1_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 165504,
     .OUTPUT_OFFSET = 446464,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 4, 4, 1, 1, 1}, {4, 2, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -178,6 +197,8 @@ const SimplifiedParams layer2_0_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -185,6 +206,7 @@ const SimplifiedParams layer2_0_conv2_params = {
     .INPUT_OFFSET = 446464,
     .WEIGHT_OFFSET = 239360,
     .OUTPUT_OFFSET = 1249280,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -203,6 +225,8 @@ const SimplifiedParams layer2_0_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -210,6 +234,7 @@ const SimplifiedParams layer2_1_conv1_params = {
     .INPUT_OFFSET = 1249280,
     .WEIGHT_OFFSET = 386944,
     .OUTPUT_OFFSET = 45056,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -228,6 +253,8 @@ const SimplifiedParams layer2_1_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -235,6 +262,7 @@ const SimplifiedParams layer2_1_conv2_params = {
     .INPUT_OFFSET = 45056,
     .WEIGHT_OFFSET = 534528,
     .OUTPUT_OFFSET = 1650688,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -253,6 +281,8 @@ const SimplifiedParams layer2_1_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -260,6 +290,7 @@ const SimplifiedParams layer3_0_downsample_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 682112,
     .OUTPUT_OFFSET = 847872,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 2, 1, 1, 1}, {8, 8, 1, 1, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -278,6 +309,8 @@ const SimplifiedParams layer3_0_downsample_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -285,6 +318,7 @@ const SimplifiedParams layer3_0_conv1_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 715136,
     .OUTPUT_OFFSET = 45056,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {8, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -303,6 +337,8 @@ const SimplifiedParams layer3_0_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -310,6 +346,7 @@ const SimplifiedParams layer3_0_conv2_params = {
     .INPUT_OFFSET = 45056,
     .WEIGHT_OFFSET = 1010304,
     .OUTPUT_OFFSET = 1249280,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -328,6 +365,8 @@ const SimplifiedParams layer3_0_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -335,6 +374,7 @@ const SimplifiedParams layer3_1_conv1_params = {
     .INPUT_OFFSET = 1249280,
     .WEIGHT_OFFSET = 4194304,
     .OUTPUT_OFFSET = 446464,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -353,6 +393,8 @@ const SimplifiedParams layer3_1_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -360,6 +402,7 @@ const SimplifiedParams layer3_1_conv2_params = {
     .INPUT_OFFSET = 446464,
     .WEIGHT_OFFSET = 4784384,
     .OUTPUT_OFFSET = 1650688,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -378,6 +421,8 @@ const SimplifiedParams layer3_1_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -385,6 +430,7 @@ const SimplifiedParams layer4_0_downsample_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 1600384,
     .OUTPUT_OFFSET = 847872,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 2, 1, 1, 1}, {16, 16, 1, 1, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -403,6 +449,8 @@ const SimplifiedParams layer4_0_downsample_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -410,6 +458,7 @@ const SimplifiedParams layer4_0_conv1_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 8388608,
     .OUTPUT_OFFSET = 446464,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -428,6 +477,8 @@ const SimplifiedParams layer4_0_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -435,6 +486,7 @@ const SimplifiedParams layer4_0_conv2_params = {
     .INPUT_OFFSET = 446464,
     .WEIGHT_OFFSET = 1731968,
     .OUTPUT_OFFSET = 1249280,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {32, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -453,6 +505,8 @@ const SimplifiedParams layer4_0_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -460,6 +514,7 @@ const SimplifiedParams layer4_1_conv1_params = {
     .INPUT_OFFSET = 1249280,
     .WEIGHT_OFFSET = 5374464,
     .OUTPUT_OFFSET = 45056,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {32, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -478,6 +533,8 @@ const SimplifiedParams layer4_1_conv1_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -485,6 +542,7 @@ const SimplifiedParams layer4_1_conv2_params = {
     .INPUT_OFFSET = 45056,
     .WEIGHT_OFFSET = 9437184,
     .OUTPUT_OFFSET = 446464,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {32, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -503,6 +561,8 @@ const SimplifiedParams layer4_1_conv2_params = {
     .MAXPOOL = false,
     .AVGPOOL = true,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
 };
 
@@ -510,6 +570,7 @@ const SimplifiedParams fc_params = {
     .INPUT_OFFSET = 446464,
     .WEIGHT_OFFSET = 7734272,
     .OUTPUT_OFFSET = 1650688,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {32, 63, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -528,6 +589,8 @@ const SimplifiedParams fc_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = false,
     .FC = true,
 };
@@ -536,6 +599,7 @@ const SimplifiedParams softmax_params = {
     .INPUT_OFFSET = 1650688,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 1651688,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1008}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -554,6 +618,8 @@ const SimplifiedParams softmax_params = {
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
     .SOFTMAX = true,
 };
 
