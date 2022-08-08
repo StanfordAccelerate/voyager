@@ -23,28 +23,19 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
     vectorParams.addressGen0Enable = true;
     vectorParams.addressGen0Broadcast = false;
-    for (int i = 0; i < 3; i++) {
-      vectorParams.addressGen0Loop[0][i] = 1;
-    }
-    vectorParams.addressGen0Loop[1][0] = 1;
-    vectorParams.addressGen0Loop[1][1] = Y;
-    vectorParams.addressGen0Loop[1][2] = C / DIMENSION;
+    vectorParams.addressGen0Loop[0][0] = 1; 
+    vectorParams.addressGen0Loop[0][1] = X; 
+    vectorParams.addressGen0Loop[0][2] = 1; 
+    vectorParams.addressGen0Loop[1][0] = 3;// requires 3 passes
+    vectorParams.addressGen0Loop[1][1] = 1;
+    vectorParams.addressGen0Loop[1][2] = Y / DIMENSION;
 
     // address gen 1 (weights)
     vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
-    vectorParams.addressGen1Mode = 2;  // 2d tensor
-    for (int i = 0; i < 3; i++) {
-      vectorParams.addressGen1Loops[0][i] = 1;
-    }
-    vectorParams.addressGen1Loops[1][0] = Y;
-    vectorParams.addressGen1Loops[1][1] = 1;
-    vectorParams.addressGen1Loops[1][2] = C / DIMENSION;
+    vectorParams.addressGen1Mode = 0;  // 2d tensor
 
     vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-    vectorParams.addressGen2Mode = 2;  // 2d tensor
-    vectorParams.addressGen2Loops[0][0] = Y;
-    vectorParams.addressGen2Loops[0][1] = 1;
-    vectorParams.addressGen2Loops[0][2] = C / DIMENSION;
+    vectorParams.addressGen2Mode = 0;  // 2d tensor
 
     vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
     vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
@@ -57,13 +48,13 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     for (int i = 0; i < 3; i++) {
       vectorParams.outputLoops[0][i] = params.loops[0][i];
     }
-    vectorParams.outputXLoopIndex[0] = params.inputXLoopIndex[0];
-    vectorParams.outputYLoopIndex[0] = params.inputYLoopIndex[0];
-    vectorParams.outputWeightLoopIndex[0] = params.weightLoopIndex[0];
+    vectorParams.outputXLoopIndex[0] = 0;
+    vectorParams.outputYLoopIndex[0] = 1;
+    vectorParams.outputWeightLoopIndex[0] = 2;
 
     vectorParams.outputLoops[1][0] = 1;
-    vectorParams.outputLoops[1][1] = Y;
-    vectorParams.outputLoops[1][2] = C / DIMENSION;
+    vectorParams.outputLoops[1][1] = X;
+    vectorParams.outputLoops[1][2] = Y / DIMENSION;
     vectorParams.outputWeightLoopIndex[1] = 2;
     vectorParams.outputYLoopIndex[1] = 1;
     vectorParams.outputXLoopIndex[1] = 0;
@@ -74,43 +65,54 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     // create instruction stream
     //    VectorInstructionConfig vectorInstructionConfig;
 
-    // inst 0- calculate max value and save
+    // inst 0- start reduction engine to calculate max
     VectorInstructions vInst0;
-    vInst0.instType = VectorInstructions::vector;
-    vInst0.vInput = VectorInstructions::readFromVectorFetch;
-    vInst0.vAccumulatePush = VectorInstructions::nop;
-    vInst0.vOp0Src1 = VectorInstructions::readInterface;
-    vInst0.vOp0 = VectorInstructions::vmult;
-    vInst0.vOp1 = VectorInstructions::nop;
-    vInst0.vOp2 = VectorInstructions::nop;
-    vInst0.vOp3Src0 = VectorInstructions::nop;
-    vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
-    vInst0.vOp3 = VectorInstructions::vadd;
-    vInst0.vOp4 = params.RELU;
-    vInst0.vDest = VectorInstructions::vWriteOut;
-
+    vInst0.instType = VectorInstructions::reduction;
+    vInst0.rCount = Y/DIMENSION;
+    vInst0.rOp = VectorInstructions::rmax;
+    vInst0.rDuplicate = 1;
+    vInst0.rDest = VectorInstructions::toVectorSrc0;
     vectorInstructionConfig.inst[0] = vInst0;
-    // C/DIMENSION to do the complete reduction
-    // DIMENSION to fill up the entire vector
-    vectorInstructionConfig.instCount[0] = Y * C / DIMENSION;
+    vectorInstructionConfig.instCount[0] = 1;
 
-    // inst 1- subtract max and exp, and reduce
+    // inst 1- send to max
+    VectorInstructions vInst1;
+    vInst1.instType = VectorInstructions::vector;
+    vInst1.vInput = VectorInstructions::readFromVectorFetch;
+    vInst1.vAccumulatePush = VectorInstructions::nop;
+    vInst1.vOp0Src1 = VectorInstructions::nop;
+    vInst1.vOp0 = VectorInstructions::nop;
+    vInst1.vOp1 = VectorInstructions::nop;
+    vInst1.vOp2 = VectorInstructions::toReduce;
+    vInst1.vOp3Src0 = VectorInstructions::nop;
+    vInst1.vOp3Src1 = VectorInstructions::nop;
+    vInst1.vOp3 = VectorInstructions::nop;
+    vInst1.vOp4 = VectorInstructions::nop;
+    vInst1.vDest = VectorInstructions::nop;
+    vectorInstructionConfig.inst[1] = vInst1;
+    vectorInstructionConfig.instCount[1] = Y / DIMENSION;
+
+    // inst 2- subtract max and exp, and reduce sum
+    VectorInstructions vInst1;
+    vInst1.instType = VectorInstructions::vector;
+    vInst1.vInput = VectorInstructions::readFromVectorFetch;
+    vInst1.vAccumulatePush = VectorInstructions::nop;
+    vInst1.vOp0Src1 = VectorInstructions::nop;
+    vInst1.vOp0 = VectorInstructions::nop;
+    vInst1.vOp1 = VectorInstructions::nop;
+    vInst1.vOp2 = VectorInstructions::toReduce;
+    vInst1.vOp3Src0 = VectorInstructions::nop;
+    vInst1.vOp3Src1 = VectorInstructions::nop;
+    vInst1.vOp3 = VectorInstructions::nop;
+    vInst1.vOp4 = VectorInstructions::nop;
+    vInst1.vDest = VectorInstructions::nop;
+    vectorInstructionConfig.inst[1] = vInst1;
+    vectorInstructionConfig.instCount[1] = Y / DIMENSION;
 
     // inst 2- subtract max and exp, and divide by reduced value
 
     vectorInstructionConfig.instLen = 1;
     vectorInstructionConfig.instLoopCount = 1;
-
-    // sendSerializedParams<VectorInstructionConfig,
-    // 32>(vectorInstructionConfig,
-    //   &serialVectorParamsIn);
-
-    //     vectorUnitStartSignal.SyncPop();
-    //     CCS_LOG("Accelerator
-    //     Layer Started.");
-    //     vectorUnitDoneSignal.SyncPop();
-    //     CCS_LOG("Accelerator
-    //     Layer Finished.");
   } else if (params.SOFTMAX_GRAD) {
     matrixParamsValid = false;
     vectorParamsValid = true;
