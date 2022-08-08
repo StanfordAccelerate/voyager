@@ -30,7 +30,7 @@ SC_MODULE(MatrixProcessor) {
   Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumOutSkewerDout);
 
-  SystolicArray<P8D, IDTYPE, P16D, NROWS, NCOLS> CCS_INIT_S1(systolicArray);
+  SystolicArray<P8D, P8D, P16D, NROWS, NCOLS> CCS_INIT_S1(systolicArray);
 
   MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
 
@@ -50,7 +50,7 @@ SC_MODULE(MatrixProcessor) {
       weightSwapToSystolicArray[NROWS];
   Connections::Combinational<P16D> psumsToSystolicArray[NCOLS];
   Connections::Combinational<P16D> outputsFromSystolicArray[NCOLS];
-  Connections::Combinational<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(
+  Connections::Combinational<Pack1D<P8D, NCOLS> > CCS_INIT_S1(
       weightsToSystolicArray);
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
@@ -128,9 +128,14 @@ SC_MODULE(MatrixProcessor) {
 #pragma hls_pipeline_init_interval 1
       for (int weight_count = 0; weight_count < NROWS; weight_count++) {
         Pack1D<IDTYPE, NCOLS> arrayWeights = weightsChannel.Pop();
+        Pack1D<P8D, NCOLS> decodedArrayWeights;
+#pragma hls_unroll yes
+        for (int i = 0; i < NCOLS; i++) {
+          decodedArrayWeights[i] = static_cast<P8D>(arrayWeights[i]);
+        }
         // std::cout << "Weights: " << arrayWeights << std::endl;
 
-        weightsToSystolicArray.Push(arrayWeights);
+        weightsToSystolicArray.Push(decodedArrayWeights);
       }
 
       weightLoadDone.SyncPush();
@@ -160,8 +165,8 @@ SC_MODULE(MatrixProcessor) {
       const MatrixParams params = paramsIn.Pop();
       startSignal.SyncPush();
 
-      ac_int<8,false> loop_counters[2][6];
-      ac_int<8,false> loop_counters_out[2][6];
+      ac_int<8, false> loop_counters[2][6];
+      ac_int<8, false> loop_counters_out[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -172,15 +177,15 @@ SC_MODULE(MatrixProcessor) {
         }
       }
 
-      ac_int<32,false> totalOps =
+      ac_int<32, false> totalOps =
           params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
           params.loops[1][0] * params.loops[1][1] * params.loops[1][2] *
           params.loops[1][3] * params.loops[1][4] * params.loops[1][5];
 
       Pack1D<ODTYPE, NCOLS> accumulation_buffer[BUFFER_SIZE];
 
-      ac_int<32,false> step = 0;
-      ac_int<32,false> outputStep = 0;
+      ac_int<32, false> step = 0;
+      ac_int<32, false> outputStep = 0;
 
       // Push inputs and psums into the array
       // Pipelined across tiles
@@ -232,10 +237,12 @@ SC_MODULE(MatrixProcessor) {
             loop_counters[1][params.fyIndex] == 0;
 
         if ((!firstAccumulation || params.ACC_FROM_ACC) && step < totalOps) {
-          int readAddress = static_cast<ac_int<10,false> >(loop_counters[1][params.weightLoopIndex[1]] *
+          int readAddress = static_cast<ac_int<10, false> >(
+                                loop_counters[1][params.weightLoopIndex[1]] *
                                 params.loops[1][params.inputXLoopIndex[1]] *
                                 params.loops[1][params.inputYLoopIndex[1]]) +
-                            static_cast<ac_int<10,false> >(loop_counters[1][params.inputYLoopIndex[1]] *
+                            static_cast<ac_int<10, false> >(
+                                loop_counters[1][params.inputYLoopIndex[1]] *
                                 params.loops[1][params.inputXLoopIndex[1]]) +
                             loop_counters[1][params.inputXLoopIndex[1]];
 #ifdef __SYNTHESIS__
@@ -264,12 +271,15 @@ SC_MODULE(MatrixProcessor) {
             DLOG("matrix processor output: " << outputs);
             // std::cout << "Output: " << outputs << std::endl;
           } else {
-            int writeAddress = static_cast<ac_int<10,false> >(loop_counters_out[1][params.weightLoopIndex[1]] *
-                                   params.loops[1][params.inputXLoopIndex[1]] *
-                                   params.loops[1][params.inputYLoopIndex[1]]) +
-                               static_cast<ac_int<10,false> >(loop_counters_out[1][params.inputYLoopIndex[1]] *
-                                   params.loops[1][params.inputXLoopIndex[1]]) +
-                               loop_counters_out[1][params.inputXLoopIndex[1]];
+            int writeAddress =
+                static_cast<ac_int<10, false> >(
+                    loop_counters_out[1][params.weightLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]] *
+                    params.loops[1][params.inputYLoopIndex[1]]) +
+                static_cast<ac_int<10, false> >(
+                    loop_counters_out[1][params.inputYLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]]) +
+                loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__
           WRITE_ACC_BUFFER:
@@ -338,12 +348,15 @@ SC_MODULE(MatrixProcessor) {
             DLOG("matrix processor output: " << outputs);
             // std::cout << "Output: " << outputs << std::endl;
           } else {
-            int writeAddress = static_cast<ac_int<10,false> >(loop_counters_out[1][params.weightLoopIndex[1]] *
-                                   params.loops[1][params.inputXLoopIndex[1]] *
-                                   params.loops[1][params.inputYLoopIndex[1]]) +
-                               static_cast<ac_int<10,false> >(loop_counters_out[1][params.inputYLoopIndex[1]] *
-                                   params.loops[1][params.inputXLoopIndex[1]]) +
-                               loop_counters_out[1][params.inputXLoopIndex[1]];
+            int writeAddress =
+                static_cast<ac_int<10, false> >(
+                    loop_counters_out[1][params.weightLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]] *
+                    params.loops[1][params.inputYLoopIndex[1]]) +
+                static_cast<ac_int<10, false> >(
+                    loop_counters_out[1][params.inputYLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]]) +
+                loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__
           WRITE_ACC_BUFFER2:

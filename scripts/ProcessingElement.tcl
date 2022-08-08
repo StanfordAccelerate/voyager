@@ -1,7 +1,7 @@
 source scripts/architecture.tcl
 
 set block "ProcessingElement"
-set full_block_name "ProcessingElement<P8D, P8, P16D>"
+set full_block_name "ProcessingElement<P8D, P8D, P16D>"
 
 source scripts/common.tcl
 

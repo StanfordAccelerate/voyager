@@ -245,7 +245,7 @@ Posit<nbits, es> posit_exp(Posit<nbits, es> val) {
   //           << std::endl;
 
   Posit<16, 0> neg_one;
-  neg_one.bits = (1 << (16-1)) | (1 << (16 - 1 - 1));
+  neg_one.bits = (1 << (16 - 1)) | (1 << (16 - 1 - 1));
 
   return static_cast<Posit<nbits, es>>(es0Posit + neg_one);
   // typename Posit<16, 0>::DecomposedPosit op1(val);
@@ -425,8 +425,8 @@ class PositFP {
     if (sign == 1) setZero();
   }
 
-  void masked_relu(const PositFP &mask){
-    if(mask.sign == 1) setZero();
+  void masked_relu(const PositFP &mask) {
+    if (mask.sign == 1) setZero();
   }
 
   PositFP<sbits, abits + 1> operator+(const PositFP &op) const;
@@ -580,9 +580,11 @@ PositFP<sbits, fbits>::operator+(const PositFP<sbits, fbits> &op) const {
   ac_int<abits, false> lhs_fraction = lhs.get_fixed_point(),
                        rhs_fraction = rhs.get_fixed_point();
   ac_int<abits, false> r1 = lhs_fraction << (3 + lhs_scale - scale_of_result);
-  r1[0] = (lhs_fraction << (abits + 2 + lhs_scale - scale_of_result)).or_reduce();
+  r1[0] =
+      (lhs_fraction << (abits + 2 + lhs_scale - scale_of_result)).or_reduce();
   ac_int<abits, false> r2 = rhs_fraction << (3 + rhs_scale - scale_of_result);
-  r2[0] = (rhs_fraction << (abits + 2 + rhs_scale - scale_of_result)).or_reduce();
+  r2[0] =
+      (rhs_fraction << (abits + 2 + rhs_scale - scale_of_result)).or_reduce();
 
   bool r1_sign = lhs.sign, r2_sign = rhs.sign;
   bool signs_are_different = r1_sign != r2_sign;
@@ -776,7 +778,9 @@ Posit<nbits2, es2> fma(const Posit<nbits, es> &a, const Posit<nbits, es> &b,
 template <int sbits, int fbits>
 inline std::ostream &operator<<(std::ostream &os,
                                 const PositFP<sbits, fbits> &val) {
+#ifndef __SYNTHESIS__
   os << static_cast<float>(val) << " ";
+#endif
   return os;
 }
 
