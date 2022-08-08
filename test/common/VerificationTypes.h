@@ -93,6 +93,10 @@ struct SimplifiedParams {
   int WEIGHT_GRADIENT_OFFSET;
   int BIAS_GRADIENT_OFFSET;
   float learningRate;
+
+  bool ACC_T_INPUT;
+  bool ACC_T_WEIGHT;
+  bool ACC_T_OUTPUT;
 };
 
 struct MemoryOffsets {

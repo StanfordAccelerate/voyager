@@ -74,7 +74,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     for (int x = 0; x < X; x++) {
       for (int y = 0; y < Y; y++) {
-        if (static_cast<float>(matrixB[y])) {
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
           outputMatrix[x * Y + y] = matrixA[x * Y + y];
           if (inputScaling) {
             outputMatrix[x * Y + y] *= static_cast<ACC_T>(matrixA[X * Y + y]);
@@ -88,14 +88,14 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     for (int x = 0; x < X; x++) {
       ACC_T max = 0;
       for (int y = 0; y < Y; y++) {
-        if (outputMatrix[x * Y + y] > max && static_cast<float>(matrixB[y])) {
-          max = outputMatrix[x * Y + y];
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
+          max = outputMatrix[x * Y + y] > max ? outputMatrix[x * Y + y] : max;
         }
       }
 
       ACC_T sum = 0;
       for (int y = 0; y < Y; y++) {
-        if (static_cast<float>(matrixB[y])) {
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
           ACC_T adjustedVal = outputMatrix[x * Y + y] - max;
           gold_exp(adjustedVal);
           outputMatrix[x * Y + y] = adjustedVal;
@@ -109,7 +109,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       ACC_T divisor = sum;
       gold_reciprocal(divisor);
       for (int y = 0; y < Y; y++) {
-        if (static_cast<float>(matrixB[y])) {
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
           // ACC_T divisor = sum.reciprocal();
           outputMatrix[x * Y + y] *= divisor;
           // outputMatrix[x * Y + y] /= sum;

@@ -328,6 +328,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   params.OUTPUT_OFFSET = offsets.OUTPUT_OFFSET + STACK_SIZE;
   params.BIAS_OFFSET = offsets.BIAS_OFFSET;
   params.RESIDUAL_OFFSET = offsets.RESIDUAL_OFFSET + STACK_SIZE;
+  params.WEIGHT_SPLITTING = false;
 
   if (!params.WEIGHT) {
     params.WEIGHT_OFFSET += STACK_SIZE;

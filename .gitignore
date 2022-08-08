@@ -3,6 +3,7 @@ pybuild
 data/resnet
 data/mobilebert
 data/mobilebert_qat
+data/train
 .direnv
 .vscode
 test_outputs/

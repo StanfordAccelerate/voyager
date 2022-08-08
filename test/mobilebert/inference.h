@@ -82,6 +82,11 @@ std::map<std::string, std::string> inferenceParamsMapping{
     {"output_bottleneck_dense", "outputBottleneck"},
     {"output_bottleneck_LayerNorm", "outputLayerNorm"},
     {"classifier", "classifier"},
+    // Additional unit tests
+    {"attention_self_attention_probs_no_mask_0", "softmax_no_mask"},
+    {"attention_self_attention_probs_no_mask_1", "softmax_no_mask"},
+    {"attention_self_attention_probs_no_mask_2", "softmax_no_mask"},
+    {"attention_self_attention_probs_no_mask_3", "softmax_no_mask"},
 };
 
 std::map<std::string, SimplifiedParams> inferenceParams{
@@ -320,6 +325,21 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .WEIGHT_SPLITTING = true,
          .learningRate = -2e-2,
      }},
+
+    // (128 x 128)
+    {"softmax_no_mask",
+     {
+         .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .SOFTMAX = true,
+     }},
 };
 
 std::map<std::string, MemoryOffsets> inferenceMemOffsets{
@@ -551,6 +571,31 @@ std::map<std::string, MemoryOffsets> inferenceMemOffsets{
          5 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
          8 * WEIGHT_INTERMEDIATE_SIZE + 21 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+     }},
+
+    {"attention_self_attention_probs_no_mask_0",
+     {
+         INTERMEDIATE_SIZE + 7 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 11 * HIDDEN_SIZE,
+     }},
+    {"attention_self_attention_probs_no_mask_1",
+     {
+         INTERMEDIATE_SIZE + 8 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 12 * HIDDEN_SIZE,
+     }},
+    {"attention_self_attention_probs_no_mask_2",
+     {
+         INTERMEDIATE_SIZE + 9 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 13 * HIDDEN_SIZE,
+     }},
+    {"attention_self_attention_probs_no_mask_3",
+     {
+         INTERMEDIATE_SIZE + 10 * HIDDEN_SIZE,
+         0,
+         INTERMEDIATE_SIZE + 14 * HIDDEN_SIZE,
      }},
     // {"ffn_1_intermediate_dense",
     //  {
@@ -939,5 +984,35 @@ std::map<std::string, Files> inferenceTestFiles{
          "classifier_weight",
          "classifier_bias",
          "mobilebert_logits",
+     }},
+
+    // Additional unit tests
+    {"attention_self_attention_probs_no_mask_0",
+     {
+         "attention_self_attention_scores_scaled_0",
+         "",
+         "",
+         "attention_self_attention_probs_no_mask_0",
+     }},
+    {"attention_self_attention_probs_no_mask_1",
+     {
+         "attention_self_attention_scores_scaled_1",
+         "",
+         "",
+         "attention_self_attention_probs_no_mask_1",
+     }},
+    {"attention_self_attention_probs_no_mask_2",
+     {
+         "attention_self_attention_scores_scaled_2",
+         "",
+         "",
+         "attention_self_attention_probs_no_mask_2",
+     }},
+    {"attention_self_attention_probs_no_mask_3",
+     {
+         "attention_self_attention_scores_scaled_3",
+         "",
+         "",
+         "attention_self_attention_probs_no_mask_3",
      }},
 };
