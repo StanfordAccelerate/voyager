@@ -170,6 +170,10 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
   if (params.NO_NORM_GRAD) {
     C = X;
   }
+  if (params.ATTENTION_MASK) {
+    C = X;
+    K = 1;
+  }
 
   int size = FY * FX * C * K;
   double* tmpValues = read_file_as_double(filename, size, useDataFile);

@@ -67,6 +67,7 @@ struct SimplifiedParams {
 
   // special vector ops
   bool SOFTMAX;
+  bool ATTENTION_MASK;
   bool FC;
   bool NO_NORM;
   bool OUTER_PRODUCT;
@@ -92,6 +93,10 @@ struct SimplifiedParams {
   int WEIGHT_GRADIENT_OFFSET;
   int BIAS_GRADIENT_OFFSET;
   float learningRate;
+
+  bool ACC_T_INPUT;
+  bool ACC_T_WEIGHT;
+  bool ACC_T_OUTPUT;
 };
 
 struct MemoryOffsets {
@@ -124,13 +129,13 @@ const int BIAS_HIDDEN_SIZE = 128;
 const int BIAS_INTERMEDIATE_SIZE = 512;
 #endif
 
-const int ENCODER_ACTIVATION_SIZE = 6 * INTERMEDIATE_SIZE + 26 * HIDDEN_SIZE;
-const int ENCODER_WEIGHT_SIZE = 12 * WEIGHT_INTERMEDIATE_SIZE +
-                                7 * BIAS_INTERMEDIATE_SIZE +
-                                3 * WEIGHT_HIDDEN_SIZE + 24 * BIAS_HIDDEN_SIZE;
+const int ENCODER_ACTIVATION_SIZE = 4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE;
+const int ENCODER_WEIGHT_SIZE = 8 * WEIGHT_INTERMEDIATE_SIZE +
+                                5 * BIAS_INTERMEDIATE_SIZE +
+                                3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE;
 
 // SRAM Memory Offsets
-const int ACTIVATION_OFFSET = 0;
+const int ACTIVATION_OFFSET = 128;
 const int GRADIENT_OFFSET =
     24 * ENCODER_ACTIVATION_SIZE + INTERMEDIATE_SIZE + 16;
 const int ERROR_OFFSET = GRADIENT_OFFSET + 24 * ENCODER_WEIGHT_SIZE +

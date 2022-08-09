@@ -61,7 +61,10 @@ int runOperation(const SimplifiedParams params, const Files files,
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
-  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
+  if (params.SOFTMAX && params.ATTENTION_MASK) {
+    C = X;
+    K = 1;
+  } else if (params.SOFTMAX || params.SOFTMAX_GRAD) {
     K = 1;
     C = 1;
   }
@@ -115,7 +118,9 @@ int runOperation(const SimplifiedParams params, const Files files,
   }
 
   if (!files.weights_file.empty()) {
-    datafile = weightDataDir + layerName + files.weights_file;
+    datafile = params.ATTENTION_MASK
+                   ? inputDataDir + files.weights_file
+                   : weightDataDir + layerName + files.weights_file;
     load_weights(params, datafile, true,
                  params.WEIGHT ? rramMemory : sramMemory, matrixB,
                  universalMatrixB, floatMatrixB);
@@ -276,7 +281,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::string activationDataDir = datapath + "activations/";
   std::string weightDataDir = datapath + "weights/";
   std::string errorDataDir = datapath + "errors/";
-  std::string gradientDataDir = datapath + "clipped_gradients/";
+  std::string gradientDataDir = datapath + "gradients/";
   std::string outfilePrefix = "test_outputs/" + test + ".";
 
   std::map<std::string, std::string> paramsMapping;
@@ -323,6 +328,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   params.OUTPUT_OFFSET = offsets.OUTPUT_OFFSET + STACK_SIZE;
   params.BIAS_OFFSET = offsets.BIAS_OFFSET;
   params.RESIDUAL_OFFSET = offsets.RESIDUAL_OFFSET + STACK_SIZE;
+  params.WEIGHT_SPLITTING = false;
 
   if (!params.WEIGHT) {
     params.WEIGHT_OFFSET += STACK_SIZE;
@@ -334,7 +340,6 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::cout << "operation name: " << paramsName << std::endl;
 
   if (task == "inference") {
-    activationDataDir = datapath + "activations2/";
     return runOperation(params, files, memoryMap, activationDataDir,
                         params.WEIGHT ? weightDataDir : activationDataDir,
                         activationDataDir, activationDataDir, gradientDataDir,

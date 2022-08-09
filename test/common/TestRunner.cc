@@ -388,46 +388,43 @@ extern "C" int sc_main(int argc, char* argv[]) {
     }
 
     if (!env_datapath) {
-      env_datapath =
-          "/sim/jeffreyy/accelerator/data/mobilebert_train/datafile/";
+      env_datapath = "/sim/jeffreyy/accelerator/data/train/datafile/step0/";
     }
 
     std::string task(env_task);
     std::string datapath(env_datapath);
 
+    std::string activationDataDir = datapath + "activations/";
+    std::string weightDataDir = datapath + "weights/";
+    std::string gradientDataDir = datapath + "gradients/";
+
     int errors = 0;
-    if (tests == "inference") {
+    if (tests == "forward") {
       errors = allocateMemory();
 
-      std::string weightDataDir = datapath + "weights/";
       loadWeights(weightDataDir);
 
-      errors += runInference(datapath, compList);
+      errors += runForward(datapath, compList);
 
       deleteMemory();
-    } else if (tests == "training") {
+    } else if (tests == "backward") {
       errors = allocateMemory();
 
-      std::string weightDataDir = datapath + "weights/";
       loadWeights(weightDataDir);
-
-      // For debug purpose
-      std::string activationDataDir = datapath + "activations/";
       loadActivation(activationDataDir);
 
-      errors += runBackprop(datapath, compList);
-      // errors += verifyGradients(datapath, "test_outputs/");
+      errors += runBackward(datapath, compList);
+      errors += verifyGradients(gradientDataDir, "test_outputs/");
 
       deleteMemory();
     } else if (tests == "e2e") {
       errors = allocateMemory();
 
-      std::string weightDataDir = datapath + "weights/";
       loadWeights(weightDataDir);
 
-      errors += runInference(datapath, compList);
-      errors += runBackprop(datapath, compList);
-      errors += verifyGradients(datapath, "test_outputs/");
+      errors += runForward(datapath, compList);
+      errors += runBackward(datapath, compList);
+      errors += verifyGradients(gradientDataDir, "test_outputs/");
 
       deleteMemory();
     } else {

@@ -74,41 +74,48 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     for (int x = 0; x < X; x++) {
       for (int y = 0; y < Y; y++) {
-        outputMatrix[x * Y + y] = matrixA[x * Y + y];
-        if (inputScaling) {
-          outputMatrix[x * Y + y] *= static_cast<ACC_T>(matrixA[X * Y + y]);
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
+          outputMatrix[x * Y + y] = matrixA[x * Y + y];
+          if (inputScaling) {
+            outputMatrix[x * Y + y] *= static_cast<ACC_T>(matrixA[X * Y + y]);
+          }
+        } else {
+          outputMatrix[x * Y + y] = 0;
         }
       }
     }
 
     for (int x = 0; x < X; x++) {
       ACC_T max = 0;
-      ACC_T sum = 0;
-
       for (int y = 0; y < Y; y++) {
-        if (outputMatrix[x * Y + y] > max) {
-          max = outputMatrix[x * Y + y];
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
+          max = outputMatrix[x * Y + y] > max ? outputMatrix[x * Y + y] : max;
         }
       }
 
+      ACC_T sum = 0;
       for (int y = 0; y < Y; y++) {
-        ACC_T adjustedVal = outputMatrix[x * Y + y] - max;
-        gold_exp(adjustedVal);
-        outputMatrix[x * Y + y] = adjustedVal;
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
+          ACC_T adjustedVal = outputMatrix[x * Y + y] - max;
+          gold_exp(adjustedVal);
+          outputMatrix[x * Y + y] = adjustedVal;
 
-        // outputMatrix[x * Y + y] =
-        //     exp(static_cast<float>(outputMatrix[x * Y + y] - max));
-        sum += outputMatrix[x * Y + y];
+          // outputMatrix[x * Y + y] =
+          //     exp(static_cast<float>(outputMatrix[x * Y + y] - max));
+          sum += outputMatrix[x * Y + y];
+        }
       }
 
       ACC_T divisor = sum;
       gold_reciprocal(divisor);
       for (int y = 0; y < Y; y++) {
-        // ACC_T divisor = sum.reciprocal();
-        outputMatrix[x * Y + y] *= divisor;
-        // outputMatrix[x * Y + y] /= sum;
-        if (inputScaling) {
-          outputMatrix[X * Y + y] += outputMatrix[x * Y + y];
+        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
+          // ACC_T divisor = sum.reciprocal();
+          outputMatrix[x * Y + y] *= divisor;
+          // outputMatrix[x * Y + y] /= sum;
+          if (inputScaling) {
+            outputMatrix[X * Y + y] += outputMatrix[x * Y + y];
+          }
         }
       }
     }
