@@ -148,7 +148,7 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
     FX = 7;
     C = 3;
   }
-  if (params.NO_NORM || params.CROSS_ENTROPY_GRAD) {
+  if (params.NO_NORM) {
     FX = 1;
     FY = 1;
     C = 1;
@@ -156,7 +156,7 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
   if (params.NO_NORM_GRAD) {
     C = X;
   }
-  if (params.ATTENTION_MASK) {
+  if (params.CROSS_ENTROPY_GRAD || params.ATTENTION_MASK) {
     C = X;
     K = 1;
   }
@@ -235,12 +235,12 @@ void load_residual(const SimplifiedParams& params, const std::string& filename,
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
-  if (params.SOFTMAX_GRAD) {
-    K = 1;
-  }
   if (params.REPLICATION) {
     FX = 7;
     C = 3;
+  }
+  if (params.SOFTMAX_GRAD) {
+    K = 1;
   }
 
   int size = X * Y * K;
@@ -256,7 +256,7 @@ void load_residual(const SimplifiedParams& params, const std::string& filename,
     save_float(floatGoldMemory, i, val);
   }
 
-  delete[] tmpValues;
+  delete[] tmpValues;o
 }
 
 void load_datafile_outputs(const SimplifiedParams params,

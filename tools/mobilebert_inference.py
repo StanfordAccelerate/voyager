@@ -69,7 +69,7 @@ def run_test(model_name_or_path, datapath, batch, results_folder, test_id):
     sim_process.communicate()
 
 
-if __name__ == '__main__':    
+if __name__ == "__main__":    
     parser = argparse.ArgumentParser(description="Finetune a transformers model on a Text Classification task")
     parser.add_argument(
         "--model_name_or_path",

@@ -73,8 +73,8 @@ struct SimplifiedParams {
   bool NO_NORM;
 
   bool SOFTMAX_GRAD;
-  bool NO_NORM_GRAD;
   bool FC_GRAD;
+  bool NO_NORM_GRAD;
   bool RELU_GRAD;
   bool BIAS_GRAD;
   bool CROSS_ENTROPY_GRAD;

@@ -2,7 +2,7 @@
 #include <sstream>
 #include <string>
 
-#include "test/mobilebert/inference.h"
+#include "test/VerificationTypes.h"
 
 std::string array_to_string(int array[], int size) {
   std::string returnstring = "{";
@@ -49,8 +49,7 @@ std::string formatOperation(SimplifiedParams params, std::string operation) {
 
      << (params.SOFTMAX ? "true" : "false") << ", // SOFTMAX\n "
      << (params.ATTENTION_MASK ? "true" : "false") << ", // ATTENTION_MASK\n "
-     << (params.ATTENTION_SCALING ? "true" : "false")
-     << ", // ATTENTION_SCALING\n " << (params.FC ? "true" : "false")
+     << (params.ATTENTION_SCALING ? "true" : "false") << ", // ATTENTION_SCALING\n "
      << (params.FC ? "true" : "false") << ", // FC\n"
      << (params.NO_NORM ? "true" : "false") << ", // NO_NORM\n "
 
@@ -70,22 +69,18 @@ std::string formatOperation(SimplifiedParams params, std::string operation) {
      << (params.SPLIT_OUTPUT ? "true" : "false") << ", // SPLIT_OUTPUT\n"
 
      << (params.GRAD_CLIPPING ? "true" : "false") << ", // GRAD_CLIPPING\n"
+
+     << (params.WEIGHT_SPLITTING ? "true" : "false")
+     << ", // WEIGHT_SPLITTING\n"
+     << params.WEIGHT_GRADIENT_OFFSET << ", // WEIGHT_GRADIENT_OFFSET\n"
+     << params.BIAS_GRADIENT_OFFSET << ", // BIAS_GRADIENT_OFFSET\n"
+     << params.learningRate << ", // learningRate\n"
+
+     << (params.ACC_T_INPUT ? "true" : "false") << ", // ACC_T_INPUT\n"
+     << (params.ACC_T_WEIGHT ? "true" : "false") << ", // ACC_T_WEIGHT\n"
+     << (params.ACC_T_OUTPUT ? "true" : "false") << ", // ACC_T_OUTPUT\n"
+
      << "};\n\n";
 
   return ss.str();
-}
-
-extern "C" int sc_main(int argc, char* argv[]) {
-  std::ofstream myfile;
-  myfile.open("verification_params.h");
-  myfile << "#ifndef MOBILEBERT_PARAMS\n"
-         << "#define MOBILEBERT_PARAMS\n\n";
-
-  for (auto op : inferenceOrder) {
-    SimplifiedParams params = inferenceParams.at(op);
-    myfile << "const MemoryMap " << op << "_mmap = {SRAM, "
-           << (params.WEIGHT ? "RRAM" : "SRAM") << ", RRAM, SRAM, SRAM};\n";
-  }
-  myfile.close();
-  return 0;
 }

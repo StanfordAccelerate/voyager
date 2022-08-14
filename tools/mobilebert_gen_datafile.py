@@ -7,7 +7,6 @@ import sys, getopt
 import os
 import struct
 
-
 ''' @brief: Writes data of form torch.tensor dtype=float64 to binary data. '''
 def write_fp64(filename, data):
     data = data.astype(np.float64)

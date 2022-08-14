@@ -108,8 +108,8 @@ sim_sysc_gui:
 sim: build/TestRunner
 	./build/TestRunner 
 
-mb_sim: build/MbTestRunner
-	./build/MbTestRunner 
+mb_params: build/mobilebert_gen_params
+	./build/mobilebert_gen_params
 
 PositTest: build/PositTest
 	./build/PositTest
@@ -130,14 +130,11 @@ gui:
 build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o build/MapOperation.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-build/MbTestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o
+build/mobilebert_gen_params: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o build/MapOperation.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/PositTest: build/PositTest.o
 	$(CC) -o $@ $^
-
-build/verification: build/verification.o
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/Accelerator.o: src/Accelerator.cc $(wildcard src/*.h)
 	$(CC) $(C11FLAGS) -c -o $@ $< 
@@ -162,9 +159,6 @@ build/TestRunner.o: test/common/TestRunner.cc test/simple/params.h test/resnet/p
 
 build/PositTest.o: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -DNO_SYSC -c -o $@ $<
-
-build/verification.o: test/mobilebert/verification.cc test/mobilebert/params.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
 
 .PHONY: clean rtl sim PositTest clean-catapult
 clean:

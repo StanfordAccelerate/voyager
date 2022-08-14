@@ -8,6 +8,7 @@
 #include "test/mobilebert/backprop.h"
 #include "test/mobilebert/gradient.h"
 #include "test/mobilebert/inference.h"
+#include "test/mobilebert/utils.h"
 
 #ifndef SRAM_MEMORY_SIZE
 // #define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
@@ -19,8 +20,9 @@
 #define RRAM_MEMORY_SIZE (22 * 1024 * 1024)  // RRAM size for MobileBERT
 #endif
 
-#define VERBOSE 1
-#define ACC_T_ERROR 1
+// #define VERBOSE
+// #define DUMP_PARAMS
+// #define ACC_T_ERROR 1
 
 // Data memory
 INPUT_DATATYPE* acc_sram_memory;
@@ -75,30 +77,6 @@ SimplifiedParams paramsLookup(std::string operation, std::string task) {
   params.RESIDUAL_OFFSET = offsets.RESIDUAL_OFFSET;
 
   return params;
-}
-
-void formatOperation(const SimplifiedParams params) {
-  int X = params.loops[0][params.inputXLoopIndex[0]] *
-          params.loops[1][params.inputXLoopIndex[1]];
-  int Y = params.loops[0][params.inputYLoopIndex[0]] *
-          params.loops[1][params.inputYLoopIndex[1]];
-  int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
-  int K = params.loops[0][params.weightLoopIndex[0]] *
-          params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
-  int FX = params.loops[1][params.fxIndex];
-  int FY = params.loops[1][params.fyIndex];
-  int STRIDE = params.STRIDE;
-
-  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
-    K = 1;
-    C = 1;
-  }
-
-  std::cout << "Performing the following operation:" << std::endl;
-  std::cout << "(" << X << "x" << Y << "x" << C << ")"
-            << " * "
-            << "(" << FX << "x" << FY << "x" << C << "x" << K << ")"
-            << std::endl;
 }
 
 int allocateMemory() {
@@ -402,6 +380,10 @@ int runOperation(const SimplifiedParams params,
     errors = compare_arrays(float_sram_memory + params.OUTPUT_OFFSET,
                             dataFileOutput, outputSize, diffFile);
   }
+
+  if (errors) {
+    std::cerr << "ERROR: " << errors << " mismatches found" << std::endl;
+  }
 #endif
 
   return errors;
@@ -410,6 +392,13 @@ int runOperation(const SimplifiedParams params,
 int runForward(std::string datapath, std::vector<std::string> groups) {
   std::string inputDataDir = datapath + "activations/";
   std::string outfilePrefix;
+
+#ifdef DUMP_PARAMS
+  std::ofstream myfile;
+  myfile.open("mobilebert_inference_params.h");
+  myfile << "#ifndef MOBILEBERT_PARAMS\n"
+         << "#define MOBILEBERT_PARAMS\n\n";
+#endif
 
   // Load embedding inputs
   std::string operation = inferenceOrder[0];
@@ -430,9 +419,9 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
   datafile = inputDataDir + "mobilebert_attention_mask";
   params.WEIGHT_OFFSET += STACK_SIZE;
   load_weights(params, datafile, useDataFile, acc_sram_memory,
-              hls_sram_memory + params.WEIGHT_OFFSET,
-              uni_sram_memory + params.WEIGHT_OFFSET,
-              float_sram_memory + params.WEIGHT_OFFSET);
+               hls_sram_memory + params.WEIGHT_OFFSET,
+               uni_sram_memory + params.WEIGHT_OFFSET,
+               float_sram_memory + params.WEIGHT_OFFSET);
 
   for (int layer = 0; layer < 24; layer++) {
     for (const auto& op : inferenceOrder) {
@@ -462,18 +451,20 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
         layerName = "";
       }
 
+#ifdef DUMP_PARAMS
+      if (layer == 1) break;
+      myfile << formatOperation(params, op);
+#endif
+
       outfilePrefix = "test_outputs/" + op + "_activation_";
       datafile = inputDataDir + layerName + files.outputs_file;
-      int errors =
-          runOperation(params, datafile, outfilePrefix, layerName + op, groups);
-
-#ifdef VERBOSE
-      if (errors) {
-        std::cerr << "ERROR: " << errors << " mismatches found" << std::endl;
-      }
-#endif
+      runOperation(params, datafile, outfilePrefix, layerName + op, groups);
     }
   }
+
+#ifdef DUMP_PARAMS
+  myfile.close();
+#endif
 
   for (int i = 0; i < 2; i++) {
     std::cout << hls_sram_memory[params.OUTPUT_OFFSET + i] << "\t"
@@ -563,12 +554,6 @@ int runBackward(std::string datapath, std::vector<std::string> groups) {
       int errors = runOperation(params, datafile, outfilePrefix,
                                 layerName + backOp, groups);
 
-#ifdef VERBOSE
-      if (errors) {
-        std::cerr << "ERROR: " << errors << " mismatches found" << std::endl;
-      }
-#endif
-
       operation = backOp;
       if (backOp == "bottlenecked_hidden_states" && layer > 0) {
         operation = "output_bottleneck_LayerNorm";
@@ -623,13 +608,6 @@ int runBackward(std::string datapath, std::vector<std::string> groups) {
           datafile = gradDataDir + layerName + files.outputs_file;
           errors = runOperation(params, datafile, outfilePrefix,
                                 layerName + gradOp, groups);
-
-#ifdef VERBOSE
-          if (errors) {
-            std::cerr << "ERROR: " << errors << " mismatches found"
-                      << std::endl;
-          }
-#endif
         }
       }
     }

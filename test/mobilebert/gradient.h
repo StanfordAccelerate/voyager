@@ -555,7 +555,7 @@ std::map<std::string, Files> gradientTestFiles{
      }},
     {"intermediate_dense_weight",
      {
-         "ffn_2_output_LayerNorm",
+         "ffn_0_output_LayerNorm",
          "intermediate_dense",
          "",
          "intermediate_dense_weight",
