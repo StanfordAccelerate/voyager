@@ -104,6 +104,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .CROSS_ENTROPY_GRAD = true,
+         .ACC_T_OUTPUT = true,
      }},
 
     // (1 x 16) x (16 x 512)
@@ -119,6 +120,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .WEIGHT = true,
+         .ACC_T_INPUT = true,
          .ACC_T_OUTPUT = true,
      }},
 
@@ -229,7 +231,6 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .ACC_T_INPUT = true,
-         .ACC_T_WEIGHT = true,
          .ACC_T_OUTPUT = true,
      }},
 
@@ -246,7 +247,6 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
-         .ACC_T_INPUT = true,
          .ACC_T_WEIGHT = true,
          .ACC_T_OUTPUT = true,
      }},
@@ -301,7 +301,6 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {5, 5},
          .STRIDE = 1,
          .ACC_T_INPUT = true,
-         .ACC_T_WEIGHT = true,
          .ACC_T_OUTPUT = true,
      }},
 
@@ -338,7 +337,6 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
          .ACC_T_INPUT = true,
-         .ACC_T_WEIGHT = true,
          .ACC_T_OUTPUT = true,
      }},
 
@@ -726,11 +724,11 @@ std::map<std::string, Files> backpropTestFiles{
 
     {"ffn_0_output_LayerNorm",
      {
-         "ffn_1_intermediate_dense",
-         "ffn_1_intermediate_dense_weight",
+         "intermediate_dense",
+         "intermediate_dense_weight",
          "",
          "ffn_0_output_LayerNorm",
-         "ffn_1_output_dense",
+         "output_dense",
      }},
     {"ffn_0_output_dense",
      {

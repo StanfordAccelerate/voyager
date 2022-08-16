@@ -96,7 +96,7 @@ int runOperation(const SimplifiedParams params, const Files files,
   INPUT_DATATYPE* matrixA = new INPUT_DATATYPE[inputSize];
   INPUT_DATATYPE* matrixB = new INPUT_DATATYPE[weightSize];
   INPUT_DATATYPE* biasMatrix = new INPUT_DATATYPE[biasSize];
-  INPUT_DATATYPE* residualMatrix = new INPUT_DATATYPE[outputSize];
+  INPUT_DATATYPE* residualMatrix = new INPUT_DATATYPE[2 * outputSize];
   INPUT_DATATYPE* weightGradMatrix = new INPUT_DATATYPE[weightSize];
   INPUT_DATATYPE* biasGradMatrix = new INPUT_DATATYPE[biasSize];
   OUTPUT_DATATYPE* matrixC = new OUTPUT_DATATYPE[2 * outputSize];
@@ -105,7 +105,7 @@ int runOperation(const SimplifiedParams params, const Files files,
   UniversalPosit* universalMatrixA = new UniversalPosit[inputSize];
   UniversalPosit* universalMatrixB = new UniversalPosit[weightSize];
   UniversalPosit* universalBiasMatrix = new UniversalPosit[biasSize];
-  UniversalPosit* universalResidualMatrix = new UniversalPosit[outputSize];
+  UniversalPosit* universalResidualMatrix = new UniversalPosit[2 * outputSize];
   UniversalPosit* universalWeightGradMatrix = new UniversalPosit[weightSize];
   UniversalPosit* universalBiasGradMatrix = new UniversalPosit[biasSize];
   UniversalPosit* universalMatrixC = new UniversalPosit[2 * outputSize];
@@ -114,7 +114,7 @@ int runOperation(const SimplifiedParams params, const Files files,
   float* floatMatrixA = new float[inputSize];
   float* floatMatrixB = new float[weightSize];
   float* floatBiasMatrix = new float[biasSize];
-  float* floatResidualMatrix = new float[outputSize];
+  float* floatResidualMatrix = new float[2 * outputSize];
   float* floatWeightGradMatrix = new float[weightSize];
   float* floatBiasGradMatrix = new float[biasSize];
   float* floatMatrixC = new float[2 * outputSize];
@@ -212,8 +212,8 @@ int runOperation(const SimplifiedParams params, const Files files,
     diffFile = outfilePrefix + "hlsgold_vs_pytorch.txt";
     compare_arrays(matrixC, floatDataFileOutput, outputSize, diffFile,
                    params.ACC_T_OUTPUT);
-    compare_arrays(matrixC, dataFileOutput, outputSize, diffFile,
-                   params.ACC_T_OUTPUT);
+    // compare_arrays(matrixC, dataFileOutput, outputSize, diffFile,
+    //                params.ACC_T_OUTPUT);
   }
 
   if (accelerator) {
@@ -250,8 +250,8 @@ int runOperation(const SimplifiedParams params, const Files files,
     std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     diffFile = outfilePrefix + "fpgold_vs_pytorch.txt";
-    errors +=
-        compare_arrays(floatMatrixC, floatDataFileOutput, outputSize, diffFile);
+    errors += compare_arrays(floatMatrixC, floatDataFileOutput, outputSize,
+                             diffFile, params.ACC_T_OUTPUT);
   }
 
   delete[] sramMemory;
@@ -334,7 +334,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
   SimplifiedParams params = mobileBertParams.at(paramsName);
   Files files = mobileBertTestFiles.at(test);
   MemoryOffsets offsets = mobileBertMemOffsets.at(test);
-  std::string layerName = "mobilebert_encoder_layer_0_";
+  std::string layerName = "mobilebert_encoder_layer_23_";
 
   if (test.find("classifier") != std::string::npos ||
       (task == "backward" && test == "output_bottleneck_LayerNorm")) {

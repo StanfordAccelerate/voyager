@@ -2,7 +2,7 @@
 #include <sstream>
 #include <string>
 
-#include "test/VerificationTypes.h"
+#include "test/common/VerificationTypes.h"
 
 std::string array_to_string(int array[], int size) {
   std::string returnstring = "{";
@@ -40,28 +40,30 @@ std::string formatOperation(SimplifiedParams params, std::string operation) {
      << (params.RESIDUAL ? "true" : "false") << ", // residual\n"
      << params.RESIDUAL_OFFSET << ", // RESIDUAL_OFFSET\n"
 
-     << (params.MAXPOOL ? "true" : "false") << ", // MAXPOOL\n "
-     << (params.AVGPOOL ? "true" : "false") << ", // AVGPOOL\n "
+     << (params.MAXPOOL ? "true" : "false") << ", // MAXPOOL\n"
+     << (params.AVGPOOL ? "true" : "false") << ", // AVGPOOL\n"
 
      << (params.WEIGHT ? "true" : "false") << ", // WEIGHT\n"
      << "false, // STORE_IN_ACC\n"
      << "false, // ACC_FROM_ACC\n"
 
-     << (params.SOFTMAX ? "true" : "false") << ", // SOFTMAX\n "
-     << (params.ATTENTION_MASK ? "true" : "false") << ", // ATTENTION_MASK\n "
-     << (params.ATTENTION_SCALING ? "true" : "false") << ", // ATTENTION_SCALING\n "
+     << (params.SOFTMAX ? "true" : "false") << ", // SOFTMAX\n"
+     << (params.ATTENTION_MASK ? "true" : "false") << ", // ATTENTION_MASK\n"
+     << (params.ATTENTION_SCALING ? "true" : "false")
+     << ", // ATTENTION_SCALING\n"
      << (params.FC ? "true" : "false") << ", // FC\n"
-     << (params.NO_NORM ? "true" : "false") << ", // NO_NORM\n "
+     << (params.NO_NORM ? "true" : "false") << ", // NO_NORM\n"
 
-     << (params.SOFTMAX_GRAD ? "true" : "false") << ", // SOFTMAX_GRAD\n "
+     << (params.SOFTMAX_GRAD ? "true" : "false") << ", // SOFTMAX_GRAD\n"
      << (params.FC_GRAD ? "true" : "false") << ", // FC_GRAD\n"
-     << (params.NO_NORM_GRAD ? "true" : "false") << ", // NO_NORM_GRAD\n "
-     << (params.RELU_GRAD ? "true" : "false") << ", // RELU_GRAD\n "
-     << (params.BIAS_GRAD ? "true" : "false") << ", // BIAS_GRAD\n "
+     << (params.NO_NORM_GRAD ? "true" : "false") << ", // NO_NORM_GRAD\n"
+     << (params.RELU_GRAD ? "true" : "false") << ", // RELU_GRAD\n"
+     << (params.BIAS_GRAD ? "true" : "false") << ", // BIAS_GRAD\n"
      << (params.CROSS_ENTROPY_GRAD ? "true" : "false")
-     << ", // CROSS_ENTROPY_GRAD\n " << (params.MSE_GRAD ? "true" : "false")
-     << ", // MSE_GRAD\n " << (params.BCE_WITH_LOGITS_GRAD ? "true" : "false")
-     << ", // BCE_WITH_LOGITS_GRAD\n "
+     << ", // CROSS_ENTROPY_GRAD\n"
+     << (params.MSE_GRAD ? "true" : "false") << ", // MSE_GRAD\n"
+     << (params.BCE_WITH_LOGITS_GRAD ? "true" : "false")
+     << ", // BCE_WITH_LOGITS_GRAD\n"
 
      << (params.INPUT_TRANSPOSE ? "true" : "false") << ", // INPUT_TRANSPOSE\n"
      << (params.CONCAT_INPUT ? "true" : "false") << ", // CONCAT_INPUT\n"
@@ -79,8 +81,7 @@ std::string formatOperation(SimplifiedParams params, std::string operation) {
      << (params.ACC_T_INPUT ? "true" : "false") << ", // ACC_T_INPUT\n"
      << (params.ACC_T_WEIGHT ? "true" : "false") << ", // ACC_T_WEIGHT\n"
      << (params.ACC_T_OUTPUT ? "true" : "false") << ", // ACC_T_OUTPUT\n"
-
-     << "};\n\n";
+     << "};\n";
 
   return ss.str();
 }

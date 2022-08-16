@@ -66,6 +66,22 @@ inline UniversalPositAccum readInput(UniversalPosit *matrix, int index,
   p16.setbits((encoding1 << 8) + encoding2);
   return p16;
 }
+
+inline UniversalPositAccum readInput2(UniversalPosit *matrix, int index,
+                                      bool accType, int expBias = 0) {
+  UniversalPositAccum p16;
+  if (!accType) {
+    p16 = matrix[index];
+  } else {
+    int encoding1 = matrix[2 * index].encoding();
+    int encoding2 = matrix[2 * index + 1].encoding();
+    p16.setbits((encoding1 << 8) + encoding2);
+  }
+  sw::universal::value<12> val = p16.to_value();
+  val.setExponent(val.scale() + expBias);
+  sw::universal::convert<16, 1>(val, p16);
+  return p16;
+}
 #endif
 
 inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
@@ -81,8 +97,27 @@ inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
   return p16;
 }
 
+inline ACCUM_DATATYPE readInput2(INPUT_DATATYPE *matrix, int index,
+                                 bool accType, int expBias = 0) {
+  ACCUM_DATATYPE p16;
+  if (!accType) {
+    p16 = matrix[index];
+  } else {
+    int encoding1 = matrix[2 * index].bits;
+    int encoding2 = matrix[2 * index + 1].bits;
+    p16.setbits((encoding1 << 8) + encoding2);
+  }
+  ACCUM_DATATYPE::DecomposedPosit val = p16;
+  val.scale += expBias;
+  return val;
+}
+
 inline float readInput(float *matrix, int index, bool accType) {
-  return matrix[index];
+  return accType ? matrix[2 * index] : matrix[index];
+}
+
+inline float readInput2(float *matrix, int index, bool accType, int expBias) {
+  return accType ? matrix[2 * index] : matrix[index];
 }
 
 #ifndef NO_UNIVERSAL
@@ -110,7 +145,12 @@ inline void saveOutput(INPUT_DATATYPE *matrix, int index, ACCUM_DATATYPE value,
 }
 
 inline void saveOutput(float *matrix, int index, float value, bool accType) {
-  matrix[index] = value;
+  if (!accType) {
+    matrix[index] = value;
+  } else {
+    matrix[2 * index] = value;
+    matrix[2 * index + 1] = 0;
+  }
 }
 
 template <typename T, typename ACC_T>
@@ -276,8 +316,9 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else if (params.NO_NORM_GRAD) {
-    // elementwise multiplication and addition of matrices
     ACC_T outputMatrix[K];
+    memset(outputMatrix, 0, sizeof(outputMatrix));
+
     for (int i = 0; i < X; i++) {
       for (int j = 0; j < K; j++) {
         ACC_T a = readInput(matrixA, i * K + j, params.ACC_T_INPUT);
@@ -292,7 +333,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         acc += outputMatrix[i] * outputMatrix[i];
       }
 
-      gold_reciprocal(acc);
+      gold_inv_sqrt(acc);
       acc = std::min(static_cast<float>(acc), 1.0f);
       for (int i = 0; i < K; i++) {
         outputMatrix[i] *= acc;
@@ -303,12 +344,30 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else if (params.BIAS_GRAD) {
+    ACC_T accumMatrixB[C * K];
+    for (int i = 0; i < C * K; i++) {
+      accumMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+    }
+
+    if (params.CONCAT_WEIGHT) {
+      ACC_T copyMatrixB[C * K];
+      memcpy(copyMatrixB, accumMatrixB, sizeof(copyMatrixB));
+      for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < C; j++) {
+          for (int k = 0; k < K / 4; k++) {
+            accumMatrixB[i * K / 4 + j * K + k] =
+                copyMatrixB[i * C * K / 4 + j * K / 4 + k];
+          }
+        }
+      }
+    }
+
     ACC_T outputMatrix[K];
     memset(outputMatrix, 0, sizeof(outputMatrix));
 
-    for (int i = 0; i < K; i++) {
-      for (int j = 0; j < C; j++) {
-        outputMatrix[i] += static_cast<ACC_T>(matrixB[j * K + i]);
+    for (int i = 0; i < C; i++) {
+      for (int j = 0; j < K; j++) {
+        outputMatrix[j] += accumMatrixB[i * K + j];
       }
     }
 
@@ -318,7 +377,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
         acc += outputMatrix[i] * outputMatrix[i];
       }
 
-      gold_reciprocal(acc);
+      gold_inv_sqrt(acc);
       acc = std::min(static_cast<float>(acc), 1.0f);
       for (int i = 0; i < K; i++) {
         outputMatrix[i] *= acc;
@@ -365,6 +424,23 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     ACC_T divisor = 1 / X;
     for (int i = 0; i < X; i++) {
       matrixC[i] = static_cast<ACC_T>(matrixA[i] - matrixB[i]) * divisor;
+    }
+  } else if (params.GRAD_CLIPPING_UNIT_TEST) {
+    ACC_T outputMatrix[X * C];
+    for (int i = 0; i < X * C; i++) {
+      outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+    }
+
+    ACC_T acc = 0;
+    for (int i = 0; i < X * C; i++) {
+      acc += outputMatrix[i] * outputMatrix[i];
+    }
+
+    gold_reciprocal(acc);
+    acc = std::min(static_cast<float>(acc), 1.0f);
+    for (int i = 0; i < X * C; i++) {
+      outputMatrix[i] *= acc;
+      saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else {
     ACC_T accumMatrixA[(STRIDE * X) * (STRIDE * Y) * C];

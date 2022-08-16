@@ -9,25 +9,25 @@
 std::map<std::string, std::string> gradientParamsMapping{
     {"classifier_weight", "classifier_weight"},
     {"output_bottleneck_LayerNorm_weight", "outputLayerNorm"},
-    {"output_bottleneck_LayerNorm_bias", "hiddenReduction"},
+    {"output_bottleneck_LayerNorm_bias", "interBottleneckBias"},
     {"output_bottleneck_dense_weight", "outputBottleneck"},
-    {"output_bottleneck_dense_bias", "hiddenReduction"},
+    {"output_bottleneck_dense_bias", "interBottleneckBias"},
     {"output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"output_LayerNorm_bias", "bottleneckReduction"},
+    {"output_LayerNorm_bias", "intraBottleneckBias"},
     {"output_dense_weight", "ffn2"},
-    {"output_dense_bias", "bottleneckReduction"},
+    {"output_dense_bias", "intraBottleneckBias"},
     {"intermediate_dense_weight", "outputBottleneck"},
-    {"intermediate_dense_bias", "hiddenReduction"},
+    {"intermediate_dense_bias", "interBottleneckBias"},
     {"ffn_0_output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"ffn_0_output_LayerNorm_bias", "bottleneckReduction"},
+    {"ffn_0_output_LayerNorm_bias", "intraBottleneckBias"},
     {"ffn_0_output_dense_weight", "ffn2"},
-    {"ffn_0_output_dense_bias", "bottleneckReduction"},
+    {"ffn_0_output_dense_bias", "intraBottleneckBias"},
     {"ffn_0_intermediate_dense_weight", "outputBottleneck"},
-    {"ffn_0_intermediate_dense_bias", "hiddenReduction"},
+    {"ffn_0_intermediate_dense_bias", "interBottleneckBias"},
     {"attention_output_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"attention_output_LayerNorm_bias", "bottleneckReduction"},
+    {"attention_output_LayerNorm_bias", "intraBottleneckBias"},
     {"attention_output_dense_weight", "outputAttention"},
-    {"attention_output_dense_bias", "bottleneckReduction"},
+    {"attention_output_dense_bias", "intraBottleneckBias"},
     {"attention_self_value_weight", "vProjection"},
     {"attention_self_value_bias", "qkvBias"},
     {"attention_self_query_weight", "qkProjection"},
@@ -35,13 +35,15 @@ std::map<std::string, std::string> gradientParamsMapping{
     {"attention_self_key_weight", "qkProjection"},
     {"attention_self_key_bias", "qkvBias"},
     {"bottleneck_attention_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"bottleneck_attention_LayerNorm_bias", "bottleneckReduction"},
+    {"bottleneck_attention_LayerNorm_bias", "intraBottleneckBias"},
     {"bottleneck_attention_dense_weight", "inputBottleneck"},
-    {"bottleneck_attention_dense_bias", "bottleneckReduction"},
+    {"bottleneck_attention_dense_bias", "intraBottleneckBias"},
     {"bottleneck_input_LayerNorm_weight", "bottleneckLayerNorm"},
-    {"bottleneck_input_LayerNorm_bias", "bottleneckReduction"},
+    {"bottleneck_input_LayerNorm_bias", "intraBottleneckBias"},
     {"bottleneck_input_dense_weight", "inputBottleneck"},
-    {"bottleneck_input_dense_bias", "bottleneckReduction"},
+    {"bottleneck_input_dense_bias", "intraBottleneckBias"},
+    // extra unit tests
+    {"grad_norm_clippping_unit_test", "gradNormClippingUnitTest"},
 };
 
 std::map<std::string, SimplifiedParams> gradientParams{
@@ -193,7 +195,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
      }},
 
     // (128 x 128)
-    {"bottleneckReduction",
+    {"intraBottleneckBias",
      {
          .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
          .inputXLoopIndex = {0, 5},
@@ -206,6 +208,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .STRIDE = 1,
          .BIAS_GRAD = true,
          .GRAD_CLIPPING = true,
+         .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128)
@@ -223,10 +226,11 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .BIAS_GRAD = true,
          .CONCAT_WEIGHT = true,
          .GRAD_CLIPPING = true,
+         .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 512)
-    {"hiddenReduction",
+    {"interBottleneckBias",
      {
          .loops = {{1, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 1}},
          .inputXLoopIndex = {0, 5},
@@ -239,15 +243,30 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .STRIDE = 1,
          .BIAS_GRAD = true,
          .GRAD_CLIPPING = true,
+         .ACC_T_OUTPUT = true,
      }},
-};
+
+    // (128 x 128)
+    {"gradNormClippingUnitTest",
+     {
+         .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
+         .inputXLoopIndex = {0, 5},
+         .inputYLoopIndex = {1, 4},
+         .reductionLoopIndex = {3, 0},
+         .weightLoopIndex = {2, 1},
+         .fxIndex = 3,
+         .fyIndex = 2,
+         .weightReuseIndex = {4, 5},
+         .STRIDE = 1,
+         .GRAD_CLIPPING_UNIT_TEST = true,
+     }}};
 
 std::map<std::string, MemoryOffsets> gradientMemOffsets{
     {"classifier_weight",
      {
          8 * WEIGHT_INTERMEDIATE_SIZE + 21 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         5 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
          8 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
      }},
@@ -481,6 +500,13 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
          0,
      }},
     {"bottleneck_input_dense_bias",
+     {
+         0,
+         0,
+         WEIGHT_INTERMEDIATE_SIZE,
+     }},
+
+    {"grad_norm_clippping_unit_test",
      {
          0,
          0,
@@ -739,5 +765,13 @@ std::map<std::string, Files> gradientTestFiles{
          "bottleneck_input_dense",
          "",
          "bottleneck_input_dense_bias",
+     }},
+
+    {"grad_norm_clippping_unit_test",
+     {
+         "",
+         "",
+         "",
+         "",
      }},
 };

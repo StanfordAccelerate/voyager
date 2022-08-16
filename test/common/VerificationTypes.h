@@ -88,6 +88,7 @@ struct SimplifiedParams {
   bool SPLIT_OUTPUT;
 
   bool GRAD_CLIPPING;
+  bool GRAD_CLIPPING_UNIT_TEST;
 
   bool WEIGHT_SPLITTING;
   int WEIGHT_GRADIENT_OFFSET;
@@ -99,6 +100,9 @@ struct SimplifiedParams {
   bool ACC_T_OUTPUT;
 
   int inputExpBias;
+  int weightExpBias;
+  int outputExpBias;
+  int residualExpBias;
 };
 
 struct MemoryOffsets {
@@ -124,7 +128,7 @@ const int ENCODER_WEIGHT_SIZE = 8 * WEIGHT_INTERMEDIATE_SIZE +
                                 3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE;
 
 // SRAM Memory Offsets
-const int STACK_SIZE = 90112;
+const int STACK_SIZE = 90112 * 2;
 const int ACTIVATION_OFFSET = STACK_SIZE + 128;
 const int GRADIENT_OFFSET =
     ACTIVATION_OFFSET + 24 * ENCODER_ACTIVATION_SIZE + INTERMEDIATE_SIZE + 16;

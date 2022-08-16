@@ -28,7 +28,14 @@ void save_float(UniversalPosit* array, int index, float val, bool accType) {
 }
 #endif
 
-void save_float(float* array, int index, float val) { array[index] = val; }
+void save_float(float* array, int index, float val, bool accType) {
+  if (!accType) {
+    array[index] = val;
+  } else {
+    array[2 * index] = val;
+    array[2 * index + 1] = 0;
+  }
+}
 
 double* read_file_as_double(const std::string& filename, int size,
                             bool useDataFile) {
@@ -89,7 +96,7 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
 
   int size = STRIDE * Y * STRIDE * X * C;
 
-#if PIPE_INPUT == 1
+#ifdef PIPE_INPUT
   double* tmpValues = read_input_as_double(size);
 #else
   double* tmpValues = read_file_as_double(filename, size, useDataFile);
@@ -105,13 +112,13 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
             double val = *(tmpValuePtr++);
 
             int address = y * ((STRIDE * X) / 4) * 16 + x_o * 16 + x_i * 3 + c;
-            save_float(&acceleratorMemory[params.INPUT_OFFSET], address, val,
+            save_float(acceleratorMemory, params.INPUT_OFFSET + address, val,
                        params.ACC_T_INPUT);
 
             address = y * (STRIDE * X) * C + x * C + c;
             save_float(goldMemory, address, val, params.ACC_T_INPUT);
             save_float(universalGoldMemory, address, val, params.ACC_T_INPUT);
-            save_float(floatGoldMemory, address, val);
+            save_float(floatGoldMemory, address, val, params.ACC_T_INPUT);
           }
         }
       }
@@ -119,11 +126,11 @@ void load_inputs(const SimplifiedParams& params, const std::string& filename,
   } else {
     for (int i = 0; i < size; i++) {
       double val = *(tmpValuePtr++);
-      save_float(&acceleratorMemory[params.INPUT_OFFSET], i, val,
+      save_float(acceleratorMemory, params.INPUT_OFFSET + i, val,
                  params.ACC_T_INPUT);
       save_float(goldMemory, i, val, params.ACC_T_INPUT);
       save_float(universalGoldMemory, i, val, params.ACC_T_INPUT);
-      save_float(floatGoldMemory, i, val);
+      save_float(floatGoldMemory, i, val, params.ACC_T_INPUT);
     }
   }
 
@@ -162,7 +169,7 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
   }
 
   int size = FY * FX * C * K;
-#if PIPE_INPUT == 1
+#ifdef PIPE_INPUT
   double* tmpValues;
   if (params.ATTENTION_MASK) {
     tmpValues = read_input_as_double(size);
@@ -176,11 +183,11 @@ void load_weights(const SimplifiedParams& params, const std::string& filename,
 
   for (int i = 0; i < size; i++) {
     double val = *(tmpValuePtr++);
-    save_float(&acceleratorMemory[params.WEIGHT_OFFSET], i, val,
+    save_float(acceleratorMemory, params.WEIGHT_OFFSET + i, val,
                params.ACC_T_WEIGHT);
     save_float(goldMemory, i, val, params.ACC_T_WEIGHT);
     save_float(universalGoldMemory, i, val, params.ACC_T_WEIGHT);
-    save_float(floatGoldMemory, i, val);
+    save_float(floatGoldMemory, i, val, params.ACC_T_WEIGHT);
   }
 
   delete[] tmpValues;
@@ -211,10 +218,10 @@ void load_bias(const SimplifiedParams& params, const std::string& filename,
 
   for (int i = 0; i < size; i++) {
     double val = *(tmpValuePtr++);
-    save_float(&acceleratorMemory[params.BIAS_OFFSET], i, val, true);
+    save_float(acceleratorMemory, params.BIAS_OFFSET + i, val, true);
     save_float(goldMemory, i, val, true);
     save_float(universalGoldMemory, i, val, true);
-    save_float(floatGoldMemory, i, val);
+    save_float(floatGoldMemory, i, val, true);
   }
 
   delete[] tmpValues;
@@ -249,14 +256,14 @@ void load_residual(const SimplifiedParams& params, const std::string& filename,
 
   for (int i = 0; i < size; i++) {
     double val = *(tmpValuePtr++);
-    save_float(&acceleratorMemory[params.RESIDUAL_OFFSET], i, val,
+    save_float(acceleratorMemory, params.RESIDUAL_OFFSET + i, val,
                params.ACC_T_OUTPUT);
     save_float(goldMemory, i, val, params.ACC_T_OUTPUT);
     save_float(universalGoldMemory, i, val, params.ACC_T_OUTPUT);
-    save_float(floatGoldMemory, i, val);
+    save_float(floatGoldMemory, i, val, params.ACC_T_OUTPUT);
   }
 
-  delete[] tmpValues;o
+  delete[] tmpValues;
 }
 
 void load_datafile_outputs(const SimplifiedParams params,
@@ -302,7 +309,7 @@ void load_datafile_outputs(const SimplifiedParams params,
     double val = *(tmpValuePtr++);
     save_float(outputMatrix, i, val, params.ACC_T_OUTPUT);
     save_float(universalOutputMatrix, i, val, params.ACC_T_OUTPUT);
-    save_float(floatOutputMatrix, i, val);
+    save_float(floatOutputMatrix, i, val, params.ACC_T_OUTPUT);
   }
 
   delete[] tmpValues;

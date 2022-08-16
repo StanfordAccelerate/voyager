@@ -227,7 +227,13 @@ Posit<nbits, es> posit_exp(Posit<nbits, es> val) {
   // if ((float)val < -5.0) {
   //   return Posit<nbits, es>(0.0);
   // }
-  if (val_fp.sign == true && val_fp.scale > 2) {
+  // Posit<nbits, es> constant;
+  // constant.setbits();
+  assert(nbits == 16 && es == 1);
+  Posit<nbits, es> p16;
+  p16.setbits(40448);
+  typename Posit<nbits, es>::DecomposedPosit min_val = p16;
+  if (val_fp < min_val) {
     Posit<nbits, es> zero;
     zero.bits.template set_val<AC_VAL_0>();
     return zero;
@@ -697,9 +703,13 @@ inline PositFP<sbits, fbits> &PositFP<sbits, fbits>::operator+=(
 
 template <int sbits, int fbits>
 bool PositFP<sbits, fbits>::operator<(const PositFP<sbits, fbits> &rhs) const {
-  if (this->sign ^ rhs.sign) return sign;
-  if (scale != rhs.scale) return scale < rhs.scale;
-  return fraction < rhs.fraction;
+  if (sign ^ rhs.sign) {
+    return sign;
+  } else if (scale != rhs.scale) {
+    return sign ? scale > rhs.scale : scale < rhs.scale;
+  } else {
+    return sign ? fraction > rhs.fraction : fraction < rhs.fraction;
+  }
 }
 
 template <int sbits, int fbits>

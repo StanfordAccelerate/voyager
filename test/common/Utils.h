@@ -20,4 +20,4 @@ int compare_arrays(UniversalPosit *matrixA, float *matrixB, size_t size,
                    std::string filename, bool accType);
 #endif
 int compare_arrays(float *matrixA, float *matrixB, size_t size,
-                   std::string filename);
+                   std::string filename, bool accType);

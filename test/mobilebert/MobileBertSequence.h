@@ -20,8 +20,8 @@
 #define RRAM_MEMORY_SIZE (22 * 1024 * 1024)  // RRAM size for MobileBERT
 #endif
 
-// #define VERBOSE
-// #define DUMP_PARAMS
+#define VERBOSE
+#define DUMP_PARAMS
 // #define ACC_T_ERROR 1
 
 // Data memory
@@ -213,37 +213,40 @@ int verifyGradients(std::string dataDir, std::string outfilePrefix) {
       int C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
       int K = params.loops[0][params.weightLoopIndex[0]] *
               params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+
       int weightSize = params.NO_NORM ? K : C * K;
-
-      float floatMatrixB[weightSize];
-      INPUT_DATATYPE hlsMatrixB[weightSize];
-      UniversalPosit universalMatrixB[weightSize];
-
-      float floatBias[K];
-      INPUT_DATATYPE hlsBias[K];
-      UniversalPosit universalBias[K];
+      int biasSize = 2 * K;
 
       if (params.WEIGHT) {
+        float floatMatrixB[weightSize];
+        INPUT_DATATYPE hlsMatrixB[weightSize];
+        UniversalPosit uniMatrixB[weightSize];
+
         datafile = dataDir + layerName + files.weights_file;
         std::cout << "Checking " << datafile << std::endl;
         load_weights(params, datafile, true, acc_sram_memory, hlsMatrixB,
-                     universalMatrixB, floatMatrixB);
-        diffFile = outfilePrefix + files.weights_file + "_float_vs_pytorch.txt";
+                     uniMatrixB, floatMatrixB);
+        diffFile =
+            outfilePrefix + files.weights_file + "_fpgold_vs_pytorch.txt";
         errors = compare_arrays(float_sram_memory + params.WEIGHT_OFFSET,
-                                floatMatrixB, weightSize, diffFile);
+                                floatMatrixB, weightSize, diffFile, false);
         if (errors) {
           std::cerr << "ERROR: " << errors << " mismatches found" << std::endl;
         }
       }
 
       if (params.BIAS) {
+        float floatBiasMatrix[biasSize];
+        INPUT_DATATYPE hlsBiasMatrix[biasSize];
+        UniversalPosit uniBiasMatrix[biasSize];
+
         datafile = dataDir + layerName + files.bias_file;
         std::cout << "Checking " << datafile << std::endl;
-        load_bias(params, datafile, true, acc_sram_memory, hlsBias,
-                  universalBias, floatBias);
-        diffFile = outfilePrefix + files.bias_file + "_float_vs_pytorch.txt";
+        load_bias(params, datafile, true, acc_sram_memory, hlsBiasMatrix,
+                  uniBiasMatrix, floatBiasMatrix);
+        diffFile = outfilePrefix + files.bias_file + "_fpgold_vs_pytorch.txt";
         errors = compare_arrays(float_sram_memory + params.BIAS_OFFSET,
-                                floatBias, K, diffFile);
+                                floatBiasMatrix, K, diffFile, true);
         if (errors) {
           std::cerr << "ERROR: " << errors << " mismatches found" << std::endl;
         }
@@ -377,8 +380,9 @@ int runOperation(const SimplifiedParams params,
     std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     diffFile = outfilePrefix + "fpgold_vs_pytorch.txt";
-    errors = compare_arrays(float_sram_memory + params.OUTPUT_OFFSET,
-                            dataFileOutput, outputSize, diffFile);
+    errors =
+        compare_arrays(float_sram_memory + params.OUTPUT_OFFSET, dataFileOutput,
+                       outputSize, diffFile, params.ACC_T_OUTPUT);
   }
 
   if (errors) {
@@ -395,7 +399,7 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
 
 #ifdef DUMP_PARAMS
   std::ofstream myfile;
-  myfile.open("mobilebert_inference_params.h");
+  myfile.open("test/mobilebert/mobilebert_inference_params.h");
   myfile << "#ifndef MOBILEBERT_PARAMS\n"
          << "#define MOBILEBERT_PARAMS\n\n";
 #endif
@@ -452,8 +456,9 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
       }
 
 #ifdef DUMP_PARAMS
-      if (layer == 1) break;
-      myfile << formatOperation(params, op);
+      if (layer == 0 || op == "classifier") {
+        myfile << formatOperation(params, op);
+      }
 #endif
 
       outfilePrefix = "test_outputs/" + op + "_activation_";
@@ -463,6 +468,7 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
   }
 
 #ifdef DUMP_PARAMS
+  myfile << "#endif\n";
   myfile.close();
 #endif
 
@@ -475,6 +481,12 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
 }
 
 int runBackward(std::string datapath, std::vector<std::string> groups) {
+#ifdef DUMP_PARAMS
+  std::ofstream myfile;
+  myfile.open("test/mobilebert/mobilebert_backprop_params.h");
+  myfile << "#ifndef MOBILEBERT_PARAMS\n"
+         << "#define MOBILEBERT_PARAMS\n\n";
+#endif
   std::string inputDataDir = datapath + "activations/";
   std::string errorDataDir = datapath + "errors/";
   std::string gradDataDir = datapath + "gradients/";
@@ -549,6 +561,12 @@ int runBackward(std::string datapath, std::vector<std::string> groups) {
         layerName = "";
       }
 
+#ifdef DUMP_PARAMS
+      if (layer == 0) {
+        myfile << formatOperation(params, backOp) << std::endl;
+      }
+#endif
+
       outfilePrefix = "test_outputs/" + backOp + "_error_";
       datafile = errorDataDir + layerName + files.outputs_file;
       int errors = runOperation(params, datafile, outfilePrefix,
@@ -604,6 +622,12 @@ int runBackward(std::string datapath, std::vector<std::string> groups) {
                 "mobilebert_encoder_layer_" + std::to_string(layer - 1) + "_";
           }
 
+#ifdef DUMP_PARAMS
+          if (layer == 0) {
+            myfile << formatOperation(params, gradOp) << std::endl;
+          }
+#endif
+
           outfilePrefix = "test_outputs/" + gradOp + "_";
           datafile = gradDataDir + layerName + files.outputs_file;
           errors = runOperation(params, datafile, outfilePrefix,
@@ -612,6 +636,11 @@ int runBackward(std::string datapath, std::vector<std::string> groups) {
       }
     }
   }
+
+#ifdef DUMP_PARAMS
+  myfile << "#endif\n";
+  myfile.close();
+#endif
 
   return 0;
 }
