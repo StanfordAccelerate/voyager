@@ -165,18 +165,21 @@ struct VectorInstructions {
   static const unsigned int reduction = 1;
   static const unsigned int accumulation = 2;
 
-  ac_int<2, false> vInput;
+  ac_int<3, false> vInput;
   static const unsigned int readFromSystolicArray = 1;
   static const unsigned int readFromVectorFetch = 2;
   static const unsigned int readFromAccumulation = 3;
+  static const unsigned int readFromReduce = 4;
 
   // src0 refers to lhs and src1 refers to rhs
 
   // Stage 0: add, mult
-  ac_int<2, false> vOp0Src1;
+  ac_int<3, false> vOp0Src1;
   static const unsigned int readInterface = 1;
   static const unsigned int op0immediate0 = 2;
   static const unsigned int op0immediate1 = 3;
+  // static const unsigned int readFromReduce = 4;
+
   ac_int<2, false> vOp0;  // add, sub, mult
   static const unsigned int nop = 0;
   static const unsigned int vadd = 1;
@@ -192,7 +195,6 @@ struct VectorInstructions {
   static const unsigned int toReduce = 1;
 
   // Stage 3: add, div
-  ac_int<1, false> vOp3Src0;  // use existing or read from reduce interface
   ac_int<3, false> vOp3Src1;  // don't read, read from reduce interface 2, or
                               // normal interface
   static const unsigned int readReduceInterface = 1;
@@ -223,15 +225,19 @@ struct VectorInstructions {
   ac_int<1, false> rInvSqrt;
   ac_int<1, false> rDuplicate;
 
-  ac_int<2, false> rDest;
-  static const unsigned int toVectorSrc0 = 1;
-  static const unsigned int toVectorSrc1 = 2;
-  static const unsigned int sWriteOut = 3;
+  ac_int<3, false> rDest;
+  static const unsigned int toVectorOp0Src0 = 1;
+  static const unsigned int toVectorOp0Src1 = 2;
+  static const unsigned int toVectorOp3Src1 = 3;
+  static const unsigned int sWriteOut = 4;
+
+  // broadcast count comes from {immediate1,immediate0}
+  ac_int<1, false> rBroadcast;
 
   ac_int<8, false> immediate0;
   ac_int<8, false> immediate1;
 
-  static const unsigned int width = 52;
+  static const unsigned int width = 55;
   VectorInstructions() {}
 
 #ifndef NO_SYSC
@@ -258,7 +264,6 @@ struct VectorInstructions {
     m& vOp0;
     m& vOp1;
     m& vOp2;
-    m& vOp3Src0;
     m& vOp3Src1;
     m& vOp3;
     m& vOp4;
@@ -269,6 +274,7 @@ struct VectorInstructions {
     m& rInvSqrt;
     m& rDuplicate;
     m& rDest;
+    m& rBroadcast;
     m& immediate0;
     m& immediate1;
   }
@@ -288,7 +294,6 @@ struct VectorInstructions {
     os << "vOp0: " << params.vOp0 << std::endl;
     os << "vOp1: " << params.vOp1 << std::endl;
     os << "vOp2: " << params.vOp2 << std::endl;
-    os << "vOp3Src0: " << params.vOp3Src0 << std::endl;
     os << "vOp3Src1: " << params.vOp3Src1 << std::endl;
     os << "vOp3: " << params.vOp3 << std::endl;
     os << "vOp4: " << params.vOp4 << std::endl;
@@ -466,9 +471,6 @@ struct VectorInstructionConfig {
       m& inst[j].vOp2;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp3Src0;
-    }
-    for (int j = 0; j < 8; j++) {
       m& inst[j].vOp3Src1;
     }
     for (int j = 0; j < 8; j++) {
@@ -497,6 +499,9 @@ struct VectorInstructionConfig {
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rDest;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].rBroadcast;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].immediate0;

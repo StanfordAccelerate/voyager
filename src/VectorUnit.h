@@ -4,6 +4,7 @@
 #include <systemc.h>
 
 #include "AccelTypes.h"
+#include "Broadcaster.h"
 #include "MaxpoolUnit.h"
 #include "OutputAddressGenerator.h"
 #include "ParamsDeserializer.h"
@@ -41,13 +42,55 @@ SC_MODULE(VectorOpUnit) {
       CCS_INIT_S1(reductionOpInput);
   Connections::Combinational<
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
-      CCS_INIT_S1(reductionOpOutputSrc0);
+      CCS_INIT_S1(reductionOpOutputOp0Src0);
   Connections::Combinational<
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
-      CCS_INIT_S1(reductionOpOutputSrc1);
+      CCS_INIT_S1(reductionOpOutputOp0Src1);
+  Connections::Combinational<
+      Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
+      CCS_INIT_S1(reductionOpOutputOp3Src1);
+
+  Broadcaster<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> > CCS_INIT_S1(
+      broadcastReduction0);
+  Connections::Combinational<ac_int<16, false> > broadcastReduction0Count;
+  Connections::Combinational<
+      Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
+      CCS_INIT_S1(broadcastReductionOpOutputOp0Src0);
+
+  Broadcaster<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> > CCS_INIT_S1(
+      broadcastReduction1);
+  Connections::Combinational<ac_int<16, false> > broadcastReduction1Count;
+  Connections::Combinational<
+      Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
+      CCS_INIT_S1(broadcastReductionOpOutputOp0Src1);
+
+  Broadcaster<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> > CCS_INIT_S1(
+      broadcastReduction2);
+  Connections::Combinational<ac_int<16, false> > broadcastReduction2Count;
+  Connections::Combinational<
+      Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
+      CCS_INIT_S1(broadcastReductionOpOutputOp3Src1);
 
   SC_CTOR(VectorOpUnit) {
     // systolicArrayOutput.enable_local_rand_stall();
+
+    broadcastReduction0.clk(clk);
+    broadcastReduction0.rstn(rstn);
+    broadcastReduction0.dataIn(reductionOpOutputOp0Src0);
+    broadcastReduction0.count(broadcastReduction0Count);
+    broadcastReduction0.dataOut(broadcastReductionOpOutputOp0Src0);
+
+    broadcastReduction1.clk(clk);
+    broadcastReduction1.rstn(rstn);
+    broadcastReduction1.dataIn(reductionOpOutputOp0Src1);
+    broadcastReduction1.count(broadcastReduction1Count);
+    broadcastReduction1.dataOut(broadcastReductionOpOutputOp0Src1);
+
+    broadcastReduction2.clk(clk);
+    broadcastReduction2.rstn(rstn);
+    broadcastReduction2.dataIn(reductionOpOutputOp3Src1);
+    broadcastReduction2.count(broadcastReduction2Count);
+    broadcastReduction2.dataOut(broadcastReductionOpOutputOp3Src1);
 
     SC_THREAD(vectorOpRun);
     sensitive << clk.pos();
@@ -72,8 +115,9 @@ SC_MODULE(VectorOpUnit) {
     accumulationOpInput.ResetWrite();
     accumulationOpOutput.ResetRead();
     reductionOpInput.ResetWrite();
-    reductionOpOutputSrc0.ResetRead();
-    reductionOpOutputSrc1.ResetRead();
+    broadcastReductionOpOutputOp0Src0.ResetRead();
+    broadcastReductionOpOutputOp0Src1.ResetRead();
+    broadcastReductionOpOutputOp3Src1.ResetRead();
 
     wait();
 
@@ -111,6 +155,8 @@ SC_MODULE(VectorOpUnit) {
         }
       } else if (inst.vInput == VectorInstructions::readFromAccumulation) {
         op0Src0 = accumulationOpOutput.Pop();
+      } else if (inst.vInput == VectorInstructions::readFromReduce) {
+        op0Src0 = broadcastReductionOpOutputOp0Src0.Pop();
       }
 
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> op0Src1;
@@ -133,6 +179,8 @@ SC_MODULE(VectorOpUnit) {
         for (int i = 0; i < WIDTH; i++) {
           op0Src1[i] = immediate;
         }
+      } else if (inst.vOp0Src1 == VectorInstructions::readFromReduce) {
+        op0Src1 = broadcastReductionOpOutputOp0Src1.Pop();
       }
 
       // DLOG("vector unit input: " << op0Src0);
@@ -184,15 +232,11 @@ SC_MODULE(VectorOpUnit) {
        * Stage 3: add, div
        */
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> op3Src0;
-      if (inst.vOp3Src0 == VectorInstructions::readReduceInterface) {
-        op3Src0 = reductionOpOutputSrc0.Pop();
-      } else {
-        op3Src0 = res2;
-      }
+      op3Src0 = res2;
 
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> op3Src1;
       if (inst.vOp3Src1 == VectorInstructions::readReduceInterface) {
-        op3Src1 = reductionOpOutputSrc1.Pop();
+        op3Src1 = broadcastReductionOpOutputOp3Src1.Pop();
       } else if (inst.vOp3Src1 == VectorInstructions::readNormalInterface) {
         Pack1D<ACC_DTYPE, WIDTH> tmp = vectorFetch2Output.Pop();
 
@@ -219,19 +263,19 @@ SC_MODULE(VectorOpUnit) {
         vadd<typename ACC_DTYPE::DecomposedPosit, WIDTH>(op3Src0, op3Src1,
                                                          res3);
 
-        DLOG(op3Src0 << std::endl
-                     << " + " << std::endl
-                     << op3Src1 << std::endl
-                     << " = " << std::endl
-                     << res3);
+        // DLOG(op3Src0 << std::endl
+        //              << " + " << std::endl
+        //              << op3Src1 << std::endl
+        //              << " = " << std::endl
+        //              << res3);
       } else if (inst.vOp3 == VectorInstructions::vmult) {
         // FIXME: combine this with div
         vmult<typename ACC_DTYPE::DecomposedPosit, WIDTH>(op3Src0, op3Src1,
                                                           res3);
 
       } else if (inst.vOp3 == VectorInstructions::vdiv) {
-        // vdiv<typename ACC_DTYPE::DecomposedPosit, WIDTH>(op3Src0, op3Src1,
-        //                                                  res3);
+        vdiv<typename ACC_DTYPE::DecomposedPosit, WIDTH>(op3Src0, op3Src1,
+                                                         res3);
       } else {
         res3 = op3Src0;
       }
@@ -304,8 +348,12 @@ SC_MODULE(VectorOpUnit) {
     scalarOpUnitOutput.Reset();
     reductionOpUnitInstructions.Reset();
     reductionOpInput.ResetRead();
-    reductionOpOutputSrc0.ResetWrite();
-    reductionOpOutputSrc1.ResetWrite();
+    reductionOpOutputOp0Src0.ResetWrite();
+    reductionOpOutputOp0Src1.ResetWrite();
+    reductionOpOutputOp3Src1.ResetWrite();
+    broadcastReduction0Count.ResetWrite();
+    broadcastReduction1Count.ResetWrite();
+    broadcastReduction2Count.ResetWrite();
     scalarOpUnitOutput.Reset();
 
     wait();
@@ -323,6 +371,7 @@ SC_MODULE(VectorOpUnit) {
 #pragma hls_pipeline_stall_mode flush
       for (int index = 0; index < iterationCount; index++) {
         typename ACC_DTYPE::DecomposedPosit prevResult;
+        prevResult.setZero();
 
         if (inst.rOp == VectorInstructions::radd) {
           for (int i = 0; i < inst.rCount; i++) {
@@ -347,14 +396,12 @@ SC_MODULE(VectorOpUnit) {
             typename ACC_DTYPE::DecomposedPosit result = treemax16(op);
             // TreeOps<typename ACC_DTYPE::DecomposedPosit, WIDTH>().treemax(
             //     op);
-            if (i != 0) {
-              result = result < prevResult ? prevResult : result;
-            }
+
+            result = result < prevResult ? prevResult : result;
 
             prevResult = result;
           }
         }
-
         if (!inst.rDuplicate) {
           res[index] = prevResult;
         } else {
@@ -378,10 +425,31 @@ SC_MODULE(VectorOpUnit) {
       }
 
       if (inst.rDest != 0) {
-        if (inst.rDest == VectorInstructions::toVectorSrc0) {
-          reductionOpOutputSrc0.Push(res);
-        } else if (inst.rDest == VectorInstructions::toVectorSrc1) {
-          reductionOpOutputSrc1.Push(res);
+        if (inst.rDest == VectorInstructions::toVectorOp0Src0) {
+          ac_int<16, false> broadcastCount = 1;
+          if (inst.rBroadcast) {
+            broadcastCount.set_slc(0, inst.immediate0);
+            broadcastCount.set_slc(8, inst.immediate1);
+          }
+          broadcastReduction0Count.Push(broadcastCount);
+          reductionOpOutputOp0Src0.Push(res);
+        } else if (inst.rDest == VectorInstructions::toVectorOp0Src1) {
+          ac_int<16, false> broadcastCount = 1;
+          if (inst.rBroadcast) {
+            broadcastCount.set_slc(0, inst.immediate0);
+            broadcastCount.set_slc(8, inst.immediate1);
+          }
+
+          broadcastReduction1Count.Push(broadcastCount);
+          reductionOpOutputOp0Src1.Push(res);
+        } else if (inst.rDest == VectorInstructions::toVectorOp3Src1) {
+          ac_int<16, false> broadcastCount = 1;
+          if (inst.rBroadcast) {
+            broadcastCount.set_slc(0, inst.immediate0);
+            broadcastCount.set_slc(8, inst.immediate1);
+          }
+          broadcastReduction2Count.Push(broadcastCount);
+          reductionOpOutputOp3Src1.Push(res);
         } else if (inst.rDest == VectorInstructions::sWriteOut) {
           Pack1D<IDTYPE, WIDTH> outputRes;
 #pragma hls_unroll yes

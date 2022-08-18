@@ -29,6 +29,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vectorParams.addressGen0Loop[1][0] = 3;  // requires 3 passes
     vectorParams.addressGen0Loop[1][1] = 1;
     vectorParams.addressGen0Loop[1][2] = Y / DIMENSION;
+    vectorParams.DP_VEC0 = false;
 
     // address gen 1 (weights)
     vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
@@ -46,7 +47,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
 
     // output
     for (int i = 0; i < 3; i++) {
-      vectorParams.outputLoops[0][i] = params.loops[0][i];
+      vectorParams.outputLoops[0][i] = 1;
     }
     vectorParams.outputXLoopIndex[0] = 0;
     vectorParams.outputYLoopIndex[0] = 1;
@@ -58,6 +59,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vectorParams.outputWeightLoopIndex[1] = 2;
     vectorParams.outputYLoopIndex[1] = 1;
     vectorParams.outputXLoopIndex[1] = 0;
+    vectorParams.DP_OUTPUT = false;
 
     // sendSerializedParams<VectorParams, 32>(vectorParams,
     // &serialVectorParamsIn);
@@ -71,7 +73,14 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst0.rCount = Y / DIMENSION;
     vInst0.rOp = VectorInstructions::rmax;
     vInst0.rDuplicate = 1;
-    vInst0.rDest = VectorInstructions::toVectorSrc0;
+    vInst0.rDest = VectorInstructions::toVectorOp0Src1;
+    vInst0.rBroadcast = 1;
+    // broadcast max over entire array, for 2 passes
+    ac_int<16, false> vInst0_broadcastCount = 2 * Y / DIMENSION;
+    vInst0.immediate0 = vInst0_broadcastCount.slc<8>(0);
+    vInst0.immediate1 = vInst0_broadcastCount.slc<8>(8);
+    vInst0.rInvSqrt = false;
+
     vectorInstructionConfig.inst[0] = vInst0;
     vectorInstructionConfig.instCount[0] = 1;
 
@@ -84,7 +93,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst1.vOp0 = VectorInstructions::nop;
     vInst1.vOp1 = VectorInstructions::nop;
     vInst1.vOp2 = VectorInstructions::toReduce;
-    vInst1.vOp3Src0 = VectorInstructions::nop;
     vInst1.vOp3Src1 = VectorInstructions::nop;
     vInst1.vOp3 = VectorInstructions::nop;
     vInst1.vOp4 = VectorInstructions::nop;
@@ -92,27 +100,57 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vectorInstructionConfig.inst[1] = vInst1;
     vectorInstructionConfig.instCount[1] = Y / DIMENSION;
 
-    // inst 2- subtract max and exp, and reduce sum
+    // inst 2- start reduction engine to calculate sum
     VectorInstructions vInst2;
-    vInst2.instType = VectorInstructions::vector;
-    vInst2.vInput = VectorInstructions::readFromVectorFetch;
-    vInst2.vAccumulatePush = VectorInstructions::nop;
-    vInst2.vOp0Src1 = VectorInstructions::nop;
-    vInst2.vOp0 = VectorInstructions::nop;
-    vInst2.vOp1 = VectorInstructions::nop;
-    vInst2.vOp2 = VectorInstructions::toReduce;
-    vInst2.vOp3Src0 = VectorInstructions::nop;
-    vInst2.vOp3Src1 = VectorInstructions::nop;
-    vInst2.vOp3 = VectorInstructions::nop;
-    vInst2.vOp4 = VectorInstructions::nop;
-    vInst2.vDest = VectorInstructions::nop;
+    vInst2.instType = VectorInstructions::reduction;
+    vInst2.rCount = Y / DIMENSION;
+    vInst2.rOp = VectorInstructions::radd;
+    vInst2.rDuplicate = 1;
+    vInst2.rDest = VectorInstructions::toVectorOp3Src1;
+    vInst2.rBroadcast = 1;
+    // broadcast max over entire array
+    ac_int<16, false> vInst2_broadcastCount = Y / DIMENSION;
+    vInst2.immediate0 = vInst2_broadcastCount.slc<8>(0);
+    vInst2.immediate1 = vInst2_broadcastCount.slc<8>(8);
+    vInst2.rInvSqrt = false;
+
     vectorInstructionConfig.inst[2] = vInst2;
-    vectorInstructionConfig.instCount[1] = Y / DIMENSION;
+    vectorInstructionConfig.instCount[2] = 1;
 
-    // inst 2- subtract max and exp, and divide by reduced value
+    // inst 3- subtract max and exp, and reduce sum
+    VectorInstructions vInst3;
+    vInst3.instType = VectorInstructions::vector;
+    vInst3.vInput = VectorInstructions::readFromVectorFetch;
+    vInst3.vAccumulatePush = VectorInstructions::nop;
+    vInst3.vOp0Src1 = VectorInstructions::readFromReduce;
+    vInst3.vOp0 = VectorInstructions::vsub;
+    vInst3.vOp1 = VectorInstructions::vexp;
+    vInst3.vOp2 = VectorInstructions::toReduce;
+    vInst3.vOp3Src1 = VectorInstructions::nop;
+    vInst3.vOp3 = VectorInstructions::nop;
+    vInst3.vOp4 = VectorInstructions::nop;
+    vInst3.vDest = VectorInstructions::nop;
+    vectorInstructionConfig.inst[3] = vInst3;
+    vectorInstructionConfig.instCount[3] = Y / DIMENSION;
 
-    vectorInstructionConfig.instLen = 1;
-    vectorInstructionConfig.instLoopCount = 1;
+    // inst 4- subtract max and exp, and divide by reduced value
+    VectorInstructions vInst4;
+    vInst4.instType = VectorInstructions::vector;
+    vInst4.vInput = VectorInstructions::readFromVectorFetch;
+    vInst4.vAccumulatePush = VectorInstructions::nop;
+    vInst4.vOp0Src1 = VectorInstructions::readFromReduce;
+    vInst4.vOp0 = VectorInstructions::vsub;
+    vInst4.vOp1 = VectorInstructions::vexp;
+    vInst4.vOp2 = VectorInstructions::nop;
+    vInst4.vOp3Src1 = VectorInstructions::readReduceInterface;
+    vInst4.vOp3 = VectorInstructions::vdiv;
+    vInst4.vOp4 = VectorInstructions::nop;
+    vInst4.vDest = VectorInstructions::vWriteOut;
+    vectorInstructionConfig.inst[4] = vInst4;
+    vectorInstructionConfig.instCount[4] = Y / DIMENSION;
+
+    vectorInstructionConfig.instLen = 5;
+    vectorInstructionConfig.instLoopCount = X;  // X
   } else if (params.SOFTMAX_GRAD) {
     matrixParamsValid = false;
     vectorParamsValid = true;
@@ -181,7 +219,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst0.rCount = Y;
     vInst0.rOp = VectorInstructions::radd;
     vInst0.rDuplicate = 0;
-    vInst0.rDest = VectorInstructions::toVectorSrc0;
+    // vInst0.rDest = VectorInstructions::toVectorSrc0;
     vectorInstructionConfig.inst[0] = vInst0;
     vectorInstructionConfig.instCount[0] = 1;
 
@@ -194,7 +232,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst1.vOp0 = VectorInstructions::vmult;
     vInst1.vOp1 = VectorInstructions::nop;
     vInst1.vOp2 = VectorInstructions::toReduce;
-    vInst1.vOp3Src0 = VectorInstructions::nop;
+    //
     vInst1.vOp3Src1 = VectorInstructions::readNormalInterface;
     vInst1.vOp3 = VectorInstructions::vmult;
     vInst1.vOp4 = VectorInstructions::nop;
@@ -211,7 +249,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst2.vOp0 = VectorInstructions::vmult;
     vInst2.vOp1 = VectorInstructions::nop;
     vInst2.vOp2 = VectorInstructions::toReduce;
-    vInst2.vOp3Src0 = VectorInstructions::readReduceInterface;
+    // vInst2.vOp3Src0 = VectorInstructions::readReduceInterface;
     vInst2.vOp3Src1 = VectorInstructions::op3immediate0;
 
     vInst2.vOp3 = VectorInstructions::vmult;
@@ -314,7 +352,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst0.rCount = C / DIMENSION;
     vInst0.rOp = VectorInstructions::radd;
     vInst0.rDuplicate = 0;
-    vInst0.rDest = VectorInstructions::toVectorSrc0;
+    vInst0.rDest = VectorInstructions::toVectorOp0Src0;
     vectorInstructionConfig.inst[0] = vInst0;
     vectorInstructionConfig.instCount[0] = 1;
 
@@ -327,7 +365,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst1.vOp0 = VectorInstructions::vmult;
     vInst1.vOp1 = VectorInstructions::nop;
     vInst1.vOp2 = VectorInstructions::toReduce;
-    vInst1.vOp3Src0 = VectorInstructions::nop;
+
     vInst1.vOp3Src1 = VectorInstructions::nop;
     vInst1.vOp3 = VectorInstructions::nop;
     vInst1.vOp4 = VectorInstructions::nop;
@@ -341,13 +379,12 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     // inst2- add bias, write out
     VectorInstructions vInst2;
     vInst2.instType = VectorInstructions::vector;
-    vInst2.vInput = VectorInstructions::nop;
+    vInst2.vInput = VectorInstructions::readFromReduce;
     vInst2.vAccumulatePush = VectorInstructions::nop;
     vInst2.vOp0Src1 = VectorInstructions::nop;
     vInst2.vOp0 = VectorInstructions::nop;
     vInst2.vOp1 = VectorInstructions::nop;
     vInst2.vOp2 = VectorInstructions::nop;
-    vInst2.vOp3Src0 = VectorInstructions::readReduceInterface;
     vInst2.vOp3Src1 = VectorInstructions::readNormalInterface;
     vInst2.vOp3 = VectorInstructions::vadd;
     vInst2.vOp4 = VectorInstructions::nop;
@@ -380,7 +417,8 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     }
     vectorParams.addressGen0Loop[1][0] = 1;
     vectorParams.addressGen0Loop[1][1] = X;
-    vectorParams.addressGen0Loop[1][2] = C / DIMENSION;
+    vectorParams.addressGen0Loop[1][2] = K / DIMENSION;
+    vectorParams.DP_VEC0 = false;
 
     // address gen 1 (weights)
     vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
@@ -390,10 +428,10 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     }
     vectorParams.addressGen1Loops[1][0] = X;
     vectorParams.addressGen1Loops[1][1] = 1;
-    vectorParams.addressGen1Loops[1][2] = C / DIMENSION;
+    vectorParams.addressGen1Loops[1][2] = K / DIMENSION;
 
     vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-    vectorParams.addressGen2Mode = 1;  // use bias mode
+    vectorParams.addressGen2Mode = params.BIAS;  // use bias mode
     vectorParams.addressGen2Loops[0][0] = X;
     vectorParams.addressGen2Loops[0][1] = 1;
     vectorParams.addressGen2Loops[0][2] = 1;
@@ -415,7 +453,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
 
     // output
     for (int i = 0; i < 3; i++) {
-      vectorParams.outputLoops[0][i] = params.loops[0][i];
+      vectorParams.outputLoops[0][i] = 1;
     }
     vectorParams.outputXLoopIndex[0] = params.inputXLoopIndex[0];
     vectorParams.outputYLoopIndex[0] = params.inputYLoopIndex[0];
@@ -423,10 +461,11 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
 
     vectorParams.outputLoops[1][0] = 1;
     vectorParams.outputLoops[1][1] = X;
-    vectorParams.outputLoops[1][2] = C / DIMENSION;
+    vectorParams.outputLoops[1][2] = K / DIMENSION;
     vectorParams.outputWeightLoopIndex[1] = 2;
     vectorParams.outputYLoopIndex[1] = 0;
     vectorParams.outputXLoopIndex[1] = 1;
+    vectorParams.DP_OUTPUT = false;
 
     // sendSerializedParams<VectorParams, 32>(vectorParams,
     // &serialVectorParamsIn);
@@ -443,16 +482,20 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst0.vOp0 = VectorInstructions::vmult;
     vInst0.vOp1 = VectorInstructions::nop;
     vInst0.vOp2 = VectorInstructions::nop;
-    vInst0.vOp3Src0 = VectorInstructions::nop;
-    vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
-    vInst0.vOp3 = VectorInstructions::vadd;
+    if (params.BIAS) {
+      vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
+      vInst0.vOp3 = VectorInstructions::vadd;
+    } else {
+      vInst0.vOp3Src1 = VectorInstructions::nop;
+      vInst0.vOp3 = VectorInstructions::nop;
+    }
     vInst0.vOp4 = params.RELU;
     vInst0.vDest = VectorInstructions::vWriteOut;
     vectorInstructionConfig.inst[0] = vInst0;
 
     // C/DIMENSION to do the complete reduction
     // DIMENSION to fill up the entire vector
-    vectorInstructionConfig.instCount[0] = X * C / DIMENSION;
+    vectorInstructionConfig.instCount[0] = X * K / DIMENSION;
 
     vectorInstructionConfig.instLen = 1;
     vectorInstructionConfig.instLoopCount = 1;
@@ -539,7 +582,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst1.vOp0 = VectorInstructions::vmult;
     vInst1.vOp1 = VectorInstructions::nop;
     vInst1.vOp2 = VectorInstructions::nop;
-    vInst1.vOp3Src0 = VectorInstructions::nop;
+
     vInst1.vOp3Src1 = VectorInstructions::nop;
     vInst1.vOp3 = VectorInstructions::nop;
     vInst1.vOp4 = VectorInstructions::nop;
@@ -559,7 +602,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst2.vOp0 = VectorInstructions::nop;
     vInst2.vOp1 = VectorInstructions::nop;
     vInst2.vOp2 = VectorInstructions::nop;
-    vInst2.vOp3Src0 = VectorInstructions::nop;
     vInst2.vOp3Src1 = VectorInstructions::nop;
     vInst2.vOp3 = VectorInstructions::nop;
     vInst2.vOp4 = VectorInstructions::nop;
@@ -646,7 +688,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst0.vOp0 = VectorInstructions::vmult;
     vInst0.vOp1 = VectorInstructions::nop;
     vInst0.vOp2 = VectorInstructions::nop;
-    vInst0.vOp3Src0 = VectorInstructions::nop;
     vInst0.vOp3Src1 = VectorInstructions::nop;
     vInst0.vOp3 = VectorInstructions::nop;
     vInst0.vOp4 = VectorInstructions::nop;
@@ -716,7 +757,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
     vInst0.vOp0 = VectorInstructions::vsub;
     vInst0.vOp1 = VectorInstructions::nop;
     vInst0.vOp2 = VectorInstructions::nop;
-    vInst0.vOp3Src0 = VectorInstructions::nop;
     vInst0.vOp3Src1 = VectorInstructions::op3immediate0;
     vInst0.vOp3 = VectorInstructions::nop;
     vInst0.vOp4 = VectorInstructions::nop;
@@ -987,7 +1027,7 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
       vInst1.vOp0 = VectorInstructions::nop;
       vInst1.vOp1 = VectorInstructions::nop;
       vInst1.vOp1 = VectorInstructions::nop;
-      vInst1.vOp3Src0 = VectorInstructions::nop;  // use existing
+      // use existing
       vInst1.vOp3Src1 = VectorInstructions::nop;
       vInst1.vOp3 = VectorInstructions::nop;
       vInst1.vOp4 = VectorInstructions::nop;
@@ -1004,7 +1044,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
       vInst2.vOp0 = VectorInstructions::nop;
       vInst2.vOp1 = VectorInstructions::nop;
       vInst2.vOp1 = VectorInstructions::nop;
-      vInst2.vOp3Src0 = VectorInstructions::nop;  // use existing
       vInst2.vOp3Src1 = VectorInstructions::op3immediate0;
       vInst2.vOp3 = VectorInstructions::vmult;
       vInst2.vOp4 = VectorInstructions::nop;
@@ -1040,7 +1079,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
 
       vInst0.vOp1 = VectorInstructions::nop;
       vInst0.vOp2 = VectorInstructions::nop;
-      vInst0.vOp3Src0 = VectorInstructions::nop;  // use existing
 
       if (params.BIAS) {
         vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
@@ -1067,8 +1105,6 @@ void map_operation(const SimplifiedParams &params, MatrixParams &matrixParams,
           params.loops[1][params.inputYLoopIndex[1]] *
           params.loops[0][params.weightLoopIndex[0]] *
           params.loops[1][params.weightLoopIndex[1]];
-      std::cout << "count: " << vectorInstructionConfig.instCount[0]
-                << std::endl;
       vectorInstructionConfig.instLen = 1;
       vectorInstructionConfig.instLoopCount = 1;
     }

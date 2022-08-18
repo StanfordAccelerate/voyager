@@ -61,7 +61,7 @@ void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
 
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
-    posit_exp(tmp[i]);
+    tmp[i] = posit_exp(tmp[i]);
   }
 
 // convert back to decoded format
@@ -79,7 +79,7 @@ void vdiv(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
   Pack1D<Posit<16, 1>, WIDTH> tmp;
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
-    tmp[i] = op0[i];
+    tmp[i] = op1[i];
   }
 
 #pragma hls_unroll yes
