@@ -71,30 +71,30 @@ void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
   }
 }
 
-#pragma hls_design ccore
-template <typename ACC_DTYPE, int WIDTH>
-void vdiv(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
-          Pack1D<ACC_DTYPE, WIDTH>& res) {
-  // convert to Posit16
-  Pack1D<Posit<16, 1>, WIDTH> tmp;
-#pragma hls_unroll yes
-  for (int i = 0; i < WIDTH; i++) {
-    tmp[i] = op1[i];
-  }
+// #pragma hls_design ccore
+// template <typename ACC_DTYPE, int WIDTH>
+// void vdiv(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
+//           Pack1D<ACC_DTYPE, WIDTH>& res) {
+//   // convert to Posit16
+//   Pack1D<Posit<16, 1>, WIDTH> tmp;
+// #pragma hls_unroll yes
+//   for (int i = 0; i < WIDTH; i++) {
+//     tmp[i] = op1[i];
+//   }
 
-#pragma hls_unroll yes
-  for (int i = 0; i < WIDTH; i++) {
-    tmp[i].reciprocal();
-  }
+// #pragma hls_unroll yes
+//   for (int i = 0; i < WIDTH; i++) {
+//     tmp[i].reciprocal();
+//   }
 
-// convert back to decoded format
-#pragma hls_unroll yes
-  for (int i = 0; i < WIDTH; i++) {
-    res[i] = tmp[i];
-  }
+// // convert back to decoded format
+// #pragma hls_unroll yes
+//   for (int i = 0; i < WIDTH; i++) {
+//     res[i] = tmp[i];
+//   }
 
-  vmult<ACC_DTYPE, WIDTH>(op0, res, res);
-}
+//   vmult<ACC_DTYPE, WIDTH>(op0, res, res);
+// }
 
 #pragma hls_design ccore
 template <typename ACC_DTYPE, int WIDTH>
@@ -123,7 +123,10 @@ void vmultdiv(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
     op1_factor = op1;
   }
 
-  vmult<ACC_DTYPE, WIDTH>(op0, op1_factor, res);
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    res[i] = static_cast<ACC_DTYPE>(op0[i] * op1_factor[i]);
+  }
 }
 
 #pragma hls_design ccore
