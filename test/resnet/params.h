@@ -593,6 +593,7 @@ const SimplifiedParams fc_params = {
     .ACC_FROM_ACC = false,
     .SOFTMAX = false,
     .ATTENTION_MASK = false,
+    .ATTENTION_SCALING = false,
     .FC = true,
 };
 
