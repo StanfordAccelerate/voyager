@@ -157,7 +157,7 @@ std::map<std::string, SimplifiedParams> inferenceParams{
     {"qkAttention",
      {
          .WEIGHT_TRANSPOSE = true,
-         .loops = {{4, 1, 2, 1, 1, 1}, {2, 4, 1, 1, 1, 32}},
+         .loops = {{4, 1, 1, 1, 1, 1}, {2, 8, 1, 1, 1, 32}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
          .reductionLoopIndex = {3, 0},
@@ -771,7 +771,7 @@ std::map<std::string, Files> inferenceTestFiles{
 
     {"intermediate_dense",
      {
-         "ffn_2_output_LayerNorm",
+         "ffn_0_output_LayerNorm",
          "intermediate_dense_weight",
          "intermediate_dense_bias",
          "intermediate_intermediate_act_fn",

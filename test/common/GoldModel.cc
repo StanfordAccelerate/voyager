@@ -457,6 +457,13 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       accumMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
     }
 
+    // for (int i = 0; i < C; i++) {
+    //   for (int j = 0; j < K; j++) {
+    //     std::cerr << static_cast<float>(accumMatrixB[i * K + j]) << "\t";
+    //   }
+    //   std::cerr << std::endl;
+    // }
+
     if (params.RESIDUAL || params.RELU_GRAD) {
       for (int i = 0; i < X * Y * K; i++) {
         accumResidualMatrix[i] =
@@ -485,6 +492,13 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
           accumMatrixA[x * C + c] = copyMatrixA[c * X + x];
         }
       }
+    }
+
+    for (int i = 0; i < X; i++) {
+      for (int j = 0; j < C; j++) {
+        std::cerr << static_cast<float>(accumMatrixA[i * C + j]) << "\t";
+      }
+      std::cerr << std::endl;
     }
 
     if (params.CONCAT_WEIGHT) {
@@ -556,9 +570,8 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
           }
 
           if (params.ATTENTION_SCALING) {
-            float fscale = 1.0f / sqrt(32);
-            T scale = static_cast<T>(fscale); 
-            acc *= scale;
+            T scale = 1.0f / sqrt(32);
+            acc *= static_cast<ACC_T>(scale);
           }
 
           outputMatrix[y * X * K + x * K + k] = acc;
@@ -650,9 +663,33 @@ void run_custom_posit_gold_model(
     INPUT_DATATYPE *matrixB, INPUT_DATATYPE *matrixC,
     INPUT_DATATYPE *biasMatrix, INPUT_DATATYPE *residualMatrix,
     INPUT_DATATYPE *weightGradMatrix, INPUT_DATATYPE *biasGradMatrix) {
+  // for (int i = 0; i < 128; i++) {
+  //   for (int j = 0; j < 512; j++) {
+  //     std::cerr << std::hex << matrixA[i * 512 + j].bits << "\t";
+  //   }
+  //   std::cerr << std::endl;
+  // }
+  // std::cerr << std::endl << std::endl;
+
+  // for (int i = 0; i < 32; i++) {
+  //   for (int j = 0; j < 128; j++) {
+  //     // std::cerr << std::hex << matrixB[i * 128 + j].bits << "\t";
+  //     std::cerr << (float)matrixB[i * 128 + j] << "\t";
+  //   }
+  //   std::cerr << std::endl;
+  // }
+  // std::cerr << std::endl << std::endl;
+
   run_gold_op<INPUT_DATATYPE, ACCUM_DATATYPE>(params, matrixA, matrixB, matrixC,
                                               biasMatrix, residualMatrix,
                                               weightGradMatrix, biasGradMatrix);
+
+  // for (int i = 0; i < 128; i++) {
+  //   for (int j = 0; j < 128; j++) {
+  //     std::cerr << std::hex << matrixC[i * 128 + j].bits << "\t";
+  //   }
+  //   std::cerr << std::endl;
+  // }
 }
 
 void run_universal_posit_gold_model(
