@@ -79,6 +79,12 @@ SC_MODULE(ProcessingElement) {
     while (true) {
       IDTYPE input = inputIn.Pop();
       ac_int<1, false> weightSwap = weightSwapIn.Pop();
+            // needed for better scheduling
+#ifdef __SYNTHESIS__
+      inputOut.Push(input);
+      weightSwapOut.Push(weightSwap);
+#endif
+
       ODTYPE psum = psumIn.Pop();
 
       if (weightSwap) {
@@ -86,8 +92,11 @@ SC_MODULE(ProcessingElement) {
       }
 
       ODTYPE output = pe_fma(input, weight_reg, psum);
+#ifndef __SYNTHESIS__
       inputOut.Push(input);
       weightSwapOut.Push(weightSwap);
+#endif
+
       psumOut.Push(output);
     }
   }
