@@ -104,7 +104,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .CROSS_ENTROPY_GRAD = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (1 x 16) x (16 x 512)
@@ -120,8 +120,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .WEIGHT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 512) * 512
@@ -138,8 +138,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .WEIGHT = true,
          .NO_NORM = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 512) x (512 x 128)
@@ -156,8 +156,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .WEIGHT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -175,8 +175,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .WEIGHT = true,
          .RELU_GRAD = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 512) x (512 x 128)
@@ -194,8 +194,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .RESIDUAL = true,
          .WEIGHT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -213,8 +213,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .WEIGHT = true,
          .SPLIT_OUTPUT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 32) * (32 x 128)
@@ -230,8 +230,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 32)
@@ -247,8 +247,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
-         .ACC_T_WEIGHT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_WEIGHT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -267,8 +267,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .RESIDUAL = true,
          .WEIGHT = true,
          .CONCAT_INPUT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128)
@@ -284,8 +284,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .SOFTMAX_GRAD = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 32)
@@ -300,8 +300,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .fyIndex = 2,
          .weightReuseIndex = {5, 5},
          .STRIDE = 1,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -319,8 +319,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .WEIGHT = true,
          .CONCAT_INPUT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) * (128 x 32)
@@ -336,8 +336,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .weightReuseIndex = {5, 5},
          .STRIDE = 1,
          .INPUT_TRANSPOSE = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -356,8 +356,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .RESIDUAL = true,
          .WEIGHT = true,
          .CONCAT_INPUT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) * 128
@@ -374,8 +374,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .WEIGHT = true,
          .NO_NORM = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -393,8 +393,8 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .STRIDE = 1,
          .RESIDUAL = true,
          .WEIGHT = true,
-         .ACC_T_INPUT = true,
-         .ACC_T_OUTPUT = true,
+         //  .ACC_T_INPUT = true,
+         //  .ACC_T_OUTPUT = true,
      }},
 };
 

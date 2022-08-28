@@ -47,18 +47,12 @@ backprop_tests = [
     "output_LayerNorm",
     "output_dense",
     "intermediate_dense",
-    "ffn_2_output_LayerNorm",
-    "ffn_2_output_dense",
-    "ffn_2_intermediate_dense",
-    "ffn_1_output_LayerNorm",
-    "ffn_1_output_dense",
-    "ffn_1_intermediate_dense",
     "ffn_0_output_LayerNorm",
     "ffn_0_output_dense",
     "ffn_0_intermediate_dense",
     "attention_output_LayerNorm",
     "attention_output_dense",
-    "bottleneck_input_dense"
+    "bottleneck_input_dense",
     "attention_self_context_layer",
     "attention_self_value_layer_0",
     "attention_self_value_layer_1",
@@ -95,18 +89,6 @@ gradient_tests = [
     "output_dense_bias",
     "intermediate_dense_weight",
     "intermediate_dense_bias",
-    "ffn_2_output_LayerNorm_weight",
-    "ffn_2_output_LayerNorm_bias",
-    "ffn_2_output_dense_weight",
-    "ffn_2_output_dense_bias",
-    "ffn_2_intermediate_dense_weight",
-    "ffn_2_intermediate_dense_bias",
-    "ffn_1_output_LayerNorm_weight",
-    "ffn_1_output_LayerNorm_bias",
-    "ffn_1_output_dense_weight",
-    "ffn_1_output_dense_bias",
-    "ffn_1_intermediate_dense_weight",
-    "ffn_1_intermediate_dense_bias",
     "ffn_0_output_LayerNorm_weight",
     "ffn_0_output_LayerNorm_bias",
     "ffn_0_output_dense_weight",
@@ -158,13 +140,13 @@ if __name__ == '__main__':
     parser.add_argument(
         "--datapath",
         type=str,
-        default="data/mobilebert_train/datafile/",
-        help="Path to dumped MobileBERT data.",
+        default=None,
+        help="Path to MobileBERT test data.",
     )
     parser.add_argument(
         "--task",
         type=str,
-        default="inference",
+        default="forward",
         help="Group of tests to run.",
     )
     parser.add_argument(
@@ -183,9 +165,9 @@ if __name__ == '__main__':
     pool = mp.Pool(32)
 
     tests = None
-    if args.task == "inference":
+    if args.task == "forward":
         tests = inference_tests
-    elif args.task == "backprop":
+    elif args.task == "backward":
         tests = backprop_tests
     elif args.task == "gradient":
         tests = gradient_tests

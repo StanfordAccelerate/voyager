@@ -85,3 +85,73 @@ std::string formatOperation(SimplifiedParams params, std::string operation) {
 
   return ss.str();
 }
+
+void formatBoolField(std::string name, bool value, std::stringstream &ss) {
+  ss << "." << name << " = " << (value ? "true" : "false") << ",\n";
+}
+
+std::string formatOperation2(SimplifiedParams params, std::string operation) {
+  std::stringstream ss;
+  ss << "const SimplifiedParams " << operation << "_params = {\n"
+     << ".INPUT_OFFSET = " << params.INPUT_OFFSET << ",\n"
+     << ".WEIGHT_OFFSET = " << params.WEIGHT_OFFSET << ",\n"
+     << ".OUTPUT_OFFSET = " << params.OUTPUT_OFFSET << ",\n";
+
+  formatBoolField("WEIGHT_TRANSPOSE", params.WEIGHT_TRANSPOSE, ss);
+
+  ss << ".loops = {" << array_to_string(params.loops[0], 6) << ", "
+     << array_to_string(params.loops[1], 6) << "},\n"
+     << ".inputXLoopIndex = " << array_to_string(params.inputXLoopIndex, 2)
+     << ",\n"
+     << ".inputYLoopIndex = " << array_to_string(params.inputYLoopIndex, 2)
+     << ",\n"
+     << ".reductionLoopIndex = "
+     << array_to_string(params.reductionLoopIndex, 2) << ",\n"
+     << ".weightLoopIndex = " << array_to_string(params.weightLoopIndex, 2)
+     << ",\n"
+     << ".fxIndex = " << params.fxIndex << ",\n"
+     << ".fyIndex = " << params.fyIndex << ",\n"
+     << ".weightReuseIndex = " << array_to_string(params.weightReuseIndex, 2)
+     << ",\n"
+     << ".STRIDE = " << params.STRIDE << ",\n";
+
+  formatBoolField("REPLICATION", params.REPLICATION, ss);
+
+  formatBoolField("RELU", params.RELU, ss);
+  formatBoolField("BIAS", params.BIAS, ss);
+  ss << ".BIAS_OFFSET = " << params.BIAS_OFFSET << ",\n";
+  formatBoolField("RESIDUAL", params.RESIDUAL, ss);
+  ss << ".RESIDUAL_OFFSET = " << params.RESIDUAL_OFFSET << ",\n";
+
+  formatBoolField("MAXPOOL", params.MAXPOOL, ss);
+  formatBoolField("AVGPOOL", params.AVGPOOL, ss);
+  formatBoolField("WEIGHT", params.WEIGHT, ss);
+
+  formatBoolField("STORE_IN_ACC", params.STORE_IN_ACC, ss);
+  formatBoolField("ACC_FROM_ACC", params.ACC_FROM_ACC, ss);
+
+  formatBoolField("SOFTMAX", params.SOFTMAX, ss);
+  formatBoolField("ATTENTION_MASK", params.ATTENTION_MASK, ss);
+  formatBoolField("ATTENTION_SCALING", params.ATTENTION_SCALING, ss);
+  formatBoolField("FC", params.FC, ss);
+  formatBoolField("NO_NORM", params.NO_NORM, ss);
+
+  formatBoolField("SOFTMAX_GRAD", params.SOFTMAX_GRAD, ss);
+  formatBoolField("FC_GRAD", params.FC_GRAD, ss);
+  formatBoolField("NO_NORM_GRAD", params.NO_NORM_GRAD, ss);
+  formatBoolField("RELU_GRAD", params.RELU_GRAD, ss);
+  formatBoolField("BIAS_GRAD", params.BIAS_GRAD, ss);
+  formatBoolField("CROSS_ENTROPY_GRAD", params.CROSS_ENTROPY_GRAD, ss);
+  formatBoolField("MSE_GRAD", params.MSE_GRAD, ss);
+  formatBoolField("BCE_WITH_LOGITS_GRAD", params.BCE_WITH_LOGITS_GRAD, ss);
+
+  formatBoolField("INPUT_TRANSPOSE", params.INPUT_TRANSPOSE, ss);
+  formatBoolField("CONCAT_INPUT", params.CONCAT_INPUT, ss);
+  formatBoolField("CONCAT_WEIGHT", params.CONCAT_WEIGHT, ss);
+  formatBoolField("SPLIT_OUTPUT", params.SPLIT_OUTPUT, ss);
+
+  formatBoolField("GRAD_CLIPPING", params.GRAD_CLIPPING, ss);
+  ss << "};" << std::endl;
+
+  return ss.str();
+}
