@@ -337,7 +337,7 @@ int runMobileBertUnitTest(std::string task, std::string test,
       weightDataDir = datapath + "activations/";
     }
 
-    // FIXME: turn off for accelerator
+    // FIXME: accelerator doesn't support these functionalities
     params.ACC_T_OUTPUT = false;
     params.GRAD_CLIPPING = false;
   }

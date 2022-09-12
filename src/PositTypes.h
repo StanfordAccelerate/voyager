@@ -258,18 +258,6 @@ Posit<nbits, es> posit_exp(Posit<nbits, es> val) {
   neg_one.bits = (1 << (16 - 1)) | (1 << (16 - 1 - 1));
 
   return static_cast<Posit<nbits, es>>(es0Posit + neg_one);
-  // typename Posit<16, 0>::DecomposedPosit op1(val);
-  // typename Posit<16, 0>::DecomposedPosit op2;
-  // op2.sign = 1;
-  // op2.scale = 0;
-  // op2.fraction = 0;
-  // op2._zero = false;
-  // typename Posit<nbits, es>::DecomposedPosit res =
-  //     static_cast<typename Posit<nbits, es>::DecomposedPosit>(op1 + op2);
-  // FIXME!! the following line does not work:
-  // return res;
-  //  std::cout << "final  :\t" << bits.to_string(AC_BIN, false, true)
-  //            << std::endl;
 }
 
 template <int nbits, int es>
@@ -351,20 +339,6 @@ inline bool Posit<nbits, es>::operator<(const Posit<nbits, es> &rhs) const {
     return r1 < r2;
   }
 }
-
-// template <int nbits, int es>
-// template <int nbits2, int es2, int sbits, int fbits>
-// Posit<nbits, es> &Posit<nbits, es>::fma(const Posit<nbits2, es2> input, const
-// PositFP<sbits, fbits> weight) {
-//   constexpr size_t fbits = nbits - 2 - es;
-//   constexpr size_t fbits2 = nbits2 - 2 - es2;
-//   PositFP<8, fbits2> a = input;
-//   PositFP<8, fbits2> b = (PositFP<8, fbits2>) weight;
-//   PositFP<8, 2 * fbits2> product = input * weight;
-//   PositFP<8, fbits> c = *this;
-//   *this = (PositFP<8, fbits>) product + c;
-//   return *this;
-// }
 
 #ifndef __SYNTHESIS__
 template <int nbits, int es>
@@ -514,15 +488,28 @@ class PositFP {
 
   template <int sbits2, int fbits2>
   explicit operator PositFP<sbits2, fbits2>() const {
-    // FIXME: Perform rouding on fraction
     PositFP<sbits2, fbits2> fp;
     if (isZero()) {
       fp.setZero();
       return fp;
     }
+
     fp.sign = this->sign;
     fp.scale = this->scale;
     copy_(this->fraction, fp.fraction);
+
+    if (fbits > fbits2) {
+      bool last = this->fraction[fbits2 - 1];
+      bool guard = this->fraction[fbits2];
+      bool sticky = this->fraction << (fbits2 + 1);
+      if (guard & (last | sticky)) {
+        fp.fraction++;
+        if (fp.fraction == 0) {
+          fp.scale++;
+        }
+      }
+    }
+
     return fp;
   }
 
@@ -785,19 +772,16 @@ typename Posit<nbits2, es2>::DecomposedPosit decomposed_fma(
   constexpr size_t fbits2 = nbits2 - 3 - es2;
   constexpr size_t abits = fbits2 + 4;  // size of the addend
 
-  PositFP<8, mbits> product;
-  PositFP<8, abits + 1> sum;
-
   if (a.isZero() || b.isZero()) {
     return c;
+  }
+
+  PositFP<8, mbits> product = a * b;
+  if (c.isZero()) {
+    return static_cast<typename Posit<nbits2, es2>::DecomposedPosit>(product);
   } else {
-    product = a * b;
-    if (c.isZero()) {
-      return typename Posit<nbits2, es2>::DecomposedPosit(product);
-    } else {
-      sum = (PositFP<8, 12>)product + c;
-      return typename Posit<nbits2, es2>::DecomposedPosit(sum);
-    }
+    PositFP<8, abits + 1> sum = static_cast<PositFP<8, fbits2>>(product) + c;
+    return static_cast<typename Posit<nbits2, es2>::DecomposedPosit>(sum);
   }
 }
 
@@ -812,22 +796,19 @@ Posit<nbits2, es2> fma(const Posit<nbits, es> &a, const Posit<nbits, es> &b,
   constexpr size_t abits = fbits2 + 4;  // size of the addend
 
   PositFP<8, fbits> va(a), vb(b);
-  PositFP<8, mbits> product;
-  // PositFP<8, fbits> product; // product for log posit
   PositFP<8, fbits2> vc(c);
-  PositFP<8, abits + 1> sum;
 
   if (a.isZero() || b.isZero()) {
     return Posit<nbits2, es2>(c);
+  }
+
+  PositFP<8, mbits> product = va * vb;
+  // PositFP<8, fbits> product = va.log_mult(vb);
+  if (c.isZero()) {
+    return Posit<nbits2, es2>(product);
   } else {
-    product = va * vb;  // a * b also works here
-    // product = va.log_mult(vb);  // a * b also works here
-    if (c.isZero()) {
-      return Posit<nbits2, es2>(product);
-    } else {
-      sum = (PositFP<8, fbits2>)product + vc;
-      return Posit<nbits2, es2>(sum);
-    }
+    PositFP<8, abits + 1> sum = (PositFP<8, fbits2>)product + vc;
+    return Posit<nbits2, es2>(sum);
   }
 }
 

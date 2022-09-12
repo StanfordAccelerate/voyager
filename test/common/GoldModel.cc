@@ -353,18 +353,18 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else if (params.BIAS_GRAD) {
-    INT_T accumMatrixB[C * K];
+    INT_T inputMatrixB[C * K];
     for (int i = 0; i < C * K; i++) {
-      accumMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+      inputMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
     }
 
     if (params.CONCAT_WEIGHT) {
       INT_T copyMatrixB[C * K];
-      memcpy(copyMatrixB, accumMatrixB, sizeof(copyMatrixB));
+      memcpy(copyMatrixB, inputMatrixB, sizeof(copyMatrixB));
       for (int i = 0; i < 4; i++) {
         for (int j = 0; j < C; j++) {
           for (int k = 0; k < K / 4; k++) {
-            accumMatrixB[i * K / 4 + j * K + k] =
+            inputMatrixB[i * K / 4 + j * K + k] =
                 copyMatrixB[i * C * K / 4 + j * K / 4 + k];
           }
         }
@@ -378,7 +378,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     for (int i = 0; i < C; i++) {
       for (int j = 0; j < K; j++) {
-        outputMatrix[j] += accumMatrixB[i * K + j];
+        outputMatrix[j] += inputMatrixB[i * K + j];
       }
     }
 
@@ -445,37 +445,37 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else {
-    INT_T accumMatrixA[(STRIDE * X) * (STRIDE * Y) * C];
-    INT_T accumMatrixB[FX * FY * C * K];
-    INT_T accumResidualMatrix[X * Y * K];
-
+    INT_T inputMatrixA[(STRIDE * X) * (STRIDE * Y) * C];
+    INT_T inputMatrixB[FX * FY * C * K];
+    ACC_T inputResidualMatrix[X * Y * K];
     ACC_T outputMatrix[X * Y * K];
+
     for (int i = 0; i < X * Y * K; i++) {
       outputMatrix[i] = 0;
     }
 
     for (int i = 0; i < (STRIDE * X) * (STRIDE * Y) * C; i++) {
-      accumMatrixA[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+      inputMatrixA[i] = readInput(matrixA, i, params.ACC_T_INPUT);
     }
 
     for (int i = 0; i < FX * FY * C * K; i++) {
-      accumMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+      inputMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
     }
 
     if (params.RESIDUAL || params.RELU_GRAD) {
       for (int i = 0; i < X * Y * K; i++) {
-        accumResidualMatrix[i] =
-            readInput(residualMatrix, i, params.ACC_T_OUTPUT);
+        inputResidualMatrix[i] =
+            readInput(residualMatrix, i, params.ACC_T_INPUT);
       }
     }
 
     if (params.CONCAT_INPUT) {
       INT_T copyMatrixA[X * C];
-      memcpy(copyMatrixA, accumMatrixA, sizeof(copyMatrixA));
+      memcpy(copyMatrixA, inputMatrixA, sizeof(copyMatrixA));
       for (int i = 0; i < 4; i++) {
         for (int j = 0; j < X; j++) {
           for (int k = 0; k < C / 4; k++) {
-            accumMatrixA[i * C / 4 + j * C + k] =
+            inputMatrixA[i * C / 4 + j * C + k] =
                 copyMatrixA[i * X * C / 4 + j * C / 4 + k];
           }
         }
@@ -484,21 +484,21 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     if (params.INPUT_TRANSPOSE) {
       INT_T copyMatrixA[X * C];
-      memcpy(copyMatrixA, accumMatrixA, sizeof(copyMatrixA));
+      memcpy(copyMatrixA, inputMatrixA, sizeof(copyMatrixA));
       for (int x = 0; x < X; x++) {
         for (int c = 0; c < C; c++) {
-          accumMatrixA[x * C + c] = copyMatrixA[c * X + x];
+          inputMatrixA[x * C + c] = copyMatrixA[c * X + x];
         }
       }
     }
 
     if (params.CONCAT_WEIGHT) {
       INT_T copyMatrixB[C * K];
-      memcpy(copyMatrixB, accumMatrixB, sizeof(copyMatrixB));
+      memcpy(copyMatrixB, inputMatrixB, sizeof(copyMatrixB));
       for (int i = 0; i < 4; i++) {
         for (int j = 0; j < C; j++) {
           for (int k = 0; k < K / 4; k++) {
-            accumMatrixB[i * K / 4 + j * K + k] =
+            inputMatrixB[i * K / 4 + j * K + k] =
                 copyMatrixB[i * C * K / 4 + j * K / 4 + k];
           }
         }
@@ -507,10 +507,10 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     if (params.WEIGHT_TRANSPOSE) {
       INT_T copyMatrixB[C * K];
-      memcpy(copyMatrixB, accumMatrixB, sizeof(copyMatrixB));
+      memcpy(copyMatrixB, inputMatrixB, sizeof(copyMatrixB));
       for (int c = 0; c < C; c++) {
         for (int k = 0; k < K; k++) {
-          accumMatrixB[c * K + k] = copyMatrixB[k * C + c];
+          inputMatrixB[c * K + k] = copyMatrixB[k * C + c];
         }
       }
     }
@@ -581,8 +581,8 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                                 (fy + (FY - 1) / 2) * FX * C * K +
                                 (fx + (FX - 1) / 2) * C * K + c * K + k;
 
-                            gold_fma(accumMatrixA[inputAddress],
-                                     accumMatrixB[weightAddress],
+                            gold_fma(inputMatrixA[inputAddress],
+                                     inputMatrixB[weightAddress],
                                      outputMatrix[outputAddress]);
                           }
                         }
@@ -605,6 +605,12 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                   int k = (k1 * K0 + k0) * DIMENSION + oc0;
                   int outputAddress = y * X * K + x * K + k;
 
+                  // FIXME: residual addition must be after bias
+                  if (params.RESIDUAL) {
+                    outputMatrix[outputAddress] +=
+                        inputResidualMatrix[outputAddress];
+                  }
+
                   if (params.BIAS) {
                     ACC_T bias = readInput(biasMatrix, k, true);
                     outputMatrix[outputAddress] += bias;
@@ -621,7 +627,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                   }
 
                   if (params.RELU_GRAD &&
-                      accumResidualMatrix[outputAddress] <= 0) {
+                      inputResidualMatrix[outputAddress] <= 0) {
                     outputMatrix[outputAddress] = 0;
                   }
 
@@ -641,11 +647,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       clip_grad_norm_(outputMatrix, Y * X * K);
     }
 
-    if (params.RESIDUAL) {
-      for (int i = 0; i < Y * X * K; i++) {
-        outputMatrix[i] += accumResidualMatrix[i];
-      }
-    }
+    // if (params.RESIDUAL) {
+    //   for (int i = 0; i < Y * X * K; i++) {
+    //     outputMatrix[i] += inputResidualMatrix[i];
+    //   }
+    // }
 
     if (params.SPLIT_OUTPUT) {
       ACC_T copyMatrixC[X * K];
