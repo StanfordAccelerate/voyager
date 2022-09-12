@@ -137,8 +137,6 @@ void Harness::memAccessBurst(
     CombinationalInterface<MemoryRequest> *addressRequest,
     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse,
     MemorySource memSource) {
-  INPUT_DATATYPE *memory = memSource == SRAM ? sramMemory : rramMemory;
-
   addressRequest->ResetRead();
   dataResponse->ResetWrite();
 
@@ -146,6 +144,12 @@ void Harness::memAccessBurst(
 
   while (true) {
     MemoryRequest memRequest = addressRequest->Pop();
+    INPUT_DATATYPE *memory;
+    if (currentParams.WEIGHT && memSource == RRAM) {
+      memory = rramMemory;
+    } else {
+      memory = sramMemory;
+    }
 
     for (int b = 0; b < memRequest.burstSize / DIMENSION; b++) {
       Pack1D<INPUT_DATATYPE, DIMENSION> data;
@@ -228,15 +232,15 @@ void Harness::memAccess(CombinationalInterface<int> *addressRequest,
 }
 
 void Harness::memAccessInputs() {
-  memAccessBurst(&inputAddressRequest, &inputDataResponse, memoryMap.inputs);
+  memAccessBurst(&inputAddressRequest, &inputDataResponse, SRAM);
 }
 
 void Harness::memAccessWeights() {
-  memAccessBurst(&weightAddressRequest, &weightDataResponse, memoryMap.weights);
+  memAccessBurst(&weightAddressRequest, &weightDataResponse, RRAM);
 }
 
 void Harness::memAccessGrad() {
-  memAccessBurst(&gradAddressRequest, &gradDataResponse, memoryMap.inputs);
+  memAccessBurst(&gradAddressRequest, &gradDataResponse, SRAM);
 }
 
 void Harness::memAccessVector0() {
@@ -319,10 +323,9 @@ void Harness::sendParams() {
     copy_output(sramMemory, sizeof(INPUT_DATATYPE) * 2 * 1024 * 1024,
                 sizeof(INPUT_DATATYPE));
     syscDone = true;
-#else
-    sc_stop();
 #endif
   }
+  sc_stop();
 }
 
 void Harness::storeVectorOutputs() {

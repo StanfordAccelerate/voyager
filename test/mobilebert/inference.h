@@ -185,7 +185,7 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .ATTENTION_MASK = true,
      }},
 
-     // (128 x 128)
+    // (128 x 128)
     {"softmax_no_mask",
      {
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},

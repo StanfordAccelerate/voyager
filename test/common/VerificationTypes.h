@@ -8,6 +8,8 @@ struct Files {
   std::string bias_file;
   std::string outputs_file;
   std::string residual_file;
+  std::string weight_grad_file;
+  std::string bias_grad_file;
 };
 
 enum MemorySource { SRAM, RRAM };

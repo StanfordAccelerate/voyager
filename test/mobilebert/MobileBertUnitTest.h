@@ -34,12 +34,7 @@ void run_op(std::vector<SimplifiedParams> params_list,
             MemoryMap memoryMap);
 
 int runOperation(const SimplifiedParams params, const Files files,
-                 const MemoryMap memoryMap, const std::string inputDataDir,
-                 const std::string weightDataDir,
-                 const std::string outputDataDir,
-                 const std::string residualDataDir,
-                 const std::string gradDataDir, const std::string layerName,
-                 const std::string outfilePrefix,
+                 const MemoryMap memoryMap, const std::string outfilePrefix,
                  const std::vector<std::string> groups) {
   validateMapping(params);
 
@@ -84,65 +79,53 @@ int runOperation(const SimplifiedParams params, const Files files,
   float* float_sram_memory = new float[SRAM_MEMORY_SIZE];
   float* float_rram_memory = new float[RRAM_MEMORY_SIZE];
 
-  std::string datafile;
   if (!files.inputs_file.empty()) {
-    datafile = inputDataDir + layerName + files.inputs_file;
-    std::cerr << "Loading inputs: " << datafile << std::endl;
-    load_inputs(params, datafile, true, acc_sram_memory,
+    std::cerr << "Load input file: " << files.inputs_file << std::endl;
+    load_inputs(params, files.inputs_file, true, acc_sram_memory,
                 hls_sram_memory + params.INPUT_OFFSET,
                 uni_sram_memory + params.INPUT_OFFSET,
                 float_sram_memory + params.INPUT_OFFSET);
   }
 
   if (params.WEIGHT) {
-    datafile = weightDataDir + layerName + files.weights_file;
-    std::cerr << "Loading weights: " << datafile << std::endl;
-    load_weights(params, datafile, true, acc_rram_memory,
+    std::cerr << "Load weight file: " << files.weights_file << std::endl;
+    load_weights(params, files.weights_file, true, acc_rram_memory,
                  hls_rram_memory + params.WEIGHT_OFFSET,
                  uni_rram_memory + params.WEIGHT_OFFSET,
                  float_rram_memory + params.WEIGHT_OFFSET);
   } else if (!files.weights_file.empty()) {
-    datafile = weightDataDir + (params.ATTENTION_MASK
-                                    ? files.weights_file
-                                    : layerName + files.weights_file);
-    std::cerr << "Loading weights: " << datafile << std::endl;
-    load_weights(params, datafile, true, acc_sram_memory,
+    std::cerr << "Load weight file: " << files.weights_file << std::endl;
+    load_weights(params, files.weights_file, true, acc_sram_memory,
                  hls_sram_memory + params.WEIGHT_OFFSET,
                  uni_sram_memory + params.WEIGHT_OFFSET,
                  float_sram_memory + params.WEIGHT_OFFSET);
   }
 
   if (params.BIAS) {
-    datafile = weightDataDir + layerName + files.bias_file;
-    std::cerr << "Loading bias: " << datafile << std::endl;
-    load_bias(params, datafile, true, acc_rram_memory,
+    std::cerr << "Load bias file: " << files.bias_file << std::endl;
+    load_bias(params, files.bias_file, true, acc_rram_memory,
               hls_rram_memory + params.BIAS_OFFSET,
               uni_rram_memory + params.BIAS_OFFSET,
               float_rram_memory + params.BIAS_OFFSET);
   }
 
   if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
-    datafile = residualDataDir + layerName + files.residual_file;
-    std::cerr << "Loading residual: " << datafile << std::endl;
-    load_residual(params, datafile, true, acc_sram_memory,
+    std::cerr << "Load residual file: " << files.residual_file << std::endl;
+    load_residual(params, files.residual_file, true, acc_sram_memory,
                   hls_sram_memory + params.RESIDUAL_OFFSET,
                   uni_sram_memory + params.RESIDUAL_OFFSET,
                   float_sram_memory + params.RESIDUAL_OFFSET);
   }
 
   if (params.WEIGHT_SPLITTING && params.WEIGHT) {
-    datafile = gradDataDir + layerName + files.weights_file;
-    std::cerr << "Loading bias gradients: " << datafile << std::endl;
-    load_weights(params, datafile, true, acc_sram_memory,
+    load_weights(params, files.weight_grad_file, true, acc_sram_memory,
                  hls_sram_memory + params.WEIGHT_GRADIENT_OFFSET,
                  uni_sram_memory + params.WEIGHT_GRADIENT_OFFSET,
                  float_sram_memory + params.WEIGHT_GRADIENT_OFFSET);
   }
 
   if (params.WEIGHT_SPLITTING && params.BIAS) {
-    datafile = gradDataDir + layerName + files.bias_file;
-    std::cerr << "Loading weight gradients: " << datafile << std::endl;
-    load_bias(params, datafile, true, acc_sram_memory,
+    load_bias(params, files.bias_grad_file, true, acc_sram_memory,
               hls_sram_memory + params.BIAS_GRADIENT_OFFSET,
               uni_sram_memory + params.BIAS_GRADIENT_OFFSET,
               float_sram_memory + params.BIAS_GRADIENT_OFFSET);
@@ -152,10 +135,9 @@ int runOperation(const SimplifiedParams params, const Files files,
   UniversalPosit uniDataFileOutput[2 * outputSize];
   float dataFileOutput[outputSize];
 
-  datafile = outputDataDir + layerName + files.outputs_file;
-  std::cerr << "Loading outputs: " << datafile << std::endl;
-  load_datafile_outputs(params, datafile, hlsDataFileOutput, uniDataFileOutput,
-                        dataFileOutput);
+  std::cerr << "Load output file: " << files.outputs_file << std::endl;
+  load_datafile_outputs(params, files.outputs_file, hlsDataFileOutput,
+                        uniDataFileOutput, dataFileOutput);
 
   bool accelerator =
       std::find(groups.begin(), groups.end(), "accelerator") != groups.end();
@@ -298,11 +280,6 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::string residualDataDir;
   std::string gradientDataDir;
 
-  if (test.find("classifier") != std::string::npos ||
-      (task == "backward" && test == "output_bottleneck_LayerNorm")) {
-    layerName = "";
-  }
-
   if (task == "forward") {
     paramName = inferenceParamsMapping.at(test);
     params = inferenceParams.at(paramName);
@@ -365,6 +342,28 @@ int runMobileBertUnitTest(std::string task, std::string test,
     params.GRAD_CLIPPING = false;
   }
 
+  if (test.find("classifier") != std::string::npos ||
+      (task == "backward" && test == "output_bottleneck_LayerNorm")) {
+    layerName = "";
+  }
+
+  files.weight_grad_file = gradientDataDir + layerName + files.weights_file;
+  files.bias_grad_file = gradientDataDir + layerName + files.bias_file;
+
+  if (!files.inputs_file.empty()) {
+    files.inputs_file = inputDataDir + layerName + files.inputs_file;
+  }
+
+  if (params.ATTENTION_MASK) {
+    files.weights_file = weightDataDir + files.weights_file;
+  } else if (!files.weights_file.empty()) {
+    files.weights_file = weightDataDir + layerName + files.weights_file;
+  }
+
+  files.outputs_file = outputDataDir + layerName + files.outputs_file;
+  files.bias_file = weightDataDir + layerName + files.bias_file;
+  files.residual_file = residualDataDir + layerName + files.residual_file;
+
   // Fake memory offsets used for unit tests
   params.INPUT_OFFSET = STACK_SIZE;
   params.WEIGHT_OFFSET = STACK_SIZE + INTERMEDIATE_SIZE;
@@ -377,7 +376,5 @@ int runMobileBertUnitTest(std::string task, std::string test,
   std::cout << "Test name: " << test << std::endl;
   std::cout << "Operation name: " << paramName << std::endl;
 
-  return runOperation(params, files, memoryMap, inputDataDir, weightDataDir,
-                      outputDataDir, residualDataDir, gradientDataDir,
-                      layerName, outfilePrefix, compList);
+  return runOperation(params, files, memoryMap, outfilePrefix, compList);
 }
