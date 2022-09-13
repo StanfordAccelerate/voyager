@@ -108,10 +108,7 @@ sim_sysc_gui:
 # Untimed C Simulations (Faster than SystemC)
 ###########################################################
 sim: build/TestRunner
-	./build/TestRunner 
-
-mb_params: build/mobilebert_gen_params
-	./build/mobilebert_gen_params
+	./build/TestRunner
 
 PositTest: build/PositTest
 	./build/PositTest
@@ -130,9 +127,6 @@ gui:
 	catapult build/Catapult_debug
 
 build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o build/MapOperation.o
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-build/mobilebert_gen_params: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o build/MapOperation.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 build/PositTest: build/PositTest.o

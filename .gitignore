@@ -1,9 +1,7 @@
 build
 pybuild
 data/resnet
-data/imdb
-data/sst2_eval
-data/sst2_train
+datafile/
 .direnv
 .vscode
 test_outputs/
