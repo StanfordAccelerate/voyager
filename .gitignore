@@ -2,6 +2,8 @@ build
 pybuild
 data/resnet
 datafile/
+data/sst2_eval/step*
+data/sst2_train/step*
 .direnv
 .vscode
 test_outputs/
@@ -11,3 +13,7 @@ novas*
 *.fsdb*
 ucli.key
 verdiLog/
+__pycache__
+*.py[cod]
+.venv
+.env
