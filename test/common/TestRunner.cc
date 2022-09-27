@@ -27,7 +27,8 @@
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
 #endif
 
-// Run of sequence of tests for feed-forward conv networks
+// Run of sequence of tests for feed-forward conv-nets
+// Returns != 0 if # of value diffs greater than hardcoded threshold
 int run_sequence(const std::string& model,
                  const std::vector<std::string>& tests,
                  const std::vector<std::string>& sims,
@@ -194,69 +195,80 @@ int run_sequence(const std::string& model,
   INPUT_DATATYPE* hls_comp = nullptr;
   UniversalPosit* uni_comp = nullptr;
   float* fp_comp = nullptr;
+  size_t size = X * Y * K;
+
   try {
-    hls_comp = new INPUT_DATATYPE[X * Y * K];
-    uni_comp = new UniversalPosit[X * Y * K];
-    fp_comp = new float[X * Y * K];
+    hls_comp = new INPUT_DATATYPE[size];
+    uni_comp = new UniversalPosit[size];
+    fp_comp = new float[size];
   } catch (const std::bad_alloc&) {
     throw std::runtime_error("ERROR: Failed to allocate comparison memory");
   }
 
+  // Load reference values from file
   if (use_data_file) {
     load_datafile_outputs(param_map[tests.back()],
                           data_dir + file_map[tests.back()].outputs_file,
                           hls_comp, uni_comp, fp_comp);
   }
 
-  // Go over every combination of sims and cross-check results
   int error_count = 0;
+  // Go over every combination of sims and cross-check results
   for (int i = 0; i < sims.size(); i += 2) {
     std::string diff_file = out_dir + model + '.' + tests.front() + "_to_" +
                             tests.back() + '.' + sims[i] + "_vs_" + sims[i + 1];
 
+    int diff_count = 0;  // Number of values with absolute diff over 1
     if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
         (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           acc_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          X * Y * K, diff_file, false);
+          hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
+          diff_file, false);
     } else if ((sims[i] == "accelerator" && sims[i + 1] == "file") ||
                (sims[i + 1] == "accelerator" && sims[i] == "file")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           acc_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, hls_comp,
-          X * Y * K, diff_file, false);
+          size, diff_file, false);
     } else if ((sims[i] == "customposit" && sims[i + 1] == "file") ||
                (sims[i + 1] == "customposit" && sims[i] == "file")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          hls_comp, X * Y * K, diff_file, false);
+          hls_comp, size, diff_file, false);
     } else if ((sims[i] == "universal" && sims[i + 1] == "customposit") ||
                (sims[i + 1] == "universal" && sims[i] == "customposit")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          X * Y * K, diff_file, false);
+          uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
+          diff_file, false);
     } else if ((sims[i] == "universal" && sims[i + 1] == "file") ||
                (sims[i + 1] == "universal" && sims[i] == "file")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          uni_comp, X * Y * K, diff_file, false);
+          uni_comp, size, diff_file, false);
     } else if ((sims[i] == "fp32" && sims[i + 1] == "file") ||
                (sims[i + 1] == "fp32" && sims[i] == "file")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          fp_comp, X * Y * K, diff_file, false);
+          fp_comp, size, diff_file, false);
     } else if ((sims[i] == "customposit" && sims[i + 1] == "fp32") ||
                (sims[i] == "fp32" && sims[i + 1] == "customposit")) {
-      error_count += compare_arrays(
+      diff_count += compare_arrays(
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
-          X * Y * K, diff_file, false);
+          float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
+          diff_file, false);
     } else {
       std::cerr << "ERROR: Comparison between " + sims[i] + " and "
                 << sims[i + 1] << " not supported." << std::endl;
-      error_count += 1;
+      return -1;
     }
+
+    // If more than 1% of values have abs diff over 1, record error
+    // TODO(fpedd): Ideally we would be interested in rel diff, not abs
+    //              But this would require changing the compare_arrays() api
+    float percent_diff = (float)diff_count / size * 100.0;
+    std::cout << percent_diff << std::endl;
+    if (percent_diff > 1.0) error_count += percent_diff;
   }
 
   delete[] acc_sram_memory;
@@ -386,7 +398,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
     }
 
     return errors;
-  } else {  // Run ResNet and Simple
+  } else {  // Run ResNet or Simple
     return run_sequence(model, tests_list, sim_list, data_dir, out_dir);
   }
 }
