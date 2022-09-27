@@ -8,7 +8,6 @@ data/sst2_train/step*
 .vscode
 test_outputs/
 logs/
-models/mobilebert
 novas*
 *.fsdb*
 ucli.key
@@ -17,3 +16,6 @@ __pycache__
 *.py[cod]
 .venv
 .env
+.swp
+models/resnet/binary_data
+models/resnet/model_data/*pkl

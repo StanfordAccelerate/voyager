@@ -28,7 +28,6 @@
 #define RRAM_MEMORY_SIZE (22 * 1024 * 1024)  // RRAM size for MobileBERT
 #endif
 
-void validateMapping(SimplifiedParams params);
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* acc_sram_memory, INPUT_DATATYPE* acc_rram_memory,
             MemoryMap memoryMap);

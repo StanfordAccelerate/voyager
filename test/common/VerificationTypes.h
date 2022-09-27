@@ -15,14 +15,7 @@ struct Files {
 enum MemorySource { SRAM, RRAM };
 
 inline std::ostream& operator<<(std::ostream& os, MemorySource& memory) {
-  switch (memory) {
-    case SRAM:
-      os << "SRAM";
-      break;
-    case RRAM:
-      os << "RRAM";
-      break;
-  }
+  os << (memory == SRAM ? "SRAM" : "RRAM");
   return os;
 }
 

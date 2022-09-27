@@ -187,3 +187,43 @@ int compare_arrays(float *matrixA, float *matrixB, size_t size,
   return compare_arrays_internal<float, float>(matrixA, matrixB, size, filename,
                                                accType);
 }
+
+int validateMapping(SimplifiedParams params) {
+  int x0 = params.loops[1][params.inputXLoopIndex[1]];
+  int y0 = params.loops[1][params.inputYLoopIndex[1]];
+  int c0 = params.loops[1][params.reductionLoopIndex[1]];
+  int k0 = params.loops[1][params.weightLoopIndex[1]];
+  int fx = params.loops[1][params.fxIndex];
+  int fy = params.loops[1][params.fyIndex];
+  int stride = params.STRIDE;
+
+  if (params.FC || params.SOFTMAX || params.SOFTMAX_GRAD ||
+      params.NO_NORM) {  // don't check for vector ops
+    return 0;
+  }
+
+  // Input buffer
+  int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy - 1);
+  if (params.REPLICATION) {
+    // don't check temporarily TODO(fpedd): Why not?
+    input_buffer_tile_size = 1;
+  }
+  if (input_buffer_tile_size > INPUT_BUFFER_SIZE) {
+    std::cerr << "ERROR: Input buffer tile size violation." << std::endl;
+    return -1;
+  }
+
+  // Weight buffer
+  if (fx * fy * k0 > WEIGHT_BUFFER_SIZE) {
+    std::cerr << "ERROR: Weight buffer tile size violation." << std::endl;
+    return -1;
+  }
+
+  // Accumulation buffer
+  if (x0 * y0 * k0 > ACCUMULATION_BUFFER_SIZE) {
+    std::cerr << "ERROR: Accumulation buffer tile size violation." << std::endl;
+    return -1;
+  }
+
+  return 0;
+}

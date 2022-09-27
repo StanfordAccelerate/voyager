@@ -150,20 +150,15 @@ gui:
 sim: build/TestRunner
 	./build/TestRunner
 
+.PHONY: TestRunner
+TestRunner: build/TestRunner
+
 build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o build/toolchain.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-# Main target for accelerator simulations (new)
-.PHONY: AccelTest
-AccelTest: build/AccelTest
-
-build/AccelTest: build/Accelerator.o build/Harness.o build/AccelTest.o build/GoldModel.o build/Utils.o build/DataLoader.o build/toolchain.a
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)	
 
 # Unit tests for custom Posit implementation
 .PHONY: PositTest
 PositTest: build/PositTest
-	./build/PositTest
 
 build/PositTest: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -fopenmp -DNO_SYSC $< -o $@
@@ -184,9 +179,6 @@ build/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h src/Archi
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/TestRunner.o: test/common/TestRunner.cc test/simple/params.h test/resnet/params.h test/mobilebert/*.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
-	
-build/AccelTest.o: test/common/AccelTest.cc test/simple/params.h test/resnet/params.h test/mobilebert/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
@@ -210,7 +202,7 @@ build/toolchain.a: $(TOOLCHAIN_OBJ)
 ###########################################################
 
 clean:
-	rm -rf build/*.o build/TestRunner build/AccelTest build/PositTest
+	rm -rf build/*.o build/TestRunner build/PositTest build/test/*.o build/test/toolchain/*.o build/test/toolchain/operations/*.o
 
 clean-test:
 	rm -rf test_outputs/*
