@@ -1,5 +1,5 @@
 # MINOTAUR DNN Accelerator
-[![Tests](https://code.stanford.edu/tsmc40r/brainpower/accelerator/badges/master/pipeline.svg)](https://code.stanford.edu/tsmc40r/brainpower/accelerator/-/commits/master)
+[![Tests](https://code.stanford.edu/tsmc40r/brainpower/accelerator/badges/master/pipeline.svg?key_text=Tests)](https://code.stanford.edu/tsmc40r/brainpower/accelerator/-/commits/master)
 
 This repository contains the MINOTAUR DNN accelerator HLS code. 
 
