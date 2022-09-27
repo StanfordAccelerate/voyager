@@ -143,7 +143,7 @@ if __name__ == "__main__":
             continue
         input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
         
-        os.environ["GROUP"] = "resnet"
+        os.environ["MODEL"] = "resnet"
         os.environ["TEST"] = "conv1"
         p = subprocess.Popen(["./build/TestRunner"], stdin=PIPE, stdout=PIPE)
         # p = subprocess.Popen(["wc"], stdin=PIPE, stdout=PIPE)
@@ -187,7 +187,7 @@ for sample in range(start_sample, end_sample):
     if not valid
         update blacklist
     else 
-        cat data/resnet/conv1_input | GROUP=resnet TEST=conv1 ./build/TestRunner
+        cat data/resnet/conv1_input | MODEL=resnet TEST=conv1 ./build/TestRunner
         process = subprocess.Popen(['foo', '-b', 'bar'])
         perform run
         update accuracy
