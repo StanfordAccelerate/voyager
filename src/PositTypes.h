@@ -1,3 +1,17 @@
+// This file contains the custom Posting implementation for the accelerator.
+// Posits are a new number format, similar to floats, but with more precision
+// around 1 and higher dynamic range
+// https://www.johndcook.com/blog/2018/04/11/anatomy-of-a-posit-number/
+// It's roughly modeled after the Universal Numbers Library posit implementation
+// https://github.com/stillwater-sc/universal
+// but with more emphasis on a lightweight implementation.
+// This implementation mainly consists of two classes: Posit and PositFP
+// PositFP is a decoded version of Posit used for the internal calculations
+// also referred to as DecomposedPosit.
+
+// TODO(fpedd): Maybe clean this up a little according to
+// https://stackoverflow.com/questions/4421706/what-are-the-basic-rules-and-idioms-for-operator-overloading
+
 #pragma once
 
 #include <ac_float.h>
@@ -104,6 +118,7 @@ void decode(ac_int<nbits, false> bits, bool &sign, int &scale,
 }
 
 #ifndef __SYNTHESIS__
+// Used for float <-> posit conversion
 union ufloat {
   float f;
   uint32_t u;
@@ -117,7 +132,6 @@ class PositFP;
 template <int nbits, int es>
 class Posit {
  public:
-  // static const definitions
   static constexpr int width = nbits;
   static constexpr int esbits = es;
   static constexpr int sbits = ac::log2_ceil<nbits - 2>::val + es + 1;
@@ -171,7 +185,7 @@ class Posit {
 
   operator float() const;
 
-// SystemC is not compatible with C++11
+// SystemC is not compatible with C++17
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
@@ -221,6 +235,7 @@ Posit<nbits, es>::Posit(const float f) {
 }
 #endif
 
+// Implements an optimized exp that is only valid for inputs smaller than zero
 template <int nbits, int es>
 Posit<nbits, es> posit_exp(Posit<nbits, es> val) {
   typename Posit<nbits, es>::DecomposedPosit val_fp =
@@ -269,6 +284,7 @@ inline Posit<nbits, es> Posit<nbits, es>::operator*(
   return op1 * op2;
 }
 
+// TODO(fpedd): Deprecated, no need for log mult anymore?!
 template <int nbits, int es>
 inline Posit<nbits, es> Posit<nbits, es>::log_mult(
     const Posit<nbits, es> &rhs) {
@@ -429,7 +445,7 @@ class PositFP {
     return PositFP(ac_f_inv_sqrt);
   }
 
-  // SystemC is not compatible with C++11
+  // SystemC is not compatible with C++17
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
@@ -578,6 +594,7 @@ PositFP<sbits, PositFP<sbits, fbits>::mbits> PositFP<sbits, fbits>::operator*(
   return result;
 }
 
+// TODO(fpedd): This is now deprecated ?!
 template <int sbits, int fbits>
 PositFP<sbits, fbits> PositFP<sbits, fbits>::log_mult(
     const PositFP<sbits, fbits> &op) const {
@@ -834,30 +851,3 @@ inline bool operator==(const Posit<nbits, es> &lhs,
                        const Posit<nbits, es> &rhs) {
   return lhs.bits == rhs.bits;
 }
-
-// template <int sbits, int fbits>
-// class Wrapped<PositFP<sbits, fbits> > {
-//  public:
-//   typedef PositFP<sbits, fbits> Type;
-//   Type val;
-//   Wrapped() {}
-//   Wrapped(const Type &v) : val(v) {}
-//   static const unsigned int width = Type::width;
-//   static const bool is_signed = false;
-//   template <unsigned int Size>
-//   void Marshall(Marshaller<Size> &m) {
-//     m &val.sign;
-//     m &val.scale;
-//     m &val.fraction;
-//   }
-// };
-
-// template <unsigned int Size, int sbits, int fbits>
-// Marshaller<Size> &operator&(Marshaller<Size> &m, PositFP<sbits, fbits> &rhs)
-// {
-//   typedef PositFP<sbits, fbits> Type;
-//   m.template AddField<ac_int<1, false>, 1>(rhs.sign);
-//   m.template AddField<ac_int<sbits, true>, sbits>(rhs.scale);
-//   m.template AddField<ac_int<fbits, false>, fbits>(rhs.fraction);
-//   return m;
-// }
