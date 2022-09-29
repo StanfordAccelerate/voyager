@@ -267,7 +267,6 @@ int run_sequence(const std::string& model,
     // TODO(fpedd): Ideally we would be interested in rel diff, not abs
     //              But this would require changing the compare_arrays() api
     float percent_diff = (float)diff_count / size * 100.0;
-    std::cout << percent_diff << std::endl;
     if (percent_diff > 1.0) error_count += percent_diff;
   }
 
