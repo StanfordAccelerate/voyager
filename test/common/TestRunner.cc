@@ -287,13 +287,14 @@ int run_sequence(const std::string& model,
 }
 
 void print_help() {
-  std::cout << "Configure simulator by using environment variables."
-            << "\nmodel - Type of network to run {mobilebert, resnet}"
-            << "\nTESTS - Layers in network to run {conv1, ...}"
-            << "\nSIMS - Simulators / models to compare {accelerator, "
+  std::cout << "\nConfigure simulator by using environment variables."
+            << "\n model - Type of network to run {mobilebert, resnet}"
+            << "\n TESTS - Layers in network to run. Either single or tuple: "
+               "<first>,<last>."
+            << "\n SIMS - Simulators / models to compare {accelerator, "
                "customposit, universal, fp32, file}."
-            << "\nDATA_DIR - Path to binary input data."
-            << "\nOUT_DIR - Path to output data." << std::endl;
+            << "\n DATA_DIR - Path to binary input data."
+            << "\n OUT_DIR - Path to output data." << std::endl;
 }
 
 // Return environment variable
@@ -321,6 +322,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
     return -1;
   }
 
+  // TODO(fpedd): Implement more cmd line arg tests
   std::string model(get_env_var("MODEL"));
   if (model.empty()) model = "simple";
 
@@ -345,6 +347,31 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::vector<std::string> tests_list;
   split_string(tests, ',', std::back_inserter(tests_list));
 
+  if (tests_list.size() > 2) {
+    std::cerr << "ERROR: Supply at max two TESTS." << std::endl;
+    print_help();
+    return -1;
+  }
+
+  // Check if first test is actually in our list of layers
+  if (std::find(resnet_order.begin(), resnet_order.end(), tests_list[0]) ==
+      resnet_order.end()) {
+    std::cerr << "ERROR: Test " << tests_list[0] << " is not supported."
+              << std::endl;
+    print_help();
+    return -1;
+  }
+
+  // Check if second test is actually in our list of layers
+  if (tests_list.size() == 2 &&
+      std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]) ==
+          resnet_order.end()) {
+    std::cerr << "ERROR: Test " << tests_list[1] << " is not supported."
+              << std::endl;
+    print_help();
+    return -1;
+  }
+
   // Parse sims to run
   std::vector<std::string> sim_list;
   split_string(sims, ',', std::back_inserter(sim_list));
@@ -357,7 +384,9 @@ extern "C" int sc_main(int argc, char* argv[]) {
   for (const std::string& s : sim_list) std::cout << s << ' ';
   if (model == "mobilebert") std::cout << "\n> Task: " << task;
   std::cout << "\n> Data dir: " << data_dir;
-  std::cout << "\n> Out dir: " << out_dir << "\n" << std::endl;
+  std::cout << "\n> Out dir: " << out_dir << "\n";
+  std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
+  std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n" << std::endl;
 
   // Run mobileBERT
   if (model == "mobilebert") {
@@ -398,6 +427,18 @@ extern "C" int sc_main(int argc, char* argv[]) {
 
     return errors;
   } else {  // Run ResNet or Simple
-    return run_sequence(model, tests_list, sim_list, data_dir, out_dir);
+    if (tests_list.size() > 1) {
+      // Generate a complete list of tests to run in order from test_list tuple
+      auto first_test =
+          std::find(resnet_order.begin(), resnet_order.end(), tests_list[0]);
+      auto last_test =
+          std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]);
+      std::vector<std::string> tests_to_run(first_test, last_test + 1);
+      return run_sequence(model, tests_to_run, sim_list, data_dir, out_dir);
+    } else {
+      // Simply run a single test
+      return run_sequence(model, tests_list, sim_list, data_dir, out_dir);
+    }
   }
+  return 0;
 }

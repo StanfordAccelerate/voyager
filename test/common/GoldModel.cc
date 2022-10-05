@@ -65,21 +65,21 @@ inline UniversalPositAccum readInput(UniversalPosit *matrix, int index,
   return p16;
 }
 
-inline UniversalPositAccum readInput2(UniversalPosit *matrix, int index,
-                                      bool accType, int expBias = 0) {
-  UniversalPositAccum p16;
-  if (!accType) {
-    p16 = matrix[index];
-  } else {
-    int encoding1 = matrix[2 * index].encoding();
-    int encoding2 = matrix[2 * index + 1].encoding();
-    p16.setbits((encoding2 << 8) + encoding1);
-  }
-  sw::universal::value<12> val = p16.to_value();
-  val.setExponent(val.scale() + expBias);
-  sw::universal::convert<16, 1>(val, p16);
-  return p16;
-}
+// inline UniversalPositAccum readInput2(UniversalPosit *matrix, int index,
+//                                       bool accType, int expBias = 0) {
+//   UniversalPositAccum p16;
+//   if (!accType) {
+//     p16 = matrix[index];
+//   } else {
+//     int encoding1 = matrix[2 * index].encoding();
+//     int encoding2 = matrix[2 * index + 1].encoding();
+//     p16.setbits((encoding2 << 8) + encoding1);
+//   }
+//   sw::universal::value<12> val = p16.to_value();
+//   val.setExponent(val.scale() + expBias);
+//   sw::universal::convert<16, 1>(val, p16);
+//   return p16;
+// }
 #endif
 
 inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
@@ -95,29 +95,29 @@ inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
   return p16;
 }
 
-inline ACCUM_DATATYPE readInput2(INPUT_DATATYPE *matrix, int index,
-                                 bool accType, int expBias = 0) {
-  ACCUM_DATATYPE p16;
-  if (!accType) {
-    p16 = matrix[index];
-  } else {
-    int encoding1 = matrix[2 * index].bits;
-    int encoding2 = matrix[2 * index + 1].bits;
-    p16.setbits((encoding2 << 8) + encoding1);
-  }
+// inline ACCUM_DATATYPE readInput2(INPUT_DATATYPE *matrix, int index,
+//                                  bool accType, int expBias = 0) {
+//   ACCUM_DATATYPE p16;
+//   if (!accType) {
+//     p16 = matrix[index];
+//   } else {
+//     int encoding1 = matrix[2 * index].bits;
+//     int encoding2 = matrix[2 * index + 1].bits;
+//     p16.setbits((encoding2 << 8) + encoding1);
+//   }
 
-  ACCUM_DATATYPE::DecomposedPosit val = p16;
-  val.scale += expBias;
-  return val;
-}
+//   ACCUM_DATATYPE::DecomposedPosit val = p16;
+//   val.scale += expBias;
+//   return val;
+// }
 
 inline float readInput(float *matrix, int index, bool accType) {
   return accType ? matrix[2 * index] : matrix[index];
 }
 
-inline float readInput2(float *matrix, int index, bool accType, int expBias) {
-  return accType ? matrix[2 * index] : matrix[index];
-}
+// inline float readInput2(float *matrix, int index, bool accType, int expBias) {
+//   return accType ? matrix[2 * index] : matrix[index];
+// }
 
 #ifndef NO_UNIVERSAL
 inline void saveOutput(UniversalPosit *matrix, int index,

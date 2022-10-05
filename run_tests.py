@@ -43,7 +43,6 @@ MODELS = {
         "layer4_1_conv1",
         "layer4_1_conv2",  # TODO(fpedd): Still failing...
         "fc",
-        # "softmax",
     ]
 }
 
@@ -55,7 +54,7 @@ def main():
         description='MINOTAUR Test Runner. Dispatches and manages tests.')
     parser.add_argument('-sims', '--simulators',
                         type=str,
-                        default='accelerator,file',
+                        default='fp32,file',
                         help='Simulators to compare (accelerator, customposit, universal, fp32, file) [SIMS].')
     # TODO(fpedd): Implement commandline args and tests (should overwrite values from MODELS dict)
     # parser.add_argument('-mod', '--model',
