@@ -244,29 +244,58 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
 
   memset(&vectorInstructionConfig, 0, sizeof(vectorInstructionConfig));
 
+  VectorInstructions vInst0;
+  memset(&vInst0, 0, sizeof(vInst0));
+  vInst0.instType = VectorInstructions::vector;
+  vInst0.vInput = VectorInstructions::readFromSystolicArray;
+  vInst0.vAccumulatePush = 0;
+
+  if (params.RESIDUAL) {
+    vInst0.vOp0Src1 = VectorInstructions::readInterface;
+    vInst0.vOp0 = VectorInstructions::vadd;
+  } else if (params.ATTENTION_SCALING) {
+    vInst0.vOp0Src1 = VectorInstructions::op0immediate0;
+    float fpscale = (1.0 / sqrt(32));
+    Posit<8, 1> scale = static_cast<Posit<8, 1> >(fpscale);
+    vInst0.immediate0 = scale.bits;
+    vInst0.vOp0 = VectorInstructions::vmult;
+  } else {
+    vInst0.vOp0Src1 = VectorInstructions::nop;
+    vInst0.vOp0 = VectorInstructions::nop;
+  }
+
+  vInst0.vOp1 = VectorInstructions::nop;
+  vInst0.vOp2 = VectorInstructions::nop;
+
+  if (params.BIAS) {
+    vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
+    vInst0.vOp3 = VectorInstructions::vadd;
+  } else {
+    vInst0.vOp3Src1 = VectorInstructions::nop;
+    vInst0.vOp3 = VectorInstructions::nop;
+  }
+
+  if (params.RELU) {
+    vInst0.vOp4 = VectorInstructions::vrelu;
+  } else if (params.RELU_GRAD) {
+    vInst0.vOp0Src1 = VectorInstructions::readInterface;
+    vInst0.vOp4 = VectorInstructions::vrelumask;
+  } else {
+    vInst0.vOp4 = VectorInstructions::nop;
+  }
+
   if (params.AVGPOOL) {
     // accumulate over X*Y
-    VectorInstructions vInst0;
-    vInst0.instType = VectorInstructions::accumulation;
-    vInst0.rCount = X * Y;
+    VectorInstructions accumulatorInst;
+    accumulatorInst.instType = VectorInstructions::accumulation;
+    accumulatorInst.rCount = X * Y;
     vectorInstructionConfig.instCount[0] = 1;
-    vectorInstructionConfig.inst[0] = vInst0;
+    vectorInstructionConfig.inst[0] = accumulatorInst;
 
+    // build on top of existing inst0
     // send to accumulator
-    VectorInstructions vInst1;
-    vInst1.instType = VectorInstructions::vector;
-    vInst1.vInput = VectorInstructions::readFromSystolicArray;
-    vInst1.vAccumulatePush = 1;
-    vInst1.vOp0Src1 = VectorInstructions::nop;
-    vInst1.vOp0 = VectorInstructions::nop;
-    vInst1.vOp1 = VectorInstructions::nop;
-    vInst1.vOp1 = VectorInstructions::nop;
-    // use existing
-    vInst1.vOp3Src1 = VectorInstructions::nop;
-    vInst1.vOp3 = VectorInstructions::nop;
-    vInst1.vOp4 = VectorInstructions::nop;
-    vInst1.vDest = VectorInstructions::nop;
-    vectorInstructionConfig.inst[1] = vInst1;
+    vInst0.vAccumulatePush = 1;
+    vectorInstructionConfig.inst[1] = vInst0;
     vectorInstructionConfig.instCount[1] = X * Y;
 
     // pull from accumulator and divide by X*Y
@@ -291,46 +320,6 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
     vectorInstructionConfig.instLen = 3;
     vectorInstructionConfig.instLoopCount = K / DIMENSION;
   } else {
-    VectorInstructions vInst0;
-    memset(&vInst0, 0, sizeof(vInst0));
-    vInst0.instType = VectorInstructions::vector;
-    vInst0.vInput = VectorInstructions::readFromSystolicArray;
-    vInst0.vAccumulatePush = 0;
-
-    if (params.RESIDUAL) {
-      vInst0.vOp0Src1 = VectorInstructions::readInterface;
-      vInst0.vOp0 = VectorInstructions::vadd;
-    } else if (params.ATTENTION_SCALING) {
-      vInst0.vOp0Src1 = VectorInstructions::op0immediate0;
-      float fpscale = (1.0 / sqrt(32));
-      Posit<8, 1> scale = static_cast<Posit<8, 1> >(fpscale);
-      vInst0.immediate0 = scale.bits;
-      vInst0.vOp0 = VectorInstructions::vmult;
-    } else {
-      vInst0.vOp0Src1 = VectorInstructions::nop;
-      vInst0.vOp0 = VectorInstructions::nop;
-    }
-
-    vInst0.vOp1 = VectorInstructions::nop;
-    vInst0.vOp2 = VectorInstructions::nop;
-
-    if (params.BIAS) {
-      vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
-      vInst0.vOp3 = VectorInstructions::vadd;
-    } else {
-      vInst0.vOp3Src1 = VectorInstructions::nop;
-      vInst0.vOp3 = VectorInstructions::nop;
-    }
-
-    if (params.RELU) {
-      vInst0.vOp4 = VectorInstructions::vrelu;
-    } else if (params.RELU_GRAD) {
-      vInst0.vOp0Src1 = VectorInstructions::readInterface;
-      vInst0.vOp4 = VectorInstructions::vrelumask;
-    } else {
-      vInst0.vOp4 = VectorInstructions::nop;
-    }
-
     vInst0.vDest = VectorInstructions::vWriteOut;
     vectorInstructionConfig.inst[0] = vInst0;
 

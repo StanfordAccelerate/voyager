@@ -30,7 +30,6 @@ def arrange_data(name: str, x: Tensor):
         pass
     else:
         x = torch.permute(x, (2, 3, 1, 0))
-    # print(torch.flatten(x).cpu().detach().numpy().shape)
 
     # To make sure we copy/move tensor to CPU and convert to np
     return torch.flatten(x).cpu().detach().numpy()

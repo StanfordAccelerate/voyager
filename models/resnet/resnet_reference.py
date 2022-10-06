@@ -9,6 +9,7 @@ from torch import Tensor
 # The only functional change is the padding in the maxpool layer, from 1 to 0 here
 # The ResNet() class is only able to create ResNet18 and ResNet34 models
 
+
 def conv3x3(in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) -> nn.Conv2d:
     """3x3 convolution with padding"""
     return nn.Conv2d(

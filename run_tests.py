@@ -3,6 +3,8 @@
 import functools
 import subprocess
 import argparse
+import time
+import datetime
 import sys
 import os
 
@@ -39,11 +41,12 @@ MODELS = {
         "layer4_0_conv1",
         "layer4_0_conv2",
         "layer4_1_conv1",
-        # "layer4_1_conv2", TODO(fpedd): Still failing...
+        "layer4_1_conv2",  # TODO(fpedd): Still failing...
         "fc",
-        # "softmax",
     ]
 }
+
+# TODO(fpedd): Implement e2e runs by generating list of layers
 
 
 def main():
@@ -51,7 +54,7 @@ def main():
         description='MINOTAUR Test Runner. Dispatches and manages tests.')
     parser.add_argument('-sims', '--simulators',
                         type=str,
-                        default='accelerator,file',
+                        default='fp32,file',
                         help='Simulators to compare (accelerator, customposit, universal, fp32, file) [SIMS].')
     # TODO(fpedd): Implement commandline args and tests (should overwrite values from MODELS dict)
     # parser.add_argument('-mod', '--model',
@@ -74,10 +77,10 @@ def main():
                         type=str,
                         default='./test_outputs/',
                         help='Path to output data [OUT_DIR].')
-    parser.add_argument('-mc', '--make_clean',
-                        default=True,
-                        action='store_false',
-                        help='Run make clean before building.')
+    parser.add_argument('-nmc', '--no_make_clean',
+                        default=False,
+                        action='store_true',
+                        help='Do not run make clean before building.')
     parser.add_argument('-tn', '--target_name',
                         type=str,
                         default='TestRunner',
@@ -88,11 +91,13 @@ def main():
                         help='Name of build directory.')
     args = parser.parse_args()
 
+    start_time = time.time()
+
     # Build SystemC code (running make twice because of linker issues when on NFS)
-    if args.make_clean:
-        subprocess.run(['make', 'clean', args.target_name, '-j'])
-    else:
+    if args.no_make_clean:
         subprocess.run(['make', args.target_name, '-j'])
+    else:
+        subprocess.run(['make', 'clean', args.target_name, '-j'])
     subprocess.run(['make', args.target_name, '-j'])
 
     # Create output directories for both test value and console output
@@ -114,42 +119,49 @@ def main():
             env["DATA_DIR"] = args.data_dir
             env["OUT_DIR"] = args.output_dir
             # Spawn an new subprocess and grab its name, handle, and output file
-            results.append(
-                [
-                    model + "." + test,
-                    subprocess.Popen([os.path.join(args.build_dir, args.target_name)],
-                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env),
-                    file
-                ])
+            p = subprocess.Popen([os.path.join(args.build_dir, args.target_name)],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+            # Enable non-blocking read from process
+            os.set_blocking(p.stdout.fileno(), False)
+            results.append([model + "." + test, p, file])
 
     # Observe and manage running processes
+    last_print_time = 0
     while True:
         running = 0
         failures = 0
         for res in results:
+            # Read all lines from proc
+            while line := res[1].stdout.readline():
+                line = line.decode("utf-8")
+                # Write to file
+                res[2].write(line)
+                # If format is right, print to console once per second
+                nums = [int(s) for s in line.split() if s.isdigit()]
+                if len(nums) == 3:
+                    print("{} -> {} out of {} cycle ({:0.2f}%)".format(
+                        res[0], nums[1], nums[2], nums[1]/nums[2]*100.0))
             # Check if proc is still running
             ret = res[1].poll()
             if ret is None:
                 running = running + 1
-                # Get current proc output
-                line_str = res[1].stdout.readline().decode("utf-8")
-                # Write to file
-                res[2].write(line_str)
-                # If format is right, print to console
-                nums = [int(s) for s in line_str.split() if s.isdigit()]
-                if len(nums) == 3:
-                    print("{} -> {} out of {} cycle ({:0.2f}%)".format(
-                        res[0], nums[1], nums[2], nums[1]/nums[2]*100.0))
             else:
                 # Record number of failures
                 failures = failures + bool(res[1].returncode)
                 # Close file
-                res[2].close()
-        print("-> Total {} running {} failed {}".format(
-            len(results), running, failures))
+                if not res[2].closed:
+                    res[2].close()
+        curr_start = str(datetime.timedelta(
+            seconds=round(time.time()-start_time)))
+        if time.time() - last_print_time >= 1.0:
+            last_print_time = time.time()
+            print("-> {}, Total {}, Running {}, Failed {}".format(
+                curr_start, len(results), running, failures))
         # If all are done, exit
         if not running:
             break
+        # Free-running while loops are not good
+        time.sleep(0.1)
 
     print("--- Simulation run done ---")
     print('\n'.join(["{} returned with {}".format(

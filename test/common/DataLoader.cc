@@ -206,11 +206,11 @@ void load_bias(const SimplifiedParams& params, const std::string& filename,
           params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
-  int STRIDE = params.STRIDE;
-  if (params.REPLICATION) {
-    FX = 7;
-    C = 3;
-  }
+  // int STRIDE = params.STRIDE;
+  // if (params.REPLICATION) {
+  //   FX = 7;
+  //   C = 3;
+  // }
 
   int size = K;
   double* tmpValues = read_file_as_double(filename, size, useDataFile);
@@ -331,16 +331,16 @@ void load_memory(
   load_inputs(params, dataDir + files.inputs_file, useDataFile,
               memoryMap.inputs == SRAM ? sramMemory : rramMemory, matrixA,
               universalMatrixA, floatMatrixA);
-  if (params.WEIGHT) {
-    load_weights(params, dataDir + files.weights_file, useDataFile,
-                 memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB,
-                 universalMatrixB, floatMatrixB);
-  }
-  if (params.BIAS) {
-    load_bias(params, dataDir + files.bias_file, useDataFile,
-              memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix,
-              universalBiasMatrix, floatBiasMatrix);
-  }
+  // if (params.WEIGHT) {
+  //   load_weights(params, dataDir + files.weights_file, useDataFile,
+  //                memoryMap.weights == SRAM ? sramMemory : rramMemory, matrixB,
+  //                universalMatrixB, floatMatrixB);
+  // }
+  // if (params.BIAS) {
+  //   load_bias(params, dataDir + files.bias_file, useDataFile,
+  //             memoryMap.bias == SRAM ? sramMemory : rramMemory, biasMatrix,
+  //             universalBiasMatrix, floatBiasMatrix);
+  // }
   if (params.RESIDUAL) {
     load_residual(params, dataDir + files.residual_file, useDataFile,
                   memoryMap.residual == SRAM ? sramMemory : rramMemory,
