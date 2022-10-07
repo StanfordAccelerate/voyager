@@ -28,7 +28,6 @@
 #define RRAM_MEMORY_SIZE (22 * 1024 * 1024)  // RRAM size for MobileBERT
 #endif
 
-void validateMapping(SimplifiedParams params);
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* acc_sram_memory, INPUT_DATATYPE* acc_rram_memory,
             MemoryMap memoryMap);
@@ -192,8 +191,9 @@ int runOperation(const SimplifiedParams params, const Files files,
     std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in representing float as Posit)" << std::endl;
     diffFile = outfilePrefix + "universal_vs_pytorch.txt";
-    compare_arrays(uni_sram_memory + params.OUTPUT_OFFSET, uniDataFileOutput,
-                   outputSize, diffFile, params.ACC_T_OUTPUT);
+    errors += compare_arrays(uni_sram_memory + params.OUTPUT_OFFSET,
+                             uniDataFileOutput, outputSize, diffFile,
+                             params.ACC_T_OUTPUT);
   }
 
   if (customposit) {
@@ -201,8 +201,9 @@ int runOperation(const SimplifiedParams params, const Files files,
     std::cout << "(reveals bugs in mapping operations to accelerator)"
               << std::endl;
     diffFile = outfilePrefix + "hlsgold_vs_pytorch.txt";
-    compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET, hlsDataFileOutput,
-                   outputSize, diffFile, params.ACC_T_OUTPUT);
+    errors += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
+                             hlsDataFileOutput, outputSize, diffFile,
+                             params.ACC_T_OUTPUT);
   }
 
   if (accelerator) {
@@ -210,8 +211,9 @@ int runOperation(const SimplifiedParams params, const Files files,
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
     diffFile = outfilePrefix + "accel_vs_pytorch.txt";
-    compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET, hlsDataFileOutput,
-                   outputSize, diffFile, params.ACC_T_OUTPUT);
+    errors += compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
+                             hlsDataFileOutput, outputSize, diffFile,
+                             params.ACC_T_OUTPUT);
   }
 
   if (accelerator && customposit) {
@@ -219,9 +221,9 @@ int runOperation(const SimplifiedParams params, const Files files,
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
     diffFile = outfilePrefix + "accel_vs_hlsgold.txt";
-    compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
-                   hls_sram_memory + params.OUTPUT_OFFSET, outputSize, diffFile,
-                   params.ACC_T_OUTPUT);
+    errors += compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
+                             hls_sram_memory + params.OUTPUT_OFFSET, outputSize,
+                             diffFile, params.ACC_T_OUTPUT);
   }
 
   if (customposit && universal) {
@@ -231,9 +233,9 @@ int runOperation(const SimplifiedParams params, const Files files,
         << "(reveals bugs in implementation of custom HLS Posit operators)"
         << std::endl;
     diffFile = outfilePrefix + "hlsgold_vs_universal.txt";
-    compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
-                   uni_sram_memory + params.OUTPUT_OFFSET, outputSize, diffFile,
-                   params.ACC_T_OUTPUT);
+    errors += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
+                             uni_sram_memory + params.OUTPUT_OFFSET, outputSize,
+                             diffFile, params.ACC_T_OUTPUT);
   }
 
   if (fp32) {

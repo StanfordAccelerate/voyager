@@ -1,19 +1,11 @@
-#include <sys/wait.h>
-#include <unistd.h>
-
-#include <algorithm>
-#include <cstring>
-#include <fstream>
-#include <locale>
-#include <sstream>
-#include <stdexcept>
+// This file is the main entry point to running event-level SystemC simulations.
+// It can run both ResNet18 and mobileBert-Tiny
+// Parameters are passed via environment variables, not arguments.
 #include <string>
-#include <unordered_set>
 #include <vector>
 
 #include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
-// #include "test/common/Harness.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
 #include "test/mobilebert/MobileBertSequence.h"
@@ -21,164 +13,112 @@
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
 
+// TODO(fpedd): These defines get overwritten from other files...
+
+// By default we have 2MB of SRAM per MINOTAUR SoC
+// organized as 8x 256KB Banks with 2x 128KB Macros each
 #ifndef SRAM_MEMORY_SIZE
 #define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
 #endif
 
+// By default we have 12MB of RRAM per MINOTAUR SoC
+// organized as 12x 1MB Banks with 4x 256KB Macros each
 #ifndef RRAM_MEMORY_SIZE
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
 #endif
 
-void validateMapping(SimplifiedParams params);
-void run_sequence(const std::string& group,
-                  const std::vector<std::string>& tests,
-                  const std::unordered_set<std::string>& comparisons);
-void run_op(std::vector<SimplifiedParams> params_list,
-            INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
-            MemoryMap memoryMap);
-std::vector<std::string> parse_csv(const std::string& csv);
-
-// NOTE: Binary data files are always supplied in [Y][X][C][K] ordering, except
-// FC which is in [K][C]
-
-std::vector<std::string> parse_csv(std::string& csv) {
-  // Remove spaces
-  std::remove(csv.begin(), csv.end(), ' ');
-
-  std::stringstream ss(csv);
-  std::string token;
-  std::vector<std::string> result;
-
-  // Tokenize
-  while (std::getline(ss, token, ',')) {
-    result.push_back(token);
-  }
-
-  return result;
-}
-
-void validateMapping(SimplifiedParams params) {
-  int x0 = params.loops[1][params.inputXLoopIndex[1]];
-  int y0 = params.loops[1][params.inputYLoopIndex[1]];
-  int c0 = params.loops[1][params.reductionLoopIndex[1]];
-  int k0 = params.loops[1][params.weightLoopIndex[1]];
-  int fx = params.loops[1][params.fxIndex];
-  int fy = params.loops[1][params.fyIndex];
-  int stride = params.STRIDE;
-
-  if (params.FC || params.SOFTMAX || params.SOFTMAX_GRAD ||
-      params.NO_NORM) {  // don't check for vector ops
-    return;
-  }
-
-  // Input buffer
-  int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy - 1);
-  if (params.REPLICATION) {
-    // don't check temporarily
-    input_buffer_tile_size = 1;
-  }
-  if (input_buffer_tile_size > INPUT_BUFFER_SIZE) {
-    std::cout << "[ERROR] Input buffer tile size violation." << std::endl;
-    std::terminate();
-  }
-
-  // Weight buffer
-  if (fx * fy * k0 > WEIGHT_BUFFER_SIZE) {
-    std::cout << "[ERROR] Weight buffer tile size violation." << std::endl;
-    std::terminate();
-  }
-
-  if (x0 * y0 * k0 > ACCUMULATION_BUFFER_SIZE) {
-    std::cout << "[ERROR] Accumulation buffer tile size violation."
-              << std::endl;
-    std::terminate();
-  }
-}
-
-int run_sequence(const std::string& group,
+// Run of sequence of tests for feed-forward conv-nets
+// Returns != 0 if # of value diffs greater than hardcoded threshold
+int run_sequence(const std::string& model,
                  const std::vector<std::string>& tests,
-                 const std::vector<std::string>& comparisons) {
+                 const std::vector<std::string>& sims,
+                 const std::string& data_dir, const std::string& out_dir) {
   // Set data parameters
   bool use_data_file = true;
-  bool accType = false;
-  std::string data_dir;
-  std::map<std::string, MemoryMap>* mem_map;
-  std::map<std::string, SimplifiedParams>* param_map;
-  std::map<std::string, Files>* file_map;
+  std::map<std::string, MemoryMap> mem_map;
+  std::map<std::string, SimplifiedParams> param_map;
+  std::map<std::string, Files> file_map;
 
-  if (group == "resnet") {
-    data_dir = resnetDataDir;
-    mem_map = &resnetMemoryMap;
-    param_map = &resnetParams;
-    file_map = &resnetFiles;
-  } else if (group == "simple") {
-    data_dir = resnetDataDir;
-    mem_map = &simpleMemoryMap;
-    param_map = &simple;
-    file_map = &resnetFiles;
+  if (model == "resnet") {
+    mem_map = resnetMemoryMap;
+    param_map = resnetParams;
+    file_map = resnetFiles;
+  } else if (model == "simple") {
+    mem_map = simpleMemoryMap;
+    param_map = simple;
+    file_map = resnetFiles;
     use_data_file = false;
+  } else {
+    throw std::runtime_error(
+        "ERROR: run_sequence() does not support this model.");
   }
 
-  int error_count = 0;
-
   // Memory allocation
-  INPUT_DATATYPE* acc_sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-  INPUT_DATATYPE* acc_rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
-  INPUT_DATATYPE* hls_gold_sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-  INPUT_DATATYPE* hls_gold_rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
-  UniversalPosit* uni_gold_sram_memory = new UniversalPosit[SRAM_MEMORY_SIZE];
-  UniversalPosit* uni_gold_rram_memory = new UniversalPosit[RRAM_MEMORY_SIZE];
-  float* float_gold_sram_memory = new float[SRAM_MEMORY_SIZE];
-  float* float_gold_rram_memory = new float[RRAM_MEMORY_SIZE];
-  uint64_t* trash = new uint64_t[RRAM_MEMORY_SIZE];
+  INPUT_DATATYPE* acc_sram_memory = nullptr;
+  INPUT_DATATYPE* acc_rram_memory = nullptr;
+  INPUT_DATATYPE* hls_gold_sram_memory = nullptr;
+  INPUT_DATATYPE* hls_gold_rram_memory = nullptr;
+  UniversalPosit* uni_gold_sram_memory = nullptr;
+  UniversalPosit* uni_gold_rram_memory = nullptr;
+  float* float_gold_sram_memory = nullptr;
+  float* float_gold_rram_memory = nullptr;
+  uint64_t* trash = nullptr;
+  try {
+    acc_sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+    acc_rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+    hls_gold_sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
+    hls_gold_rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
+    uni_gold_sram_memory = new UniversalPosit[SRAM_MEMORY_SIZE];
+    uni_gold_rram_memory = new UniversalPosit[RRAM_MEMORY_SIZE];
+    float_gold_sram_memory = new float[SRAM_MEMORY_SIZE];
+    float_gold_rram_memory = new float[RRAM_MEMORY_SIZE];
+    trash = new uint64_t[RRAM_MEMORY_SIZE];
+  } catch (const std::bad_alloc&) {
+    throw std::runtime_error("ERROR: Failed to allocate simulation memory");
+  }
 
-  if (acc_sram_memory == nullptr || acc_rram_memory == nullptr ||
-      hls_gold_sram_memory == nullptr || hls_gold_rram_memory == nullptr ||
-      uni_gold_sram_memory == nullptr || uni_gold_rram_memory == nullptr ||
-      float_gold_sram_memory == nullptr || float_gold_rram_memory == nullptr ||
-      trash == nullptr)
-    throw std::runtime_error("Failed to allocate simulation memory");
-
-  // Load first layer input
-  load_memory((*param_map)[tests[0]], data_dir, (*file_map)[tests[0]],
-              (*mem_map)[tests[0]], use_data_file, acc_sram_memory,
+  // Load first tests input
+  load_memory(param_map[tests.front()], data_dir, file_map[tests.front()],
+              mem_map[tests.front()], use_data_file, acc_sram_memory,
               acc_rram_memory,
-              hls_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
+              hls_gold_sram_memory + param_map[tests.front()].INPUT_OFFSET,
               (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-              hls_gold_sram_memory + (*param_map)[tests[0]].RESIDUAL_OFFSET,
+              hls_gold_sram_memory + param_map[tests.front()].RESIDUAL_OFFSET,
               (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-              uni_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
+              uni_gold_sram_memory + param_map[tests.front()].INPUT_OFFSET,
               (UniversalPosit*)trash, (UniversalPosit*)trash,
-              uni_gold_sram_memory + (*param_map)[tests[0]].RESIDUAL_OFFSET,
+              uni_gold_sram_memory + param_map[tests.front()].RESIDUAL_OFFSET,
               (UniversalPosit*)trash, (UniversalPosit*)trash,
-              float_gold_sram_memory + (*param_map)[tests[0]].INPUT_OFFSET,
+              float_gold_sram_memory + param_map[tests.front()].INPUT_OFFSET,
               (float*)trash, (float*)trash,
-              float_gold_sram_memory + (*param_map)[tests[0]].RESIDUAL_OFFSET,
+              float_gold_sram_memory + param_map[tests.front()].RESIDUAL_OFFSET,
               (float*)trash, (float*)trash);
 
-  // Load weights, biases, and comparisons
+  // Load weights, biases, and sims
   for (const std::string& test : tests) {
-    load_wb((*param_map)[test], data_dir, (*file_map)[test], (*mem_map)[test],
-            use_data_file, acc_sram_memory, acc_rram_memory,
-            (INPUT_DATATYPE*)trash,
-            hls_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
-            hls_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-            (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-            (INPUT_DATATYPE*)trash, (UniversalPosit*)trash,
-            uni_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
-            uni_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-            (UniversalPosit*)trash, (UniversalPosit*)trash,
-            (UniversalPosit*)trash, (float*)trash,
-            float_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
-            float_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-            (float*)trash, (float*)trash, (float*)trash);
+    load_wb(
+        param_map[test], data_dir, file_map[test], mem_map[test], use_data_file,
+        acc_sram_memory, acc_rram_memory, (INPUT_DATATYPE*)trash,
+        hls_gold_rram_memory + param_map[test].WEIGHT_OFFSET,
+        hls_gold_rram_memory + param_map[test].BIAS_OFFSET,
+        (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
+        (UniversalPosit*)trash,
+        uni_gold_rram_memory + param_map[test].WEIGHT_OFFSET,
+        uni_gold_rram_memory + param_map[test].BIAS_OFFSET,
+        (UniversalPosit*)trash, (UniversalPosit*)trash, (UniversalPosit*)trash,
+        (float*)trash, float_gold_rram_memory + param_map[test].WEIGHT_OFFSET,
+        float_gold_rram_memory + param_map[test].BIAS_OFFSET, (float*)trash,
+        (float*)trash, (float*)trash);
   }
 
   // Run tests in sequence
   int X, Y, C, K, FX, FY, STRIDE;
   for (const std::string& test : tests) {
-    SimplifiedParams currentParams = (*param_map)[test];
-    validateMapping(currentParams);
+    SimplifiedParams currentParams = param_map[test];
+
+    // Check if mapping valid
+    if (validateMapping(currentParams) != 0) return -1;
+
     X = currentParams.loops[0][currentParams.inputXLoopIndex[0]] *
         currentParams.loops[1][currentParams.inputXLoopIndex[1]];
     Y = currentParams.loops[0][currentParams.inputYLoopIndex[0]] *
@@ -196,8 +136,8 @@ int run_sequence(const std::string& group,
     }
 
     if (currentParams.MAXPOOL) {
-      X = X / 2;
-      Y = Y / 2;
+      X /= 2;
+      Y /= 2;
     }
 
     if (currentParams.AVGPOOL) {
@@ -212,254 +152,298 @@ int run_sequence(const std::string& group,
               << std::endl;
 
     // Run gold models
-    if (std::find(comparisons.begin(), comparisons.end(), "customposit") !=
-        comparisons.end()) {
+    if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
       run_custom_posit_gold_model(
-          (*param_map)[test],
-          hls_gold_sram_memory + (*param_map)[test].INPUT_OFFSET,
-          hls_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
-          hls_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
-          hls_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          hls_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, nullptr,
+          param_map[test], hls_gold_sram_memory + param_map[test].INPUT_OFFSET,
+          hls_gold_rram_memory + param_map[test].WEIGHT_OFFSET,
+          hls_gold_sram_memory + param_map[test].OUTPUT_OFFSET,
+          hls_gold_rram_memory + param_map[test].BIAS_OFFSET,
+          hls_gold_sram_memory + param_map[test].RESIDUAL_OFFSET, nullptr,
           nullptr);
     }
-    if (std::find(comparisons.begin(), comparisons.end(), "universal") !=
-        comparisons.end()) {
+    if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
       run_universal_posit_gold_model(
-          (*param_map)[test],
-          uni_gold_sram_memory + (*param_map)[test].INPUT_OFFSET,
-          uni_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
-          uni_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
-          uni_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          uni_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, nullptr,
+          param_map[test], uni_gold_sram_memory + param_map[test].INPUT_OFFSET,
+          uni_gold_rram_memory + param_map[test].WEIGHT_OFFSET,
+          uni_gold_sram_memory + param_map[test].OUTPUT_OFFSET,
+          uni_gold_rram_memory + param_map[test].BIAS_OFFSET,
+          uni_gold_sram_memory + param_map[test].RESIDUAL_OFFSET, nullptr,
           nullptr);
     }
-    if (std::find(comparisons.begin(), comparisons.end(), "fp32") !=
-        comparisons.end()) {
+    if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
       run_fp_gold_model(
-          (*param_map)[test],
-          float_gold_sram_memory + (*param_map)[test].INPUT_OFFSET,
-          float_gold_rram_memory + (*param_map)[test].WEIGHT_OFFSET,
-          float_gold_sram_memory + (*param_map)[test].OUTPUT_OFFSET,
-          float_gold_rram_memory + (*param_map)[test].BIAS_OFFSET,
-          float_gold_sram_memory + (*param_map)[test].RESIDUAL_OFFSET, nullptr,
+          param_map[test],
+          float_gold_sram_memory + param_map[test].INPUT_OFFSET,
+          float_gold_rram_memory + param_map[test].WEIGHT_OFFSET,
+          float_gold_sram_memory + param_map[test].OUTPUT_OFFSET,
+          float_gold_rram_memory + param_map[test].BIAS_OFFSET,
+          float_gold_sram_memory + param_map[test].RESIDUAL_OFFSET, nullptr,
           nullptr);
     }
   }
 
-  if (std::find(comparisons.begin(), comparisons.end(), "accelerator") !=
-      comparisons.end()) {
-    // Run accelerator
+  // Run accelerator
+  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     std::vector<SimplifiedParams> params_list;
     for (const std::string& test : tests) {
-      params_list.push_back((*param_map)[test]);
+      params_list.push_back(param_map[test]);
     }
-    run_op(params_list, acc_sram_memory, acc_rram_memory, (*mem_map)[tests[0]]);
+    run_op(params_list, acc_sram_memory, acc_rram_memory, mem_map[tests[0]]);
   }
 
   // Allocate comparison
-  INPUT_DATATYPE* hls_comp = new INPUT_DATATYPE[X * Y * K];
-  UniversalPosit* uni_comp = new UniversalPosit[X * Y * K];
-  float* fp_comp = new float[X * Y * K];
+  INPUT_DATATYPE* hls_comp = nullptr;
+  UniversalPosit* uni_comp = nullptr;
+  float* fp_comp = nullptr;
+  size_t size = X * Y * K;
 
-  std::string last_test = *(tests.end() - 1);
+  try {
+    hls_comp = new INPUT_DATATYPE[size];
+    uni_comp = new UniversalPosit[size];
+    fp_comp = new float[size];
+  } catch (const std::bad_alloc&) {
+    throw std::runtime_error("ERROR: Failed to allocate comparison memory");
+  }
+
+  // Load reference values from file
   if (use_data_file) {
-    load_datafile_outputs((*param_map)[last_test],
-                          data_dir + (*file_map)[last_test].outputs_file,
+    load_datafile_outputs(param_map[tests.back()],
+                          data_dir + file_map[tests.back()].outputs_file,
                           hls_comp, uni_comp, fp_comp);
   }
 
-  if (hls_comp == nullptr || uni_comp == nullptr || fp_comp == nullptr)
-    throw std::runtime_error(
-        "Failed to allocate simulation memory in sequence");
+  int error_count = 0;
+  // Go over every combination of sims and cross-check results
+  for (int i = 0; i < sims.size(); i += 2) {
+    std::string diff_file = out_dir + model + '.' + tests.front() + "_to_" +
+                            tests.back() + '.' + sims[i] + "_vs_" + sims[i + 1];
 
-  for (int i = 0; i < comparisons.size(); i += 2) {
-    std::string diff_file = "test_outputs/" + group + '.' + *(tests.begin()) +
-                            '.' + *(--tests.end()) + '.' + comparisons[i] +
-                            "_vs_" + comparisons[i + 1];
-    std::cout << diff_file << std::endl;
-
-    if ((comparisons[i] == "accelerator" &&
-         comparisons[i + 1] == "customposit") ||
-        (comparisons[i + 1] == "accelerator" &&
-         comparisons[i] == "customposit")) {
-      error_count += compare_arrays(
-          acc_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          X * Y * K, diff_file, accType);
-    } else if ((comparisons[i] == "accelerator" &&
-                comparisons[i + 1] == "file") ||
-               (comparisons[i + 1] == "accelerator" &&
-                comparisons[i] == "file")) {
-      error_count += compare_arrays(
-          acc_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET, hls_comp,
-          X * Y * K, diff_file, accType);
-    } else if ((comparisons[i] == "customposit" &&
-                comparisons[i + 1] == "file") ||
-               (comparisons[i + 1] == "customposit" &&
-                comparisons[i] == "file")) {
-      error_count += compare_arrays(
-          hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          hls_comp, X * Y * K, diff_file, accType);
-    } else if ((comparisons[i] == "universal" &&
-                comparisons[i + 1] == "customposit") ||
-               (comparisons[i + 1] == "universal" &&
-                comparisons[i] == "customposit")) {
-      error_count += compare_arrays(
-          hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          uni_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          X * Y * K, diff_file, accType);
-    } else if ((comparisons[i] == "universal" &&
-                comparisons[i + 1] == "file") ||
-               (comparisons[i + 1] == "universal" &&
-                comparisons[i] == "file")) {
-      error_count += compare_arrays(
-          uni_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          uni_comp, X * Y * K, diff_file, accType);
-    } else if ((comparisons[i] == "fp32" && comparisons[i + 1] == "file") ||
-               (comparisons[i + 1] == "fp32" && comparisons[i] == "file")) {
-      error_count += compare_arrays(
-          float_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          fp_comp, X * Y * K, diff_file, accType);
-    } else if ((comparisons[i] == "customposit" &&
-                comparisons[i + 1] == "fp32") ||
-               (comparisons[i] == "fp32" &&
-                comparisons[i + 1] == "customposit")) {
-      error_count += compare_arrays(
-          hls_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          float_gold_sram_memory + (*param_map)[last_test].OUTPUT_OFFSET,
-          X * Y * K, diff_file, accType);
+    int diff_count = 0;  // Number of values with absolute diff over 1
+    if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
+        (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
+      diff_count += compare_arrays(
+          acc_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
+          hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
+          diff_file, false);
+    } else if ((sims[i] == "accelerator" && sims[i + 1] == "file") ||
+               (sims[i + 1] == "accelerator" && sims[i] == "file")) {
+      diff_count += compare_arrays(
+          acc_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, hls_comp,
+          size, diff_file, false);
+    } else if ((sims[i] == "customposit" && sims[i + 1] == "file") ||
+               (sims[i + 1] == "customposit" && sims[i] == "file")) {
+      diff_count += compare_arrays(
+          hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
+          hls_comp, size, diff_file, false);
+    } else if ((sims[i] == "universal" && sims[i + 1] == "customposit") ||
+               (sims[i + 1] == "universal" && sims[i] == "customposit")) {
+      diff_count += compare_arrays(
+          hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
+          uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
+          diff_file, false);
+    } else if ((sims[i] == "universal" && sims[i + 1] == "file") ||
+               (sims[i + 1] == "universal" && sims[i] == "file")) {
+      diff_count += compare_arrays(
+          uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
+          uni_comp, size, diff_file, false);
+    } else if ((sims[i] == "fp32" && sims[i + 1] == "file") ||
+               (sims[i + 1] == "fp32" && sims[i] == "file")) {
+      diff_count += compare_arrays(
+          float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
+          fp_comp, size, diff_file, false);
+    } else if ((sims[i] == "customposit" && sims[i + 1] == "fp32") ||
+               (sims[i] == "fp32" && sims[i + 1] == "customposit")) {
+      diff_count += compare_arrays(
+          hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
+          float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
+          diff_file, false);
     } else {
-      std::cout << "Comparison not supported." << std::endl;
+      std::cerr << "ERROR: Comparison between " + sims[i] + " and "
+                << sims[i + 1] << " not supported." << std::endl;
+      return -1;
     }
+
+    // If more than 1% of values have abs diff over 1, record error
+    // TODO(fpedd): Ideally we would be interested in rel diff, not abs
+    //              But this would require changing the compare_arrays() api
+    float percent_diff = (float)diff_count / size * 100.0;
+    if (percent_diff > 1.0) error_count += percent_diff;
   }
+
+  delete[] acc_sram_memory;
+  delete[] acc_rram_memory;
+  delete[] hls_gold_sram_memory;
+  delete[] hls_gold_rram_memory;
+  delete[] uni_gold_sram_memory;
+  delete[] uni_gold_rram_memory;
+  delete[] float_gold_sram_memory;
+  delete[] float_gold_rram_memory;
+  delete[] trash;
+  delete[] hls_comp;
+  delete[] uni_comp;
+  delete[] fp_comp;
 
   return error_count;
 }
 
+void print_help() {
+  std::cout << "\nConfigure simulator by using environment variables."
+            << "\n MODEL - Type of network to run {mobilebert, resnet}"
+            << "\n TESTS - Layers in network to run. Either single or tuple: "
+               "<first>,<last>."
+            << "\n SIMS - Simulators / models to compare {accelerator, "
+               "customposit, universal, fp32, file}."
+            << "\n DATA_DIR - Path to binary input data."
+            << "\n OUT_DIR - Path to output data." << std::endl;
+}
+
+// Return environment variable
+std::string get_env_var(std::string const& name) {
+  const char* val = std::getenv(name.c_str());
+  return val == NULL ? std::string() : std::string(val);
+}
+
+// Iterate over string and return vector of substrings
+template <typename T>
+void split_string(const std::string& in_string, char delim, T result) {
+  std::istringstream ss(in_string);
+  std::string item;
+  while (std::getline(ss, item, delim)) {
+    *result++ = item;
+  }
+}
+
 extern "C" int sc_main(int argc, char* argv[]) {
-  std::cout << "ex: " << argv[0] << std::endl;
-  SimplifiedParams params;
-
-  const char* env_group = std::getenv("GROUP");
-  const char* env_test = std::getenv("TESTS");
-  const char* env_sims = std::getenv("SIMS");
-  const char* env_task = std::getenv("TASK");
-  const char* env_datapath = std::getenv("DATA");
-
-  if (!(env_test && env_group && env_sims)) {
-    std::cout << "Warning! No group/test specified! Please set the environment "
-                 "variables GROUP and TESTS"
-              << std::endl;
-    // return -1;
-    std::cout << "Continuing with simple convolution...";
-    env_group = "simple";
-    env_test = "simple";
-    env_sims = "accelerator,customposit";
+  if (argc > 1) {
+    std::cerr
+        << "ERROR: Don't supply command line arguments, instead use env vars."
+        << std::endl;
+    print_help();
+    return -1;
   }
 
-  if (!env_sims) {
-    std::cout << "You must set the environment variable SIMS" << std::endl;
-  }
+  // TODO(fpedd): Implement more cmd line arg tests
+  std::string model(get_env_var("MODEL"));
+  if (model.empty()) model = "simple";
 
-  std::string group(env_group);
-  std::string tests(env_test);
-  std::string comps(env_sims);
+  std::string tests(get_env_var("TESTS"));
+  if (tests.empty()) tests = "simple";
 
-  std::vector<std::string> testList = parse_csv(tests);
-  std::vector<std::string> compList = parse_csv(comps);
+  std::string sims(get_env_var("SIMS"));
+  if (sims.empty()) sims = "accelerator,customposit";
 
-  std::string fullName = "test_outputs/" + group + "." + testList[0] + ".";
+  // Only applicable when MODEL=mobilebert
+  std::string task(get_env_var("TASK"));
+  if (task.empty()) task = "forward";
 
-  std::cout << "Running: " << group << ": " << testList[0];
-  if (testList.size() > 1) {
-    for (auto it = testList.begin() + 1; it != testList.end(); it++) {
-      std::cout << " -> " << (*it);
+  // Paths are relative to Makefile
+  std::string data_dir(get_env_var("DATA_DIR"));
+  if (data_dir.empty()) {
+    if (model == "resnet") {
+      data_dir = "./models/resnet/binary_data/";
+    } else if (model == "mobilebert") {
+      data_dir = "./data/mobilebert_tiny/datafile/step0/";
     }
   }
-  std::cout << std::endl;
 
-  if (group != "simple" && group != "mobilebert" && group != "resnet") {
-    throw std::runtime_error("Group: " + group + " not found");
+  std::string out_dir(get_env_var("OUT_DIR"));
+  if (out_dir.empty()) out_dir = "./test_outputs/";
+
+  // Parse tests to run
+  std::vector<std::string> tests_list;
+  split_string(tests, ',', std::back_inserter(tests_list));
+
+  if (tests_list.size() > 2) {
+    std::cerr << "ERROR: Supply at max two TESTS." << std::endl;
+    print_help();
+    return -1;
   }
 
-  if (group == "mobilebert") {
-    if (!env_task) {
-      env_task = "forward";
-    }
+  // Parse sims to run
+  std::vector<std::string> sim_list;
+  split_string(sims, ',', std::back_inserter(sim_list));
 
-    if (!env_datapath) {
-      env_datapath =
-          "/sim/jeffreyy/accelerator/data/mobilebert_tiny/datafile/step0/";
-    }
+  std::cout << "Starting new simulation with config:";
+  std::cout << "\n> Model: " << model;
+  std::cout << "\n> Tests: ";
+  for (const std::string& l : tests_list) std::cout << l << ' ';
+  std::cout << "\n> Sims: ";
+  for (const std::string& s : sim_list) std::cout << s << ' ';
+  if (model == "mobilebert") std::cout << "\n> Task: " << task;
+  std::cout << "\n> Data dir: " << data_dir;
+  std::cout << "\n> Out dir: " << out_dir << "\n";
+  std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
+  std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n" << std::endl;
 
-    std::string task(env_task);
-    std::string datapath(env_datapath);
-
-    std::string activationDataDir = datapath + "activations/";
-    std::string weightDataDir = datapath + "weights/";
-    std::string gradientDataDir = datapath + "gradients/";
+  // Run mobileBERT
+  if (model == "mobilebert") {
+    std::string activationDataDir = data_dir + "activations/";
+    std::string weightDataDir = data_dir + "weights/";
+    std::string gradientDataDir = data_dir + "gradients/";
 
     int errors = 0;
     if (tests == "forward") {
       errors = allocateMemory();
-
       loadWeights(weightDataDir);
-
-      runForward(datapath, compList);
-
+      runForward(data_dir, sim_list);
       deleteMemory();
+
     } else if (tests == "backward") {
       errors = allocateMemory();
-
       loadWeights(weightDataDir);
       loadActivation(activationDataDir);
-
-      runBackward(datapath, compList);
-      verifyGradients(gradientDataDir, "test_outputs/verif_");
-
+      runBackward(data_dir, sim_list);
+      verifyGradients(gradientDataDir, out_dir + "/verif_");
       deleteMemory();
+
+      // End-to-end pass over mobileBERT
     } else if (tests == "e2e") {
       errors = allocateMemory();
-
       loadWeights(weightDataDir);
-
-      runForward(datapath, compList);
-      runBackward(datapath, compList);
-      verifyGradients(gradientDataDir, "test_outputs/verif_");
-
+      runForward(data_dir, sim_list);
+      runBackward(data_dir, sim_list);
+      verifyGradients(gradientDataDir, out_dir + "/verif_");
       deleteMemory();
+
     } else {
-      for (auto test : testList) {
-        errors += runMobileBertUnitTest(task, test, compList, datapath);
+      // Run individual tests
+      for (auto tests : tests_list) {
+        errors += runMobileBertUnitTest(task, tests, sim_list, data_dir);
       }
     }
 
     return errors;
-  }
-
-  // Get sequence to run
-  std::vector<std::string> sequence;
-  if (testList.size() > 1) {
-    if (group == "resnet") {
-      bool log = false;
-      for (const std::string& test : resnet_order) {
-        if (test == testList[0]) {
-          log = true;
-        }
-        if (log) {
-          sequence.push_back(test);
-        }
-        if (test == testList[1]) {
-          log = false;
-        }
-      }
-    } else {
-      throw std::runtime_error("Sequences only work for resnet right now");
+  } else {  // Run ResNet or Simple
+    // Check if first test is actually in our list of layers
+    if (std::find(resnet_order.begin(), resnet_order.end(), tests_list[0]) ==
+        resnet_order.end()) {
+      std::cerr << "ERROR: Test " << tests_list[0] << " is not supported."
+                << std::endl;
+      print_help();
+      return -1;
     }
-  } else {
-    sequence.push_back(testList[0]);
-  }
 
-  return run_sequence(group, sequence, compList) != 0;
+    // Check if second test is actually in our list of layers
+    if (tests_list.size() == 2 &&
+        std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]) ==
+            resnet_order.end()) {
+      std::cerr << "ERROR: Test " << tests_list[1] << " is not supported."
+                << std::endl;
+      print_help();
+      return -1;
+    }
+
+    if (tests_list.size() > 1) {
+      // Generate a complete list of tests to run in order from test_list tuple
+      auto first_test =
+          std::find(resnet_order.begin(), resnet_order.end(), tests_list[0]);
+      auto last_test =
+          std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]);
+      std::vector<std::string> tests_to_run(first_test, last_test + 1);
+      return run_sequence(model, tests_to_run, sim_list, data_dir, out_dir);
+    } else {
+      // Simply run a single test
+      return run_sequence(model, tests_list, sim_list, data_dir, out_dir);
+    }
+  }
 }

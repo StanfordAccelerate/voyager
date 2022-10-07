@@ -117,7 +117,7 @@ gradient_tests = [
 
 def run_test(results_folder, groups, task, test):
     env_vars = os.environ.copy()
-    env_vars['GROUP'] = "mobilebert"
+    env_vars['MODEL'] = "mobilebert"
     env_vars['SIMS'] = groups
     env_vars['TASK'] = task
     env_vars['TESTS'] = test

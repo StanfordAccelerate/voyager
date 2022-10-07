@@ -48,7 +48,7 @@ def run_test(model_name_or_path, datapath, batch, results_folder, test_id):
     attention_mask = batch["attention_mask"].detach().numpy().astype(np.float64)
 
     env_vars = os.environ.copy()
-    env_vars['GROUP'] = "mobilebert"
+    env_vars['MODEL'] = "mobilebert"
     env_vars['SIMS'] = "fp32,customposit"
     env_vars['TESTS'] = "forward"
     env_vars['DATA'] = datapath

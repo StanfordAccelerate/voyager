@@ -6,7 +6,8 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
-#define DIMENSION 16
+#define DIMENSION \
+  16  // TODO(fpedd): Should probably come from ArchitectureParams.h
 
 template <typename DTYPE, int NROWS, int NCOLS>
 SC_MODULE(WeightController) {

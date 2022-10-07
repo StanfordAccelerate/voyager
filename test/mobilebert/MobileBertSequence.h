@@ -15,6 +15,7 @@
 // #define DUMP_PARAMS
 // #define ACC_T_ERROR 1
 
+// TODO(fpedd): Redefinition of SRAM/RRAM, see TestRunner.cc
 #ifdef ACCELERATOR
 #define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
@@ -38,7 +39,6 @@ const int numTrainEpochs = 3;
 const int gradientAccumulationSteps = 32;
 float learningRate = 2e-3;
 
-void validateMapping(SimplifiedParams params);
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* acc_sram_memory, INPUT_DATATYPE* acc_rram_memory,
             MemoryMap memoryMap);
@@ -91,6 +91,7 @@ int allocateMemory() {
   float_sram_memory = new float[SRAM_MEMORY_SIZE];
   float_rram_memory = new float[RRAM_MEMORY_SIZE];
 
+  // TODO(fpedd): new never returns nullptr, use try/catch instead
   if (!acc_sram_memory || !acc_rram_memory || !hls_sram_memory ||
       !hls_rram_memory || !uni_sram_memory || !uni_rram_memory ||
       !float_sram_memory || !float_rram_memory) {

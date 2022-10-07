@@ -65,21 +65,21 @@ inline UniversalPositAccum readInput(UniversalPosit *matrix, int index,
   return p16;
 }
 
-inline UniversalPositAccum readInput2(UniversalPosit *matrix, int index,
-                                      bool accType, int expBias = 0) {
-  UniversalPositAccum p16;
-  if (!accType) {
-    p16 = matrix[index];
-  } else {
-    int encoding1 = matrix[2 * index].encoding();
-    int encoding2 = matrix[2 * index + 1].encoding();
-    p16.setbits((encoding2 << 8) + encoding1);
-  }
-  sw::universal::value<12> val = p16.to_value();
-  val.setExponent(val.scale() + expBias);
-  sw::universal::convert<16, 1>(val, p16);
-  return p16;
-}
+// inline UniversalPositAccum readInput2(UniversalPosit *matrix, int index,
+//                                       bool accType, int expBias = 0) {
+//   UniversalPositAccum p16;
+//   if (!accType) {
+//     p16 = matrix[index];
+//   } else {
+//     int encoding1 = matrix[2 * index].encoding();
+//     int encoding2 = matrix[2 * index + 1].encoding();
+//     p16.setbits((encoding2 << 8) + encoding1);
+//   }
+//   sw::universal::value<12> val = p16.to_value();
+//   val.setExponent(val.scale() + expBias);
+//   sw::universal::convert<16, 1>(val, p16);
+//   return p16;
+// }
 #endif
 
 inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
@@ -95,29 +95,29 @@ inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
   return p16;
 }
 
-inline ACCUM_DATATYPE readInput2(INPUT_DATATYPE *matrix, int index,
-                                 bool accType, int expBias = 0) {
-  ACCUM_DATATYPE p16;
-  if (!accType) {
-    p16 = matrix[index];
-  } else {
-    int encoding1 = matrix[2 * index].bits;
-    int encoding2 = matrix[2 * index + 1].bits;
-    p16.setbits((encoding2 << 8) + encoding1);
-  }
+// inline ACCUM_DATATYPE readInput2(INPUT_DATATYPE *matrix, int index,
+//                                  bool accType, int expBias = 0) {
+//   ACCUM_DATATYPE p16;
+//   if (!accType) {
+//     p16 = matrix[index];
+//   } else {
+//     int encoding1 = matrix[2 * index].bits;
+//     int encoding2 = matrix[2 * index + 1].bits;
+//     p16.setbits((encoding2 << 8) + encoding1);
+//   }
 
-  ACCUM_DATATYPE::DecomposedPosit val = p16;
-  val.scale += expBias;
-  return val;
-}
+//   ACCUM_DATATYPE::DecomposedPosit val = p16;
+//   val.scale += expBias;
+//   return val;
+// }
 
 inline float readInput(float *matrix, int index, bool accType) {
   return accType ? matrix[2 * index] : matrix[index];
 }
 
-inline float readInput2(float *matrix, int index, bool accType, int expBias) {
-  return accType ? matrix[2 * index] : matrix[index];
-}
+// inline float readInput2(float *matrix, int index, bool accType, int expBias) {
+//   return accType ? matrix[2 * index] : matrix[index];
+// }
 
 #ifndef NO_UNIVERSAL
 inline void saveOutput(UniversalPosit *matrix, int index,
@@ -169,9 +169,9 @@ void clip_grad_norm_(ACC_T *matrix, int size) {
 }
 
 template <typename T, typename ACC_T, typename INT_T>
-void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
-                 T *matrixC, T *biasMatrix, T *residualMatrix,
-                 T *weightGradMatrix, T *biasGradMatrix) {
+void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
+                 T *biasMatrix, T *residualMatrix, T *weightGradMatrix,
+                 T *biasGradMatrix) {
   std::cerr << "Running gold model " << std::endl;
 
   int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -440,10 +440,11 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else {
-    INT_T inputMatrixA[(STRIDE * X) * (STRIDE * Y) * C];
-    INT_T inputMatrixB[FX * FY * C * K];
-    ACC_T inputResidualMatrix[X * Y * K];
-    ACC_T outputMatrix[X * Y * K];
+    // Large arrays need to go on the heap
+    INT_T *inputMatrixA = new INT_T[(STRIDE * X) * (STRIDE * Y) * C];
+    INT_T *inputMatrixB = new INT_T[FX * FY * C * K];
+    ACC_T *inputResidualMatrix = new ACC_T[X * Y * K];
+    ACC_T *outputMatrix = new ACC_T[X * Y * K];
 
     for (int i = 0; i < X * Y * K; i++) {
       outputMatrix[i] = 0;
@@ -512,14 +513,20 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
 
     int loop_counters[2][6] = {0};
 
-    int X0 = STRIDE * params.loops[1][params.inputXLoopIndex[1]];
-    int X1 = params.loops[0][params.inputXLoopIndex[0]];
-    int Y0 = STRIDE * params.loops[1][params.inputYLoopIndex[1]];
-    int Y1 = params.loops[0][params.inputYLoopIndex[0]];
-    int C0 = params.loops[1][params.reductionLoopIndex[1]];
-    int C1 = params.loops[0][params.reductionLoopIndex[0]];
+    int X0 = params.loops[1][params.inputXLoopIndex[1]];
+    // int X1 = params.loops[0][params.inputXLoopIndex[0]];
+    int Y0 = params.loops[1][params.inputYLoopIndex[1]];
+    // int Y1 = params.loops[0][params.inputYLoopIndex[0]];
+    // int C0 = params.loops[1][params.reductionLoopIndex[1]];
+    // int C1 = params.loops[0][params.reductionLoopIndex[0]];
     int K0 = params.loops[1][params.weightLoopIndex[1]];
-    int K1 = params.loops[0][params.weightLoopIndex[0]];
+    // int K1 = params.loops[0][params.weightLoopIndex[0]];
+    int IC_unroll = DIMENSION;
+
+    if (params.REPLICATION) {
+      params.loops[1][params.fxIndex] = 7;
+      IC_unroll = 3;
+    }
 
     for (loop_counters[0][0] = 0; loop_counters[0][0] < params.loops[0][0];
          loop_counters[0][0]++) {
@@ -548,8 +555,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                        loop_counters[1][4]++) {
                     for (loop_counters[1][5] = 0;
                          loop_counters[1][5] < params.loops[1][5];
-                         params.REPLICATION ? loop_counters[1][5] += 4
-                                            : loop_counters[1][5]++) {
+                         loop_counters[1][5]++) {
                       int x0 = loop_counters[1][params.inputXLoopIndex[1]];
                       int y0 = loop_counters[1][params.inputYLoopIndex[1]];
                       int c0 = loop_counters[1][params.reductionLoopIndex[1]];
@@ -560,15 +566,15 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                       int x = x1 * X0 + x0;
                       int y = y1 * Y0 + y0;
 
-                      for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
-                        int k = (k1 * K0 + k0) * DIMENSION + oc0;
-                        int outputAddress = y * X * K + x * K + k;
-                        for (int ic0 = 0; ic0 < DIMENSION; ic0++) {
-                          if (STRIDE * x + fx >= 0 &&
-                              STRIDE * x + fx < STRIDE * X &&
-                              STRIDE * y + fy >= 0 &&
-                              STRIDE * y + fy < STRIDE * Y) {
-                            int c = c0 * DIMENSION + ic0;
+                      if (STRIDE * x + fx >= 0 &&
+                          STRIDE * x + fx < STRIDE * X &&
+                          STRIDE * y + fy >= 0 &&
+                          STRIDE * y + fy < STRIDE * Y) {
+                        for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
+                          int k = (k1 * K0 + k0) * DIMENSION + oc0;
+                          int outputAddress = y * X * K + x * K + k;
+                          for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
+                            int c = c0 * IC_unroll + ic0;
                             int inputAddress =
                                 (STRIDE * y + fy) * STRIDE * X * C +
                                 (STRIDE * x + fx) * C + c;
@@ -580,9 +586,9 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
                                      inputMatrixB[weightAddress],
                                      outputMatrix[outputAddress]);
                           }
+                          outputMatrix[outputAddress] =
+                              static_cast<INT_T>(outputMatrix[outputAddress]);
                         }
-                        outputMatrix[outputAddress] =
-                            static_cast<INT_T>(outputMatrix[outputAddress]);
                       }
                     }
                   }
@@ -590,6 +596,9 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
               }
             }
           }
+
+          int X0 = params.loops[1][params.inputXLoopIndex[1]];
+          int Y0 = params.loops[1][params.inputYLoopIndex[1]];
 
           for (int y0 = 0; y0 < Y0; y0++) {
             for (int x0 = 0; x0 < X0; x0++) {
@@ -659,8 +668,7 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
     }
 
     if (params.MAXPOOL) {
-      // create copy
-      T tmpMatrixC[X * Y * K];
+      T *tmpMatrixC = new T[X * Y * K];
       memcpy(tmpMatrixC, matrixC, sizeof(T) * X * Y * K);
 
       for (int y = 0; y < Y / 2; y++) {
@@ -681,11 +689,12 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
           }
         }
       }
+      delete[] tmpMatrixC;
     }
 
     if (params.AVGPOOL) {
       // create copy
-      T tmpMatrixC[X * Y * K];
+      T *tmpMatrixC = new T[X * Y * K];
       memcpy(tmpMatrixC, matrixC, sizeof(T) * X * Y * K);
 
       for (int k = 0; k < K; k++) {
@@ -695,9 +704,17 @@ void run_gold_op(const SimplifiedParams params, T *matrixA, T *matrixB,
             acc += tmpMatrixC[y * X * K + x * K + k];
           }
         }
-        matrixC[k] = acc;  /// (Y * X);  // Average
+        float scale = 1.0 / (X * Y);
+        T divisor = static_cast<T>(scale);
+        matrixC[k] = acc * static_cast<INT_T>(divisor);
       }
+      delete[] tmpMatrixC;
     }
+
+    delete[] inputMatrixA;
+    delete[] inputMatrixB;
+    delete[] inputResidualMatrix;
+    delete[] outputMatrix;
   }
 }
 
