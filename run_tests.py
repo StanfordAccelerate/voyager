@@ -79,7 +79,7 @@ def main():
     # TODO(fpedd): Implement commandline args and tests (should overwrite values from MODELS dict)
     parser.add_argument('-mod', '--model',
                         type=str,
-                        default=None,
+                        default="resnet",
                         help='Model to run (simple, resnet, mobilebert) [MODEL].')
     # parser.add_argument('-tst', '--tests',
     #                     type=str,
