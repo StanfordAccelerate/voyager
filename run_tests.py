@@ -61,12 +61,10 @@ MODELS = {
         "layer4_0_conv1",
         "layer4_0_conv2",
         "layer4_1_conv1",
-        "layer4_1_conv2",  # TODO(fpedd): Still failing...
+        "layer4_1_conv2",
         "fc",
     ]
 }
-
-# TODO(fpedd): Implement e2e runs by generating list of layers
 
 
 def main():
@@ -76,36 +74,35 @@ def main():
                         type=str,
                         default='fp32,file',
                         help='Simulators to compare (accelerator, customposit, universal, fp32, file) [SIMS].')
-    # TODO(fpedd): Implement commandline args and tests (should overwrite values from MODELS dict)
-    parser.add_argument('-mod', '--model',
+    parser.add_argument('--model',
                         type=str,
                         default="resnet",
                         help='Model to run (simple, resnet, mobilebert) [MODEL].')
-    # parser.add_argument('-tst', '--tests',
-    #                     type=str,
-    #                     default=None,
-    #                     help='Tests/layers to run (if "e2e", end-to-end will be run) [TESTS].')
-    parser.add_argument('-tsk', '--task',
+    parser.add_argument('--task',
                         type=str,
                         default='forward',
                         help='Operation to run (only applicable to mobilebert) [TASK].')
-    parser.add_argument('-dd', '--data_dir',
+    parser.add_argument('--tolerance',
+                        type=float,
+                        default=5.0,
+                        help='Relative normalized error in % we allow [TOLERANCE].')
+    parser.add_argument('--data_dir',
                         type=str,
                         default=None,
                         help='Path to binary input data [DATA_DIR].')
-    parser.add_argument('-od', '--output_dir',
+    parser.add_argument('--output_dir',
                         type=str,
                         default='./test_outputs/',
                         help='Path to output data [OUT_DIR].')
-    parser.add_argument('-nmc', '--no_make_clean',
+    parser.add_argument('--make_clean',
                         default=False,
                         action='store_true',
-                        help='Do not run make clean before building.')
-    parser.add_argument('-tn', '--target_name',
+                        help='Run make clean before building.')
+    parser.add_argument('--target_name',
                         type=str,
                         default='TestRunner',
-                        help='Name of main target.')
-    parser.add_argument('-bd', '--build_dir',
+                        help='Name of main target (compiled C++ binary).')
+    parser.add_argument('--build_dir',
                         type=str,
                         default='build',
                         help='Name of build directory.')
@@ -120,11 +117,11 @@ def main():
     start_time = time.time()
 
     # Build SystemC code (running make twice because of linker issues when on NFS)
-    if args.no_make_clean:
-        subprocess.run(['make', args.target_name, '-j'])
+    if args.make_clean:
+        subprocess.run(['make', 'clean', args.target_name, '-j'], check=True)
     else:
-        subprocess.run(['make', 'clean', args.target_name, '-j'])
-    subprocess.run(['make', args.target_name, '-j'])
+        subprocess.run(['make', args.target_name, '-j'], check=True)
+    subprocess.run(['make', args.target_name, '-j'], check=True)
 
     # Create output directories for both test value and console output
     script_output_dir = os.path.join(args.output_dir, "console_outputs")
@@ -141,12 +138,13 @@ def main():
         env["MODEL"] = args.model
         env["TESTS"] = test
         env["SIMS"] = args.simulators
+        env["TASK"] = args.task
+        env["TOLERANCE"] = str(args.tolerance)
         env["OUT_DIR"] = args.output_dir
         env["DATA_DIR"] = args.data_dir
-        env["TASK"] = args.task
         # Spawn an new subprocess and grab its name, handle, and output file
         p = subprocess.Popen([os.path.join(args.build_dir, args.target_name)],
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
         # Enable non-blocking read from process
         os.set_blocking(p.stdout.fileno(), False)
         results.append([args.model + "." + test, p, file])
@@ -189,7 +187,7 @@ def main():
         # Free-running while loops are not good
         time.sleep(0.1)
 
-    print("--- Simulation run done ---")
+    print("--- Tests done ---")
     print('\n'.join(["{} returned with {}".format(
         res[0], res[1].returncode) for res in results]))
     failures = functools.reduce(

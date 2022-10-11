@@ -28,11 +28,12 @@
 #endif
 
 // Run of sequence of tests for feed-forward conv-nets
-// Returns != 0 if # of value diffs greater than hardcoded threshold
+// Returns != 0 if diffs greater tolerance
 int run_sequence(const std::string& model,
                  const std::vector<std::string>& tests,
                  const std::vector<std::string>& sims,
-                 const std::string& data_dir, const std::string& out_dir) {
+                 const std::string& data_dir, const std::string& out_dir,
+                 const int tolerance) {
   // Set data parameters
   bool use_data_file = true;
   std::map<std::string, MemoryMap> mem_map;
@@ -218,42 +219,42 @@ int run_sequence(const std::string& model,
     std::string diff_file = out_dir + model + '.' + tests.front() + "_to_" +
                             tests.back() + '.' + sims[i] + "_vs_" + sims[i + 1];
 
-    int diff_count = 0;  // Number of values with absolute diff over 1
+    int rel_err = 0;
     if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
         (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           acc_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
           diff_file, false);
     } else if ((sims[i] == "accelerator" && sims[i + 1] == "file") ||
                (sims[i + 1] == "accelerator" && sims[i] == "file")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           acc_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, hls_comp,
           size, diff_file, false);
     } else if ((sims[i] == "customposit" && sims[i + 1] == "file") ||
                (sims[i + 1] == "customposit" && sims[i] == "file")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
           hls_comp, size, diff_file, false);
     } else if ((sims[i] == "universal" && sims[i + 1] == "customposit") ||
                (sims[i + 1] == "universal" && sims[i] == "customposit")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
           uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
           diff_file, false);
     } else if ((sims[i] == "universal" && sims[i + 1] == "file") ||
                (sims[i + 1] == "universal" && sims[i] == "file")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           uni_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
           uni_comp, size, diff_file, false);
     } else if ((sims[i] == "fp32" && sims[i + 1] == "file") ||
                (sims[i + 1] == "fp32" && sims[i] == "file")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
           fp_comp, size, diff_file, false);
     } else if ((sims[i] == "customposit" && sims[i + 1] == "fp32") ||
                (sims[i] == "fp32" && sims[i + 1] == "customposit")) {
-      diff_count += compare_arrays(
+      rel_err += compare_arrays(
           hls_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET,
           float_gold_sram_memory + param_map[tests.back()].OUTPUT_OFFSET, size,
           diff_file, false);
@@ -263,11 +264,7 @@ int run_sequence(const std::string& model,
       return -1;
     }
 
-    // If more than 1% of values have abs diff over 1, record error
-    // TODO(fpedd): Ideally we would be interested in rel diff, not abs
-    //              But this would require changing the compare_arrays() api
-    float percent_diff = (float)diff_count / size * 100.0;
-    if (percent_diff > 1.0) error_count += percent_diff;
+    if (rel_err > tolerance) error_count += rel_err;
   }
 
   delete[] acc_sram_memory;
@@ -287,14 +284,17 @@ int run_sequence(const std::string& model,
 }
 
 void print_help() {
-  std::cout << "\nConfigure simulator by using environment variables."
-            << "\n MODEL - Type of network to run {mobilebert, resnet}"
-            << "\n TESTS - Layers in network to run. Either single or tuple: "
-               "<first>,<last>."
-            << "\n SIMS - Simulators / models to compare {accelerator, "
-               "customposit, universal, fp32, file}."
-            << "\n DATA_DIR - Path to binary input data."
-            << "\n OUT_DIR - Path to output data." << std::endl;
+  std::cout
+      << "\nConfigure simulator by using environment variables."
+      << "\n MODEL - Type of network to run {mobilebert, resnet}"
+      << "\n TESTS - Layers in network to run. Either single or tuple: "
+         "<first>,<last>."
+      << "\n SIMS - Simulators / models to compare {accelerator, "
+         "customposit, universal, fp32, file}."
+      << "\n TASK - MobileBERT run time (forward, backward, e2e)."
+      << "\n TOLERANCE - Relative normalized error in % we allow (default 10)."
+      << "\n DATA_DIR - Path to binary input data."
+      << "\n OUT_DIR - Path to output data." << std::endl;
 }
 
 // Return environment variable
@@ -336,6 +336,10 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::string task(get_env_var("TASK"));
   if (task.empty()) task = "forward";
 
+  std::string tolerance_str(get_env_var("TOLERANCE"));
+  float tolerance = 5.0;
+  if (!tolerance_str.empty()) tolerance = std::stof(tolerance_str);
+
   // Paths are relative to Makefile
   std::string data_dir(get_env_var("DATA_DIR"));
   if (data_dir.empty()) {
@@ -370,6 +374,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::cout << "\n> Sims: ";
   for (const std::string& s : sim_list) std::cout << s << ' ';
   if (model == "mobilebert") std::cout << "\n> Task: " << task;
+  std::cout << "\n> Tolerance: " << tolerance;
   std::cout << "\n> Data dir: " << data_dir;
   std::cout << "\n> Out dir: " << out_dir << "\n";
   std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
@@ -440,10 +445,12 @@ extern "C" int sc_main(int argc, char* argv[]) {
       auto last_test =
           std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]);
       std::vector<std::string> tests_to_run(first_test, last_test + 1);
-      return run_sequence(model, tests_to_run, sim_list, data_dir, out_dir);
+      return run_sequence(model, tests_to_run, sim_list, data_dir, out_dir,
+                          tolerance);
     } else {
       // Simply run a single test
-      return run_sequence(model, tests_list, sim_list, data_dir, out_dir);
+      return run_sequence(model, tests_list, sim_list, data_dir, out_dir,
+                          tolerance);
     }
   }
 }
