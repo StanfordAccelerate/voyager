@@ -58,3 +58,16 @@ TODO(fpedd)
 
 ## Integration
 The accelerator by itself is not very useful. It has to be integrated into an SoC. We are using the [Chipyard Framework](https://github.com/ucb-bar/chipyard) for that. Our fork [`soc`](https://code.stanford.edu/tsmc40r/brainpower/soc) of Chipyard includes the [`minotaur-blocks`](https://code.stanford.edu/tsmc40r/brainpower/minotaur-blocks) repo as a submodule under `soc/generators/minotaur-blocks`, which in turn includes this [`accelerator`](https://code.stanford.edu/tsmc40r/brainpower/accelerator) repo under `minotaur-blocks/src/main/resources/sysc/accelerator`.
+
+
+## Roadmap / TODOs
+
+### Refactor CI / Verification concept
+- Unify most of the MobileBERT / ResNet code
+- Related to that, we need to prepare the verification for more than just these two types of networks
+- Refactor testing / tolerance criteria
+  - Currently we are simply looking at the greater than 1 realtive error bin and comparing it to a fixed threshold
+  - Instead, we should probably differentiate:
+    - For layer-by-layer tests we should iterate over all output values, calculate the relative difference and maybe even apply exp(). We should then sum all the errors up and compare to a threshold (called TOLERANCE in out code). This should help with detecting outliers, while ignoring small differences. However, this comes with the caveat that it is a lot harder to debug (because of the non-linearity). So we should still keep the diff tables and print them.
+    - For end-to-end tests we only compare the output layer and we only care about whether the top (or top5/10) value(s) match(es). So we need to implement a special case here. Furthermore, this really only makes sense when we run multiple workloads (10s to 100s), as top categories might not always match (both models (fp and posit) make errors, but they don't necessarly make the same errors on the same inputs). However, this quickly becomes infeasable (one end-to-end run of ResNet18 takes ~10h on the SystemC model). So we need to come up with smth here. Maybe we can choose some test(s) where the top category is very obivous (large diff, high confidence) and thus unlikely to be different between models.
+- Prepare for extended end-to-end tests going from model training all the way to SystemC simulation
