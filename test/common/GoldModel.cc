@@ -595,6 +595,13 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                         for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
                           int k = (k1 * K0 + k0) * DIMENSION + oc0;
                           int outputAddress = y * X * K + x * K + k;
+
+                          // cast to INT_T at the beginning, instead of the end
+                          // since outputs leaving systolic array are not cast
+                          // down to INT_T
+                          outputMatrix[outputAddress] =
+                              static_cast<INT_T>(outputMatrix[outputAddress]);
+
                           for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
                             int c = c0 * IC_unroll + ic0;
                             int inputAddress =
@@ -608,8 +615,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                                      inputMatrixB[weightAddress],
                                      outputMatrix[outputAddress]);
                           }
-                          outputMatrix[outputAddress] =
-                              static_cast<INT_T>(outputMatrix[outputAddress]);
                         }
                       }
                     }
@@ -716,11 +721,11 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
 
     if (params.AVGPOOL) {
       // create copy
-      T *tmpMatrixC = new T[X * Y * K];
-      memcpy(tmpMatrixC, matrixC, sizeof(T) * X * Y * K);
+      ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
+      memcpy(tmpMatrixC, outputMatrix, sizeof(ACC_T) * X * Y * K);
 
       for (int k = 0; k < K; k++) {
-        INT_T acc = 0;
+        ACC_T acc = 0;
         for (int y = 0; y < Y; y++) {
           for (int x = 0; x < X; x++) {
             acc += tmpMatrixC[y * X * K + x * K + k];
@@ -728,7 +733,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
         }
         float scale = 1.0 / (X * Y);
         T divisor = static_cast<T>(scale);
-        matrixC[k] = acc * static_cast<INT_T>(divisor);
+        matrixC[k] = acc * static_cast<ACC_T>(divisor);
       }
       delete[] tmpMatrixC;
     }
