@@ -7,9 +7,9 @@
 #include "test/common/VerificationTypes.h"
 
 const SimplifiedParams conv1_params = {
-    .INPUT_OFFSET = 0,
+    .INPUT_OFFSET = 65536,
     .WEIGHT_OFFSET = 0,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, 2, 16, 16}},
     .inputXLoopIndex = {0, 5},
@@ -35,9 +35,9 @@ const SimplifiedParams conv1_params = {
 };
 
 const SimplifiedParams layer1_0_conv1_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 9536,
-    .OUTPUT_OFFSET = 600000,
+    .OUTPUT_OFFSET = 665536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -63,9 +63,9 @@ const SimplifiedParams layer1_0_conv1_params = {
 };
 
 const SimplifiedParams layer1_0_conv2_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 46528,
-    .OUTPUT_OFFSET = 0,
+    .OUTPUT_OFFSET = 65536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -81,7 +81,7 @@ const SimplifiedParams layer1_0_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 83392,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 300000,
+    .RESIDUAL_OFFSET = 365536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -91,9 +91,9 @@ const SimplifiedParams layer1_0_conv2_params = {
 };
 
 const SimplifiedParams layer1_1_conv1_params = {
-    .INPUT_OFFSET = 0,
+    .INPUT_OFFSET = 65536,
     .WEIGHT_OFFSET = 83520,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -119,9 +119,9 @@ const SimplifiedParams layer1_1_conv1_params = {
 };
 
 const SimplifiedParams layer1_1_conv2_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 120512,
-    .OUTPUT_OFFSET = 600000,
+    .OUTPUT_OFFSET = 665536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -137,7 +137,7 @@ const SimplifiedParams layer1_1_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 157376,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 0,
+    .RESIDUAL_OFFSET = 65536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -147,9 +147,9 @@ const SimplifiedParams layer1_1_conv2_params = {
 };
 
 const SimplifiedParams layer2_0_downsample_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 157504,
-    .OUTPUT_OFFSET = 0,
+    .OUTPUT_OFFSET = 65536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {4, 2, 1, 1, 14, 14}},
     .inputXLoopIndex = {0, 5},
@@ -175,9 +175,9 @@ const SimplifiedParams layer2_0_downsample_params = {
 };
 
 const SimplifiedParams layer2_0_conv1_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 165952,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 4, 4, 1, 1, 1}, {4, 2, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -203,9 +203,9 @@ const SimplifiedParams layer2_0_conv1_params = {
 };
 
 const SimplifiedParams layer2_0_conv2_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 239936,
-    .OUTPUT_OFFSET = 600000,
+    .OUTPUT_OFFSET = 665536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -221,7 +221,7 @@ const SimplifiedParams layer2_0_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 387392,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 0,
+    .RESIDUAL_OFFSET = 65536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -231,9 +231,9 @@ const SimplifiedParams layer2_0_conv2_params = {
 };
 
 const SimplifiedParams layer2_1_conv1_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 387648,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -259,9 +259,9 @@ const SimplifiedParams layer2_1_conv1_params = {
 };
 
 const SimplifiedParams layer2_1_conv2_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 535360,
-    .OUTPUT_OFFSET = 0,
+    .OUTPUT_OFFSET = 65536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
     .inputXLoopIndex = {0, 5},
@@ -277,7 +277,7 @@ const SimplifiedParams layer2_1_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 682816,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 600000,
+    .RESIDUAL_OFFSET = 665536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -287,9 +287,9 @@ const SimplifiedParams layer2_1_conv2_params = {
 };
 
 const SimplifiedParams layer3_0_downsample_params = {
-    .INPUT_OFFSET = 0,
+    .INPUT_OFFSET = 65536,
     .WEIGHT_OFFSET = 683072,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 2, 1, 1, 1}, {8, 8, 1, 1, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -315,9 +315,9 @@ const SimplifiedParams layer3_0_downsample_params = {
 };
 
 const SimplifiedParams layer3_0_conv1_params = {
-    .INPUT_OFFSET = 0,
+    .INPUT_OFFSET = 65536,
     .WEIGHT_OFFSET = 716352,
-    .OUTPUT_OFFSET = 600000,
+    .OUTPUT_OFFSET = 665536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {8, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -343,9 +343,9 @@ const SimplifiedParams layer3_0_conv1_params = {
 };
 
 const SimplifiedParams layer3_0_conv2_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 1011776,
-    .OUTPUT_OFFSET = 0,
+    .OUTPUT_OFFSET = 65536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -361,7 +361,7 @@ const SimplifiedParams layer3_0_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 1601600,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 300000,
+    .RESIDUAL_OFFSET = 365536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -371,9 +371,9 @@ const SimplifiedParams layer3_0_conv2_params = {
 };
 
 const SimplifiedParams layer3_1_conv1_params = {
-    .INPUT_OFFSET = 0,
+    .INPUT_OFFSET = 65536,
     .WEIGHT_OFFSET = 1602112,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -399,9 +399,9 @@ const SimplifiedParams layer3_1_conv1_params = {
 };
 
 const SimplifiedParams layer3_1_conv2_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 2192448,
-    .OUTPUT_OFFSET = 600000,
+    .OUTPUT_OFFSET = 665536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{2, 2, 4, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -417,7 +417,7 @@ const SimplifiedParams layer3_1_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 2782272,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 0,
+    .RESIDUAL_OFFSET = 65536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -427,9 +427,9 @@ const SimplifiedParams layer3_1_conv2_params = {
 };
 
 const SimplifiedParams layer4_0_downsample_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 2782784,
-    .OUTPUT_OFFSET = 0,
+    .OUTPUT_OFFSET = 65536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 2, 1, 1, 1}, {16, 16, 1, 1, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -455,9 +455,9 @@ const SimplifiedParams layer4_0_downsample_params = {
 };
 
 const SimplifiedParams layer4_0_conv1_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 2914880,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {16, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -483,9 +483,9 @@ const SimplifiedParams layer4_0_conv1_params = {
 };
 
 const SimplifiedParams layer4_0_conv2_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 4095552,
-    .OUTPUT_OFFSET = 600000,
+    .OUTPUT_OFFSET = 665536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {32, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -501,7 +501,7 @@ const SimplifiedParams layer4_0_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 6454848,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 0,
+    .RESIDUAL_OFFSET = 65536,
     .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
@@ -511,9 +511,9 @@ const SimplifiedParams layer4_0_conv2_params = {
 };
 
 const SimplifiedParams layer4_1_conv1_params = {
-    .INPUT_OFFSET = 600000,
+    .INPUT_OFFSET = 665536,
     .WEIGHT_OFFSET = 6455872,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {32, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -539,9 +539,9 @@ const SimplifiedParams layer4_1_conv1_params = {
 };
 
 const SimplifiedParams layer4_1_conv2_params = {
-    .INPUT_OFFSET = 300000,
+    .INPUT_OFFSET = 365536,
     .WEIGHT_OFFSET = 8816192,
-    .OUTPUT_OFFSET = 0,
+    .OUTPUT_OFFSET = 65536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 8, 1, 1, 1}, {32, 4, 3, 3, 7, 7}},
     .inputXLoopIndex = {0, 5},
@@ -557,7 +557,7 @@ const SimplifiedParams layer4_1_conv2_params = {
     .BIAS = true,
     .BIAS_OFFSET = 11175488,
     .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 600000,
+    .RESIDUAL_OFFSET = 665536,
     .MAXPOOL = false,
     .AVGPOOL = true,
     .WEIGHT = true,
@@ -567,9 +567,9 @@ const SimplifiedParams layer4_1_conv2_params = {
 };
 
 const SimplifiedParams fc_params = {
-    .INPUT_OFFSET = 0,
+    .INPUT_OFFSET = 65536,
     .WEIGHT_OFFSET = 11176512,
-    .OUTPUT_OFFSET = 300000,
+    .OUTPUT_OFFSET = 365536,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {32, 63, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},

@@ -7,8 +7,9 @@ import time
 import datetime
 import sys
 import os
+import logging
 
-MODELS = {
+NETWORKS = {
     'mobilebert':
     [
         "bottleneck_input_dense",
@@ -77,7 +78,7 @@ def main():
     parser.add_argument('--model',
                         type=str,
                         default="resnet",
-                        help='Model to run (simple, resnet, mobilebert) [MODEL].')
+                        help='Model to run (simple, resnet, mobilebert) [NETWORK].')
     parser.add_argument('--task',
                         type=str,
                         default='forward',
@@ -108,6 +109,17 @@ def main():
                         help='Name of build directory.')
     args = parser.parse_args()
 
+    # Create output directories for both test value and console output
+    script_output_dir = os.path.join(args.output_dir, "console_outputs")
+    os.makedirs(script_output_dir, exist_ok=True)
+
+    # TODO(fpedd): Move all prints to console to seperate logger, see here https://stackoverflow.com/a/9321890/8130394
+    # Setup a logger to log to file
+    logging.basicConfig(level=logging.INFO,
+                        format='%(message)s',
+                        filename=f'{args.output_dir}/console_outputs/run_tests.log',
+                        filemode='w')
+
     if args.data_dir is None:
         if args.model == "resnet":
             args.data_dir = './models/resnet/binary_data/'
@@ -123,19 +135,15 @@ def main():
         subprocess.run(['make', args.target_name, '-j'], check=True)
     subprocess.run(['make', args.target_name, '-j'], check=True)
 
-    # Create output directories for both test value and console output
-    script_output_dir = os.path.join(args.output_dir, "console_outputs")
-    os.makedirs(script_output_dir, exist_ok=True)
-
     # Prepare and run all tests/layers simultaneously as different processes
     results = []
-    for test in MODELS[args.model]:
+    for test in NETWORKS[args.model]:
         file_name = os.path.join(
             script_output_dir, args.model + '_' + test + '.out')
         file = open(file_name, 'w')
         # Set environment variables
         env = os.environ.copy()
-        env["MODEL"] = args.model
+        env["NETWORK"] = args.model
         env["TESTS"] = test
         env["SIMS"] = args.simulators
         env["TASK"] = args.task
@@ -193,6 +201,11 @@ def main():
     failures = functools.reduce(
         (lambda acc, res: acc + bool(res[1].returncode)), results, 0)
     print("-> Total {} failed {}".format(len(results), failures))
+
+    # Also log info to file 
+    logging.info('\n'.join(["{} returned with {}".format(
+        res[0], res[1].returncode) for res in results]))
+    logging.info("-> Total {} failed {}".format(len(results), failures))
 
     sys.exit(failures)
 

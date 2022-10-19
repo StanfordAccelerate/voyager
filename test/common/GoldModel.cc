@@ -14,7 +14,7 @@ inline void gold_fma(UniversalPosit a, UniversalPosit b,
 }
 #endif
 
-inline void gold_fma(ACCUM_DATATYPE a, ACCUM_DATATYPE b,
+inline void gold_fma(INPUT_DATATYPE a, INPUT_DATATYPE b,
                      ACCUM_DATATYPE::DecomposedPosit &c) {
   INPUT_DATATYPE::DecomposedPosit v1 = a;
   INPUT_DATATYPE::DecomposedPosit v2 = b;
@@ -234,21 +234,42 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     // fully connected layer (matrix-vector)
     for (int k = 0; k < K; k++) {
       ACC_T acc = 0;
+
+      ACC_T flattened_mult[C];
       for (int c = 0; c < C; c++) {
         ACC_T a = readInput(matrixA, c, params.ACC_T_INPUT);
         ACC_T b = readInput(matrixB, k * C + c, params.ACC_T_WEIGHT);
-
-        if (params.WEIGHT_SPLITTING) {
-          ACC_T grad = weightGradMatrix[k * C + c];
-          b += static_cast<ACC_T>(learningRate * grad);
-        }
-
-        acc += static_cast<ACC_T>(a * b);
+        flattened_mult[c] =
+            static_cast<ACC_T>(static_cast<ACC_T>(a) * static_cast<ACC_T>(b));
       }
 
+      for (int reductionCount = 0; reductionCount < C;
+           reductionCount += DIMENSION) {
+        // perform a tree addition
+        ACC_T accum[DIMENSION];
+        for (int i = 0; i < DIMENSION; i++) {
+          accum[i] = flattened_mult[reductionCount + i];
+        }
+
+        int depth = DIMENSION;
+        while (depth > 1) {
+          for (int i = 0; i < depth; i += 2) {
+            accum[i / 2] = static_cast<ACC_T>(accum[i] + accum[i + 1]);
+          }
+          depth = depth / 2;
+        }
+        acc = static_cast<ACC_T>(acc + accum[0]);
+      }
+
+      // FIXME
+      // if (params.WEIGHT_SPLITTING) {
+      //   ACC_T grad = weightGradMatrix[k * C + c];
+      //   b += static_cast<ACC_T>(learningRate * grad);
+      // }
+
       if (params.BIAS) {
-        ACC_T bias = readInput(biasMatrix, k, true);
-        acc += bias;
+        INT_T bias = readInput(biasMatrix, k, true);
+        acc = static_cast<ACC_T>(acc + static_cast<ACC_T>(bias));
 
         if (params.WEIGHT_SPLITTING) {
           ACC_T biasGrad = readInput(biasGradMatrix, k, true);
@@ -567,26 +588,34 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                       int x = x1 * X0 + x0;
                       int y = y1 * Y0 + y0;
 
-                      if (STRIDE * x + fx >= 0 &&
-                          STRIDE * x + fx < STRIDE * X &&
-                          STRIDE * y + fy >= 0 &&
-                          STRIDE * y + fy < STRIDE * Y) {
-                        for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
-                          int k = (k1 * K0 + k0) * DIMENSION + oc0;
-                          int outputAddress = y * X * K + x * K + k;
-                          for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
-                            int c = c0 * IC_unroll + ic0;
-                            int inputAddress =
-                                (STRIDE * y + fy) * STRIDE * X * C +
-                                (STRIDE * x + fx) * C + c;
-                            int weightAddress =
-                                (fy + (FY - 1) / 2) * FX * C * K +
-                                (fx + (FX - 1) / 2) * C * K + c * K + k;
+                      for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
+                        int k = (k1 * K0 + k0) * DIMENSION + oc0;
+                        int outputAddress = y * X * K + x * K + k;
 
+                        for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
+                          int c = c0 * IC_unroll + ic0;
+                          int inputAddress =
+                              (STRIDE * y + fy) * STRIDE * X * C +
+                              (STRIDE * x + fx) * C + c;
+                          int weightAddress = (fy + (FY - 1) / 2) * FX * C * K +
+                                              (fx + (FX - 1) / 2) * C * K +
+                                              c * K + k;
+                          if (STRIDE * x + fx >= 0 &&
+                              STRIDE * x + fx < STRIDE * X &&
+                              STRIDE * y + fy >= 0 &&
+                              STRIDE * y + fy < STRIDE * Y) {
                             gold_fma(inputMatrixA[inputAddress],
                                      inputMatrixB[weightAddress],
                                      outputMatrix[outputAddress]);
                           }
+                        }
+                        if (params.REPLICATION) {
+                          if (loop_counters[1][params.fxIndex] == 3 ||
+                              loop_counters[1][params.fxIndex] == 6) {
+                            outputMatrix[outputAddress] =
+                                static_cast<INT_T>(outputMatrix[outputAddress]);
+                          }
+                        } else {
                           outputMatrix[outputAddress] =
                               static_cast<INT_T>(outputMatrix[outputAddress]);
                         }
@@ -695,11 +724,11 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
 
     if (params.AVGPOOL) {
       // create copy
-      T *tmpMatrixC = new T[X * Y * K];
-      memcpy(tmpMatrixC, matrixC, sizeof(T) * X * Y * K);
+      ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
+      memcpy(tmpMatrixC, outputMatrix, sizeof(ACC_T) * X * Y * K);
 
       for (int k = 0; k < K; k++) {
-        INT_T acc = 0;
+        ACC_T acc = 0;
         for (int y = 0; y < Y; y++) {
           for (int x = 0; x < X; x++) {
             acc += tmpMatrixC[y * X * K + x * K + k];
@@ -707,7 +736,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
         }
         float scale = 1.0 / (X * Y);
         T divisor = static_cast<T>(scale);
-        matrixC[k] = acc * static_cast<INT_T>(divisor);
+        matrixC[k] = acc * static_cast<ACC_T>(divisor);
       }
       delete[] tmpMatrixC;
     }

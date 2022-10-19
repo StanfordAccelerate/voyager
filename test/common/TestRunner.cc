@@ -33,7 +33,7 @@ int run_sequence(const std::string& model,
                  const std::vector<std::string>& tests,
                  const std::vector<std::string>& sims,
                  const std::string& data_dir, const std::string& out_dir,
-                 const int tolerance) {
+                 const float tolerance) {
   // Set data parameters
   bool use_data_file = true;
   std::map<std::string, MemoryMap> mem_map;
@@ -219,7 +219,7 @@ int run_sequence(const std::string& model,
     std::string diff_file = out_dir + model + '.' + tests.front() + "_to_" +
                             tests.back() + '.' + sims[i] + "_vs_" + sims[i + 1];
 
-    int rel_err = 0;
+    float rel_err = 0;
     if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
         (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
       rel_err += compare_arrays(
@@ -264,7 +264,7 @@ int run_sequence(const std::string& model,
       return -1;
     }
 
-    if (rel_err > tolerance) error_count += rel_err;
+    if (rel_err > tolerance) error_count += rel_err < 1.0 ? 1 : (int)rel_err;
   }
 
   delete[] acc_sram_memory;
@@ -286,7 +286,7 @@ int run_sequence(const std::string& model,
 void print_help() {
   std::cout
       << "\nConfigure simulator by using environment variables."
-      << "\n MODEL - Type of network to run {mobilebert, resnet}"
+      << "\n NETWORK - Type of network to run {mobilebert, resnet}"
       << "\n TESTS - Layers in network to run. Either single or tuple: "
          "<first>,<last>."
       << "\n SIMS - Simulators / models to compare {accelerator, "
@@ -323,7 +323,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
   }
 
   // TODO(fpedd): Implement more cmd line arg tests
-  std::string model(get_env_var("MODEL"));
+  std::string model(get_env_var("NETWORK"));
   if (model.empty()) model = "simple";
 
   std::string tests(get_env_var("TESTS"));
@@ -332,7 +332,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::string sims(get_env_var("SIMS"));
   if (sims.empty()) sims = "accelerator,customposit";
 
-  // Only applicable when MODEL=mobilebert
+  // Only applicable when NETWORK=mobilebert
   std::string task(get_env_var("TASK"));
   if (task.empty()) task = "forward";
 
