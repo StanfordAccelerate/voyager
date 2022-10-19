@@ -219,7 +219,7 @@ int run_sequence(const std::string& model,
     std::string diff_file = out_dir + model + '.' + tests.front() + "_to_" +
                             tests.back() + '.' + sims[i] + "_vs_" + sims[i + 1];
 
-    int rel_err = 0;
+    float rel_err = 0;
     if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
         (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
       rel_err += compare_arrays(
@@ -264,7 +264,7 @@ int run_sequence(const std::string& model,
       return -1;
     }
 
-    if (rel_err > tolerance) error_count += rel_err;
+    if (rel_err > tolerance) error_count += rel_err < 1.0 ? 1 : (int)rel_err;
   }
 
   delete[] acc_sram_memory;

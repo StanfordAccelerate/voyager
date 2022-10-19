@@ -7,6 +7,7 @@ import time
 import datetime
 import sys
 import os
+import logging
 
 MODELS = {
     'mobilebert':
@@ -108,6 +109,17 @@ def main():
                         help='Name of build directory.')
     args = parser.parse_args()
 
+    # Create output directories for both test value and console output
+    script_output_dir = os.path.join(args.output_dir, "console_outputs")
+    os.makedirs(script_output_dir, exist_ok=True)
+
+    # TODO(fpedd): Move all prints to console to seperate logger, see here https://stackoverflow.com/a/9321890/8130394
+    # Setup a logger to log to file
+    logging.basicConfig(level=logging.INFO,
+                        format='%(message)s',
+                        filename=f'{args.output_dir}/console_outputs/run_tests.log',
+                        filemode='w')
+
     if args.data_dir is None:
         if args.model == "resnet":
             args.data_dir = './models/resnet/binary_data/'
@@ -122,10 +134,6 @@ def main():
     else:
         subprocess.run(['make', args.target_name, '-j'], check=True)
     subprocess.run(['make', args.target_name, '-j'], check=True)
-
-    # Create output directories for both test value and console output
-    script_output_dir = os.path.join(args.output_dir, "console_outputs")
-    os.makedirs(script_output_dir, exist_ok=True)
 
     # Prepare and run all tests/layers simultaneously as different processes
     results = []
@@ -193,6 +201,11 @@ def main():
     failures = functools.reduce(
         (lambda acc, res: acc + bool(res[1].returncode)), results, 0)
     print("-> Total {} failed {}".format(len(results), failures))
+
+    # Also log info to file 
+    logging.info('\n'.join(["{} returned with {}".format(
+        res[0], res[1].returncode) for res in results]))
+    logging.info("-> Total {} failed {}".format(len(results), failures))
 
     sys.exit(failures)
 
