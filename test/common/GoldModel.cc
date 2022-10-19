@@ -14,7 +14,7 @@ inline void gold_fma(UniversalPosit a, UniversalPosit b,
 }
 #endif
 
-inline void gold_fma(ACCUM_DATATYPE a, ACCUM_DATATYPE b,
+inline void gold_fma(INPUT_DATATYPE a, INPUT_DATATYPE b,
                      ACCUM_DATATYPE::DecomposedPosit &c) {
   INPUT_DATATYPE::DecomposedPosit v1 = a;
   INPUT_DATATYPE::DecomposedPosit v2 = b;
@@ -588,33 +588,36 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                       int x = x1 * X0 + x0;
                       int y = y1 * Y0 + y0;
 
-                      if (STRIDE * x + fx >= 0 &&
-                          STRIDE * x + fx < STRIDE * X &&
-                          STRIDE * y + fy >= 0 &&
-                          STRIDE * y + fy < STRIDE * Y) {
-                        for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
-                          int k = (k1 * K0 + k0) * DIMENSION + oc0;
-                          int outputAddress = y * X * K + x * K + k;
+                      for (int oc0 = 0; oc0 < DIMENSION; oc0++) {
+                        int k = (k1 * K0 + k0) * DIMENSION + oc0;
+                        int outputAddress = y * X * K + x * K + k;
 
-                          // cast to INT_T at the beginning, instead of the end
-                          // since outputs leaving systolic array are not cast
-                          // down to INT_T
-                          outputMatrix[outputAddress] =
-                              static_cast<INT_T>(outputMatrix[outputAddress]);
-
-                          for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
-                            int c = c0 * IC_unroll + ic0;
-                            int inputAddress =
-                                (STRIDE * y + fy) * STRIDE * X * C +
-                                (STRIDE * x + fx) * C + c;
-                            int weightAddress =
-                                (fy + (FY - 1) / 2) * FX * C * K +
-                                (fx + (FX - 1) / 2) * C * K + c * K + k;
-
+                        for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
+                          int c = c0 * IC_unroll + ic0;
+                          int inputAddress =
+                              (STRIDE * y + fy) * STRIDE * X * C +
+                              (STRIDE * x + fx) * C + c;
+                          int weightAddress = (fy + (FY - 1) / 2) * FX * C * K +
+                                              (fx + (FX - 1) / 2) * C * K +
+                                              c * K + k;
+                          if (STRIDE * x + fx >= 0 &&
+                              STRIDE * x + fx < STRIDE * X &&
+                              STRIDE * y + fy >= 0 &&
+                              STRIDE * y + fy < STRIDE * Y) {
                             gold_fma(inputMatrixA[inputAddress],
                                      inputMatrixB[weightAddress],
                                      outputMatrix[outputAddress]);
                           }
+                        }
+                        if (params.REPLICATION) {
+                          if (loop_counters[1][params.fxIndex] == 3 ||
+                              loop_counters[1][params.fxIndex] == 6) {
+                            outputMatrix[outputAddress] =
+                                static_cast<INT_T>(outputMatrix[outputAddress]);
+                          }
+                        } else {
+                          outputMatrix[outputAddress] =
+                              static_cast<INT_T>(outputMatrix[outputAddress]);
                         }
                       }
                     }
