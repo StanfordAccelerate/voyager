@@ -115,7 +115,8 @@ inline float readInput(float *matrix, int index, bool accType) {
   return accType ? matrix[2 * index] : matrix[index];
 }
 
-// inline float readInput2(float *matrix, int index, bool accType, int expBias) {
+// inline float readInput2(float *matrix, int index, bool accType, int expBias)
+// {
 //   return accType ? matrix[2 * index] : matrix[index];
 // }
 
