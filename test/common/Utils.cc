@@ -61,7 +61,7 @@ void plot_histograms(TA *matrixA, TB *matrixB, size_t size,
 
 template <typename TA, typename TB>
 float compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
-                            std::string filename, bool accType) {
+                              std::string filename, bool accType) {
   // plot_histograms<TA, TB>(matrixA, matrixB, size, filename);
   // buckets of <0.001, <0.01, <0.1, <1, >1
   int diff_buckets[5] = {0, 0, 0, 0, 0};
@@ -147,43 +147,45 @@ float compare_arrays_internal(TA *matrixA, TB *matrixB, size_t size,
 
   std::cout << std::endl;
 
-  return (float)percent_diff_buckets[4] / (size)*100.0;
+  int total_bucket = percent_diff_buckets[3] + percent_diff_buckets[4];
+  float mismatch = total_bucket - percent_diff_buckets[0];
+  return mismatch / size * 100;
 }
 
 float compare_arrays(INPUT_DATATYPE *matrixA, INPUT_DATATYPE *matrixB,
-                   size_t size, std::string filename, bool accType) {
+                     size_t size, std::string filename, bool accType) {
   return compare_arrays_internal<INPUT_DATATYPE, INPUT_DATATYPE>(
       matrixA, matrixB, size, filename, accType);
 }
 
 float compare_arrays(INPUT_DATATYPE *matrixA, float *matrixB, size_t size,
-                   std::string filename, bool accType) {
+                     std::string filename, bool accType) {
   return compare_arrays_internal<INPUT_DATATYPE, float>(matrixA, matrixB, size,
                                                         filename, accType);
 }
 
 #ifndef NO_UNIVERSAL
 float compare_arrays(INPUT_DATATYPE *matrixA, UniversalPosit *matrixB,
-                   size_t size, std::string filename, bool accType) {
+                     size_t size, std::string filename, bool accType) {
   return compare_arrays_internal<INPUT_DATATYPE, UniversalPosit>(
       matrixA, matrixB, size, filename, accType);
 }
 
 float compare_arrays(UniversalPosit *matrixA, UniversalPosit *matrixB,
-                   size_t size, std::string filename, bool accType) {
+                     size_t size, std::string filename, bool accType) {
   return compare_arrays_internal<UniversalPosit, UniversalPosit>(
       matrixA, matrixB, size, filename, accType);
 }
 
 float compare_arrays(UniversalPosit *matrixA, float *matrixB, size_t size,
-                   std::string filename, bool accType) {
+                     std::string filename, bool accType) {
   return compare_arrays_internal<UniversalPosit, float>(matrixA, matrixB, size,
                                                         filename, accType);
 }
 #endif
 
 float compare_arrays(float *matrixA, float *matrixB, size_t size,
-                   std::string filename, bool accType) {
+                     std::string filename, bool accType) {
   return compare_arrays_internal<float, float>(matrixA, matrixB, size, filename,
                                                accType);
 }

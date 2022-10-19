@@ -413,8 +413,11 @@ extern "C" int sc_main(int argc, char* argv[]) {
     } else {
       // Run individual tests
       for (auto tests : tests_list) {
-        errors += runMobileBertUnitTest(task, tests, sim_list, data_dir);
+        float pctDiff = runMobileBertUnitTest(task, tests, sim_list, data_dir);
+        // std::cerr << "Percentage difference: " << pctDiff << std::endl;
+        if (pctDiff > tolerance) errors++;
       }
+      // std::cerr << "Failed layers: " << errors << std::endl;
     }
 
     return errors;
