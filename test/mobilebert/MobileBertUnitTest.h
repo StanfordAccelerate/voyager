@@ -15,26 +15,25 @@
 // #include "test/common/Harness.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
-#include "test/mobilebert/backprop.h"
-#include "test/mobilebert/gradient.h"
 #include "test/mobilebert/mobilebert_tiny/inference.h"
+#include "test/mobilebert/mobilebert_tiny2/backprop.h"
+#include "test/mobilebert/mobilebert_tiny2/gradient.h"
 
 #ifndef SRAM_MEMORY_SIZE
-#define SRAM_MEMORY_SIZE (30 * 1024 * 1024)
+#define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
 #endif
 
 #ifndef RRAM_MEMORY_SIZE
-// #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)  // RRAM size for TinyBERT
-#define RRAM_MEMORY_SIZE (22 * 1024 * 1024)  // RRAM size for MobileBERT
+#define RRAM_MEMORY_SIZE (12 * 1024 * 1024)  // RRAM size for TinyBERT
 #endif
 
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* acc_sram_memory, INPUT_DATATYPE* acc_rram_memory,
             MemoryMap memoryMap);
 
-int runOperation(const SimplifiedParams params, const Files files,
-                 const MemoryMap memoryMap, const std::string outfilePrefix,
-                 const std::vector<std::string> groups) {
+float runOperation(const SimplifiedParams params, const Files files,
+                   const MemoryMap memoryMap, const std::string outfilePrefix,
+                   const std::vector<std::string> groups) {
   validateMapping(params);
 
   int X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -145,6 +144,8 @@ int runOperation(const SimplifiedParams params, const Files files,
   bool universal =
       std::find(groups.begin(), groups.end(), "universal") != groups.end();
   bool fp32 = std::find(groups.begin(), groups.end(), "fp32") != groups.end();
+  bool pytorch =
+      std::find(groups.begin(), groups.end(), "pytorch") != groups.end();
 
   if (accelerator) {
     run_op({params}, acc_sram_memory, acc_rram_memory, memoryMap);
@@ -186,34 +187,34 @@ int runOperation(const SimplifiedParams params, const Files files,
   }
 
   std::string diffFile;
-  int errors = 0;
-  if (universal) {
+  float pctDiff = 0;
+  if (universal && pytorch) {
     std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in representing float as Posit)" << std::endl;
     diffFile = outfilePrefix + "universal_vs_pytorch.txt";
-    errors += compare_arrays(uni_sram_memory + params.OUTPUT_OFFSET,
-                             uniDataFileOutput, outputSize, diffFile,
-                             params.ACC_T_OUTPUT);
+    pctDiff += compare_arrays(uni_sram_memory + params.OUTPUT_OFFSET,
+                              uniDataFileOutput, outputSize, diffFile,
+                              params.ACC_T_OUTPUT);
   }
 
-  if (customposit) {
+  if (customposit && pytorch) {
     std::cout << "HLS Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals bugs in mapping operations to accelerator)"
               << std::endl;
     diffFile = outfilePrefix + "hlsgold_vs_pytorch.txt";
-    errors += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
-                             hlsDataFileOutput, outputSize, diffFile,
-                             params.ACC_T_OUTPUT);
+    pctDiff += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
+                              hlsDataFileOutput, outputSize, diffFile,
+                              params.ACC_T_OUTPUT);
   }
 
-  if (accelerator) {
+  if (accelerator && pytorch) {
     std::cout << "Accelerator vs. PyTorch" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
     diffFile = outfilePrefix + "accel_vs_pytorch.txt";
-    errors += compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
-                             hlsDataFileOutput, outputSize, diffFile,
-                             params.ACC_T_OUTPUT);
+    pctDiff += compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
+                              hlsDataFileOutput, outputSize, diffFile,
+                              params.ACC_T_OUTPUT);
   }
 
   if (accelerator && customposit) {
@@ -221,9 +222,9 @@ int runOperation(const SimplifiedParams params, const Files files,
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
     diffFile = outfilePrefix + "accel_vs_hlsgold.txt";
-    errors += compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
-                             hls_sram_memory + params.OUTPUT_OFFSET, outputSize,
-                             diffFile, params.ACC_T_OUTPUT);
+    pctDiff += compare_arrays(acc_sram_memory + params.OUTPUT_OFFSET,
+                              hls_sram_memory + params.OUTPUT_OFFSET,
+                              outputSize, diffFile, params.ACC_T_OUTPUT);
   }
 
   if (customposit && universal) {
@@ -233,16 +234,16 @@ int runOperation(const SimplifiedParams params, const Files files,
         << "(reveals bugs in implementation of custom HLS Posit operators)"
         << std::endl;
     diffFile = outfilePrefix + "hlsgold_vs_universal.txt";
-    errors += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
-                             uni_sram_memory + params.OUTPUT_OFFSET, outputSize,
-                             diffFile, params.ACC_T_OUTPUT);
+    pctDiff += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
+                              uni_sram_memory + params.OUTPUT_OFFSET,
+                              outputSize, diffFile, params.ACC_T_OUTPUT);
   }
 
-  if (fp32) {
+  if (fp32 && pytorch) {
     std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     diffFile = outfilePrefix + "fpgold_vs_pytorch.txt";
-    errors +=
+    pctDiff +=
         compare_arrays(float_sram_memory + params.OUTPUT_OFFSET, dataFileOutput,
                        outputSize, diffFile, params.ACC_T_OUTPUT);
   }
@@ -256,18 +257,12 @@ int runOperation(const SimplifiedParams params, const Files files,
   delete float_sram_memory;
   delete float_rram_memory;
 
-  if (errors == 0) {
-    std::cout << "Test passed!" << std::endl;
-  } else {
-    std::cout << "Test failed!" << std::endl;
-  }
-
-  return errors;
+  return pctDiff;
 }
 
-int runMobileBertUnitTest(std::string task, std::string test,
-                          std::vector<std::string> compList,
-                          std::string datapath) {
+float runMobileBertUnitTest(std::string task, std::string test,
+                            std::vector<std::string> compList,
+                            std::string datapath) {
   SimplifiedParams params;
   Files files;
   MemoryOffsets offsets;

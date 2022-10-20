@@ -85,7 +85,7 @@ while(samples < sample_size):
     infile.close()
 
     # Run complete simulation to file
-    os.system("make -j sim MODEL=resnet TEST=conv1")
+    os.system("make -j sim NETWORK=resnet TEST=conv1")
 
 
     # Convert output to floating point and get max

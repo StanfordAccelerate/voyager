@@ -286,7 +286,7 @@ int run_sequence(const std::string& model,
 void print_help() {
   std::cout
       << "\nConfigure simulator by using environment variables."
-      << "\n MODEL - Type of network to run {mobilebert, resnet}"
+      << "\n NETWORK - Type of network to run {mobilebert, resnet}"
       << "\n TESTS - Layers in network to run. Either single or tuple: "
          "<first>,<last>."
       << "\n SIMS - Simulators / models to compare {accelerator, "
@@ -323,7 +323,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
   }
 
   // TODO(fpedd): Implement more cmd line arg tests
-  std::string model(get_env_var("MODEL"));
+  std::string model(get_env_var("NETWORK"));
   if (model.empty()) model = "simple";
 
   std::string tests(get_env_var("TESTS"));
@@ -332,7 +332,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
   std::string sims(get_env_var("SIMS"));
   if (sims.empty()) sims = "accelerator,customposit";
 
-  // Only applicable when MODEL=mobilebert
+  // Only applicable when NETWORK=mobilebert
   std::string task(get_env_var("TASK"));
   if (task.empty()) task = "forward";
 
@@ -413,8 +413,11 @@ extern "C" int sc_main(int argc, char* argv[]) {
     } else {
       // Run individual tests
       for (auto tests : tests_list) {
-        errors += runMobileBertUnitTest(task, tests, sim_list, data_dir);
+        float pctDiff = runMobileBertUnitTest(task, tests, sim_list, data_dir);
+        // std::cerr << "Percentage difference: " << pctDiff << std::endl;
+        if (pctDiff > tolerance) errors++;
       }
+      // std::cerr << "Failed layers: " << errors << std::endl;
     }
 
     return errors;

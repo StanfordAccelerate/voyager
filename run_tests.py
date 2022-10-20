@@ -9,7 +9,7 @@ import sys
 import os
 import logging
 
-MODELS = {
+NETWORKS = {
     'mobilebert':
     [
         "bottleneck_input_dense",
@@ -78,7 +78,7 @@ def main():
     parser.add_argument('--model',
                         type=str,
                         default="resnet",
-                        help='Model to run (simple, resnet, mobilebert) [MODEL].')
+                        help='Model to run (simple, resnet, mobilebert) [NETWORK].')
     parser.add_argument('--task',
                         type=str,
                         default='forward',
@@ -137,13 +137,13 @@ def main():
 
     # Prepare and run all tests/layers simultaneously as different processes
     results = []
-    for test in MODELS[args.model]:
+    for test in NETWORKS[args.model]:
         file_name = os.path.join(
             script_output_dir, args.model + '_' + test + '.out')
         file = open(file_name, 'w')
         # Set environment variables
         env = os.environ.copy()
-        env["MODEL"] = args.model
+        env["NETWORK"] = args.model
         env["TESTS"] = test
         env["SIMS"] = args.simulators
         env["TASK"] = args.task

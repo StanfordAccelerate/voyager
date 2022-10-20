@@ -5,9 +5,9 @@
 // #include "test/common/Harness.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
-#include "test/mobilebert/backprop.h"
-#include "test/mobilebert/gradient.h"
 #include "test/mobilebert/mobilebert_tiny/inference.h"
+#include "test/mobilebert/mobilebert_tiny2/backprop.h"
+#include "test/mobilebert/mobilebert_tiny2/gradient.h"
 #include "test/mobilebert/utils.h"
 
 #define VERBOSE
@@ -297,6 +297,8 @@ int runOperation(const SimplifiedParams params,
   bool universal =
       std::find(groups.begin(), groups.end(), "universal") != groups.end();
   bool fp32 = std::find(groups.begin(), groups.end(), "fp32") != groups.end();
+  bool pytorch =
+      std::find(groups.begin(), groups.end(), "pytorch") != groups.end();
 
   if (customposit) {
     run_custom_posit_gold_model(
@@ -344,21 +346,23 @@ int runOperation(const SimplifiedParams params,
                         uniDataFileOutput, dataFileOutput);
 
   std::string diffFile;
-  if (customposit) {
+  if (customposit && pytorch) {
     std::cout << "HLS Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals bugs in mapping operations to accelerator)"
               << std::endl;
     diffFile = outfilePrefix + "hlsgold_vs_pytorch.txt";
-    compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET, hlsDataFileOutput,
-                   outputSize, diffFile, params.ACC_T_OUTPUT);
+    errors += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
+                             hlsDataFileOutput, outputSize, diffFile,
+                             params.ACC_T_OUTPUT);
   }
 
-  if (universal) {
+  if (universal && pytorch) {
     std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in representing float as Posit)" << std::endl;
     diffFile = outfilePrefix + "universalgold_vs_pytorch.txt";
-    compare_arrays(uni_sram_memory + params.OUTPUT_OFFSET, uniDataFileOutput,
-                   outputSize, diffFile, params.ACC_T_OUTPUT);
+    errors += compare_arrays(uni_sram_memory + params.OUTPUT_OFFSET,
+                             uniDataFileOutput, outputSize, diffFile,
+                             params.ACC_T_OUTPUT);
   }
 
   if (customposit && universal) {
@@ -368,16 +372,16 @@ int runOperation(const SimplifiedParams params,
         << "(reveals bugs in implementation of custom HLS Posit operators)"
         << std::endl;
     diffFile = outfilePrefix + "hlsgold_vs_universalgold.txt";
-    compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
-                   uni_sram_memory + params.OUTPUT_OFFSET, outputSize, diffFile,
-                   params.ACC_T_OUTPUT);
+    errors += compare_arrays(hls_sram_memory + params.OUTPUT_OFFSET,
+                             uni_sram_memory + params.OUTPUT_OFFSET, outputSize,
+                             diffFile, params.ACC_T_OUTPUT);
   }
 
-  if (fp32) {
+  if (fp32 && pytorch) {
     std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     diffFile = outfilePrefix + "fpgold_vs_pytorch.txt";
-    errors =
+    errors +=
         compare_arrays(float_sram_memory + params.OUTPUT_OFFSET, dataFileOutput,
                        outputSize, diffFile, params.ACC_T_OUTPUT);
   }

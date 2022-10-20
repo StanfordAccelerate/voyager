@@ -24,7 +24,7 @@ We are using the build-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It trigge
 
 ## Test 
 1. After setup, use the `run_tests.py` script to run the tests
-2. If you want to "manually" run the tests, you can invoke `make TestRunner` directly and then use, for example, `MODEL=resnet TESTS=conv1 SIMS=fp32,file ./build/TestRunner` to run layer `conv1` of resnet, comparing `fp32` (Floating-point gold model) vs `file` (tensor data recorded from PyTorch)
+2. If you want to "manually" run the tests, you can invoke `make TestRunner` directly and then use, for example, `NETWORK=resnet TESTS=conv1 SIMS=fp32,file ./build/TestRunner` to run layer `conv1` of resnet, comparing `fp32` (Floating-point gold model) vs `file` (tensor data recorded from PyTorch)
 
 ## HLS
 TODO(fpedd)
