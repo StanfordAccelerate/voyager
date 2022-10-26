@@ -36,6 +36,10 @@ def prepare_data(args: argparse.Namespace):
     for dir, _, files in os.walk(args.data_dir):
         for f in files:
             image_paths.append(os.path.join(dir, f))
+    
+    # Only make single sample case deterministic (as per Kartik's request)
+    if args.samples == 1:
+        image_paths = sorted(image_paths)
 
     # Get (all) reference labels from the labels file in the root of the data directory
     ref_labels = []
@@ -213,7 +217,7 @@ def main():
         description='ResNet data generator (from model and images to binary data).')
     parser.add_argument('--data_dir',
                         type=str,
-                        default='data/imagenette',
+                        default='data/imagenet',
                         help='Path to dataset.')
     parser.add_argument('--model_dir',
                         type=str,

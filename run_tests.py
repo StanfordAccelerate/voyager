@@ -99,6 +99,10 @@ def main():
                         default=False,
                         action='store_true',
                         help='Run make clean before building.')
+    parser.add_argument('--use_codegen',
+                        default=False,
+                        action='store_true',
+                        help='Use results from automatic code generation flow.')
     parser.add_argument('--target_name',
                         type=str,
                         default='TestRunner',
@@ -126,22 +130,25 @@ def main():
             # Check if there are files in the binary_data dir, or whether we
             # need to go step deeper in the hierarchy
             sub_dir_info = list(os.walk(args.data_dir))
+            assert len(
+                sub_dir_info) > 0, f'Directory {args.data_dir} appears to be empty. Run data gen first.'
             if len(sub_dir_info[0][2]) == 0:
-                assert len(
-                    sub_dir_info[0][1]) > 0, f'Directory {sub_dir_info[0][0]} appears to be empty.'
                 args.data_dir = os.path.join(
                     args.data_dir, sub_dir_info[0][1][0]) + '/'
         elif args.model == "mobilebert":
             args.data_dir = './data/mobilebert_tiny/datafile/step0/'
 
+    # Start timing before executing first "time-consuming" command
     start_time = time.time()
 
-    # Build SystemC code (running make twice because of linker issues when on NFS)
     if args.make_clean:
-        subprocess.run(['make', 'clean', args.target_name, '-j'], check=True)
-    else:
-        subprocess.run(['make', args.target_name, '-j'], check=True)
-    subprocess.run(['make', args.target_name, '-j'], check=True)
+        subprocess.run(["make", "clean"], check=True)
+
+    # Build SystemC code (running make twice because of linker issues on NFS)
+    cmd = ["make", "-j"] + ["BASE_FLAGS='-DUSE_CODEGEN'"] * \
+        args.use_codegen + [args.target_name]
+    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True)
 
     # Prepare and run all tests/layers simultaneously as different processes
     results = []
