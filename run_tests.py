@@ -41,6 +41,85 @@ NETWORKS = {
         "output_bottleneck_LayerNorm",
         "classifier",
     ],
+    'mobilebert_activation_gradient': [
+        "classifier",
+        "output_bottleneck_LayerNorm",
+        "output_bottleneck_dense",
+        "output_LayerNorm",
+        "output_dense",
+        "intermediate_dense",
+        "ffn_0_output_LayerNorm",
+        "ffn_0_output_dense",
+        "ffn_0_intermediate_dense",
+        "attention_output_LayerNorm",
+        "attention_output_dense",
+        "bottleneck_input_dense",
+        "attention_self_context_layer",
+        "attention_self_value_layer_3",
+        "attention_self_value_layer_2",
+        "attention_self_value_layer_1",
+        "attention_self_value_layer_0",
+        "attention_self_attention_probs_0",
+        "attention_self_attention_probs_1",
+        "attention_self_attention_probs_2",
+        "attention_self_attention_probs_3",
+        "attention_self_attention_scores_0",
+        "attention_self_attention_scores_1",
+        "attention_self_attention_scores_2",
+        "attention_self_attention_scores_3",
+        "attention_self_query_layer_3",
+        "attention_self_query_layer_2",
+        "attention_self_query_layer_1",
+        "attention_self_query_layer_0",
+        "attention_self_key_layer_3",
+        "attention_self_key_layer_2",
+        "attention_self_key_layer_1",
+        "attention_self_key_layer_0",
+        # "bottleneck_attention_LayerNorm_q",
+        # "bottleneck_attention_LayerNorm_k",
+        "bottleneck_attention_dense",
+        # "shared_attention_input_to_hidden_states",
+        # "value_to_hidden_states",
+        # "bottlenecked_hidden_states",
+    ],
+    'mobilebert_weight_gradient': [
+        "classifier_weight",
+        "classifier_bias",
+        "output_bottleneck_LayerNorm_weight",
+        "output_bottleneck_LayerNorm_bias",
+        "output_bottleneck_dense_weight",
+        "output_bottleneck_dense_bias",
+        "output_LayerNorm_weight",
+        "output_LayerNorm_bias",
+        "output_dense_weight",
+        "output_dense_bias",
+        "intermediate_dense_weight",
+        "intermediate_dense_bias",
+        "ffn_0_output_LayerNorm_weight",
+        "ffn_0_output_LayerNorm_bias",
+        "ffn_0_output_dense_weight",
+        "ffn_0_output_dense_bias",
+        "ffn_0_intermediate_dense_weight",
+        "ffn_0_intermediate_dense_bias",
+        "attention_output_LayerNorm_weight",
+        "attention_output_LayerNorm_bias",
+        "attention_output_dense_weight",
+        "attention_output_dense_bias",
+        "attention_self_value_weight",
+        "attention_self_value_bias",
+        "attention_self_query_weight",
+        "attention_self_query_bias",
+        "attention_self_key_weight",
+        "attention_self_key_bias",
+        # "bottleneck_attention_LayerNorm_weight",
+        # "bottleneck_attention_LayerNorm_bias",
+        # "bottleneck_attention_dense_weight",
+        # "bottleneck_attention_dense_bias",
+        "bottleneck_input_LayerNorm_weight",
+        "bottleneck_input_LayerNorm_bias",
+        "bottleneck_input_dense_weight",
+        "bottleneck_input_dense_bias",
+    ],
     'resnet':
     [
         "conv1",
@@ -145,7 +224,18 @@ def main():
 
     # Prepare and run all tests/layers simultaneously as different processes
     results = []
-    for test in NETWORKS[args.model]:
+    if args.model == "resnet":
+        all_tests = NETWORKS[args.model]
+    elif args.model == "mobilebert" and args.task == "forward":
+        all_tests = NETWORKS["mobilebert"]
+    elif args.model == "mobilebert" and args.task == "backward":
+        all_tests = NETWORKS["mobilebert_activation_gradient"]
+    elif args.model == "mobilebert" and args.task == "gradient":
+        all_tests = NETWORKS["mobilebert_weight_gradient"]
+    else:
+        raise SystemExit(1)
+
+    for test in all_tests:
         file_name = os.path.join(
             script_output_dir, args.model + '_' + test + '.out')
         file = open(file_name, 'w')

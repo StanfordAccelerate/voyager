@@ -299,10 +299,16 @@ float runMobileBertUnitTest(std::string task, std::string test,
 
     params.WEIGHT_SPLITTING = false;
   } else if (task == "backward") {
+    std::cerr << "Here" << std::endl;
+    std::cerr << test << std::endl;
     paramName = backpropParamsMapping.at(test);
+    std::cerr << "Here1" << std::endl;
     params = backpropParams.at(paramName);
+    std::cerr << "Here2" << std::endl;
     files = backpropTestFiles.at(test);
+    std::cerr << "Here3" << std::endl;
     offsets = backpropMemOffsets.at(test);
+    std::cerr << "Here4" << std::endl;
 
     inputDataDir = datapath + "errors/";
     weightDataDir = datapath + "weights/";
@@ -338,7 +344,7 @@ float runMobileBertUnitTest(std::string task, std::string test,
 
     // FIXME: accelerator doesn't support these functionalities
     params.ACC_T_OUTPUT = false;
-    params.GRAD_CLIPPING = false;
+    // params.GRAD_CLIPPING = false;
   }
 
   if (test.find("classifier") != std::string::npos ||

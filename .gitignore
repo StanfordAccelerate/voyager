@@ -20,3 +20,4 @@ venv
 models/resnet/binary_data*
 models/resnet/model_data/*
 !models/resnet/model_data/*.pth
+datafile
