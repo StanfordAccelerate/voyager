@@ -430,23 +430,27 @@ extern "C" int sc_main(int argc, char* argv[]) {
 
     return errors;
   } else {  // Run ResNet or Simple
-    // Check if first test is actually in our list of layers
-    if (std::find(resnet_order.begin(), resnet_order.end(), tests_list[0]) ==
-        resnet_order.end()) {
-      std::cerr << "ERROR: Test " << tests_list[0] << " is not supported."
-                << std::endl;
-      print_help();
-      return -1;
-    }
 
-    // Check if second test is actually in our list of layers
-    if (tests_list.size() == 2 &&
-        std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]) ==
-            resnet_order.end()) {
-      std::cerr << "ERROR: Test " << tests_list[1] << " is not supported."
-                << std::endl;
-      print_help();
-      return -1;
+    // Don't check for simple
+    if (model == "resnet") {
+      // Check if first test is actually in our list of layers
+      if (std::find(resnet_order.begin(), resnet_order.end(), tests_list[0]) ==
+          resnet_order.end()) {
+        std::cerr << "ERROR: Test " << tests_list[0] << " is not supported."
+                  << std::endl;
+        print_help();
+        return -1;
+      }
+
+      // Check if second test is actually in our list of layers
+      if (tests_list.size() == 2 &&
+          std::find(resnet_order.begin(), resnet_order.end(), tests_list[1]) ==
+              resnet_order.end()) {
+        std::cerr << "ERROR: Test " << tests_list[1] << " is not supported."
+                  << std::endl;
+        print_help();
+        return -1;
+      }
     }
 
     if (tests_list.size() > 1) {

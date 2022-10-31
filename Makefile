@@ -27,7 +27,7 @@ INC := \
 	-I.
 
 # TODO(fpedd): Fix code and remove Wno-* flags step by step
-BASE_FLAGS := \
+override BASE_FLAGS += \
 	$(INC) \
 	-DSC_INCLUDE_DYNAMIC_PROCESSES \
 	-D_GLIBCXX_USE_CXX11_ABI=0 \
@@ -41,9 +41,9 @@ BASE_FLAGS := \
 	-Wall
 
 ifeq ($(DEBUG), 1)
-	BASE_FLAGS += -DDEBUG_LOG -g -ggdb
+	override BASE_FLAGS += -DDEBUG_LOG -g -ggdb
 else 
-	BASE_FLAGS += -O3 # TODO(fpedd): SystemC is not happy about this flag -DCONNECTIONS_FAST_SIM
+	override BASE_FLAGS += -O3 # TODO(fpedd): SystemC is not happy about this flag -DCONNECTIONS_FAST_SIM
 endif
 
 # We need to work with multiple C++ standards, as the SystemC lib is only 
