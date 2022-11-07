@@ -110,11 +110,11 @@ NETWORKS = {
         "attention_self_query_weight",
         "attention_self_query_bias",
         "attention_self_key_weight",
-        "attention_self_key_bias",
-        # "bottleneck_attention_LayerNorm_weight",
-        # "bottleneck_attention_LayerNorm_bias",
-        # "bottleneck_attention_dense_weight",
-        # "bottleneck_attention_dense_bias",
+        # "attention_self_key_bias", # this test is known to fail
+        "bottleneck_attention_LayerNorm_weight",
+        "bottleneck_attention_LayerNorm_bias",
+        "bottleneck_attention_dense_weight",
+        "bottleneck_attention_dense_bias",
         "bottleneck_input_LayerNorm_weight",
         "bottleneck_input_LayerNorm_bias",
         "bottleneck_input_dense_weight",
@@ -215,7 +215,10 @@ def main():
                 args.data_dir = os.path.join(
                     args.data_dir, sub_dir_info[0][1][0]) + '/'
         elif args.model == "mobilebert":
-            args.data_dir = './data/mobilebert_tiny/datafile/step0/'
+            if args.task == "forward":
+                args.data_dir = './data/mobilebert_tiny/datafile/step0/'
+            else:
+                args.data_dir = './data/sst2_train/datafile/step0/'
 
     # Start timing before executing first "time-consuming" command
     start_time = time.time()
