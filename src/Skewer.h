@@ -124,7 +124,7 @@ SC_MODULE(DeserializedSkewer) {
   Connections::Out<Pack1D<ODTYPE, SIZE> > CCS_INIT_S1(dout);
 
 #define FIFO_SIZE_INIT(z, i, unused) \
-  BOOST_PP_CAT(fifo, i)(2 * (DIMENSION - i + 1)),
+  BOOST_PP_CAT(fifo, i)(1 * (DIMENSION - i + 1)),
 
   SC_CTOR(DeserializedSkewer) : REPEAT(FIFO_SIZE_INIT) dummy(0) {
 #undef FIFO_SIZE_INIT
