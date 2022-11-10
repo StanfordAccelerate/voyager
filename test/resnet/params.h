@@ -597,7 +597,7 @@ const SimplifiedParams fc_params = {
     .FC = true,
 };
 
-std::map<std::string, SimplifiedParams> resnetParams{
+const std::map<std::string, SimplifiedParams> resnetParams{
     {"conv1", conv1_params},
     {"layer1_0_conv1", layer1_0_conv1_params},
     {"layer1_0_conv2", layer1_0_conv2_params},
@@ -620,29 +620,29 @@ std::map<std::string, SimplifiedParams> resnetParams{
     {"layer4_1_conv2", layer4_1_conv2_params},
     {"fc", fc_params}};
 
-std::array<std::string, 21> resnet_order{"conv1",
-                                         "layer1_0_conv1",
-                                         "layer1_0_conv2",
-                                         "layer1_1_conv1",
-                                         "layer1_1_conv2",
-                                         "layer2_0_downsample",
-                                         "layer2_0_conv1",
-                                         "layer2_0_conv2",
-                                         "layer2_1_conv1",
-                                         "layer2_1_conv2",
-                                         "layer3_0_downsample",
-                                         "layer3_0_conv1",
-                                         "layer3_0_conv2",
-                                         "layer3_1_conv1",
-                                         "layer3_1_conv2",
-                                         "layer4_0_downsample",
-                                         "layer4_0_conv1",
-                                         "layer4_0_conv2",
-                                         "layer4_1_conv1",
-                                         "layer4_1_conv2",
-                                         "fc"};
+const std::array<std::string, 21> resnet_order{"conv1",
+                                               "layer1_0_conv1",
+                                               "layer1_0_conv2",
+                                               "layer1_1_conv1",
+                                               "layer1_1_conv2",
+                                               "layer2_0_downsample",
+                                               "layer2_0_conv1",
+                                               "layer2_0_conv2",
+                                               "layer2_1_conv1",
+                                               "layer2_1_conv2",
+                                               "layer3_0_downsample",
+                                               "layer3_0_conv1",
+                                               "layer3_0_conv2",
+                                               "layer3_1_conv1",
+                                               "layer3_1_conv2",
+                                               "layer4_0_downsample",
+                                               "layer4_0_conv1",
+                                               "layer4_0_conv2",
+                                               "layer4_1_conv1",
+                                               "layer4_1_conv2",
+                                               "fc"};
 
-std::map<std::string, Files> resnetFiles{
+const std::map<std::string, Files> resnetFiles{
     {"conv1", {"conv1_input", "conv1_weight", "conv1_bias", "conv1_comp"}},
     {"layer1_0_conv1",
      {"layer1_0_conv1_input", "layer1_0_conv1_weight", "layer1_0_conv1_bias",
@@ -703,7 +703,7 @@ std::map<std::string, Files> resnetFiles{
       "layer4_1_conv2_comp", "layer4_0_conv2_comp"}},
     {"fc", {"fc_input", "fc_weight", "fc_bias", "fc_comp"}}};
 
-std::map<std::string, MemoryMap> resnetMemoryMap{
+const std::map<std::string, MemoryMap> resnetMemoryMap{
     {"conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
     {"layer1_0_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
     {"layer1_0_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
