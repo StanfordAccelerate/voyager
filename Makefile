@@ -17,6 +17,9 @@ ifeq ($(OS), Ubuntu)
 	CC := g++
 else # CentOS or RHEL
 	CC := /opt/rh/devtoolset-10/root/bin/g++
+	ifeq (,$(wildcard $(CC))) # If devtoolset-10 does not exist, fall back to devtoolset-7
+		CC := /opt/rh/devtoolset-7/root/bin/g++
+	endif
 endif
 
 INC := \
