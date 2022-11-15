@@ -9,7 +9,8 @@
 #ifdef SOC_COSIM
 extern bool syscDone;
 void register_interface(
-    std::deque<sc_lv<Wrapped<int>::width> > *serialParamsIn,
+    std::deque<sc_lv<Wrapped<int>::width> > *serialMatrixParamsIn,
+    std::deque<sc_lv<Wrapped<int>::width> > *serialVectorParamsIn,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width> > *inputAddressRequest,
     std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
         *inputAddressResponse,
@@ -34,7 +35,7 @@ void register_interface(
     std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
         *scalarUnitOutput,
     std::deque<sc_lv<Wrapped<int>::width> > *scalarOutputAddress);
-void copy_output(void *sram, int size, int data_size);
+// void copy_output(void *sram, int size, int data_size);
 #endif
 
 Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
@@ -74,9 +75,9 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
 
 #ifdef SOC_COSIM
   register_interface(
-      serialParamsIn.getDataQueue(), inputAddressRequest.getDataQueue(),
-      inputDataResponse.getDataQueue(), weightAddressRequest.getDataQueue(),
-      weightDataResponse.getDataQueue(),
+      serialMatrixParamsIn.getDataQueue(), serialVectorParamsIn.getDataQueue(),
+      inputAddressRequest.getDataQueue(), inputDataResponse.getDataQueue(),
+      weightAddressRequest.getDataQueue(), weightDataResponse.getDataQueue(),
       vectorFetch0AddressRequest.getDataQueue(),
       vectorFetch0DataResponse.getDataQueue(),
       vectorFetch1AddressRequest.getDataQueue(),
@@ -320,12 +321,15 @@ void Harness::sendParams() {
     CCS_LOG("Accelerator Layer Finshed.");
 
 #ifdef SOC_COSIM
-    copy_output(sramMemory, sizeof(INPUT_DATATYPE) * 2 * 1024 * 1024,
-                sizeof(INPUT_DATATYPE));
+    // copy_output(sramMemory, sizeof(INPUT_DATATYPE) * 2 * 1024 * 1024,
+    //             sizeof(INPUT_DATATYPE));
     syscDone = true;
 #endif
   }
+
+#ifndef SOC_COSIM
   sc_stop();
+#endif
 }
 
 void Harness::storeVectorOutputs() {

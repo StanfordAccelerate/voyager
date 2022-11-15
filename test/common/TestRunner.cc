@@ -1,17 +1,27 @@
 // This file is the main entry point to running event-level SystemC simulations.
 // It can run both ResNet18 and mobileBert-Tiny
 // Parameters are passed via environment variables, not arguments.
+#include <iostream>
 #include <string>
 #include <vector>
-#include <iostream>
+
+#ifdef SOC_COSIM
+#include <experimental/filesystem>
+namespace std {
+namespace filesystem = experimental::filesystem;
+}
+#else
 #include <filesystem>
+#endif
 
 #include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
+#ifndef SOC_COSIM
 #include "test/mobilebert/MobileBertSequence.h"
 #include "test/mobilebert/MobileBertUnitTest.h"
+#endif
 #include "test/resnet/params.h"
 #include "test/simple/params.h"
 
@@ -28,6 +38,10 @@
 #ifndef RRAM_MEMORY_SIZE
 #define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
 #endif
+
+void run_op(std::vector<SimplifiedParams> params_list,
+            INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
+            MemoryMap memoryMap);
 
 // Run of sequence of tests for feed-forward conv-nets
 // Returns != 0 if diffs greater tolerance
@@ -321,6 +335,7 @@ void split_string(const std::string& in_string, char delim, T result) {
 }
 
 extern "C" int sc_main(int argc, char* argv[]) {
+#ifndef SOC_COSIM
   if (argc > 1) {
     std::cerr
         << "ERROR: Don't supply command line arguments, instead use env vars."
@@ -328,6 +343,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
     print_help();
     return -1;
   }
+#endif
 
   // TODO(fpedd): Implement more cmd line arg tests
   std::string model(get_env_var("NETWORK"));
@@ -352,7 +368,11 @@ extern "C" int sc_main(int argc, char* argv[]) {
   if (data_dir.empty()) {
     if (model == "resnet") {
       std::string raw_data_dir = "./models/resnet/binary_data/";
-      data_dir = (*std::filesystem::begin(std::filesystem::directory_iterator(raw_data_dir))).path().string() + '/';
+      data_dir = (*std::filesystem::begin(
+                      std::filesystem::directory_iterator(raw_data_dir)))
+                     .path()
+                     .string() +
+                 '/';
     } else if (model == "mobilebert") {
       data_dir = "./data/mobilebert_tiny/datafile/step0/";
     }
@@ -390,6 +410,8 @@ extern "C" int sc_main(int argc, char* argv[]) {
 
   // Run mobileBERT
   if (model == "mobilebert") {
+// FIXME: make mobilebert run on SoC
+#ifndef SOC_COSIM
     std::string activationDataDir = data_dir + "activations/";
     std::string weightDataDir = data_dir + "weights/";
     std::string gradientDataDir = data_dir + "gradients/";
@@ -429,6 +451,7 @@ extern "C" int sc_main(int argc, char* argv[]) {
     }
 
     return errors;
+#endif
   } else {  // Run ResNet or Simple
 
     // Don't check for simple
