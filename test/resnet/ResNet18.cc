@@ -120,28 +120,6 @@ ResNet18::ResNet18() {
         "layer4_1_conv2_comp", "layer4_0_conv2_comp"}},
       {"fc", {"fc_input", "fc_weight", "fc_bias", "fc_comp"}}};
 
-  memoryMap = {{"conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer1_0_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer1_0_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer1_1_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer1_1_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer2_0_downsample", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer2_0_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer2_0_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer2_1_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer2_1_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer3_0_downsample", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer3_0_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer3_0_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer3_1_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer3_1_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer4_0_downsample", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer4_0_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer4_0_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer4_1_conv1", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"layer4_1_conv2", {SRAM, RRAM, RRAM, SRAM, SRAM}},
-               {"fc", {SRAM, RRAM, RRAM, SRAM, SRAM}}};
-
   const char* dataDirEnv = std::getenv("DATA_DIR");
   std::string dataDir;
   if (dataDirEnv == NULL) {
@@ -190,7 +168,7 @@ std::vector<Workload> ResNet18::getWorkloads(
     workload.name = layer;
     workload.params = paramsMap.at(layer);
     workload.files = filesMap.at(layer);
-    workload.memoryMap = memoryMap.at(layer);
+    workload.memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
 
     workloads.push_back(workload);
   }
