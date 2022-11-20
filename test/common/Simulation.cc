@@ -7,12 +7,8 @@
 #include "test/common/GoldModel.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
+#include "test/mobilebert/MobileBERT.h"
 #include "test/resnet/ResNet18.h"
-#ifndef SOC_COSIM
-// FIXME: enable mobilebert
-// #include "test/mobilebert/MobileBertSequence.h"
-// #include "test/mobilebert/MobileBertUnitTest.h"
-#endif
 
 // TODO(fpedd): These defines get overwritten from other files...
 
@@ -70,7 +66,7 @@ Simulation::Simulation(int argc, char* argv[]) {
 
   // Only applicable when NETWORK=mobilebert
   std::string task(get_env_var("TASK"));
-  if (task.empty()) task = "forward";
+  if (task.empty()) task = "inference";
 
   std::string tolerance_str(get_env_var("TOLERANCE"));
   tolerance = 0.1;
@@ -124,49 +120,8 @@ Simulation::Simulation(int argc, char* argv[]) {
     ResNet18 resnet18;
     workloads = resnet18.getWorkloads(tests_list);
   } else if (model == "mobilebert") {
-// FIXME: make mobilebert run on SoC
-#ifndef SOC_COSIM
-    // std::string activationDataDir = data_dir + "activations/";
-    // std::string weightDataDir = data_dir + "weights/";
-    // std::string gradientDataDir = data_dir + "gradients/";
-
-    // int errors = 0;
-    // if (tests == "forward") {
-    //   errors = allocateMemory();
-    //   loadWeights(weightDataDir);
-    //   runForward(data_dir, sim_list);
-    //   deleteMemory();
-
-    // } else if (tests == "backward") {
-    //   errors = allocateMemory();
-    //   loadWeights(weightDataDir);
-    //   loadActivation(activationDataDir);
-    //   runBackward(data_dir, sim_list);
-    //   verifyGradients(gradientDataDir, out_dir + "/verif_");
-    //   deleteMemory();
-
-    //   // End-to-end pass over mobileBERT
-    // } else if (tests == "e2e") {
-    //   errors = allocateMemory();
-    //   loadWeights(weightDataDir);
-    //   runForward(data_dir, sim_list);
-    //   runBackward(data_dir, sim_list);
-    //   verifyGradients(gradientDataDir, out_dir + "/verif_");
-    //   deleteMemory();
-
-    // } else {
-    //   // Run individual tests
-    //   for (auto tests : tests_list) {
-    //     float pctDiff = runMobileBertUnitTest(task, tests, sim_list,
-    //     data_dir);
-    //     // std::cerr << "Percentage difference: " << pctDiff << std::endl;
-    //     if (pctDiff > tolerance) errors++;
-    //   }
-    //   // std::cerr << "Failed layers: " << errors << std::endl;
-    // }
-
-    // return errors;
-#endif
+    MobileBERT mobileBERT(task);
+    workloads = mobileBERT.getWorkloads(tests_list);
   }
 }
 
