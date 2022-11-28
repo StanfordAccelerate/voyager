@@ -23,10 +23,6 @@ def main():
                         type=str,
                         default="resnet",
                         help='Model to run (simple, resnet, mobilebert) [NETWORK].')
-    parser.add_argument('--task',
-                        type=str,
-                        default='forward',
-                        help='Operation to run (only applicable to mobilebert) [TASK].')
     parser.add_argument('--tolerance',
                         type=float,
                         default=0.1,

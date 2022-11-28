@@ -146,7 +146,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--task",
         type=str,
-        default="forward",
+        default="inference",
         help="Group of tests to run.",
     )
     parser.add_argument(
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     pool = mp.Pool(32)
 
     tests = None
-    if args.task == "forward":
+    if args.task == "inference":
         tests = inference_tests
     elif args.task == "backward":
         tests = backprop_tests

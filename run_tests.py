@@ -10,7 +10,7 @@ import os
 import logging
 
 NETWORKS = {
-    'mobilebert':
+    "mobilebert":
     [
         "bottleneck_input_dense",
         "bottleneck_input_LayerNorm",
@@ -41,7 +41,7 @@ NETWORKS = {
         "output_bottleneck_LayerNorm",
         "classifier",
     ],
-    'mobilebert_activation_gradient': [
+    "mobilebert_activation_gradient": [
         "classifier",
         "output_bottleneck_LayerNorm",
         "output_bottleneck_dense",
@@ -82,7 +82,7 @@ NETWORKS = {
         # "value_to_hidden_states",
         # "bottlenecked_hidden_states",
     ],
-    'mobilebert_weight_gradient': [
+    "mobilebert_weight_gradient": [
         "classifier_weight",
         "classifier_bias",
         "output_bottleneck_LayerNorm_weight",
@@ -120,7 +120,7 @@ NETWORKS = {
         "bottleneck_input_dense_weight",
         "bottleneck_input_dense_bias",
     ],
-    'resnet':
+    "resnet":
     [
         "conv1",
         "layer1_0_conv1",
@@ -149,47 +149,47 @@ NETWORKS = {
 
 def main():
     parser = argparse.ArgumentParser(
-        description='MINOTAUR Test Runner. Dispatches and manages tests.')
-    parser.add_argument('-sims', '--simulators',
+        description="MINOTAUR Test Runner. Dispatches and manages tests.")
+    parser.add_argument("-sims", "--simulators",
                         type=str,
-                        default='fp32,file',
-                        help='Simulators to compare (accelerator, customposit, universal, fp32, file) [SIMS].')
-    parser.add_argument('--model',
+                        default="fp32,file",
+                        help="Simulators to compare (accelerator, customposit, universal, fp32, file) [SIMS].")
+    parser.add_argument("--model",
                         type=str,
                         default="resnet",
-                        help='Model to run (simple, resnet, mobilebert) [NETWORK].')
-    parser.add_argument('--task',
+                        help="Model to run (simple, resnet, mobilebert) [NETWORK].")
+    parser.add_argument("--task",
                         type=str,
-                        default='forward',
-                        help='Operation to run (only applicable to mobilebert) [TASK].')
-    parser.add_argument('--tolerance',
+                        default="inference",
+                        help="Operation to run (only applicable to mobilebert) [TASK].")
+    parser.add_argument("--tolerance",
                         type=float,
                         default=0.1,
-                        help='Relative normalized error in % we allow [TOLERANCE].')
-    parser.add_argument('--data_dir',
+                        help="Relative normalized error in % we allow [TOLERANCE].")
+    parser.add_argument("--data_dir",
                         type=str,
                         default=None,
-                        help='Path to binary input data [DATA_DIR].')
-    parser.add_argument('--output_dir',
+                        help="Path to binary input data [DATA_DIR].")
+    parser.add_argument("--output_dir",
                         type=str,
-                        default='./test_outputs/',
-                        help='Path to output data [OUT_DIR].')
-    parser.add_argument('--make_clean',
+                        default="./test_outputs/",
+                        help="Path to output data [OUT_DIR].")
+    parser.add_argument("--make_clean",
                         default=False,
-                        action='store_true',
-                        help='Run make clean before building.')
-    parser.add_argument('--use_codegen',
+                        action="store_true",
+                        help="Run make clean before building.")
+    parser.add_argument("--use_codegen",
                         default=False,
-                        action='store_true',
-                        help='Use results from automatic code generation flow.')
-    parser.add_argument('--target_name',
+                        action="store_true",
+                        help="Use results from automatic code generation flow.")
+    parser.add_argument("--target_name",
                         type=str,
-                        default='TestRunner',
-                        help='Name of main target (compiled C++ binary).')
-    parser.add_argument('--build_dir',
+                        default="TestRunner",
+                        help="Name of main target (compiled C++ binary).")
+    parser.add_argument("--build_dir",
                         type=str,
-                        default='build',
-                        help='Name of build directory.')
+                        default="build",
+                        help="Name of build directory.")
     args = parser.parse_args()
 
     # Create output directories for both test value and console output
@@ -199,26 +199,26 @@ def main():
     # TODO(fpedd): Move all prints to console to seperate logger, see here https://stackoverflow.com/a/9321890/8130394
     # Setup a logger to log to file
     logging.basicConfig(level=logging.INFO,
-                        format='%(message)s',
-                        filename=f'{args.output_dir}/console_outputs/run_tests.log',
+                        format="%(message)s",
+                        filename=f"{args.output_dir}/console_outputs/run_tests.log",
                         filemode='w')
 
     if args.data_dir is None:
         if args.model == "resnet":
-            args.data_dir = './models/resnet/binary_data/'
+            args.data_dir = "./models/resnet/binary_data/"
             # Check if there are files in the binary_data dir, or whether we
             # need to go step deeper in the hierarchy
             sub_dir_info = list(os.walk(args.data_dir))
             assert len(
-                sub_dir_info) > 0, f'Directory {args.data_dir} appears to be empty. Run data gen first.'
+                sub_dir_info) > 0, f"Directory {args.data_dir} appears to be empty. Run data gen first."
             if len(sub_dir_info[0][2]) == 0:
                 args.data_dir = os.path.join(
                     args.data_dir, sub_dir_info[0][1][0]) + '/'
         elif args.model == "mobilebert":
-            if args.task == "forward":
-                args.data_dir = './data/mobilebert_tiny/datafile/step0/'
+            if args.task == "inference":
+                args.data_dir = "./data/mobilebert_tiny/datafile/step0/"
             else:
-                args.data_dir = './data/sst2_train/datafile/step0/'
+                args.data_dir = "./data/sst2_train/datafile/step0/"
 
     # Start timing before executing first "time-consuming" command
     start_time = time.time()
@@ -236,7 +236,7 @@ def main():
     results = []
     if args.model == "resnet":
         all_tests = NETWORKS[args.model]
-    elif args.model == "mobilebert" and args.task == "forward":
+    elif args.model == "mobilebert" and args.task == "inference":
         all_tests = NETWORKS["mobilebert"]
     elif args.model == "mobilebert" and args.task == "backward":
         all_tests = NETWORKS["mobilebert_activation_gradient"]
@@ -247,7 +247,7 @@ def main():
 
     for test in all_tests:
         file_name = os.path.join(
-            script_output_dir, args.model + '_' + test + '.out')
+            script_output_dir, args.model + '_' + test + ".out")
         file = open(file_name, 'w')
         # Set environment variables
         env = os.environ.copy()
@@ -263,7 +263,7 @@ def main():
                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env)
         # Enable non-blocking read from process
         os.set_blocking(p.stdout.fileno(), False)
-        results.append([args.model + "." + test, p, file])
+        results.append([args.model + '.' + test, p, file])
 
     # Observe and manage running processes
     last_print_time = 0

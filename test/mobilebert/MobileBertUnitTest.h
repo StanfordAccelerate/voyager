@@ -281,7 +281,7 @@ float runMobileBertUnitTest(std::string task, std::string test,
   std::string residualDataDir;
   std::string gradientDataDir;
 
-  if (task == "forward") {
+  if (task == "inference") {
     paramName = inferenceParamsMapping.at(test);
     params = inferenceParams.at(paramName);
     files = inferenceTestFiles.at(test);

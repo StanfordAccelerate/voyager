@@ -50,7 +50,7 @@ def run_test(model_name_or_path, datapath, batch, results_folder, test_id):
     env_vars = os.environ.copy()
     env_vars['NETWORK'] = "mobilebert"
     env_vars['SIMS'] = "fp32,customposit"
-    env_vars['TESTS'] = "forward"
+    env_vars['TESTS'] = "inference"
     env_vars['DATA'] = datapath
 
     stdout_file = open(f'{results_folder}/run.{test_id}.log', 'w')
