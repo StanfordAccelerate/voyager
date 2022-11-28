@@ -10,20 +10,6 @@
 #include "test/mobilebert/MobileBERT.h"
 #include "test/resnet/ResNet18.h"
 
-// TODO(fpedd): These defines get overwritten from other files...
-
-// By default we have 2MB of SRAM per MINOTAUR SoC
-// organized as 8x 256KB Banks with 2x 128KB Macros each
-#ifndef SRAM_MEMORY_SIZE
-#define SRAM_MEMORY_SIZE (2 * 1024 * 1024)
-#endif
-
-// By default we have 12MB of RRAM per MINOTAUR SoC
-// organized as 12x 1MB Banks with 4x 256KB Macros each
-#ifndef RRAM_MEMORY_SIZE
-#define RRAM_MEMORY_SIZE (12 * 1024 * 1024)
-#endif
-
 #ifdef SOC_COSIM
 #include <experimental/filesystem>
 namespace std {
@@ -145,69 +131,48 @@ void Simulation::print_help() {
       << "\n OUT_DIR - Path to output data." << std::endl;
 }
 
-int Simulation::run() {
-  // Set data parameters
-  bool use_data_file = true;
-
-  // TODO: clean this up, and enable more reuse from the SoC simulation
-  // Memory allocation
-  INPUT_DATATYPE* acc_sram_memory = nullptr;
-  INPUT_DATATYPE* acc_rram_memory = nullptr;
-  INPUT_DATATYPE* hls_gold_sram_memory = nullptr;
-  INPUT_DATATYPE* hls_gold_rram_memory = nullptr;
-  UniversalPosit* uni_gold_sram_memory = nullptr;
-  UniversalPosit* uni_gold_rram_memory = nullptr;
-  float* float_gold_sram_memory = nullptr;
-  float* float_gold_rram_memory = nullptr;
-  uint64_t* trash = nullptr;
-  try {
-    acc_sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-    acc_rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
-    hls_gold_sram_memory = new INPUT_DATATYPE[SRAM_MEMORY_SIZE];
-    hls_gold_rram_memory = new INPUT_DATATYPE[RRAM_MEMORY_SIZE];
-    uni_gold_sram_memory = new UniversalPosit[SRAM_MEMORY_SIZE];
-    uni_gold_rram_memory = new UniversalPosit[RRAM_MEMORY_SIZE];
-    float_gold_sram_memory = new float[SRAM_MEMORY_SIZE];
-    float_gold_rram_memory = new float[RRAM_MEMORY_SIZE];
-    trash = new uint64_t[RRAM_MEMORY_SIZE];
-  } catch (const std::bad_alloc&) {
-    throw std::runtime_error("ERROR: Failed to allocate simulation memory");
+void Simulation::loadMemory() {
+  std::vector<MemoryModel*> memories;
+  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
+    acceleratorMemory = new SimpleMemoryModel<INPUT_DATATYPE>(true);
+    memories.push_back(acceleratorMemory);
+  }
+  if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
+    positMemory = new SimpleMemoryModel<INPUT_DATATYPE>(false);
+    memories.push_back(positMemory);
+  }
+  if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
+    universalPositMemory = new SimpleMemoryModel<UniversalPosit>(false);
+    memories.push_back(universalPositMemory);
+  }
+  if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
+    floatMemory = new SimpleMemoryModel<float>(false);
+    memories.push_back(floatMemory);
   }
 
   // Load first tests input
-  load_memory(workloads.front().params, workloads.front().files,
-              workloads.front().memoryMap, use_data_file, acc_sram_memory,
-              acc_rram_memory,
-              hls_gold_sram_memory + workloads.front().params.INPUT_OFFSET,
-              (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-              hls_gold_sram_memory + workloads.front().params.RESIDUAL_OFFSET,
-              (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-              uni_gold_sram_memory + workloads.front().params.INPUT_OFFSET,
-              (UniversalPosit*)trash, (UniversalPosit*)trash,
-              uni_gold_sram_memory + workloads.front().params.RESIDUAL_OFFSET,
-              (UniversalPosit*)trash, (UniversalPosit*)trash,
-              float_gold_sram_memory + workloads.front().params.INPUT_OFFSET,
-              (float*)trash, (float*)trash,
-              float_gold_sram_memory + workloads.front().params.RESIDUAL_OFFSET,
-              (float*)trash, (float*)trash);
-
-  // Load weights, biases, and sims
-  for (const Workload& workload : workloads) {
-    load_wb(workload.params, workload.files, workload.memoryMap, use_data_file,
-            acc_sram_memory, acc_rram_memory, (INPUT_DATATYPE*)trash,
-            hls_gold_rram_memory + workload.params.WEIGHT_OFFSET,
-            hls_gold_rram_memory + workload.params.BIAS_OFFSET,
-            (INPUT_DATATYPE*)trash, (INPUT_DATATYPE*)trash,
-            (INPUT_DATATYPE*)trash, (UniversalPosit*)trash,
-            uni_gold_rram_memory + workload.params.WEIGHT_OFFSET,
-            uni_gold_rram_memory + workload.params.BIAS_OFFSET,
-            (UniversalPosit*)trash, (UniversalPosit*)trash,
-            (UniversalPosit*)trash, (float*)trash,
-            float_gold_rram_memory + workload.params.WEIGHT_OFFSET,
-            float_gold_rram_memory + workload.params.BIAS_OFFSET, (float*)trash,
-            (float*)trash, (float*)trash);
+  for (MemoryModel* memModel : memories) {
+    memModel->loadModelActivations(workloads.front().params,
+                                   workloads.front().files,
+                                   workloads.front().memoryMap, true);
   }
 
+  // Load weights, biases for all layers
+  for (const Workload& workload : workloads) {
+    for (MemoryModel* memModel : memories) {
+      memModel->loadModelParams(workload.params, workload.files,
+                                workload.memoryMap, true);
+    }
+  }
+
+  // load last layer reference outputs
+  for (MemoryModel* memModel : memories) {
+    memModel->loadReferenceOutput(workloads.back().params,
+                                  workloads.back().files);
+  }
+}
+
+void Simulation::run() {
   // Run tests in sequence
   int X, Y, C, K, FX, FY, STRIDE;
   for (const Workload& workload : workloads) {
@@ -253,30 +218,29 @@ int Simulation::run() {
     // Run gold models
     if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
       run_custom_posit_gold_model(
-          currentParams, hls_gold_sram_memory + currentParams.INPUT_OFFSET,
-          hls_gold_rram_memory + currentParams.WEIGHT_OFFSET,
-          hls_gold_sram_memory + currentParams.OUTPUT_OFFSET,
-          hls_gold_rram_memory + currentParams.BIAS_OFFSET,
-          hls_gold_sram_memory + currentParams.RESIDUAL_OFFSET, nullptr,
-          nullptr);
+          currentParams, positMemory->sram + currentParams.INPUT_OFFSET,
+          positMemory->rram + currentParams.WEIGHT_OFFSET,
+          positMemory->sram + currentParams.OUTPUT_OFFSET,
+          positMemory->rram + currentParams.BIAS_OFFSET,
+          positMemory->sram + currentParams.RESIDUAL_OFFSET, nullptr, nullptr);
     }
     if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
       run_universal_posit_gold_model(
-          currentParams, uni_gold_sram_memory + currentParams.INPUT_OFFSET,
-          uni_gold_rram_memory + currentParams.WEIGHT_OFFSET,
-          uni_gold_sram_memory + currentParams.OUTPUT_OFFSET,
-          uni_gold_rram_memory + currentParams.BIAS_OFFSET,
-          uni_gold_sram_memory + currentParams.RESIDUAL_OFFSET, nullptr,
+          currentParams,
+          universalPositMemory->sram + currentParams.INPUT_OFFSET,
+          universalPositMemory->rram + currentParams.WEIGHT_OFFSET,
+          universalPositMemory->sram + currentParams.OUTPUT_OFFSET,
+          universalPositMemory->rram + currentParams.BIAS_OFFSET,
+          universalPositMemory->sram + currentParams.RESIDUAL_OFFSET, nullptr,
           nullptr);
     }
     if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-      run_fp_gold_model(currentParams,
-                        float_gold_sram_memory + currentParams.INPUT_OFFSET,
-                        float_gold_rram_memory + currentParams.WEIGHT_OFFSET,
-                        float_gold_sram_memory + currentParams.OUTPUT_OFFSET,
-                        float_gold_rram_memory + currentParams.BIAS_OFFSET,
-                        float_gold_sram_memory + currentParams.RESIDUAL_OFFSET,
-                        nullptr, nullptr);
+      run_fp_gold_model(
+          currentParams, floatMemory->sram + currentParams.INPUT_OFFSET,
+          floatMemory->rram + currentParams.WEIGHT_OFFSET,
+          floatMemory->sram + currentParams.OUTPUT_OFFSET,
+          floatMemory->rram + currentParams.BIAS_OFFSET,
+          floatMemory->sram + currentParams.RESIDUAL_OFFSET, nullptr, nullptr);
     }
   }
 
@@ -287,30 +251,41 @@ int Simulation::run() {
       params_list.push_back(workload.params);
     }
     // TODO: currently assumes that all layers have the same memory map
-    run_op(params_list, acc_sram_memory, acc_rram_memory,
+    run_op(params_list, acceleratorMemory->sram, acceleratorMemory->rram,
            workloads.front().memoryMap);
   }
+}
 
-  // Allocate comparison
-  INPUT_DATATYPE* hls_comp = nullptr;
-  UniversalPosit* uni_comp = nullptr;
-  float* fp_comp = nullptr;
+int Simulation::checkOutput() {
+  SimplifiedParams currentParams = workloads.back().params;
+  int X, Y, C, K, FX, FY, STRIDE;
+  X = currentParams.loops[0][currentParams.inputXLoopIndex[0]] *
+      currentParams.loops[1][currentParams.inputXLoopIndex[1]];
+  Y = currentParams.loops[0][currentParams.inputYLoopIndex[0]] *
+      currentParams.loops[1][currentParams.inputYLoopIndex[1]];
+  C = currentParams.loops[1][currentParams.reductionLoopIndex[1]] * DIMENSION;
+  K = currentParams.loops[0][currentParams.weightLoopIndex[0]] *
+      currentParams.loops[1][currentParams.weightLoopIndex[1]] * DIMENSION;
+  FX = currentParams.loops[1][currentParams.fxIndex];
+  FY = currentParams.loops[1][currentParams.fyIndex];
+  STRIDE = currentParams.STRIDE;
+
+  if (currentParams.REPLICATION) {
+    FX = 7;
+    C = 3;
+  }
+
+  if (currentParams.MAXPOOL) {
+    X /= 2;
+    Y /= 2;
+  }
+
+  if (currentParams.AVGPOOL) {
+    X = 1;
+    Y = 1;
+  }
+
   size_t size = X * Y * K;
-
-  try {
-    hls_comp = new INPUT_DATATYPE[size];
-    uni_comp = new UniversalPosit[size];
-    fp_comp = new float[size];
-  } catch (const std::bad_alloc&) {
-    throw std::runtime_error("ERROR: Failed to allocate comparison memory");
-  }
-
-  // Load reference values from file
-  if (use_data_file) {
-    load_datafile_outputs(workloads.back().params,
-                          workloads.back().files.outputs_file, hls_comp,
-                          uni_comp, fp_comp);
-  }
 
   int error_count = 0;
   // Go over every combination of sims and cross-check results
@@ -323,44 +298,47 @@ int Simulation::run() {
     if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
         (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
       rel_err += compare_arrays(
-          acc_sram_memory + workloads.back().params.OUTPUT_OFFSET,
+          acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
           "accelerator",
-          hls_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
+          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
           "customposit", size, diff_file, false);
     } else if ((sims[i] == "accelerator" && sims[i + 1] == "file") ||
                (sims[i + 1] == "accelerator" && sims[i] == "file")) {
       rel_err += compare_arrays(
-          acc_sram_memory + workloads.back().params.OUTPUT_OFFSET,
-          "accelerator", hls_comp, "file", size, diff_file, false);
+          acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+          "accelerator", positMemory->reference, "file", size, diff_file,
+          false);
     } else if ((sims[i] == "customposit" && sims[i + 1] == "file") ||
                (sims[i + 1] == "customposit" && sims[i] == "file")) {
       rel_err += compare_arrays(
-          hls_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
-          "customposit", hls_comp, "file", size, diff_file, false);
+          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+          "customposit", positMemory->reference, "file", size, diff_file,
+          false);
     } else if ((sims[i] == "universal" && sims[i + 1] == "customposit") ||
                (sims[i + 1] == "universal" && sims[i] == "customposit")) {
       rel_err += compare_arrays(
-          hls_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
+          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
           "universal",
-          uni_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
+          universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
           "customposit", size, diff_file, false);
     } else if ((sims[i] == "universal" && sims[i + 1] == "file") ||
                (sims[i + 1] == "universal" && sims[i] == "file")) {
       rel_err += compare_arrays(
-          uni_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
-          "universal", uni_comp, "file", size, diff_file, false);
+          universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+          "universal", universalPositMemory->reference, "file", size, diff_file,
+          false);
     } else if ((sims[i] == "fp32" && sims[i + 1] == "file") ||
                (sims[i + 1] == "fp32" && sims[i] == "file")) {
       rel_err += compare_arrays(
-          float_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
-          "fp32", fp_comp, "file", size, diff_file, false);
+          floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32",
+          floatMemory->reference, "file", size, diff_file, false);
     } else if ((sims[i] == "customposit" && sims[i + 1] == "fp32") ||
                (sims[i] == "fp32" && sims[i + 1] == "customposit")) {
       rel_err += compare_arrays(
-          hls_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
+          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
           "customposit",
-          float_gold_sram_memory + workloads.back().params.OUTPUT_OFFSET,
-          "fp32", size, diff_file, false);
+          floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32",
+          size, diff_file, false);
     } else {
       std::cerr << "ERROR: Comparison between " + sims[i] + " and "
                 << sims[i + 1] << " not supported." << std::endl;
@@ -371,19 +349,6 @@ int Simulation::run() {
     std::cout << "Rela. error: " << rel_err << std::endl;
     std::cout << "Error count: " << error_count << std::endl;
   }
-
-  delete[] acc_sram_memory;
-  delete[] acc_rram_memory;
-  delete[] hls_gold_sram_memory;
-  delete[] hls_gold_rram_memory;
-  delete[] uni_gold_sram_memory;
-  delete[] uni_gold_rram_memory;
-  delete[] float_gold_sram_memory;
-  delete[] float_gold_rram_memory;
-  delete[] trash;
-  delete[] hls_comp;
-  delete[] uni_comp;
-  delete[] fp_comp;
 
   return error_count;
 }

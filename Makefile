@@ -156,7 +156,7 @@ sim: build/TestRunner
 .PHONY: TestRunner
 TestRunner: build/TestRunner
 
-build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/DataLoader.o build/Simulation.o build/ResNet18.o build/MobileBERT.o build/toolchain.a
+build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/Simulation.o build/ResNet18.o build/MobileBERT.o build/toolchain.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 # Unit tests for custom Posit implementation
@@ -178,7 +178,10 @@ build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/Architec
 build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h src/ArchitectureParams.h
+build/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryModel.h src/ArchitectureParams.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+build/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h

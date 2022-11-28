@@ -9,5 +9,7 @@
 
 extern "C" int sc_main(int argc, char* argv[]) {
   Simulation sim(argc, argv);
-  return sim.run();
+  sim.loadMemory();
+  sim.run();
+  return sim.checkOutput();
 }

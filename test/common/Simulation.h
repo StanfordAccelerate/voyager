@@ -10,6 +10,8 @@
 #include "src/PositTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
+#include "test/common/SimpleMemoryModel.h"
+#include "test/common/UniversalPosit.h"
 
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
@@ -19,7 +21,9 @@ class Simulation {
  public:
   Simulation(int argc, char* argv[]);
 
-  int run();
+  void loadMemory();
+  void run();
+  int checkOutput();
 
  private:
   std::vector<Workload> workloads;
@@ -27,6 +31,11 @@ class Simulation {
   std::string out_dir;
   std::string model;
   float tolerance;
+
+  SimpleMemoryModel<INPUT_DATATYPE>* acceleratorMemory;
+  SimpleMemoryModel<INPUT_DATATYPE>* positMemory;
+  SimpleMemoryModel<float>* floatMemory;
+  SimpleMemoryModel<UniversalPosit>* universalPositMemory;
 
   // Return environment variable
   std::string get_env_var(std::string const& name);
