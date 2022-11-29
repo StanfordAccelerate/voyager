@@ -14,7 +14,7 @@
 #include "test/common/UniversalPosit.h"
 
 void run_op(std::vector<SimplifiedParams> params_list,
-            INPUT_DATATYPE* sramMemory, INPUT_DATATYPE* rramMemory,
+            INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
             MemoryMap memoryMap);
 
 class Simulation {
@@ -26,20 +26,21 @@ class Simulation {
   int checkOutput();
   void print_help();
 
- private:
+ protected:
   std::vector<Workload> workloads;
   std::vector<std::string> sims;
   std::string out_dir;
   std::string model;
   float tolerance = 0.1;
 
-  SimpleMemoryModel<INPUT_DATATYPE>* acceleratorMemory;
-  SimpleMemoryModel<INPUT_DATATYPE>* positMemory;
-  SimpleMemoryModel<float>* floatMemory;
-  SimpleMemoryModel<UniversalPosit>* universalPositMemory;
+ private:
+  SimpleMemoryModel<INPUT_DATATYPE> *acceleratorMemory;
+  SimpleMemoryModel<INPUT_DATATYPE> *positMemory;
+  SimpleMemoryModel<float> *floatMemory;
+  SimpleMemoryModel<UniversalPosit> *universalPositMemory;
 
-  std::string get_env_var(std::string const& name);
+  std::string get_env_var(std::string const &name);
 
   template <typename T>
-  void split_string(const std::string& in_string, char delim, T result);
+  void split_string(const std::string &in_string, char delim, T result);
 };

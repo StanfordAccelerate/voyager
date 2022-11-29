@@ -1,12 +1,12 @@
 #include "test/resnet/ResNet.h"
 
-#ifdef SOC_COSIM
+#if __has_include(<filesystem>)
+#include <filesystem>
+#else
 #include <experimental/filesystem>
 namespace std {
 namespace filesystem = experimental::filesystem;
 }
-#else
-#include <filesystem>
 #endif
 
 #include <algorithm>
