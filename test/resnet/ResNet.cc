@@ -13,7 +13,13 @@ namespace filesystem = experimental::filesystem;
 #include <cassert>
 #include <iostream>
 
+#ifndef USE_CODEGEN
 #include "test/resnet/params.h"
+#else
+#pragma message "Using codegen for ResNet model."
+#include "test/resnet/codegen_params.h"
+#endif
+
 
 ResNet::ResNet(const std::string& dataDir) {
   this->order = ::order;

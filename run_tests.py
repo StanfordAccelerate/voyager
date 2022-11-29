@@ -154,7 +154,6 @@ def main():
             # Read all lines from proc
             while line := res[1].stdout.readline():
                 line = line.decode("utf-8")
-                # Write to file
                 res[2].write(line)
                 # If format is right, print to console once per second
                 nums = [int(s) for s in line.split() if s.isdigit()]
@@ -168,7 +167,6 @@ def main():
             else:
                 # Record number of failures
                 failures = failures + bool(res[1].returncode)
-                # Close file
                 if not res[2].closed:
                     res[2].close()
         curr_start = str(datetime.timedelta(
