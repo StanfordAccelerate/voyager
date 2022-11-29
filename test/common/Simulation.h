@@ -33,12 +33,12 @@ class Simulation {
   std::string model;
   float tolerance = 0.1;
 
- private:
   SimpleMemoryModel<INPUT_DATATYPE> *acceleratorMemory;
   SimpleMemoryModel<INPUT_DATATYPE> *positMemory;
   SimpleMemoryModel<float> *floatMemory;
   SimpleMemoryModel<UniversalPosit> *universalPositMemory;
 
+ private:
   std::string get_env_var(std::string const &name);
 
   template <typename T>
