@@ -45,11 +45,28 @@ ResNet::ResNet(const std::string& dataDir) {
   }
 }
 
+std::vector<Workload> ResNet::getWorkloads(
+    const std::vector<std::string>& layers) const {
+  std::vector<Workload> workloads;
+
+  for (const std::string& layer : layers) {
+    Workload workload;
+    workload.name = layer;
+    workload.params = paramsMap.at(layer);
+    workload.files = filesMap.at(layer);
+    workload.memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
+
+    workloads.push_back(workload);
+  }
+
+  return workloads;
+}
+
 /*
  * Returns a vector of workloads to run.
  * Layers specifies either a single layer or range of layers.
  */
-std::vector<Workload> ResNet::getWorkloads(
+std::vector<Workload> ResNet::getWorkloadsInRange(
     const std::vector<std::string>& layers) const {
   // Expand layer vector to include intermediate layers, if necessary
   std::vector<std::string> layersInRange;
@@ -65,16 +82,9 @@ std::vector<Workload> ResNet::getWorkloads(
 
   assert(layersInRange.size() > 0 && "Layer list is empty.");
 
-  std::vector<Workload> workloads;
-  for (const std::string& layer : layersInRange) {
-    Workload workload;
-    workload.name = layer;
-    workload.params = paramsMap.at(layer);
-    workload.files = filesMap.at(layer);
-    workload.memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
+  return getWorkloads(layersInRange);
+}
 
-    workloads.push_back(workload);
-  }
-
-  return workloads;
+std::vector<Workload> ResNet::getAllWorkloads() const {
+  return getWorkloads(order);
 }

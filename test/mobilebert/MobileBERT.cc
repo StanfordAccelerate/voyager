@@ -4048,24 +4048,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
     const std::vector<std::string>& layers) const {
   std::vector<Workload> workloads;
 
-  std::vector<std::string> layersInRange;
-  if (layers.size() == 1) {  // Single layer
-    layersInRange.push_back(layers.front());
-  } else {  // Range of layers
-    if (task == "gradient") {
-      std::cerr << "Task gradient "
-                << " does not have an order defined. Please define one before "
-                   "attempting to run a sequence."
-                << std::endl;
-      std::abort();
-    }
-
-    auto firstLayer = std::find(order.begin(), order.end(), layers.at(0));
-    auto lastLayer = std::find(order.begin(), order.end(), layers.at(1));
-    layersInRange = std::vector<std::string>(firstLayer, lastLayer + 1);
-  }
-
-  for (const std::string& layer : layersInRange) {
+  for (const std::string& layer : layers) {
     const std::string& paramName = paramsMapping.at(layer);
 
     Workload workload;
@@ -4160,4 +4143,30 @@ std::vector<Workload> MobileBERT::getWorkloads(
   }
 
   return workloads;
+}
+
+std::vector<Workload> MobileBERT::getWorkloadsInRange(
+    const std::vector<std::string>& layers) const {
+  std::vector<std::string> layersInRange;
+  if (layers.size() == 1) {  // Single layer
+    layersInRange.push_back(layers.front());
+  } else {  // Range of layers
+    if (task == "gradient") {
+      std::cerr << "Task gradient "
+                << " does not have an order defined. Please define one before "
+                   "attempting to run a sequence."
+                << std::endl;
+      std::abort();
+    }
+
+    auto firstLayer = std::find(order.begin(), order.end(), layers.at(0));
+    auto lastLayer = std::find(order.begin(), order.end(), layers.at(1));
+    layersInRange = std::vector<std::string>(firstLayer, lastLayer + 1);
+  }
+
+  return getWorkloads(layersInRange);
+}
+
+std::vector<Workload> MobileBERT::getAllWorkloads() const {
+  return getWorkloads(order);
 }

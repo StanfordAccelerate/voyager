@@ -9,7 +9,7 @@
 // namespace plt = matplotlibcpp;
 
 #ifndef NO_UNIVERSAL
-inline float readInput(UniversalPosit *matrix, int index, bool accType) {
+inline float readValue(UniversalPosit *matrix, int index, bool accType) {
   if (!accType) {
     return static_cast<float>(matrix[index]);
   }
@@ -22,7 +22,7 @@ inline float readInput(UniversalPosit *matrix, int index, bool accType) {
 }
 #endif
 
-inline float readInput(INPUT_DATATYPE *matrix, int index, bool accType) {
+inline float readValue(INPUT_DATATYPE *matrix, int index, bool accType) {
   if (!accType) {
     return static_cast<float>(matrix[index]);
   }
@@ -34,7 +34,7 @@ inline float readInput(INPUT_DATATYPE *matrix, int index, bool accType) {
   return static_cast<float>(p16);
 }
 
-inline float readInput(float *matrix, int index, bool accType) {
+inline float readValue(float *matrix, int index, bool accType) {
   return accType ? matrix[2 * index] : matrix[index];
 }
 
@@ -75,8 +75,8 @@ float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
 
   for (int index = 0; index < size; index++) {
     // Calculate absolute difference
-    float a = readInput(matrixA, index, accType);
-    float b = readInput(matrixB, index, accType);
+    float a = readValue(matrixA, index, accType);
+    float b = readValue(matrixB, index, accType);
     float abs_diff = abs(a - b);
 
     // Write the two values + error scale indicator to file

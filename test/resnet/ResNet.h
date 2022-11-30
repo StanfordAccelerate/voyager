@@ -11,12 +11,16 @@ class ResNet : public Network {
   ResNet(const std::string&);
   ~ResNet(void){};
 
-  std::vector<Workload> getWorkloads(
+  std::vector<Workload> getWorkloadsInRange(
       const std::vector<std::string>&) const override;
+
+  std::vector<Workload> getAllWorkloads() const override;
 
  private:
   std::vector<std::string> order;
   std::map<std::string, SimplifiedParams> paramsMap;
   std::map<std::string, Files> filesMap;
   std::map<std::string, MemoryMap> memoryMap;
+
+  std::vector<Workload> getWorkloads(const std::vector<std::string>&) const;
 };

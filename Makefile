@@ -156,7 +156,7 @@ sim: build/TestRunner
 .PHONY: TestRunner
 TestRunner: build/TestRunner
 
-build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/Simulation.o build/CodeGenNet.o build/ResNet.o build/MobileBERT.o build/toolchain.a
+build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/Simulation.o build/networks.a build/toolchain.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 # Unit tests for custom Posit implementation
@@ -190,14 +190,22 @@ build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/Archi
 build/TestRunner.o: test/common/TestRunner.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-# Models
-build/CodeGenNet.o: test/codegen/*.cc test/codegen/*.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
+###########################################################
+# Networks
+###########################################################
+.PHONY: networks
+networks: build/networks.a
 
-build/ResNet.o: test/resnet/*.cc test/resnet/*.h
+build/networks.a: build/ResNet.o build/MobileBERT.o CodeGen.o
+	$(AR) rcs $@ $^
+
+build/ResNet.o: test/resnet/ResNet.cc test/resnet/ResNet.h test/resnet/params.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/MobileBERT.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+build/CodeGen.o: test/codegen/*.cc test/codegen/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
