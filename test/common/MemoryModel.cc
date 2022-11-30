@@ -266,7 +266,7 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
                                        const MemoryMap& memoryMap,
                                        bool useDataFile) {
   loadInputs(params, memoryMap.inputs, files.inputs_file, useDataFile);
-  if (params.RESIDUAL) {
+  if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
     loadResiduals(params, memoryMap.residual, files.residual_file, useDataFile);
   }
 }
