@@ -74,7 +74,7 @@ Simulation::Simulation() {
   }
 
   // Collect workloads (aka. layers) from Network
-  workloads = network->getWorkloads(tests_list);
+  workloads = network->getWorkloadsInRange(tests_list);
 
   std::cout << "Starting new simulation with config:";
   std::cout << "\n> Model: " << model;
