@@ -4079,7 +4079,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
       outputDataDir = "errors/";
       residualDataDir = "errors/";
 
-      if (layer == "attention_self_value_layer") {
+      if (layer.find("attention_self_value_layer") != std::string::npos) {
         inputDataDir = "activations/";
         weightDataDir = "errors/";
       } else if (workload.params.CROSS_ENTROPY_GRAD) {
@@ -4097,7 +4097,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
       outputDataDir = "gradients/";
       residualDataDir = "gradients/";
 
-      if (layer == "classifier") {
+      if (layer.find("classifier") != std::string::npos) {
         inputDataDir = "errors/";
         weightDataDir = "activations/";
       }
@@ -4107,8 +4107,8 @@ std::vector<Workload> MobileBERT::getWorkloads(
     }
 
     std::string encLayerName = "mobilebert_encoder_layer_0_";
-    if (layer == "classifier" || layer == "output_bottleneck_LayerNorm" ||
-        task == "backward") {
+    if (layer.find("classifier") != std::string::npos ||
+        (task == "backprop" && layer == "output_bottleneck_LayerNorm")) {
       encLayerName = "";
     }
 
