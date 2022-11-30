@@ -251,67 +251,98 @@ int Simulation::checkOutput() {
   size_t size = X * Y * K;
 
   int error_count = 0;
-  // Go over every combination of sims and cross-check results
-  for (int i = 0; i < sims.size(); i += 2) {
-    std::string diff_file = out_dir + model + '.' + workloads.front().name +
-                            "_to_" + workloads.back().name + '.' + sims[i] +
-                            "_vs_" + sims[i + 1];
 
-    float rel_err = 0;
-    if ((sims[i] == "accelerator" && sims[i + 1] == "customposit") ||
-        (sims[i + 1] == "accelerator" && sims[i] == "customposit")) {
-      rel_err += compare_arrays(
-          acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "accelerator",
-          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "customposit", size, diff_file, false);
-    } else if ((sims[i] == "accelerator" && sims[i + 1] == "file") ||
-               (sims[i + 1] == "accelerator" && sims[i] == "file")) {
-      rel_err += compare_arrays(
-          acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "accelerator", positMemory->reference, "file", size, diff_file,
-          false);
-    } else if ((sims[i] == "customposit" && sims[i + 1] == "file") ||
-               (sims[i + 1] == "customposit" && sims[i] == "file")) {
-      rel_err += compare_arrays(
-          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "customposit", positMemory->reference, "file", size, diff_file,
-          false);
-    } else if ((sims[i] == "universal" && sims[i + 1] == "customposit") ||
-               (sims[i + 1] == "universal" && sims[i] == "customposit")) {
-      rel_err += compare_arrays(
-          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "universal",
-          universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "customposit", size, diff_file, false);
-    } else if ((sims[i] == "universal" && sims[i + 1] == "file") ||
-               (sims[i + 1] == "universal" && sims[i] == "file")) {
-      rel_err += compare_arrays(
-          universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "universal", universalPositMemory->reference, "file", size, diff_file,
-          false);
-    } else if ((sims[i] == "fp32" && sims[i + 1] == "file") ||
-               (sims[i + 1] == "fp32" && sims[i] == "file")) {
-      rel_err += compare_arrays(
-          floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32",
-          floatMemory->reference, "file", size, diff_file, false);
-    } else if ((sims[i] == "customposit" && sims[i + 1] == "fp32") ||
-               (sims[i] == "fp32" && sims[i + 1] == "customposit")) {
-      rel_err += compare_arrays(
-          positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-          "customposit",
-          floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32",
-          size, diff_file, false);
-    } else {
-      std::cerr << "ERROR: Comparison between " + sims[i] + " and "
-                << sims[i + 1] << " not supported." << std::endl;
-      std::abort();
-    }
+  bool accelerator =
+      std::find(sims.begin(), sims.end(), "accelerator") != sims.end();
+  bool customposit =
+      std::find(sims.begin(), sims.end(), "customposit") != sims.end();
+  bool universal =
+      std::find(sims.begin(), sims.end(), "universal") != sims.end();
+  bool fp32 = std::find(sims.begin(), sims.end(), "fp32") != sims.end();
+  bool pytorch = std::find(sims.begin(), sims.end(), "file") != sims.end();
 
-    if (rel_err > tolerance) error_count += rel_err < 1.0 ? 1 : (int)rel_err;
-    std::cout << "Rela. error: " << rel_err << std::endl;
-    std::cout << "Error count: " << error_count << std::endl;
+  std::string outFilePrefix;
+  if (workloads.size() == 1) {
+    outFilePrefix = out_dir + model + '.' + workloads.front().name + '.';
+  } else {
+    outFilePrefix = out_dir + model + '.' + workloads.front().name + "_to_" +
+                    workloads.back().name + '.';
   }
+
+  float rel_err = 0;
+  if (universal && pytorch) {
+    std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
+    std::cout << "(reveals issues in representing float as Posit)" << std::endl;
+    std::string diffFile = outFilePrefix + "universal_vs_pytorch.txt";
+
+    rel_err += compare_arrays(
+        universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "universal", universalPositMemory->reference, "file", size, diffFile,
+        false);
+  }
+
+  if (customposit && pytorch) {
+    std::cout << "HLS Posit Gold Model vs. Pytorch" << std::endl;
+    std::cout << "(reveals bugs in mapping operations to accelerator)"
+              << std::endl;
+    std::string diffFile = outFilePrefix + "hlsgold_vs_pytorch.txt";
+
+    rel_err += compare_arrays(
+        positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "customposit", positMemory->reference, "file", size, diffFile, false);
+  }
+
+  if (accelerator && pytorch) {
+    std::cout << "Accelerator vs. PyTorch" << std::endl;
+    std::cout << "(reveals bugs in accelerator or memory placement)"
+              << std::endl;
+    std::string diffFile = outFilePrefix + "accel_vs_pytorch.txt";
+
+    rel_err += compare_arrays(
+        acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "accelerator", positMemory->reference, "file", size, diffFile, false);
+  }
+
+  if (accelerator && customposit) {
+    std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
+    std::cout << "(reveals bugs in accelerator or memory placement)"
+              << std::endl;
+    std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
+
+    rel_err += compare_arrays(
+        acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "accelerator",
+        positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "customposit", size, diffFile, false);
+  }
+
+  if (customposit && universal) {
+    std::cout << "HLS Posit Gold Model vs. Universal Posit Gold Model"
+              << std::endl;
+    std::cout
+        << "(reveals bugs in implementation of custom HLS Posit operators)"
+        << std::endl;
+    std::string diffFile = outFilePrefix + "hlsgold_vs_universal.txt";
+
+    rel_err += compare_arrays(
+        positMemory->sram + workloads.back().params.OUTPUT_OFFSET, "universal",
+        universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "customposit", size, diffFile, false);
+  }
+
+  if (fp32 && pytorch) {
+    std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
+    std::cout << "(reveals issues in data loading or mapping)" << std::endl;
+    std::string diffFile = outFilePrefix + "fpgold_vs_pytorch.txt";
+
+    rel_err += compare_arrays(
+        floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32",
+        floatMemory->reference, "file", size, diffFile, false);
+  }
+
+  if (rel_err > tolerance) error_count += rel_err < 1.0 ? 1 : (int)rel_err;
+  std::cout << "Rela. error: " << rel_err << std::endl;
+  std::cout << "Error count: " << error_count << std::endl;
 
   return error_count;
 }
@@ -334,15 +365,15 @@ std::string Simulation::get_env_var(std::string const& name) {
 }
 
 void Simulation::print_help() {
-  std::cout
-      << "\nConfigure simulator by using environment variables."
-      << "\n NETWORK - Type of network to run {mobilebert, resnet}"
-      << "\n TESTS - Layers in network to run. Either single or tuple: "
-         "<first>,<last>."
-      << "\n SIMS - Simulators / models to compare {accelerator, "
-         "customposit, universal, fp32, file}."
-      << "\n TASK - MobileBERT run time (forward, backward, e2e)."
-      << "\n TOLERANCE - Relative normalized error in % we allow (default 10)."
-      << "\n DATA_DIR - Path to binary input data."
-      << "\n OUT_DIR - Path to output data." << std::endl;
+  std::cout << "\nConfigure simulator by using environment variables."
+            << "\n NETWORK - Type of network to run {mobilebert, resnet}"
+            << "\n TESTS - Layers in network to run. Either single or tuple: "
+               "<first>,<last>."
+            << "\n SIMS - Simulators / models to compare {accelerator, "
+               "customposit, universal, fp32, file}."
+            << "\n TASK - MobileBERT run time (forward, backward, e2e)."
+            << "\n TOLERANCE - Relative normalized error in % we allow "
+               "(default 10)."
+            << "\n DATA_DIR - Path to binary input data."
+            << "\n OUT_DIR - Path to output data." << std::endl;
 }
