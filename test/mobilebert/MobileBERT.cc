@@ -4102,8 +4102,10 @@ std::vector<Workload> MobileBERT::getWorkloads(
         weightDataDir = "activations/";
       }
 
-      // TODO: accelerator doesn't support these functionalities
+      // TODO: accelerator doesn't support these functionalities yet
+      // this results in FP32<->Pytorch failing for backprop and gradients
       workload.params.ACC_T_OUTPUT = false;
+      workload.params.GRAD_CLIPPING = false;
     }
 
     std::string encLayerName = "mobilebert_encoder_layer_0_";
