@@ -718,13 +718,13 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
 
     if (params.MAXPOOL) {
-      T *tmpMatrixC = new T[X * Y * K];
-      memcpy(tmpMatrixC, outputMatrix, sizeof(T) * X * Y * K);
+      ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
+      memcpy(tmpMatrixC, outputMatrix, sizeof(ACC_T) * X * Y * K);
 
       for (int y = 0; y < Y / 2; y++) {
         for (int x = 0; x < X / 2; x++) {
           for (int k = 0; k < K; k++) {
-            std::vector<T> v;
+            std::vector<ACC_T> v;
 
             for (int x_window = 0; x_window < 2; x_window++) {
               for (int y_window = 0; y_window < 2; y_window++) {
