@@ -1,4 +1,3 @@
-#ifdef USE_CODEGEN // TODO(fpedd): Replace these filewide includes with something cleaner
 #include "test/codegen/CodeGen.h"
 
 #if __has_include(<filesystem>)
@@ -18,7 +17,7 @@ namespace filesystem = experimental::filesystem;
 #include "test/codegen/params_codegen.h"
 #else
 #pragma error \
-    "Could not find generated params header. Make sure to run Codegen(ZagZig) first."
+    "Could not find generated params header. Make sure you ran Codegen (ZagZig)."
 #endif
 
 CodeGen::CodeGen(const std::string& dataDir) {
@@ -90,4 +89,3 @@ std::vector<Workload> CodeGen::getWorkloadsInRange(
 std::vector<Workload> CodeGen::getAllWorkloads() const {
   return getWorkloads(order);
 }
-#endif

@@ -2,14 +2,27 @@
 #include <iostream>
 #include <string>
 
-
 // By default we have 2MB of SRAM per MINOTAUR SoC
 // organized as 8x 256KB Banks with 2x 128KB Macros each
-constexpr int SRAM_MEMORY_SIZE = (2 * 1024 * 1024);
+constexpr int NUM_SRAM_BANKS = 8;
+constexpr int SRAM_MEMORY_SIZE = NUM_SRAM_BANKS * 256 * 1024;
 
 // By default we have 12MB of RRAM per MINOTAUR SoC
 // organized as 12x 1MB Banks with 4x 256KB Macros each
-constexpr int RRAM_MEMORY_SIZE = (12 * 1024 * 1024);
+constexpr int NUM_RRAM_BANKS = 12;
+constexpr int RRAM_MEMORY_SIZE = NUM_RRAM_BANKS * 1024 * 1024;
+
+// Bandwidth-mode for a RRAM memory bank
+// QUAD -> 1 clock cycle acces using 4 banks
+// DOUBLE -> 2 clock cycle acces using 2 banks
+// SINGLE -> 4 clock cycle acces using 1 bank
+enum BandwidthMode { QUAD, DOUBLE, SINGLE };
+
+// Power-state for a memory bank
+// OFF -> whole macro if off (SRAM loses/RRAM retains state)
+// ON -> whole macro is on (both retain)
+// RETENTION -> control-logic is off, cells are still powered (both retain)
+enum PowerState { OFF, ON, RETENTION };
 
 struct Files {
   std::string inputs_file;
@@ -112,8 +125,12 @@ struct SimplifiedParams {
   bool depthwise;
 
   // Power state of memory banks
-  bool sram_banks[8];
-  bool rram_banks[12];
+  PowerState sram_banks[NUM_SRAM_BANKS];
+  PowerState rram_banks[NUM_RRAM_BANKS];
+
+  // Bandwidth-aware (RRAM only)
+  BandwidthMode bandwidth_mode;
+  int bank_offsets[NUM_RRAM_BANKS];
 };
 
 struct MemoryOffsets {

@@ -4,9 +4,7 @@
 #include <iostream>
 #include <string>
 
-#ifdef USE_CODEGEN
 #include "test/codegen/CodeGen.h"
-#endif
 #include "test/common/GoldModel.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
@@ -70,11 +68,8 @@ Simulation::Simulation() {
   } else if (model == "mobilebert") {
     network = std::make_unique<MobileBERT>(data_dir, task);
   } else {
-#ifdef USE_CODEGEN
+    // If the model name does not match any of the 
     network = std::make_unique<CodeGen>(data_dir);
-#else
-    throw std::runtime_error("Unsupported model.");
-#endif
   }
 
   // Collect workloads (aka. layers) from Network
