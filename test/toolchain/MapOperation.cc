@@ -30,6 +30,8 @@ void MapOperation(const SimplifiedParams &params,
     MapNoNormGrad(params, mappedParams);
   } else if (params.MSE_GRAD || params.BCE_WITH_LOGITS_GRAD) {
     MapGenericErrorGrad(params, mappedParams);
+  } else if (params.BIAS_GRAD) {
+    MapBiasGrad(params, mappedParams);
   } else {
     MapMatrixOp(params, mappedParams);
   }

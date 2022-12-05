@@ -5,6 +5,9 @@
 #include "src/Params.h"
 #include "test/common/VerificationTypes.h"
 
+void MapBiasGrad(const SimplifiedParams &params,
+                 std::deque<BaseParams *> &mappedParams);
+
 void MapSoftmax(const SimplifiedParams &params,
                 std::deque<BaseParams *> &mappedParams);
 
