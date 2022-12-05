@@ -1,9 +1,7 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
-                 bool &matrixParamsValid, VectorParams &vectorParams,
-                 VectorInstructionConfig &vectorInstructionConfig,
-                 bool &vectorParamsValid) {
+void MapMatrixOp(const SimplifiedParams &params,
+                 std::deque<BaseParams *> &mappedParams) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -15,33 +13,35 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
-  matrixParamsValid = true;
-  vectorParamsValid = true;
+  MatrixParams *matrixParams = new MatrixParams;
+  VectorParams *vectorParams = new VectorParams;
+  VectorInstructionConfig *vectorInstructionConfig =
+      new VectorInstructionConfig;
 
   // matrix params
-  matrixParams.INPUT_OFFSET = params.INPUT_OFFSET;
-  matrixParams.WEIGHT_OFFSET = params.WEIGHT_OFFSET;
-  matrixParams.WEIGHT_TRANSPOSE = params.WEIGHT_TRANSPOSE;
+  matrixParams->INPUT_OFFSET = params.INPUT_OFFSET;
+  matrixParams->WEIGHT_OFFSET = params.WEIGHT_OFFSET;
+  matrixParams->WEIGHT_TRANSPOSE = params.WEIGHT_TRANSPOSE;
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 6; j++) {
-      matrixParams.loops[i][j] = params.loops[i][j];
+      matrixParams->loops[i][j] = params.loops[i][j];
     }
-    matrixParams.inputXLoopIndex[i] = params.inputXLoopIndex[i];
-    matrixParams.inputYLoopIndex[i] = params.inputYLoopIndex[i];
-    matrixParams.reductionLoopIndex[i] = params.reductionLoopIndex[i];
-    matrixParams.weightLoopIndex[i] = params.weightLoopIndex[i];
-    matrixParams.weightReuseIndex[i] = params.weightReuseIndex[i];
+    matrixParams->inputXLoopIndex[i] = params.inputXLoopIndex[i];
+    matrixParams->inputYLoopIndex[i] = params.inputYLoopIndex[i];
+    matrixParams->reductionLoopIndex[i] = params.reductionLoopIndex[i];
+    matrixParams->weightLoopIndex[i] = params.weightLoopIndex[i];
+    matrixParams->weightReuseIndex[i] = params.weightReuseIndex[i];
   }
-  matrixParams.fxIndex = params.fxIndex;
-  matrixParams.fyIndex = params.fyIndex;
+  matrixParams->fxIndex = params.fxIndex;
+  matrixParams->fyIndex = params.fyIndex;
 
   // set outer loop values
   for (int j = 0; j < 5; j++) {
-    matrixParams.weightAddressGenLoops[0][j] = params.loops[0][j];
+    matrixParams->weightAddressGenLoops[0][j] = params.loops[0][j];
   }
-  matrixParams.weightAddressGenInputXLoopIndex = params.inputXLoopIndex[0];
-  matrixParams.weightAddressGenInputYLoopIndex = params.inputYLoopIndex[0];
-  matrixParams.weightAddressGenWeightLoopIndex[0] = params.weightLoopIndex[0];
+  matrixParams->weightAddressGenInputXLoopIndex = params.inputXLoopIndex[0];
+  matrixParams->weightAddressGenInputYLoopIndex = params.inputYLoopIndex[0];
+  matrixParams->weightAddressGenWeightLoopIndex[0] = params.weightLoopIndex[0];
 
   // set inner loop values
   if (params.WEIGHT_TRANSPOSE) {
@@ -49,18 +49,18 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
     // unrolled reduction loop
     // we can just use the following loop nest:
     // C1, K, FY, FX, C0
-    matrixParams.weightAddressGenLoops[1][4] = DIMENSION;
-    matrixParams.weightAddressGenReductionLoopIndex[1] = 4;
-    matrixParams.weightAddressGenLoops[1][3] = params.loops[1][params.fxIndex];
-    matrixParams.weightAddressGenFxIndex = 3;
-    matrixParams.weightAddressGenLoops[1][2] = params.loops[1][params.fyIndex];
-    matrixParams.weightAddressGenFyIndex = 2;
-    matrixParams.weightAddressGenLoops[1][1] =
+    matrixParams->weightAddressGenLoops[1][4] = DIMENSION;
+    matrixParams->weightAddressGenReductionLoopIndex[1] = 4;
+    matrixParams->weightAddressGenLoops[1][3] = params.loops[1][params.fxIndex];
+    matrixParams->weightAddressGenFxIndex = 3;
+    matrixParams->weightAddressGenLoops[1][2] = params.loops[1][params.fyIndex];
+    matrixParams->weightAddressGenFyIndex = 2;
+    matrixParams->weightAddressGenLoops[1][1] =
         params.loops[1][params.weightLoopIndex[1]];
-    matrixParams.weightAddressGenWeightLoopIndex[1] = 1;
-    matrixParams.weightAddressGenLoops[1][0] =
+    matrixParams->weightAddressGenWeightLoopIndex[1] = 1;
+    matrixParams->weightAddressGenLoops[1][0] =
         params.loops[1][params.reductionLoopIndex[1]];
-    matrixParams.weightAddressGenReductionLoopIndex[0] = 0;
+    matrixParams->weightAddressGenReductionLoopIndex[0] = 0;
   } else {  // if not tranpose, then we have freedom to pick any loop order
     // for efficient memory accesses, addresses should be consecutive
     // or least, not multiples of 4, due to interleaving.
@@ -69,172 +69,172 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
     // C1, C0, FX, FY, K
     // int index = 0;
     // for (int j = 0; j < 6; j++) {
-    //   if (j == matrixParams.inputXLoopIndex[1] ||
-    //       j == matrixParams.inputYLoopIndex[1]) {
+    //   if (j == matrixParams->inputXLoopIndex[1] ||
+    //       j == matrixParams->inputYLoopIndex[1]) {
     //     continue;
     //   }
-    //   matrixParams.weightAddressGenLoops[1][index] = params.loops[1][j];
+    //   matrixParams->weightAddressGenLoops[1][index] = params.loops[1][j];
 
-    //   if (j == matrixParams.reductionLoopIndex[1]) {
-    //     matrixParams.weightAddressGenReductionLoopIndex[0] = index;
+    //   if (j == matrixParams->reductionLoopIndex[1]) {
+    //     matrixParams->weightAddressGenReductionLoopIndex[0] = index;
     //   }
-    //   if (j == matrixParams.fxIndex) {
-    //     matrixParams.weightAddressGenFxIndex = index;
+    //   if (j == matrixParams->fxIndex) {
+    //     matrixParams->weightAddressGenFxIndex = index;
     //   }
-    //   if (j == matrixParams.fyIndex) {
-    //     matrixParams.weightAddressGenFyIndex = index;
+    //   if (j == matrixParams->fyIndex) {
+    //     matrixParams->weightAddressGenFyIndex = index;
     //   }
-    //   if (j == matrixParams.weightLoopIndex[1]) {
-    //     matrixParams.weightAddressGenWeightLoopIndex[1] = index;
+    //   if (j == matrixParams->weightLoopIndex[1]) {
+    //     matrixParams->weightAddressGenWeightLoopIndex[1] = index;
     //   }
 
     //   index++;
     // }
-    // matrixParams.weightAddressGenLoops[1][4] = DIMENSION;
-    // matrixParams.weightAddressGenReductionLoopIndex[1] = 4;
+    // matrixParams->weightAddressGenLoops[1][4] = DIMENSION;
+    // matrixParams->weightAddressGenReductionLoopIndex[1] = 4;
 
-    matrixParams.weightAddressGenLoops[1][4] =
+    matrixParams->weightAddressGenLoops[1][4] =
         params.loops[1][params.weightLoopIndex[1]];
-    matrixParams.weightAddressGenWeightLoopIndex[1] = 4;
+    matrixParams->weightAddressGenWeightLoopIndex[1] = 4;
 
-    matrixParams.weightAddressGenLoops[1][3] = params.loops[1][params.fyIndex];
-    matrixParams.weightAddressGenFyIndex = 3;
+    matrixParams->weightAddressGenLoops[1][3] = params.loops[1][params.fyIndex];
+    matrixParams->weightAddressGenFyIndex = 3;
 
-    matrixParams.weightAddressGenLoops[1][2] = params.loops[1][params.fxIndex];
+    matrixParams->weightAddressGenLoops[1][2] = params.loops[1][params.fxIndex];
     if (params.REPLICATION) {
-      matrixParams.weightAddressGenLoops[1][2] = 7;
+      matrixParams->weightAddressGenLoops[1][2] = 7;
     }
-    matrixParams.weightAddressGenFxIndex = 2;
+    matrixParams->weightAddressGenFxIndex = 2;
 
     if (params.REPLICATION) {
-      matrixParams.weightAddressGenLoops[1][1] = 3;
-      matrixParams.weightAddressGenReductionLoopIndex[1] = 1;
+      matrixParams->weightAddressGenLoops[1][1] = 3;
+      matrixParams->weightAddressGenReductionLoopIndex[1] = 1;
     } else {
-      matrixParams.weightAddressGenLoops[1][1] = DIMENSION;
-      matrixParams.weightAddressGenReductionLoopIndex[1] = 1;
+      matrixParams->weightAddressGenLoops[1][1] = DIMENSION;
+      matrixParams->weightAddressGenReductionLoopIndex[1] = 1;
     }
-    matrixParams.weightAddressGenLoops[1][0] =
+    matrixParams->weightAddressGenLoops[1][0] =
         params.loops[1][params.reductionLoopIndex[1]];
-    matrixParams.weightAddressGenReductionLoopIndex[0] = 0;
+    matrixParams->weightAddressGenReductionLoopIndex[0] = 0;
   }
 
-  matrixParams.STRIDE = params.STRIDE;
-  matrixParams.HEAD_SIZE_LG2 = 0;
-  matrixParams.REPLICATION = params.REPLICATION;
-  matrixParams.STORE_IN_ACC = params.STORE_IN_ACC;
-  matrixParams.ACC_FROM_ACC = params.ACC_FROM_ACC;
-  matrixParams.CONCAT_INPUT = params.CONCAT_INPUT;
-  matrixParams.CONCAT_HEAD_WEIGHTS = params.CONCAT_WEIGHT;
-  matrixParams.TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
-  matrixParams.COMBINE_GRADS = params.WEIGHT_SPLITTING;
+  matrixParams->STRIDE = params.STRIDE;
+  matrixParams->HEAD_SIZE_LG2 = 0;
+  matrixParams->REPLICATION = params.REPLICATION;
+  matrixParams->STORE_IN_ACC = params.STORE_IN_ACC;
+  matrixParams->ACC_FROM_ACC = params.ACC_FROM_ACC;
+  matrixParams->CONCAT_INPUT = params.CONCAT_INPUT;
+  matrixParams->CONCAT_HEAD_WEIGHTS = params.CONCAT_WEIGHT;
+  matrixParams->TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
+  matrixParams->COMBINE_GRADS = params.WEIGHT_SPLITTING;
   P8 learningRate = static_cast<P8>(params.learningRate);
-  matrixParams.learningRate = learningRate.bits;
+  matrixParams->learningRate = learningRate.bits;
 
   // sendSerializedParams<MatrixParams, 32>(matrixParams,
   // &serialMatrixParamsIn);
 
-  memset(&vectorParams, 0, sizeof(vectorParams));
+  // memset(vectorParams, 0, sizeof(*vectorParams));
 
-  vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams.addressGen0Enable = false;  // use matrix unit outputs
+  vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
+  vectorParams->addressGen0Enable = false;  // use matrix unit outputs
 
   // residual
-  vectorParams.ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
-  vectorParams.addressGen1Mode = params.RESIDUAL || params.RELU_GRAD;
+  vectorParams->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
+  vectorParams->addressGen1Mode = params.RESIDUAL || params.RELU_GRAD;
 
   for (int i = 0; i < 3; i++) {
-    vectorParams.addressGen1Loops[0][i] = params.loops[0][i];
+    vectorParams->addressGen1Loops[0][i] = params.loops[0][i];
   }
-  vectorParams.addressGen1InputXLoopIndex[0] = params.inputXLoopIndex[0];
-  vectorParams.addressGen1InputYLoopIndex[0] = params.inputYLoopIndex[0];
-  vectorParams.addressGen1WeightLoopIndex[0] = params.weightLoopIndex[0];
+  vectorParams->addressGen1InputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->addressGen1InputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->addressGen1WeightLoopIndex[0] = params.weightLoopIndex[0];
 
   int residualLoopIndex = 0;
   for (int i = 0; i < 6; i++) {
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
         i == params.inputYLoopIndex[1]) {
-      vectorParams.addressGen1Loops[1][residualLoopIndex] = params.loops[1][i];
+      vectorParams->addressGen1Loops[1][residualLoopIndex] = params.loops[1][i];
       if (i == params.inputXLoopIndex[1]) {
-        vectorParams.addressGen1InputXLoopIndex[1] = residualLoopIndex;
+        vectorParams->addressGen1InputXLoopIndex[1] = residualLoopIndex;
       }
       if (i == params.inputYLoopIndex[1]) {
-        vectorParams.addressGen1InputYLoopIndex[1] = residualLoopIndex;
+        vectorParams->addressGen1InputYLoopIndex[1] = residualLoopIndex;
       }
       if (i == params.weightLoopIndex[1]) {
-        vectorParams.addressGen1WeightLoopIndex[1] = residualLoopIndex;
+        vectorParams->addressGen1WeightLoopIndex[1] = residualLoopIndex;
       }
       residualLoopIndex++;
     }
   }
 
   // bias
-  vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams.addressGen2Mode = params.BIAS;
+  vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
+  vectorParams->addressGen2Mode = params.BIAS;
   for (int i = 0; i < 3; i++) {
-    vectorParams.addressGen2Loops[0][i] = params.loops[0][i];
+    vectorParams->addressGen2Loops[0][i] = params.loops[0][i];
   }
 
-  vectorParams.addressGen2InputXLoopIndex[0] = params.inputXLoopIndex[0];
-  vectorParams.addressGen2InputYLoopIndex[0] = params.inputYLoopIndex[0];
-  vectorParams.addressGen2WeightLoopIndex[0] = params.weightLoopIndex[0];
+  vectorParams->addressGen2InputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->addressGen2InputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->addressGen2WeightLoopIndex[0] = params.weightLoopIndex[0];
 
   int biasLoopIndex = 0;
   for (int i = 0; i < 6; i++) {
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
         i == params.inputYLoopIndex[1]) {
-      vectorParams.addressGen2Loops[1][biasLoopIndex] = params.loops[1][i];
+      vectorParams->addressGen2Loops[1][biasLoopIndex] = params.loops[1][i];
       if (i == params.inputXLoopIndex[1]) {
-        vectorParams.addressGen2InputXLoopIndex[1] = biasLoopIndex;
+        vectorParams->addressGen2InputXLoopIndex[1] = biasLoopIndex;
       }
       if (i == params.inputYLoopIndex[1]) {
-        vectorParams.addressGen2InputYLoopIndex[1] = biasLoopIndex;
+        vectorParams->addressGen2InputYLoopIndex[1] = biasLoopIndex;
       }
       if (i == params.weightLoopIndex[1]) {
-        vectorParams.addressGen2WeightLoopIndex[1] = biasLoopIndex;
+        vectorParams->addressGen2WeightLoopIndex[1] = biasLoopIndex;
       }
       biasLoopIndex++;
     }
   }
 
-  vectorParams.FULL_HEAD_SIZE = 0;
-  vectorParams.SPLIT_OUTPUT = params.SPLIT_OUTPUT;
-  vectorParams.DP_OUTPUT = false;
-  vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams.scalarOutputCount = 0;
-  vectorParams.MAXPOOL = params.MAXPOOL;
-  vectorParams.AVGPOOL = params.AVGPOOL;
+  vectorParams->FULL_HEAD_SIZE = 0;
+  vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
+  vectorParams->DP_OUTPUT = false;
+  vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->scalarOutputCount = 0;
+  vectorParams->MAXPOOL = params.MAXPOOL;
+  vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
   for (int i = 0; i < 3; i++) {
-    vectorParams.outputLoops[0][i] = params.loops[0][i];
+    vectorParams->outputLoops[0][i] = params.loops[0][i];
   }
-  vectorParams.outputXLoopIndex[0] = params.inputXLoopIndex[0];
-  vectorParams.outputYLoopIndex[0] = params.inputYLoopIndex[0];
-  vectorParams.outputWeightLoopIndex[0] = params.weightLoopIndex[0];
+  vectorParams->outputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->outputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->outputWeightLoopIndex[0] = params.weightLoopIndex[0];
 
   int outputLoopIndex = 0;
   for (int i = 0; i < 6; i++) {
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
         i == params.inputYLoopIndex[1]) {
-      vectorParams.outputLoops[1][outputLoopIndex] = params.loops[1][i];
+      vectorParams->outputLoops[1][outputLoopIndex] = params.loops[1][i];
       if (i == params.inputXLoopIndex[1]) {
-        vectorParams.outputXLoopIndex[1] = outputLoopIndex;
+        vectorParams->outputXLoopIndex[1] = outputLoopIndex;
       }
       if (i == params.inputYLoopIndex[1]) {
-        vectorParams.outputYLoopIndex[1] = outputLoopIndex;
+        vectorParams->outputYLoopIndex[1] = outputLoopIndex;
       }
       if (i == params.weightLoopIndex[1]) {
-        vectorParams.outputWeightLoopIndex[1] = outputLoopIndex;
+        vectorParams->outputWeightLoopIndex[1] = outputLoopIndex;
       }
       outputLoopIndex++;
     }
   }
 
-  vectorParams.SPLIT_OUTPUT = params.SPLIT_OUTPUT;
+  vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
@@ -242,7 +242,7 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
   // create instruction stream
   //    VectorInstructionConfig vectorInstructionConfig;
 
-  memset(&vectorInstructionConfig, 0, sizeof(vectorInstructionConfig));
+  // memset(vectorInstructionConfig, 0, sizeof(*vectorInstructionConfig));
 
   VectorInstructions vInst0;
   memset(&vInst0, 0, sizeof(vInst0));
@@ -289,14 +289,14 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
     VectorInstructions accumulatorInst;
     accumulatorInst.instType = VectorInstructions::accumulation;
     accumulatorInst.rCount = X * Y;
-    vectorInstructionConfig.instCount[0] = 1;
-    vectorInstructionConfig.inst[0] = accumulatorInst;
+    vectorInstructionConfig->instCount[0] = 1;
+    vectorInstructionConfig->inst[0] = accumulatorInst;
 
     // build on top of existing inst0
     // send to accumulator
     vInst0.vAccumulatePush = 1;
-    vectorInstructionConfig.inst[1] = vInst0;
-    vectorInstructionConfig.instCount[1] = X * Y;
+    vectorInstructionConfig->inst[1] = vInst0;
+    vectorInstructionConfig->instCount[1] = X * Y;
 
     // pull from accumulator and divide by X*Y
     VectorInstructions vInst2;
@@ -314,24 +314,28 @@ void MapMatrixOp(const SimplifiedParams &params, MatrixParams &matrixParams,
     float fpscale = (1.0 / (X * Y));
     Posit<8, 1> scale = static_cast<Posit<8, 1> >(fpscale);
     vInst2.immediate0 = scale.bits;
-    vectorInstructionConfig.inst[2] = vInst2;
-    vectorInstructionConfig.instCount[2] = 1;
+    vectorInstructionConfig->inst[2] = vInst2;
+    vectorInstructionConfig->instCount[2] = 1;
 
-    vectorInstructionConfig.instLen = 3;
-    vectorInstructionConfig.instLoopCount = K / DIMENSION;
+    vectorInstructionConfig->instLen = 3;
+    vectorInstructionConfig->instLoopCount = K / DIMENSION;
   } else {
     vInst0.vDest = VectorInstructions::vWriteOut;
-    vectorInstructionConfig.inst[0] = vInst0;
+    vectorInstructionConfig->inst[0] = vInst0;
 
     // total output count
-    vectorInstructionConfig.instCount[0] =
+    vectorInstructionConfig->instCount[0] =
         params.loops[0][params.inputXLoopIndex[0]] *
         params.loops[1][params.inputXLoopIndex[1]] *
         params.loops[0][params.inputYLoopIndex[0]] *
         params.loops[1][params.inputYLoopIndex[1]] *
         params.loops[0][params.weightLoopIndex[0]] *
         params.loops[1][params.weightLoopIndex[1]];
-    vectorInstructionConfig.instLen = 1;
-    vectorInstructionConfig.instLoopCount = 1;
+    vectorInstructionConfig->instLen = 1;
+    vectorInstructionConfig->instLoopCount = 1;
   }
+
+  mappedParams.push_back(matrixParams);
+  mappedParams.push_back(vectorParams);
+  mappedParams.push_back(vectorInstructionConfig);
 }

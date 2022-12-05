@@ -1,9 +1,7 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapNoNormGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
-                   bool &matrixParamsValid, VectorParams &vectorParams,
-                   VectorInstructionConfig &vectorInstructionConfig,
-                   bool &vectorParamsValid) {
+void MapNoNormGrad(const SimplifiedParams &params,
+                   std::deque<BaseParams *> &mappedParams) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -14,56 +12,57 @@ void MapNoNormGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
+  
+  VectorParams *vectorParams = new VectorParams;
+  VectorInstructionConfig *vectorInstructionConfig =
+      new VectorInstructionConfig;
 
-  matrixParamsValid = false;
-  vectorParamsValid = true;
+  vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
+  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Broadcast = false;
 
-  vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams.addressGen0Enable = true;
-  vectorParams.addressGen0Broadcast = false;
-
-  vectorParams.addressGen0Loop[0][0] = 1;
-  vectorParams.addressGen0Loop[0][1] = 1;
-  vectorParams.addressGen0Loop[0][2] = K / DIMENSION;
-  vectorParams.addressGen0Loop[1][0] = 1;
-  vectorParams.addressGen0Loop[1][1] = X;
-  vectorParams.addressGen0Loop[1][2] = 1;
+  vectorParams->addressGen0Loop[0][0] = 1;
+  vectorParams->addressGen0Loop[0][1] = 1;
+  vectorParams->addressGen0Loop[0][2] = K / DIMENSION;
+  vectorParams->addressGen0Loop[1][0] = 1;
+  vectorParams->addressGen0Loop[1][1] = X;
+  vectorParams->addressGen0Loop[1][2] = 1;
 
   // address gen 1 (weights)
-  vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
-  vectorParams.addressGen1Mode = 2;  // 2d tensor
-  vectorParams.addressGen1Loops[0][0] = 1;
-  vectorParams.addressGen1Loops[0][1] = 1;
-  vectorParams.addressGen1Loops[0][2] = K / DIMENSION;
-  vectorParams.addressGen1Loops[1][0] = 1;
-  vectorParams.addressGen1Loops[1][1] = X;
-  vectorParams.addressGen1Loops[1][2] = 1;
+  vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
+  vectorParams->addressGen1Mode = 2;  // 2d tensor
+  vectorParams->addressGen1Loops[0][0] = 1;
+  vectorParams->addressGen1Loops[0][1] = 1;
+  vectorParams->addressGen1Loops[0][2] = K / DIMENSION;
+  vectorParams->addressGen1Loops[1][0] = 1;
+  vectorParams->addressGen1Loops[1][1] = X;
+  vectorParams->addressGen1Loops[1][2] = 1;
 
-  vectorParams.ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams.addressGen2Mode = 0;  // no bias
+  vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
+  vectorParams->addressGen2Mode = 0;  // no bias
 
-  vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams.scalarOutputCount = 0;
-  vectorParams.MAXPOOL = false;
-  vectorParams.AVGPOOL = false;
-  vectorParams.SPLIT_OUTPUT = false;
+  vectorParams->scalarOutputCount = 0;
+  vectorParams->MAXPOOL = false;
+  vectorParams->AVGPOOL = false;
+  vectorParams->SPLIT_OUTPUT = false;
 
   // output
   for (int i = 0; i < 3; i++) {
-    vectorParams.outputLoops[0][i] = 1;
+    vectorParams->outputLoops[0][i] = 1;
   }
-  vectorParams.outputXLoopIndex[0] = params.inputXLoopIndex[0];
-  vectorParams.outputYLoopIndex[0] = params.inputYLoopIndex[0];
-  vectorParams.outputWeightLoopIndex[0] = params.weightLoopIndex[0];
+  vectorParams->outputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->outputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->outputWeightLoopIndex[0] = params.weightLoopIndex[0];
 
-  vectorParams.outputLoops[1][0] = 1;
-  vectorParams.outputLoops[1][1] = 1;
-  vectorParams.outputLoops[1][2] = K / DIMENSION;
-  vectorParams.outputWeightLoopIndex[1] = 2;
-  vectorParams.outputYLoopIndex[1] = 0;
-  vectorParams.outputXLoopIndex[1] = 1;
+  vectorParams->outputLoops[1][0] = 1;
+  vectorParams->outputLoops[1][1] = 1;
+  vectorParams->outputLoops[1][2] = K / DIMENSION;
+  vectorParams->outputWeightLoopIndex[1] = 2;
+  vectorParams->outputYLoopIndex[1] = 0;
+  vectorParams->outputXLoopIndex[1] = 1;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
@@ -75,8 +74,8 @@ void MapNoNormGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   VectorInstructions vInst0;
   vInst0.instType = VectorInstructions::accumulation;
   vInst0.rCount = X;
-  vectorInstructionConfig.instCount[0] = 1;
-  vectorInstructionConfig.inst[0] = vInst0;
+  vectorInstructionConfig->instCount[0] = 1;
+  vectorInstructionConfig->inst[0] = vInst0;
 
   // inst 1- (inputs x weights), send to accumulator
   VectorInstructions vInst1;
@@ -92,11 +91,11 @@ void MapNoNormGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   vInst1.vOp4 = VectorInstructions::nop;
   vInst1.vAccumulatePush = 1;
   vInst1.vDest = VectorInstructions::nop;
-  vectorInstructionConfig.inst[1] = vInst1;
+  vectorInstructionConfig->inst[1] = vInst1;
 
   // C/DIMENSION to do the complete reduction
   // DIMENSION to fill up the entire vector
-  vectorInstructionConfig.instCount[1] = X;
+  vectorInstructionConfig->instCount[1] = X;
 
   // inst 2- pull from accumulator
   VectorInstructions vInst2;
@@ -111,11 +110,11 @@ void MapNoNormGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   vInst2.vOp4 = VectorInstructions::nop;
   vInst2.vAccumulatePush = 0;
   vInst2.vDest = VectorInstructions::vWriteOut;
-  vectorInstructionConfig.inst[2] = vInst2;
-  vectorInstructionConfig.instCount[2] = 1;
+  vectorInstructionConfig->inst[2] = vInst2;
+  vectorInstructionConfig->instCount[2] = 1;
 
-  vectorInstructionConfig.instLen = 3;
-  vectorInstructionConfig.instLoopCount = C / DIMENSION;
+  vectorInstructionConfig->instLen = 3;
+  vectorInstructionConfig->instLoopCount = C / DIMENSION;
 
   // sendSerializedParams<VectorInstructionConfig,
   // 32>(vectorInstructionConfig,
@@ -127,4 +126,7 @@ void MapNoNormGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   //     vectorUnitDoneSignal.SyncPop();
   //     CCS_LOG("Accelerator
   //     Layer Finished.");
+
+  mappedParams.push_back(vectorParams);
+  mappedParams.push_back(vectorInstructionConfig);
 }

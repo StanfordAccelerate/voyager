@@ -290,35 +290,61 @@ void Harness::sendParams() {
   for (SimplifiedParams params : params_list) {
     currentParams = params;
 
-    MatrixParams matrixParams;
-    VectorParams vectorParams;
-    VectorInstructionConfig vectorInstructionConfig;
-    bool matrixParamsValid, vectorParamsValid;
+    std::deque<BaseParams *> opParams;
+    MapOperation(params, opParams);
 
-    MapOperation(params, matrixParams, matrixParamsValid, vectorParams,
-                 vectorInstructionConfig, vectorParamsValid);
+    while (opParams.size() > 0) {
+      bool matrixParamsValid, vectorParamsValid;
 
-    if (matrixParamsValid) {
-      sendSerializedParams<MatrixParams, 32>(matrixParams,
-                                             &serialMatrixParamsIn);
-      matrixUnitStartSignal.SyncPop();
-    }
-    if (vectorParamsValid) {
-      sendSerializedParams<VectorParams, 32>(vectorParams,
-                                             &serialVectorParamsIn);
-      sendSerializedParams<VectorInstructionConfig, 32>(vectorInstructionConfig,
-                                                        &serialVectorParamsIn);
-      vectorUnitStartSignal.SyncPop();
-    }
-    CCS_LOG("Accelerator Layer Started.");
+      BaseParams *baseParam = opParams.front();
 
-    if (matrixParamsValid) {
-      matrixUnitDoneSignal.SyncPop();
+      MatrixParams *matrixParams = dynamic_cast<MatrixParams *>(baseParam);
+      matrixParamsValid = matrixParams != NULL;
+      std::cout << "matrix: " << matrixParamsValid << std::endl;
+
+      if (matrixParamsValid) {
+        opParams.pop_front();
+        baseParam = opParams.front();
+      }
+
+      VectorParams *vectorParams = dynamic_cast<VectorParams *>(baseParam);
+      VectorInstructionConfig *vectorInstructionConfig;
+      vectorParamsValid = vectorParams != NULL;
+            std::cout << "vector: " << vectorParamsValid << std::endl;
+
+
+      if (vectorParamsValid) {
+        opParams.pop_front();
+        baseParam = opParams.front();
+
+        vectorInstructionConfig =
+            dynamic_cast<VectorInstructionConfig *>(baseParam);
+        opParams.pop_front();
+      }
+
+      if (matrixParamsValid) {
+        sendSerializedParams<MatrixParams, 32>(*matrixParams,
+                                               &serialMatrixParamsIn);
+        matrixUnitStartSignal.SyncPop();
+      }
+      if (vectorParamsValid) {
+        sendSerializedParams<VectorParams, 32>(*vectorParams,
+                                               &serialVectorParamsIn);
+        sendSerializedParams<VectorInstructionConfig, 32>(
+            *vectorInstructionConfig, &serialVectorParamsIn);
+        vectorUnitStartSignal.SyncPop();
+      }
+
+      CCS_LOG("Accelerator Layer Started.");
+
+      if (matrixParamsValid) {
+        matrixUnitDoneSignal.SyncPop();
+      }
+      if (vectorParamsValid) {
+        vectorUnitDoneSignal.SyncPop();
+      }
+      CCS_LOG("Accelerator Layer Finished.");
     }
-    if (vectorParamsValid) {
-      vectorUnitDoneSignal.SyncPop();
-    }
-    CCS_LOG("Accelerator Layer Finshed.");
 
 #ifdef SOC_COSIM
     // copy_output(sramMemory, sizeof(INPUT_DATATYPE) * 2 * 1024 * 1024,

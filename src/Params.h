@@ -4,7 +4,14 @@
 #include "TypeToBits.h"
 #endif
 
-struct MatrixParams {
+// Base params struct
+struct BaseParams {
+  // empty, only purpose is to serve as a base class for polymorphism
+  // We need this or any other virtual member to make Base polymorphic
+    virtual ~BaseParams () { }
+};
+
+struct MatrixParams : BaseParams {
   int INPUT_OFFSET;
   int WEIGHT_OFFSET;
 
@@ -305,7 +312,7 @@ struct VectorInstructions {
   }
 };
 
-struct VectorParams {
+struct VectorParams : BaseParams{
   // 3 address generators:
   // - Vector Input
   // - Residual/Op0Src1
@@ -440,7 +447,7 @@ struct VectorParams {
   }
 };
 
-struct VectorInstructionConfig {
+struct VectorInstructionConfig : BaseParams{
   VectorInstructions inst[8];
   int instCount[8];
   int instLen;

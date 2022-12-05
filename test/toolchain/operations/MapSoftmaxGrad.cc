@@ -1,9 +1,7 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapSoftmaxGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
-                    bool &matrixParamsValid, VectorParams &vectorParams,
-                    VectorInstructionConfig &vectorInstructionConfig,
-                    bool &vectorParamsValid) {
+void MapSoftmaxGrad(const SimplifiedParams &params,
+                    std::deque<BaseParams *> &mappedParams) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -15,60 +13,61 @@ void MapSoftmaxGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
-  matrixParamsValid = false;
-  vectorParamsValid = true;
+  VectorParams *vectorParams = new VectorParams;
+  VectorInstructionConfig *vectorInstructionConfig =
+      new VectorInstructionConfig;
 
-  vectorParams.VECTOR_OFFSET = params.RESIDUAL_OFFSET;
-  vectorParams.addressGen0Enable = true;
+  vectorParams->VECTOR_OFFSET = params.RESIDUAL_OFFSET;
+  vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
-    vectorParams.addressGen0Loop[0][i] = 1;
+    vectorParams->addressGen0Loop[0][i] = 1;
   }
-  vectorParams.addressGen0Loop[1][0] = 1;
-  vectorParams.addressGen0Loop[1][1] = X;
-  vectorParams.addressGen0Loop[1][2] = Y;
-  vectorParams.addressGen0Broadcast = true;
-  vectorParams.addressGen0BroadcastCount = Y;
-  vectorParams.SOFTMAX_GRAD_NEGATE = true;
+  vectorParams->addressGen0Loop[1][0] = 1;
+  vectorParams->addressGen0Loop[1][1] = X;
+  vectorParams->addressGen0Loop[1][2] = Y;
+  vectorParams->addressGen0Broadcast = true;
+  vectorParams->addressGen0BroadcastCount = Y;
+  vectorParams->SOFTMAX_GRAD_NEGATE = true;
 
-  vectorParams.ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
-  vectorParams.addressGen1Mode = 2;  // 2d tensor
-  vectorParams.addressGen1Loops[0][0] = 1;
-  vectorParams.addressGen1Loops[0][1] = X;
-  vectorParams.addressGen1Loops[0][2] = 1;
-  vectorParams.addressGen1Loops[1][0] = Y;  // repeat
-  vectorParams.addressGen1Loops[1][1] = 1;
-  vectorParams.addressGen1Loops[1][2] = Y;
+  vectorParams->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
+  vectorParams->addressGen1Mode = 2;  // 2d tensor
+  vectorParams->addressGen1Loops[0][0] = 1;
+  vectorParams->addressGen1Loops[0][1] = X;
+  vectorParams->addressGen1Loops[0][2] = 1;
+  vectorParams->addressGen1Loops[1][0] = Y;  // repeat
+  vectorParams->addressGen1Loops[1][1] = 1;
+  vectorParams->addressGen1Loops[1][2] = Y;
 
-  vectorParams.ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
-  vectorParams.addressGen2Mode = 2;  // 2d tensor
-  vectorParams.addressGen2Loops[0][0] = 1;
-  vectorParams.addressGen2Loops[0][1] = X;
-  vectorParams.addressGen2Loops[0][2] = 1;
-  vectorParams.addressGen2Loops[1][0] = Y;  // repeat
-  vectorParams.addressGen2Loops[1][1] = 1;
-  vectorParams.addressGen2Loops[1][2] = Y;
+  vectorParams->ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
+  vectorParams->addressGen2Mode = 2;  // 2d tensor
+  vectorParams->addressGen2Loops[0][0] = 1;
+  vectorParams->addressGen2Loops[0][1] = X;
+  vectorParams->addressGen2Loops[0][2] = 1;
+  vectorParams->addressGen2Loops[1][0] = Y;  // repeat
+  vectorParams->addressGen2Loops[1][1] = 1;
+  vectorParams->addressGen2Loops[1][2] = Y;
 
-  vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams.scalarOutputCount = 0;
-  vectorParams.MAXPOOL = params.MAXPOOL;
-  vectorParams.AVGPOOL = params.AVGPOOL;
+  vectorParams->scalarOutputCount = 0;
+  vectorParams->MAXPOOL = params.MAXPOOL;
+  vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
   for (int i = 0; i < 3; i++) {
-    vectorParams.outputLoops[0][i] = params.loops[0][i];
+    vectorParams->outputLoops[0][i] = params.loops[0][i];
   }
-  vectorParams.outputXLoopIndex[0] = params.inputXLoopIndex[0];
-  vectorParams.outputYLoopIndex[0] = params.inputYLoopIndex[0];
-  vectorParams.outputWeightLoopIndex[0] = params.weightLoopIndex[0];
+  vectorParams->outputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->outputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->outputWeightLoopIndex[0] = params.weightLoopIndex[0];
 
-  vectorParams.outputLoops[1][0] = 1;
-  vectorParams.outputLoops[1][1] = X;
-  vectorParams.outputLoops[1][2] = Y;
-  vectorParams.outputWeightLoopIndex[1] = 2;
-  vectorParams.outputYLoopIndex[1] = 1;
-  vectorParams.outputXLoopIndex[1] = 0;
+  vectorParams->outputLoops[1][0] = 1;
+  vectorParams->outputLoops[1][1] = X;
+  vectorParams->outputLoops[1][2] = Y;
+  vectorParams->outputWeightLoopIndex[1] = 2;
+  vectorParams->outputYLoopIndex[1] = 1;
+  vectorParams->outputXLoopIndex[1] = 0;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
@@ -83,8 +82,8 @@ void MapSoftmaxGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   vInst0.rOp = VectorInstructions::radd;
   vInst0.rDuplicate = 0;
   // vInst0.rDest = VectorInstructions::toVectorSrc0;
-  vectorInstructionConfig.inst[0] = vInst0;
-  vectorInstructionConfig.instCount[0] = 1;
+  vectorInstructionConfig->inst[0] = vInst0;
+  vectorInstructionConfig->instCount[0] = 1;
 
   // perform multiplication (-a_i * a_j) or (a_i * (1-a_i))
   VectorInstructions vInst1;
@@ -100,8 +99,8 @@ void MapSoftmaxGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   vInst1.vOp3 = VectorInstructions::vmult;
   vInst1.vOp4 = VectorInstructions::nop;
   vInst1.vDest = VectorInstructions::nop;
-  vectorInstructionConfig.inst[1] = vInst1;
-  vectorInstructionConfig.instCount[1] = Y * DIMENSION;
+  vectorInstructionConfig->inst[1] = vInst1;
+  vectorInstructionConfig->instCount[1] = Y * DIMENSION;
 
   // pull out from reduce and multiply by 1/sqrt(32)
   VectorInstructions vInst2;
@@ -118,13 +117,13 @@ void MapSoftmaxGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   vInst2.vOp3 = VectorInstructions::vmult;
   vInst2.vOp4 = VectorInstructions::nop;
   vInst2.vDest = VectorInstructions::vWriteOut;
-  vectorInstructionConfig.inst[2] = vInst2;
-  vectorInstructionConfig.instCount[2] = 1;
+  vectorInstructionConfig->inst[2] = vInst2;
+  vectorInstructionConfig->instCount[2] = 1;
   Posit<16, 1> scale = (1.0 / sqrt(32));
   vInst2.immediate0 = scale.bits;
 
-  vectorInstructionConfig.instLen = 3;
-  vectorInstructionConfig.instLoopCount = X * Y / DIMENSION;
+  vectorInstructionConfig->instLen = 3;
+  vectorInstructionConfig->instLoopCount = X * Y / DIMENSION;
 
   // sendSerializedParams<VectorInstructionConfig,
   // 32>(vectorInstructionConfig,
@@ -136,4 +135,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
   //     vectorUnitDoneSignal.SyncPop();
   //     CCS_LOG("Accelerator
   //     Layer Finished.");
+
+  mappedParams.push_back(vectorParams);
+  mappedParams.push_back(vectorInstructionConfig);
 }

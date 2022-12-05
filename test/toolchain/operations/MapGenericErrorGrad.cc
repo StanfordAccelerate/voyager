@@ -1,9 +1,7 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapGenericErrorGrad(const SimplifiedParams &params, MatrixParams &matrixParams,
-                   bool &matrixParamsValid, VectorParams &vectorParams,
-                   VectorInstructionConfig &vectorInstructionConfig,
-                   bool &vectorParamsValid) {
+void MapGenericErrorGrad(const SimplifiedParams &params,
+                         std::deque<BaseParams *> &mappedParams) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -15,55 +13,57 @@ void MapGenericErrorGrad(const SimplifiedParams &params, MatrixParams &matrixPar
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
+  VectorParams *vectorParams = new VectorParams;
+  VectorInstructionConfig *vectorInstructionConfig =
+      new VectorInstructionConfig;
+
   /*
    * Subtract vector from vector, and multiply with factor
    * 2/X for MSE_GRAD and 1/X for BCE_WITH_LOGITS_GRAD
    */
-  matrixParamsValid = false;
-  vectorParamsValid = true;
 
-  vectorParams.VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams.addressGen0Enable = true;
+  vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
+  vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
-    vectorParams.addressGen0Loop[0][i] = 1;
+    vectorParams->addressGen0Loop[0][i] = 1;
   }
-  vectorParams.addressGen0Loop[1][0] = 1;
-  vectorParams.addressGen0Loop[1][1] = 1;
-  vectorParams.addressGen0Loop[1][2] = X / DIMENSION;
-  vectorParams.addressGen0Broadcast = false;
+  vectorParams->addressGen0Loop[1][0] = 1;
+  vectorParams->addressGen0Loop[1][1] = 1;
+  vectorParams->addressGen0Loop[1][2] = X / DIMENSION;
+  vectorParams->addressGen0Broadcast = false;
 
-  vectorParams.ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
-  vectorParams.addressGen1Mode = 2;  // 2d tensor
-  vectorParams.addressGen1Loops[0][0] = 1;
-  vectorParams.addressGen1Loops[0][1] = 1;
-  vectorParams.addressGen1Loops[0][2] = 1;
-  vectorParams.addressGen1Loops[1][0] = 1;
-  vectorParams.addressGen1Loops[1][1] = 1;
-  vectorParams.addressGen1Loops[1][2] = X / DIMENSION;
+  vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
+  vectorParams->addressGen1Mode = 2;  // 2d tensor
+  vectorParams->addressGen1Loops[0][0] = 1;
+  vectorParams->addressGen1Loops[0][1] = 1;
+  vectorParams->addressGen1Loops[0][2] = 1;
+  vectorParams->addressGen1Loops[1][0] = 1;
+  vectorParams->addressGen1Loops[1][1] = 1;
+  vectorParams->addressGen1Loops[1][2] = X / DIMENSION;
 
-  vectorParams.ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
-  vectorParams.addressGen2Mode = 0;  // 2d tensor
+  vectorParams->ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
+  vectorParams->addressGen2Mode = 0;  // 2d tensor
 
-  vectorParams.VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams.SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
+  vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams.scalarOutputCount = 0;
-  vectorParams.MAXPOOL = params.MAXPOOL;
-  vectorParams.AVGPOOL = params.AVGPOOL;
+  vectorParams->scalarOutputCount = 0;
+  vectorParams->MAXPOOL = params.MAXPOOL;
+  vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
   for (int i = 0; i < 3; i++) {
-    vectorParams.outputLoops[0][i] = 1;
+    vectorParams->outputLoops[0][i] = 1;
   }
-  vectorParams.outputXLoopIndex[0] = 0;
-  vectorParams.outputYLoopIndex[0] = 1;
-  vectorParams.outputWeightLoopIndex[0] = 2;
-  vectorParams.outputLoops[1][0] = 1;
-  vectorParams.outputLoops[1][1] = 1;
-  vectorParams.outputLoops[1][2] = X / DIMENSION;
-  vectorParams.outputWeightLoopIndex[1] = 2;
-  vectorParams.outputXLoopIndex[1] = 1;
-  vectorParams.outputYLoopIndex[1] = 0;
+  vectorParams->outputXLoopIndex[0] = 0;
+  vectorParams->outputYLoopIndex[0] = 1;
+  vectorParams->outputWeightLoopIndex[0] = 2;
+  vectorParams->outputLoops[1][0] = 1;
+  vectorParams->outputLoops[1][1] = 1;
+  vectorParams->outputLoops[1][2] = X / DIMENSION;
+  vectorParams->outputWeightLoopIndex[1] = 2;
+  vectorParams->outputXLoopIndex[1] = 1;
+  vectorParams->outputYLoopIndex[1] = 0;
 
   // subtract, multiply by divisor
   VectorInstructions vInst0;
@@ -87,9 +87,12 @@ void MapGenericErrorGrad(const SimplifiedParams &params, MatrixParams &matrixPar
   }
   vInst0.immediate0 = (Posit<8, 1>(divisor)).bits;
 
-  vectorInstructionConfig.inst[0] = vInst0;
-  vectorInstructionConfig.instCount[0] = X / DIMENSION;
+  vectorInstructionConfig->inst[0] = vInst0;
+  vectorInstructionConfig->instCount[0] = X / DIMENSION;
 
-  vectorInstructionConfig.instLen = 1;
-  vectorInstructionConfig.instLoopCount = 1;
+  vectorInstructionConfig->instLen = 1;
+  vectorInstructionConfig->instLoopCount = 1;
+
+  mappedParams.push_back(vectorParams);
+  mappedParams.push_back(vectorInstructionConfig);
 }
