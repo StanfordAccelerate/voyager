@@ -82,9 +82,9 @@ def main():
                     args.data_dir, sub_dir_info[0][1][0]) + '/'
         elif args.model == "mobilebert":
             if args.task == "inference":
-                args.data_dir = "./data/mobilebert_tiny/datafile/step0/"
+                args.data_dir = "./data/mobilebert_tiny/datafile/"
             else:
-                args.data_dir = "./data/sst2_train/datafile/step0/"
+                args.data_dir = "./data/sst2_train/datafile/"
         else:
             raise ValueError(
                 f"Could not find default data_dir. Please provide data_dir.")

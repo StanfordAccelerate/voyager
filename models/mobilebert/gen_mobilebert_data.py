@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import argparse
 import dill as pickle
 import numpy as np
@@ -36,34 +35,23 @@ if __name__ == "__main__":
         default=None,
         help="Path to output datafiles.",
     )
-    parser.add_argument(
-        "--n_steps",
-        type=int,
-        default=1,
-        help="Number of training steps of datafiles.",
-    )
     args = parser.parse_args()
 
-    output_dir = os.path.join(args.datapath, "datafile") if args.output_dir is None else args.output_dir
-    for i in range(args.n_steps):
-        dataDir = os.path.join(output_dir, f"step{i}")
-        if not os.path.exists(dataDir):
-            os.makedirs(dataDir)
+    dataDir = os.path.join(args.datapath, "datafile") if args.output_dir is None else args.output_dir
+    files = ["activations", "errors", "weights", "gradients"]
+    for filename in files:
+        path = os.path.join(args.datapath, f"{filename}.pkl")
+        print("Reading input file: " + path)
 
-        files = ["activations", "errors", "weights", "gradients"]
-        for filename in files:
-            path = os.path.join(args.datapath, "step_" + str(i) + "_" + filename + ".pkl")
-            print("Reading input file: " + path)
+        subDir = os.path.join(dataDir, filename)
+        if not os.path.exists(subDir):
+            os.makedirs(subDir)
 
-            subDir = os.path.join(dataDir, filename)
-            if not os.path.exists(subDir):
-                os.makedirs(subDir)
+        with open(path, 'rb') as infile:
+            parameters = pickle.load(infile)
 
-            with open(path, 'rb') as infile:
-                parameters = pickle.load(infile)
-
-            for name, param in parameters.items():
-                outfile = os.path.join(subDir, name.replace('.', '_'))
-                write_fp64(outfile, param)
-                print(outfile, end="\r", flush=True)
-            print("=" * 120)
+        for name, param in parameters.items():
+            outfile = os.path.join(subDir, name.replace('.', '_'))
+            write_fp64(outfile, param)
+            print(outfile, end="\r", flush=True)
+        print("=" * 120)

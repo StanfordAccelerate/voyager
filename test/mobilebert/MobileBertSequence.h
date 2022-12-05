@@ -444,7 +444,7 @@ void checkAcceleratorOutputs(const SimplifiedParams params,
   }
 }
 
-void runForward(std::string datapath, std::vector<std::string> groups) {
+int runForward(std::string datapath, std::vector<std::string> groups) {
   std::string inputDataDir = datapath + "activations/";
   std::string outfilePrefix;
 
@@ -536,7 +536,6 @@ void runForward(std::string datapath, std::vector<std::string> groups) {
       }
 #endif
     }
-    break;
   }
 
   if (std::find(groups.begin(), groups.end(), "accelerator") != groups.end()) {
@@ -561,6 +560,9 @@ void runForward(std::string datapath, std::vector<std::string> groups) {
     std::cout << hls_sram_memory[params.OUTPUT_OFFSET + i] << "\t"
               << float_sram_memory[params.OUTPUT_OFFSET + i] << std::endl;
   }
+
+  // FIXME: count all the errors
+  return 0;
 }
 
 void runBackward(std::string datapath, std::vector<std::string> groups) {

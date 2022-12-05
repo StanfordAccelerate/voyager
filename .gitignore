@@ -1,8 +1,6 @@
 build
 pybuild
 data/resnet
-data/sst2_eval/step*
-data/sst2_train/step*
 .direnv
 .vscode
 test_outputs/
