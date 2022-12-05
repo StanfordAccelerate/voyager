@@ -8,6 +8,9 @@
 void MapBiasGrad(const SimplifiedParams &params,
                  std::deque<BaseParams *> &mappedParams);
 
+void MapCrossEntropyGrad(const SimplifiedParams &params,
+                         std::deque<BaseParams *> &mappedParams);
+
 void MapSoftmax(const SimplifiedParams &params,
                 std::deque<BaseParams *> &mappedParams);
 

@@ -32,6 +32,8 @@ void MapOperation(const SimplifiedParams &params,
     MapGenericErrorGrad(params, mappedParams);
   } else if (params.BIAS_GRAD) {
     MapBiasGrad(params, mappedParams);
+  } else if (params.CROSS_ENTROPY_GRAD) {
+    MapCrossEntropyGrad(params, mappedParams);
   } else {
     MapMatrixOp(params, mappedParams);
   }
