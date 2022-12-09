@@ -14,7 +14,7 @@ from test.resnet import resnet_networks
 try:
     from test.resnet import resnet_networks_codegen
 except ImportError:
-    print("WARNING: Could not find codegen networks.")
+    print("WARNING: Could not find and import resnet_networks_codegen.")
 
 
 def main():

@@ -4,7 +4,6 @@
 #include <iostream>
 #include <string>
 
-#include "test/codegen/CodeGen.h"
 #include "test/common/GoldModel.h"
 #include "test/common/UniversalPosit.h"
 #include "test/common/Utils.h"
