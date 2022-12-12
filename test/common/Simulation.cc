@@ -74,7 +74,7 @@ Simulation::Simulation() {
     if (data_dir.empty()) {
       network = std::make_unique<MobileBERT>(modelName, task);
     } else {
-      network = std::make_unique<MobileBERT>(modelName, data_dir, task);
+      network = std::make_unique<MobileBERT>(modelName, task, data_dir);
     }
   } else {
     throw std::runtime_error("Unknown model: " + modelName);
