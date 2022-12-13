@@ -42,5 +42,6 @@ The accelerator by itself is not very useful. It has to be integrated into an So
 
 ## TODO
 - [ ] Remove dependence on parameters NETWORK and TESTS in CI (they could change)
+- [ ] Introduce global CI variables for things like data_path, common flags, etc.
 - [ ] Get end2end Python script working again, so that once can either run a single end2end sample, or a batch of samples in order to determine end2end accuracy
 - [ ] Add other ResNets and AlexNet to CI. Use git patches to increase #banks in VerificationTypes.h
