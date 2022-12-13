@@ -197,7 +197,6 @@ def main():
         # Free-running while loops are not good
         time.sleep(0.1)
 
-
     print("--- Tests done ---")
     print('\n'.join(["{} returned with {}".format(
         res[0], res[1].returncode) for res in results]))
