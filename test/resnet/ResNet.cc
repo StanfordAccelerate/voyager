@@ -24,7 +24,6 @@ const std::vector<std::string> orderCodeGen;
 
 ResNet::ResNet(const std::string modelName, const std::string dataDir)
     : Network(modelName, dataDir) {
-
   // Make "codgen"-matching case insensitive
   std::string& modelNameLower = const_cast<std::string&>(this->modelName);
   std::transform(modelNameLower.begin(), modelNameLower.end(),
@@ -64,7 +63,8 @@ std::vector<Workload> ResNet::getWorkloads(
     workload.name = layer;
     workload.params = params.at(layer);
     workload.files = files.at(layer);
-    workload.memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
+    workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
+                          SRAM, SRAM};
 
     workloads.push_back(workload);
   }

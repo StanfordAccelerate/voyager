@@ -199,10 +199,10 @@ networks: build/networks.a
 build/networks.a: build/ResNet.o build/MobileBERT.o
 	$(AR) rcs $@ $^
 
-build/ResNet.o: test/resnet/ResNet.cc test/resnet/ResNet.h test/resnet/params.h
+build/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/MobileBERT.h
+build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
