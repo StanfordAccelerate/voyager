@@ -10,7 +10,7 @@ import os
 import logging
 
 # Import handwritten network definitions
-from test.mobilebert import mb_networks
+from test.mobilebert import mobilebert_networks
 from test.resnet import resnet_networks
 
 # Try to import generated network definitions, but only warn if they are not found
@@ -115,23 +115,21 @@ def main():
         all_tests = resnet_networks.NETWORKS[args.model]
     elif args.model == "mobilebert":
         if args.task == "inference":
-            all_tests = mb_networks.NETWORKS[args.model]
+            all_tests = mobilebert_networks.NETWORKS[args.model]
         elif args.task == "backward":
-            all_tests = mb_networks.NETWORKS[args.model+"_activation_gradient"]
+            all_tests = mobilebert_networks.NETWORKS[args.model+"_activation_gradient"]
         elif args.task == "gradient":
-            all_tests = mb_networks.NETWORKS[args.model+"_weight_gradient"]
+            all_tests = mobilebert_networks.NETWORKS[args.model+"_weight_gradient"]
         else:
             raise ValueError(f"Task {args.task} no supported on mobilebert.")
     # If we can't find the model in any of the handwritten configs, we look in the codegen
     else:
-        try:
+        if "resnet" in args.model:
             all_tests = resnet_networks_codegen.NETWORKS[args.model]
-        except KeyError:
-            pass
-        try:
+        elif "mobilebert" in args.model:
             all_tests = mobilebert_networks_codegen.NETWORKS[args.model]
-        except KeyError:
-            pass
+        else:
+            raise ValueError(f"Model {args.model} not supported.")
 
     # Ensure we found a tests for the model
     assert all_tests is not None, f"Could not find any tests for model {args.model}."
