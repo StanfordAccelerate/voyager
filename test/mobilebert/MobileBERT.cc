@@ -171,10 +171,22 @@ std::vector<Workload> MobileBERT::getWorkloads(
 
       // Fake memory offsets used for unit tests
       workload.params.INPUT_OFFSET = STACK_SIZE;
-      workload.params.WEIGHT_OFFSET = STACK_SIZE + INTERMEDIATE_SIZE;
+      if (workload.params.WEIGHT && !workload.params.SOFTMAX) {
+        workload.params.WEIGHT_OFFSET = STACK_SIZE + INTERMEDIATE_SIZE;
+      } else {
+        workload.params.WEIGHT_OFFSET = -1;
+      }
       workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
-      workload.params.BIAS_OFFSET = STACK_SIZE + 3 * INTERMEDIATE_SIZE;
-      workload.params.RESIDUAL_OFFSET = STACK_SIZE + 4 * INTERMEDIATE_SIZE;
+      if (workload.params.BIAS) {
+        workload.params.BIAS_OFFSET = STACK_SIZE + 3 * INTERMEDIATE_SIZE;
+      } else {
+        workload.params.BIAS_OFFSET = -1;
+      }
+      if (workload.params.RESIDUAL) {
+        workload.params.RESIDUAL_OFFSET = STACK_SIZE + 4 * INTERMEDIATE_SIZE;
+      } else {
+        workload.params.RESIDUAL_OFFSET = -1;
+      }
 
       workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
                             SRAM, SRAM};
