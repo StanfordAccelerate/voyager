@@ -9,12 +9,19 @@ import sys
 import os
 import logging
 
-from test.mobilebert import mb_networks
+# Import handwritten network definitions
+from test.mobilebert import mobilebert_networks
 from test.resnet import resnet_networks
+
+# Try to import generated network definitions, but only warn if they are not found
 try:
     from test.resnet import resnet_networks_codegen
 except ImportError:
     print("WARNING: Could not find and import resnet_networks_codegen.")
+try:
+    from test.mobilebert import mobilebert_networks_codegen
+except ImportError:
+    print("WARNING: Could not find and import mobilebert_networks_codegen.")
 
 
 def main():
@@ -87,7 +94,7 @@ def main():
                 args.data_dir = "./data/sst2_train/datafile/"
         else:
             raise ValueError(
-                f"Could not find default data_dir. Please provide data_dir.")
+                f"Could not find default data_dir for model {args.model}. Please provide data_dir.")
 
     # Start timing before executing first "time-consuming" command
     start_time = time.time()
@@ -102,26 +109,32 @@ def main():
 
     # Prepare and run all tests/layers simultaneously as different processes
     results = []
-    # Default resnet model (with handwritten config)
+    all_tests = None
+    # Default models (with handwritten config)
     if args.model == "resnet":
         all_tests = resnet_networks.NETWORKS[args.model]
     elif args.model == "mobilebert":
         if args.task == "inference":
-            all_tests = mb_networks.NETWORKS["mobilebert"]
+            all_tests = mobilebert_networks.NETWORKS[args.model]
         elif args.task == "backward":
-            all_tests = mb_networks.NETWORKS["mobilebert_activation_gradient"]
+            all_tests = mobilebert_networks.NETWORKS[args.model+"_activation_gradient"]
         elif args.task == "gradient":
-            all_tests = mb_networks.NETWORKS["mobilebert_weight_gradient"]
+            all_tests = mobilebert_networks.NETWORKS[args.model+"_weight_gradient"]
         else:
             raise ValueError(f"Task {args.task} no supported on mobilebert.")
     # If we can't find the model in any of the handwritten configs, we look in the codegen
     else:
-        try:
+        if "resnet" in args.model:
             all_tests = resnet_networks_codegen.NETWORKS[args.model]
-        except KeyError:
-            raise KeyError(
-                f"Could not find model {args.model}.")
+        elif "mobilebert" in args.model:
+            all_tests = mobilebert_networks_codegen.NETWORKS[args.model]
+        else:
+            raise ValueError(f"Model {args.model} not supported.")
 
+    # Ensure we found a tests for the model
+    assert all_tests is not None, f"Could not find any tests for model {args.model}."
+
+    # Launch each test as a separate process
     for test in all_tests:
         file_name = os.path.join(
             script_output_dir, args.model + '_' + test + ".out")
@@ -179,6 +192,8 @@ def main():
         # If all are done, exit
         if not running:
             break
+        # Free-running while loops are not good
+        time.sleep(0.1)
 
     print("--- Tests done ---")
     print('\n'.join(["{} returned with {}".format(

@@ -1,5 +1,6 @@
 #include "test/common/MemoryModel.h"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -14,7 +15,8 @@ double* readFileAsDouble(const std::string& filename, int size,
 
   if (useDataFile) {
     std::ifstream is(filename, std::ios::binary);
-    if (!is.good())
+    if (!is.good() || !std::filesystem::exists(filename) ||
+        !std::filesystem::is_regular_file(filename))
       throw std::runtime_error("File \"" + filename + "\" does not exist");
     is.read(tmpValuesArray, size * sizeof(double));
   } else {
@@ -52,7 +54,7 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
   }
 
   int size = STRIDE * Y * STRIDE * X * C;
-  std::cout << "size of inputs: " << size << std::endl;
+  // std::cout << "size of inputs: " << size << std::endl;
 
   double* tmpValues = readFileAsDouble(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
@@ -268,6 +270,13 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
                                        const MemoryMap& memoryMap,
                                        bool useDataFile) {
   loadInputs(params, memoryMap.inputs, files.inputs_file, useDataFile);
+  
+  // TODO(fpedd): Revisit the params.WEIGHT_OFFSET != -1 logic here
+  // We only want to load the 2nd input as weights if weights is false, but the
+  // offset is not -1 (i.e. it is set to a valid value)
+  if (!params.WEIGHT && params.WEIGHT_OFFSET != -1) {
+    loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
+  }
   if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
     loadResiduals(params, memoryMap.residual, files.residual_file, useDataFile);
   }
@@ -277,7 +286,11 @@ void MemoryModel::loadModelParams(const SimplifiedParams& params,
                                   const Files& files,
                                   const MemoryMap& memoryMap,
                                   bool useDataFile) {
-  loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
+  // If weights is false, we don't load weights, but we load the second input as
+  // weights from SRAM, see above
+  if (params.WEIGHT) {
+    loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
+  }
   if (params.BIAS) {
     loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
   }

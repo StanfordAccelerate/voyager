@@ -132,7 +132,7 @@ void Simulation::loadMemory() {
     }
   }
 
-  // load last layer reference outputs
+  // Load last layer reference outputs
   for (MemoryModel* memModel : memories) {
     memModel->loadReferenceOutput(workloads.back().params,
                                   workloads.back().files);
@@ -218,10 +218,28 @@ void Simulation::run() {
   // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     std::vector<SimplifiedParams> params_list;
+
+    // Exlude weights from memory map comparison. They are allowed to differ as
+    // we additionally check the SimplifiedParams.WEIGHT in accelerator
+    auto memoryMapCompare = [](const MemoryMap& lhs, const MemoryMap& rhs) {
+      return lhs.inputs == rhs.inputs && /* lhs.weights == rhs.weights && */
+             lhs.bias == rhs.bias && lhs.residual == rhs.residual &&
+             lhs.outputs == rhs.outputs;
+    };
+    MemoryMap memoryMap = workloads.front().memoryMap;
+
     for (const Workload& workload : workloads) {
       params_list.push_back(workload.params);
+
+      if (!memoryMapCompare(workload.memoryMap, memoryMap)) {
+        std::cerr << "Memory map mismatch for layer: " << workload.name
+                  << std::endl;
+        std::abort();
+      }
     }
-    // TODO: currently assumes that all layers have the same memory map
+
+    // TODO: Currently assumes that all layers have the same memory map, except
+    // for weights memory map, which is allowed to differ. See memoryMapCompare
     run_op(params_list, acceleratorMemory->sram, acceleratorMemory->rram,
            workloads.front().memoryMap);
   }
@@ -258,8 +276,6 @@ int Simulation::checkOutput() {
 
   size_t size = X * Y * K;
 
-  int error_count = 0;
-
   bool accelerator =
       std::find(sims.begin(), sims.end(), "accelerator") != sims.end();
   bool customposit =
@@ -277,7 +293,9 @@ int Simulation::checkOutput() {
                     "_to_" + workloads.back().name + '.';
   }
 
-  float rel_err = 0;
+  double rel_err = 0;
+  bool any_comparison = false;
+
   if (universal && pytorch) {
     std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in representing float as Posit)" << std::endl;
@@ -287,6 +305,7 @@ int Simulation::checkOutput() {
         universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
         "universal", universalPositMemory->reference, "file", size, diffFile,
         false);
+    any_comparison = true;
   }
 
   if (customposit && pytorch) {
@@ -298,6 +317,7 @@ int Simulation::checkOutput() {
     rel_err += compare_arrays(
         positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
         "customposit", positMemory->reference, "file", size, diffFile, false);
+    any_comparison = true;
   }
 
   if (accelerator && pytorch) {
@@ -308,7 +328,9 @@ int Simulation::checkOutput() {
 
     rel_err += compare_arrays(
         acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-        "accelerator", positMemory->reference, "file", size, diffFile, false);
+        "accelerator", acceleratorMemory->reference, "file", size, diffFile,
+        false);
+    any_comparison = true;
   }
 
   if (accelerator && customposit) {
@@ -322,6 +344,7 @@ int Simulation::checkOutput() {
         "accelerator",
         positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
         "customposit", size, diffFile, false);
+    any_comparison = true;
   }
 
   if (customposit && universal) {
@@ -333,9 +356,11 @@ int Simulation::checkOutput() {
     std::string diffFile = outFilePrefix + "hlsgold_vs_universal.txt";
 
     rel_err += compare_arrays(
-        positMemory->sram + workloads.back().params.OUTPUT_OFFSET, "universal",
+        positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "customposit",
         universalPositMemory->sram + workloads.back().params.OUTPUT_OFFSET,
-        "customposit", size, diffFile, false);
+        "universal", size, diffFile, false);
+    any_comparison = true;
   }
 
   if (fp32 && pytorch) {
@@ -346,9 +371,47 @@ int Simulation::checkOutput() {
     rel_err += compare_arrays(
         floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32",
         floatMemory->reference, "file", size, diffFile, false);
+    any_comparison = true;
   }
 
-  if (rel_err > tolerance) error_count += rel_err < 1.0 ? 1 : (int)rel_err;
+  if (customposit && fp32) {
+    std::cout << "HLS Posit Gold Model vs. FP32 Gold Model" << std::endl;
+    std::cout
+        << "(reveals bugs between FP32 and HLS Posit Gold Model implementation)"
+        << std::endl;
+    std::string diffFile = outFilePrefix + "hlsgold_vs_fpgold.txt";
+
+    rel_err += compare_arrays(
+        positMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "customposit",
+        floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32", size,
+        diffFile, false);
+    any_comparison = true;
+  }
+
+  if (accelerator && fp32) {
+    std::cout << "Accelerator vs. FP32 Gold Model" << std::endl;
+    std::cout << "(reveals bugs between Accelerator and FP32 Gold Model "
+                 "implementation)"
+              << std::endl;
+    std::string diffFile = outFilePrefix + "accel_vs_fpgold.txt";
+
+    rel_err += compare_arrays(
+        acceleratorMemory->sram + workloads.back().params.OUTPUT_OFFSET,
+        "accelerator",
+        floatMemory->sram + workloads.back().params.OUTPUT_OFFSET, "fp32", size,
+        diffFile, false);
+    any_comparison = true;
+  }
+
+  if (!any_comparison) {
+    std::cout << "No valid comparisons specified" << std::endl;
+    std::abort();
+  }
+
+  int error_count = 0;
+  if (rel_err > tolerance)
+    error_count += rel_err < 1.0 ? 1 : static_cast<int>(rel_err);
   std::cout << "Rela. error: " << rel_err << std::endl;
   std::cout << "Error count: " << error_count << std::endl;
 

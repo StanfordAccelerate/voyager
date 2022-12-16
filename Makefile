@@ -1,4 +1,4 @@
-.DEFAULT_GOAL := sim
+.DEFAULT_GOAL := TestRunner
 
 # Detect OS 
 OS := $(shell lsb_release -si)

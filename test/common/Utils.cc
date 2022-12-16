@@ -38,14 +38,14 @@ inline float readValue(float *matrix, int index, bool accType) {
   return accType ? matrix[2 * index] : matrix[index];
 }
 
-template <typename T>
-std::vector<float> get_float_vector(T *matrix, size_t size) {
-  std::vector<float> vector(size);
-  for (int i = 0; i < size; i++) {
-    vector[i] = (float)matrix[i];
-  }
-  return vector;
-}
+// template <typename T>
+// std::vector<float> get_float_vector(T *matrix, size_t size) {
+//   std::vector<float> vector(size);
+//   for (int i = 0; i < size; i++) {
+//     vector[i] = (float)matrix[i];
+//   }
+//   return vector;
+// }
 
 // template <typename TA, typename TB>
 // void plot_histograms(TA *matrixA, TB *matrixB, size_t size,
@@ -73,10 +73,13 @@ float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
   // Records relative differences
   int rel_diff_buckets[5] = {0, 0, 0, 0, 0};
 
+  double always_zero = 0.0;
+
   for (int index = 0; index < size; index++) {
     // Calculate absolute difference
     float a = readValue(matrixA, index, accType);
     float b = readValue(matrixB, index, accType);
+    always_zero += abs(a) + abs(b);
     float abs_diff = abs(a - b);
 
     // Write the two values + error scale indicator to file
@@ -152,6 +155,10 @@ float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
   std::cout << "> 1: " << rel_diff_buckets[4] << "("
             << (float)rel_diff_buckets[4] / size * 100.0 << "%)" << std::endl;
   std::cout << std::endl;
+
+  if (always_zero == 0.0) {
+    std::cout << "WARNING: All compared values are zero!" << std::endl;
+  }
 
   // Ideally, these buckets should be non-overlapping...
   // TODO(fpedd): Subtract the next smaller bucket to make them non-overlapping

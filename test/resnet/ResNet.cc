@@ -1,17 +1,6 @@
 #include "test/resnet/ResNet.h"
 
-#if __has_include(<filesystem>)
-#include <filesystem>
-#else
-#include <experimental/filesystem>
-namespace std {
-namespace filesystem = experimental::filesystem;
-}
-#endif
-
 #include <algorithm>
-#include <cassert>
-#include <iostream>
 
 #include "test/resnet/params.h"
 #if __has_include("test/resnet/paramsCodeGen.h")
@@ -82,11 +71,9 @@ std::vector<Workload> ResNet::getWorkloadsInRange(
   std::vector<std::string> layersInRange;
   if (layers.size() == 1) {  // Single layer
     layersInRange.push_back(layers.front());
-
   } else {  // Range of layers
     auto firstLayer = std::find(order.begin(), order.end(), layers.at(0));
     auto lastLayer = std::find(order.begin(), order.end(), layers.at(1));
-
     layersInRange = std::vector<std::string>(firstLayer, lastLayer + 1);
   }
 

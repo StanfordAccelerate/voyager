@@ -39,3 +39,9 @@ We are using the build-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It trigge
 
 ## Integration
 The accelerator by itself is not very useful. It has to be integrated into an SoC. We are using the [Chipyard Framework](https://github.com/ucb-bar/chipyard) for that. Our fork [`soc`](https://code.stanford.edu/tsmc40r/brainpower/soc) of Chipyard includes the [`minotaur-blocks`](https://code.stanford.edu/tsmc40r/brainpower/minotaur-blocks) repo as a submodule under `soc/generators/minotaur-blocks`, which in turn includes this [`accelerator`](https://code.stanford.edu/tsmc40r/brainpower/accelerator) repo under `minotaur-blocks/src/main/resources/sysc/accelerator`.
+
+## TODO
+- [ ] Remove dependence on parameters NETWORK and TESTS in CI (they could change)
+- [ ] Introduce global CI variables for things like data_path, common flags, etc.
+- [ ] Get end2end Python script working again, so that once can either run a single end2end sample, or a batch of samples in order to determine end2end accuracy
+- [ ] Add other ResNets and AlexNet to CI. Use git patches to increase #banks in VerificationTypes.h
