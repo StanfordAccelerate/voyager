@@ -4,38 +4,8 @@
 
 #include "test/mobilebert/mobilebert_tiny2/backprop.h"
 #include "test/mobilebert/mobilebert_tiny2/gradient.h"
+#include "test/mobilebert/mobilebert_tiny2/inference.h"
 
-MobileBERT::MobileBERT(const std::string& dataDir, const std::string& task)
-    : task(task) {
-  inferenceOrder = {"bottleneck_input_dense",
-                    "bottleneck_input_LayerNorm",
-                    "attention_self_query_layer",
-                    "attention_self_key_layer",
-                    "attention_self_value_layer",
-                    "attention_self_attention_scores_0",
-                    "attention_self_attention_scores_1",
-                    "attention_self_attention_scores_2",
-                    "attention_self_attention_scores_3",
-                    "attention_self_attention_probs_0",
-                    "attention_self_attention_probs_1",
-                    "attention_self_attention_probs_2",
-                    "attention_self_attention_probs_3",
-                    "attention_self_context_layer_0",
-                    "attention_self_context_layer_1",
-                    "attention_self_context_layer_2",
-                    "attention_self_context_layer_3",
-                    "attention_output_dense",
-                    "attention_output_LayerNorm",
-                    "ffn_0_intermediate_dense",
-                    "ffn_0_output_dense",
-                    "ffn_0_output_LayerNorm",
-                    "intermediate_dense",
-                    "output_dense",
-                    "output_LayerNorm",
-                    "output_bottleneck_dense",
-                    "output_bottleneck_LayerNorm",
-                    "classifier"};
-#include "test/mobilebert/params.h"
 #if __has_include("test/mobilebert/paramsCodeGen.h")
 #include "test/mobilebert/paramsCodeGen.h"
 #else
@@ -126,51 +96,52 @@ std::vector<Workload> MobileBERT::getWorkloads(
       workload.params = params.at(paramName);
       workload.files = files.at(layer);
 
-    // adjust files path
-    std::string inputDataDir;
-    std::string weightDataDir;
-    std::string outputDataDir;
-    std::string residualDataDir;
-    std::string gradientDataDir;
-    if (task == "inference") {
-      inputDataDir = "activations/";
-      weightDataDir = "weights/";
-      outputDataDir = "activations/";
-      residualDataDir = "activations/";
-      gradientDataDir = "weight_gradients/";
+      // adjust files path
+      std::string inputDataDir;
+      std::string weightDataDir;
+      std::string outputDataDir;
+      std::string residualDataDir;
+      std::string gradientDataDir;
+
+      if (task == "inference") {
+        inputDataDir = "activations/";
+        weightDataDir = "weights/";
+        outputDataDir = "activations/";
+        residualDataDir = "activations/";
+        gradientDataDir = "weight_gradients/";
 
         if (!workload.params.WEIGHT || workload.params.ATTENTION_MASK) {
           weightDataDir = "activations/";
         }
 
-    } else if (task == "backprop") {
-      inputDataDir = "activation_gradients/";
-      weightDataDir = "weights/";
-      outputDataDir = "activation_gradients/";
-      residualDataDir = "activation_gradients/";
-
-      if (layer.find("attention_self_value_layer") != std::string::npos) {
-        inputDataDir = "activations/";
-        weightDataDir = "errors/";
-      } else if (workload.params.CROSS_ENTROPY_GRAD) {
-        inputDataDir = "activations/";
-        weightDataDir = "activations/";
-      } else if (!workload.params.WEIGHT) {
-        weightDataDir = "activations/";
-      } else if (workload.params.SOFTMAX_GRAD || workload.params.RELU_GRAD) {
-        residualDataDir = "activations/";
-      }
-
-    } else if (task == "gradient") {
-      inputDataDir = "activations/";
-      weightDataDir = "activation_gradients/";
-      outputDataDir = "weight_gradients/";
-      residualDataDir = "weight_gradients/";
-
-      if (layer.find("classifier") != std::string::npos) {
+      } else if (task == "backprop") {
         inputDataDir = "activation_gradients/";
-        weightDataDir = "activations/";
-      }
+        weightDataDir = "weights/";
+        outputDataDir = "activation_gradients/";
+        residualDataDir = "activation_gradients/";
+
+        if (layer.find("attention_self_value_layer") != std::string::npos) {
+          inputDataDir = "activations/";
+          weightDataDir = "activation_gradients/";
+        } else if (workload.params.CROSS_ENTROPY_GRAD) {
+          inputDataDir = "activations/";
+          weightDataDir = "activations/";
+        } else if (!workload.params.WEIGHT) {
+          weightDataDir = "activations/";
+        } else if (workload.params.SOFTMAX_GRAD || workload.params.RELU_GRAD) {
+          residualDataDir = "activations/";
+        }
+
+      } else if (task == "gradient") {
+        inputDataDir = "activations/";
+        weightDataDir = "activation_gradients/";
+        outputDataDir = "weight_gradients/";
+        residualDataDir = "weight_gradients/";
+
+        if (layer.find("classifier") != std::string::npos) {
+          inputDataDir = "activation_gradients/";
+          weightDataDir = "activations/";
+        }
 
         // TODO: accelerator doesn't support these functionalities yet
         // this results in FP32<->Pytorch failing for backprop and gradients

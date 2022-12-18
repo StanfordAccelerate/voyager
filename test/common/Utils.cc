@@ -222,8 +222,9 @@ int validateMapping(SimplifiedParams params) {
   int fy = params.loops[1][params.fyIndex];
   int stride = params.STRIDE;
 
-  if (params.FC || params.SOFTMAX || params.SOFTMAX_GRAD ||
-      params.NO_NORM || params.CROSS_ENTROPY_GRAD) {  // don't check for vector ops
+  if (params.FC || params.FC_GRAD || params.SOFTMAX || params.SOFTMAX_GRAD ||
+      params.NO_NORM || params.NO_NORM_GRAD ||
+      params.CROSS_ENTROPY_GRAD) {  // don't check for vector ops
     return 0;
   }
 

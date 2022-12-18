@@ -38,12 +38,5 @@ class MobileBERT : public Network {
   std::map<std::string, MemoryOffsets> memOffsets;
   std::map<std::string, Files> testFiles;
 
-  // inference
-  std::vector<std::string> inferenceOrder;
-  std::map<std::string, std::string> inferenceParamsMapping;
-  std::map<std::string, SimplifiedParams> inferenceParams;
-  std::map<std::string, MemoryOffsets> inferenceMemOffsets;
-  std::map<std::string, Files> inferenceTestFiles;
-
   std::vector<Workload> getWorkloads(const std::vector<std::string> &) const;
 };

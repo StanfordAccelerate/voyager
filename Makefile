@@ -184,7 +184,7 @@ build/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryModel.h src/Ar
 build/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h
+build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h test/mobilebert/mobilebert_tiny2/*
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/TestRunner.o: test/common/TestRunner.cc
