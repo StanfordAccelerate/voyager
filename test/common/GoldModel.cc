@@ -124,9 +124,7 @@ inline float readInput(float *matrix, int index, bool accType) {
 
 #ifndef NO_UNIVERSAL
 inline void saveOutput(UniversalPosit *matrix, int index,
-                       UniversalPositAccum value, bool accType,
-                       int expBias = 0) {
-  value *= pow(2, expBias);
+                       UniversalPositAccum value, bool accType) {
   if (!accType) {
     matrix[index] = static_cast<UniversalPosit>(value);
   } else {
@@ -138,9 +136,7 @@ inline void saveOutput(UniversalPosit *matrix, int index,
 #endif
 
 inline void saveOutput(INPUT_DATATYPE *matrix, int index,
-                       ACCUM_DATATYPE::DecomposedPosit value, bool accType,
-                       int expBias = 0) {
-  value.scale += expBias;
+                       ACCUM_DATATYPE::DecomposedPosit value, bool accType) {
   if (!accType) {
     matrix[index] = static_cast<INPUT_DATATYPE>(value);
   } else {
@@ -151,9 +147,7 @@ inline void saveOutput(INPUT_DATATYPE *matrix, int index,
   }
 }
 
-inline void saveOutput(float *matrix, int index, float value, bool accType,
-                       int expBias = 0) {
-  value *= pow(2, expBias);
+inline void saveOutput(float *matrix, int index, float value, bool accType) {
   if (!accType) {
     matrix[index] = value;
   } else {
@@ -162,8 +156,22 @@ inline void saveOutput(float *matrix, int index, float value, bool accType,
   }
 }
 
+#ifndef NO_UNIVERSAL
+inline void adjustExp(UniversalPositAccum &value, int expBias) {
+  value *= pow(2, expBias);
+}
+#endif
+inline void adjustExp(ACCUM_DATATYPE::DecomposedPosit &value, int expBias) {
+  value.scale += expBias;
+}
+inline void adjustExp(float &value, int expBias) { value *= pow(2, expBias); }
+
 template <typename ACC_T>
-void clip_grad_norm_(ACC_T *matrix, int size) {
+void grad_clip_norm(ACC_T *matrix, int size, int expBias) {
+  for (int i = 0; i < size; i++) {
+    adjustExp(matrix[i], expBias);
+  }
+
   ACC_T norm = 0;
   for (int i = 0; i < size; i++) {
     norm += static_cast<ACC_T>(matrix[i] * matrix[i]);
@@ -372,7 +380,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
 
     if (params.GRAD_CLIPPING) {
-      clip_grad_norm_(outputMatrix, X * K);
+      grad_clip_norm(outputMatrix, X * K, params.outputExpBias);
     }
 
     for (int i = 0; i < X * K; i++) {
@@ -393,7 +401,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
 
     if (params.GRAD_CLIPPING) {
-      clip_grad_norm_(outputMatrix, K);
+      grad_clip_norm(outputMatrix, K, params.outputExpBias);
     }
 
     for (int i = 0; i < K; i++) {
@@ -430,7 +438,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
 
     if (params.GRAD_CLIPPING) {
-      clip_grad_norm_(outputMatrix, K);
+      grad_clip_norm(outputMatrix, K, params.outputExpBias);
     }
 
     for (int i = 0; i < K; i++) {
@@ -464,8 +472,10 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int i = 0; i < X; i++) {
       gradients[i] *= divisor;
       gradients[i] -= labels[i];
-      saveOutput(matrixC, i, gradients[i], params.ACC_T_OUTPUT,
-                 params.outputExpBias);
+      if (params.outputExpBias) {
+        adjustExp(gradients[i], params.outputExpBias);
+      }
+      saveOutput(matrixC, i, gradients[i], params.ACC_T_OUTPUT);
     }
   } else if (params.MSE_GRAD) {
     INT_T divisor = 2 / X;
@@ -482,7 +492,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int i = 0; i < X * C; i++) {
       outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
     }
-    clip_grad_norm_(outputMatrix, X * C);
+    grad_clip_norm(outputMatrix, X * C, params.outputExpBias);
 
     for (int i = 0; i < X * C; i++) {
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
@@ -697,10 +707,10 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                     outputMatrix[outputAddress] = 0;
                   }
 
-                  if (params.ATTENTION_SCALING) {
-                    T scale = 1.0f / sqrt(32);
-                    outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
-                  }
+                  // if (params.ATTENTION_SCALING) {
+                  //   T scale = 1.0f / sqrt(32);
+                  //   outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
+                  // }
                 }
               }
             }
@@ -723,7 +733,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
 
     if (params.GRAD_CLIPPING) {
-      clip_grad_norm_(outputMatrix, Y * X * K);
+      grad_clip_norm(outputMatrix, Y * X * K, params.outputExpBias);
     }
 
     if (params.MAXPOOL) {
