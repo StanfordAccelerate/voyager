@@ -121,6 +121,9 @@ struct SimplifiedParams {
   int outputExpBias;
   int residualExpBias;
 
+  bool WEIGHT_UPDATE;
+  bool ERROR_FEEDBACK;
+
   // Depthwise convolution
   bool depthwise;
 
