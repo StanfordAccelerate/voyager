@@ -92,8 +92,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .STRIDE = 1,
          .BIAS = true,
          .WEIGHT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 128) * 128
@@ -111,8 +109,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .NO_NORM = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -130,8 +126,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .SPLIT_OUTPUT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 512) x (512 x 128)
@@ -149,8 +143,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .SPLIT_OUTPUT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 32) x (32 x 128)
@@ -230,8 +222,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .RESIDUAL = true,
          .WEIGHT = true,
          .CONCAT_INPUT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -249,8 +239,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .RELU = true,
          .BIAS = true,
          .WEIGHT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 512) x (512 x 128)
@@ -268,8 +256,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .RESIDUAL = true,
          .WEIGHT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -287,8 +273,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .RESIDUAL = true,
          .WEIGHT = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (128 x 512) * 512
@@ -306,8 +290,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .NO_NORM = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 
     // (1 x 512) x (512 x 16)
@@ -325,8 +307,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BIAS = true,
          .WEIGHT = true,
          .FC = true,
-         .WEIGHT_SPLITTING = true,
-         .learningRate = -2e-2,
      }},
 };
 
@@ -734,12 +714,12 @@ std::map<std::string, Files> inferenceTestFiles{
          "attention_self_context_layer",
          "attention_output_dense_weight",
          "attention_output_dense_bias",
-         "attention_output_residual",
+         "attention_output_dense",
          "bottleneck_input_LayerNorm",
      }},
     {"attention_output_LayerNorm",
      {
-         "attention_output_residual",
+         "attention_output_dense",
          "attention_output_LayerNorm_weight",
          "attention_output_LayerNorm_bias",
          "attention_output_LayerNorm",
@@ -758,12 +738,12 @@ std::map<std::string, Files> inferenceTestFiles{
          "ffn_0_intermediate_intermediate_act_fn",
          "ffn_0_output_dense_weight",
          "ffn_0_output_dense_bias",
-         "ffn_0_output_residual",
+         "ffn_0_output_dense",
          "attention_output_LayerNorm",
      }},
     {"ffn_0_output_LayerNorm",
      {
-         "ffn_0_output_residual",
+         "ffn_0_output_dense",
          "ffn_0_output_LayerNorm_weight",
          "ffn_0_output_LayerNorm_bias",
          "ffn_0_output_LayerNorm",
@@ -781,12 +761,12 @@ std::map<std::string, Files> inferenceTestFiles{
          "intermediate_intermediate_act_fn",
          "output_dense_weight",
          "output_dense_bias",
-         "output_residual",
+         "output_dense",
          "ffn_0_output_LayerNorm",
      }},
     {"output_LayerNorm",
      {
-         "output_residual",
+         "output_dense",
          "output_LayerNorm_weight",
          "output_LayerNorm_bias",
          "output_LayerNorm",
@@ -797,12 +777,12 @@ std::map<std::string, Files> inferenceTestFiles{
          "output_LayerNorm",
          "output_bottleneck_dense_weight",
          "output_bottleneck_dense_bias",
-         "output_bottleneck_residual",
+         "output_bottleneck_dense",
          "hidden_states",
      }},
     {"output_bottleneck_LayerNorm",
      {
-         "output_bottleneck_residual",
+         "output_bottleneck_dense",
          "output_bottleneck_LayerNorm_weight",
          "output_bottleneck_LayerNorm_bias",
          "output_bottleneck_LayerNorm",
@@ -813,7 +793,7 @@ std::map<std::string, Files> inferenceTestFiles{
          "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm",
          "classifier_weight",
          "classifier_bias",
-         "mobilebert_logits",
+         "classifier",
      }},
 
     // Additional unit tests

@@ -88,10 +88,11 @@ def main():
                 args.data_dir = os.path.join(
                     args.data_dir, sub_dir_info[0][1][0]) + '/'
         elif args.model == "mobilebert":
-            if args.task == "inference":
-                args.data_dir = "./data/mobilebert_tiny/datafile/"
-            else:
-                args.data_dir = "./data/qnli/datafile/"
+            args.data_dir = "./data/qnli/datafile/"
+            # if args.task == "inference":
+            #     args.data_dir = "./data/mobilebert_tiny/datafile/"
+            # else:
+            #     args.data_dir = "./data/qnli/datafile/"
         else:
             raise ValueError(
                 f"Could not find default data_dir for model {args.model}. Please provide data_dir.")
