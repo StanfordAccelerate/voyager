@@ -546,12 +546,12 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       }
     }
 
-    // for (int x = 0; x < X; x++) {
-    //   for (int c = 0; c < C; c++) {
-    //     std::cerr << inputMatrixA[x * C + c] << '\t';
-    //   }
-    //   std::cerr << std::endl;
-    // }
+    for (int x = 0; x < X; x++) {
+      for (int c = 0; c < C; c++) {
+        std::cerr << inputMatrixA[x * C + c] << '\t';
+      }
+      std::cerr << std::endl;
+    }
 
     if (params.CONCAT_WEIGHT) {
       INT_T copyMatrixB[C * K];
@@ -707,10 +707,10 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                     outputMatrix[outputAddress] = 0;
                   }
 
-                  // if (params.ATTENTION_SCALING) {
-                  //   T scale = 1.0f / sqrt(32);
-                  //   outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
-                  // }
+                  if (params.ATTENTION_SCALING) {
+                    T scale = 1.0f / sqrt(32);
+                    outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
+                  }
                 }
               }
             }

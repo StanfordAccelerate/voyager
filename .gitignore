@@ -24,9 +24,3 @@ test/resnet/*
 !test/resnet/ResNet.h
 !test/resnet/params.h
 !test/resnet/resnet_networks.py
-test/mobilebert/*
-!test/mobilebert/MobileBERT.cc
-!test/mobilebert/MobileBERT.h
-!test/mobilebert/params.h
-!test/mobilebert/mobilebert_networks.py
-!test/mobilebert/legacy
