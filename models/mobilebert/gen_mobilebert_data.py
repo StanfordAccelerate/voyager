@@ -41,7 +41,7 @@ if __name__ == "__main__":
     files = ["activations", "activation_gradients", "weights", "weight_gradients"]
     for filename in files:
         path = os.path.join(args.datapath, f"{filename}.pkl")
-        print("Reading input file: " + path)
+        print("Parsing " + path)
 
         subDir = os.path.join(dataDir, filename)
         if not os.path.exists(subDir):
