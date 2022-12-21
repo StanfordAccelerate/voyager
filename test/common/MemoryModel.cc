@@ -52,6 +52,9 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
       params.FC_GRAD) {
     C = 1;
   }
+  if (params.WEIGHT_UPDATE) {
+    X = K;
+  }
 
   int size = STRIDE * Y * STRIDE * X * C;
   // std::cout << "size of inputs: " << size << std::endl;
@@ -84,12 +87,6 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
       double val = *(tmpValuePtr++);
 
       writeToMemory(params.INPUT_OFFSET + address, val, mem, false);
-
-      // save_float(&acceleratorMemory[params.INPUT_OFFSET], i, val,
-      //            params.ACC_T_INPUT);
-      // save_float(goldMemory, i, val, params.ACC_T_INPUT);
-      // save_float(universalGoldMemory, i, val, params.ACC_T_INPUT);
-      // save_float(floatGoldMemory, i, val, params.ACC_T_INPUT);
     }
   }
 

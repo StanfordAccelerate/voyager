@@ -496,18 +496,59 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else if (params.WEIGHT_UPDATE) {
-    INT_T *weight = new INT_T[FX * FY * C * K];
-    INT_T *gradient = new INT_T[FX * FY * C * K];
+    INT_T *weights = new INT_T[FX * FY * C * K];
+    INT_T *gradients = new INT_T[FX * FY * C * K];
     INT_T learningRate = params.learningRate;
+
+    // for (int i = 0; i < C; i++) {
+    //   for (int j = 0; j < K; j++) {
+    //     std::cerr << (float)matrixA[i * K + j] << '\t';
+    //   }
+    //   std::cerr << std::endl;
+    // }
+    // std::cerr << std::endl << std::endl;
+    // for (int i = 0; i < C; i++) {
+    //   for (int j = 0; j < K; j++) {
+    //     std::cerr << (float)matrixB[i * K + j] << '\t';
+    //   }
+    //   std::cerr << std::endl;
+    // }
+
+
     for (int i = 0; i < FX * FY * C * K; i++) {
-      weight[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
-      gradient[i] = readInput(matrixA, i, params.ACC_T_WEIGHT);
-      weight[i] -= learningRate * gradient[i];
-      // save 8-bit quantized weight
-      saveOutput(matrixB, i, weight[i], params.ACC_T_OUTPUT);
-      if (!params.ACC_T_OUTPUT) {
-        matrixA[i] = weight[i] - static_cast<INT_T>(matrixB[i]);
+      gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+      weights[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+      // weights[i] -= learningRate * gradients[i];
+      float val = (float)weights[i] - (float)learningRate * (float)gradients[i];
+      std::cerr << val << '\t';
+      if ((i + 1) % K == 0) {
+        std::cerr << std::endl;
       }
+      weights[i] = val;
+      // save 8-bit quantized weight
+      saveOutput(matrixB, i, weights[i], params.ACC_T_OUTPUT);
+
+      if (!params.ACC_T_OUTPUT && params.ERROR_FEEDBACK) {
+        // gradients[i] =
+        //     (weights[i] - static_cast<INT_T>(matrixB[i])) / learningRate;
+        gradients[i] =
+            ((float)matrixB[i] - (float)weights[i]) / (float)learningRate;
+        saveOutput(matrixA, i, gradients[i], params.ACC_T_OUTPUT);
+      }
+    }
+
+    for (int i = 0; i < C; i++) {
+      for (int j = 0; j < K; j++) {
+        std::cerr << (float)matrixB[i * K + j] << '\t';
+      }
+      std::cerr << std::endl;
+    }
+    std::cerr << std::endl << std::endl;
+    for (int i = 0; i < C; i++) {
+      for (int j = 0; j < K; j++) {
+        std::cerr << (float)weights[i * K + j] << '\t';
+      }
+      std::cerr << std::endl;
     }
   } else {
     // Large arrays need to go on the heap

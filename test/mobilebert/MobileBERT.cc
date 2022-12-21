@@ -5,6 +5,7 @@
 #include "test/mobilebert/mobilebert_tiny2/backprop.h"
 #include "test/mobilebert/mobilebert_tiny2/gradient.h"
 #include "test/mobilebert/mobilebert_tiny2/inference.h"
+#include "test/mobilebert/mobilebert_tiny2/weight.h"
 
 #if __has_include("test/mobilebert/paramsCodeGen.h")
 #include "test/mobilebert/paramsCodeGen.h"
@@ -59,6 +60,11 @@ MobileBERT::MobileBERT(const std::string modelName, const std::string task,
       params = backpropParams;
       memOffsets = backpropMemOffsets;
       files = backpropTestFiles;
+    } else if (this->task == "weight") {
+      paramsMapping = weightParamsMapping;
+      params = weightParams;
+      memOffsets = weightMemOffsets;
+      files = weightTestFiles;
     } else {
       std::cerr << "Task must be one of: inference, gradient, backprop"
                 << std::endl;
@@ -149,6 +155,11 @@ std::vector<Workload> MobileBERT::getWorkloads(
         // TODO: accelerator doesn't support these functionalities yet
         // this results in FP32<->Pytorch failing for backprop and gradients
         workload.params.ACC_T_OUTPUT = false;
+      } else if (task == "weight") {
+        inputDataDir = "weight_gradients/";
+        weightDataDir = "weights/";
+        outputDataDir = workload.params.ERROR_FEEDBACK ? "weight_residuals/"
+                                                       : "updated_weights/";
       }
 
       std::string encLayerName = "mobilebert_encoder_layer_0_";
@@ -182,7 +193,15 @@ std::vector<Workload> MobileBERT::getWorkloads(
       } else {
         workload.params.WEIGHT_OFFSET = STACK_SIZE + INTERMEDIATE_SIZE;
       }
-      workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
+
+      if (workload.params.WEIGHT_UPDATE) {
+        workload.params.OUTPUT_OFFSET = workload.params.ERROR_FEEDBACK
+                                            ? workload.params.INPUT_OFFSET
+                                            : workload.params.WEIGHT_OFFSET;
+      } else {
+        workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
+      }
+
       if (workload.params.BIAS) {
         workload.params.BIAS_OFFSET = STACK_SIZE + 3 * INTERMEDIATE_SIZE;
       } else {

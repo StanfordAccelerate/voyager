@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 import argparse
+import os
+from os import listdir
+import struct
+import sys
+import re
+
 import dill as pickle
 import numpy as np
 import torch
-import re
-import sys, getopt
-import os
-import struct
+
 
 ''' @brief: Writes data of form torch.tensor dtype=float64 to binary data. '''
 def write_fp64(filename, data):
@@ -38,12 +41,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     dataDir = os.path.join(args.datapath, "datafile") if args.output_dir is None else args.output_dir
-    files = ["activations", "activation_gradients", "weights", "weight_gradients"]
+    files = [f for f in listdir(args.datapath) if f.endswith('.pkl')]
+    print(files)
     for filename in files:
-        path = os.path.join(args.datapath, f"{filename}.pkl")
+        path = os.path.join(args.datapath, filename)
         print("Parsing " + path)
 
-        subDir = os.path.join(dataDir, filename)
+        subDir = os.path.join(dataDir, filename[:-4])
         if not os.path.exists(subDir):
             os.makedirs(subDir)
 
