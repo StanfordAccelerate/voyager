@@ -156,10 +156,11 @@ std::vector<Workload> MobileBERT::getWorkloads(
         // this results in FP32<->Pytorch failing for backprop and gradients
         workload.params.ACC_T_OUTPUT = false;
       } else if (task == "weight") {
-        inputDataDir = "weight_gradients/";
-        weightDataDir = "weights/";
-        outputDataDir = workload.params.ERROR_FEEDBACK ? "weight_residuals/"
-                                                       : "updated_weights/";
+        inputDataDir = "quantized_weight_gradients/";
+        weightDataDir = "quantized_weights/";
+        outputDataDir = workload.params.ERROR_FEEDBACK
+                            ? "updated_weight_gradients/"
+                            : "updated_weights/";
       }
 
       std::string encLayerName = "mobilebert_encoder_layer_0_";
