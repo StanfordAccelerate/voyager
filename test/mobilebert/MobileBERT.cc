@@ -120,16 +120,19 @@ std::vector<Workload> MobileBERT::getWorkloads(
         outputDataDir = "activation_gradients/";
         residualDataDir = "activation_gradients/";
 
+        if (!workload.params.WEIGHT) {
+          weightDataDir = "activations/";
+        }
+        if (workload.params.SOFTMAX_GRAD || workload.params.RELU_GRAD) {
+          residualDataDir = "activations/";
+        }
         if (layer.find("attention_self_value_layer") != std::string::npos) {
           inputDataDir = "activations/";
           weightDataDir = "activation_gradients/";
-        } else if (workload.params.CROSS_ENTROPY_GRAD) {
+        }
+        if (workload.params.CROSS_ENTROPY_GRAD) {
           inputDataDir = "activations/";
           weightDataDir = "activations/";
-        } else if (!workload.params.WEIGHT) {
-          weightDataDir = "activations/";
-        } else if (workload.params.SOFTMAX_GRAD || workload.params.RELU_GRAD) {
-          residualDataDir = "activations/";
         }
 
       } else if (task == "gradient") {

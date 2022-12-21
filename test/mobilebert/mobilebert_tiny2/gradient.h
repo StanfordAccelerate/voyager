@@ -99,6 +99,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (16 x 1)
@@ -210,6 +211,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -219,7 +221,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .WEIGHT_OFFSET = 0,
          .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
-         .loops = {{8, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 16}},
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
          .reductionLoopIndex = {3, 0},
@@ -265,6 +267,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (512 x 128) x (128 x 128)
@@ -320,6 +323,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -375,6 +379,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (512 x 128) x (128 x 128)
@@ -430,6 +435,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (128 x 128) x (128 x 128)
@@ -485,6 +491,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (128 x 128) * (128 x 128)
@@ -494,7 +501,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .WEIGHT_OFFSET = 0,
          .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
-         .loops = {{8, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 16}},
+         .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
          .inputXLoopIndex = {0, 5},
          .inputYLoopIndex = {1, 4},
          .reductionLoopIndex = {3, 0},
@@ -540,6 +547,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (512 x 128) x (128 x 128)
@@ -595,6 +603,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = -5,
      }},
 
     // (128 x 128)
@@ -650,6 +659,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = true,
+         .outputExpBias = -5,
      }},
 
     // (128 x 128)
@@ -705,6 +715,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = true,
+         .outputExpBias = -5,
      }},
 
     // (128 x 512)
@@ -760,6 +771,7 @@ std::map<std::string, SimplifiedParams> gradientParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = true,
+         .outputExpBias = -5,
      }},
 };
 
@@ -1032,7 +1044,7 @@ std::map<std::string, Files> gradientTestFiles{
      }},
     {"output_bottleneck_LayerNorm_weight",
      {
-         "output_bottleneck_residual",
+         "output_bottleneck_dense",
          "output_bottleneck_LayerNorm",
          "",
          "output_bottleneck_LayerNorm_weight",
@@ -1061,7 +1073,7 @@ std::map<std::string, Files> gradientTestFiles{
 
     {"output_LayerNorm_weight",
      {
-         "output_residual",
+         "output_dense",
          "output_LayerNorm",
          "",
          "output_LayerNorm_weight",
@@ -1104,7 +1116,7 @@ std::map<std::string, Files> gradientTestFiles{
 
     {"ffn_0_output_LayerNorm_weight",
      {
-         "ffn_0_output_residual",
+         "ffn_0_output_dense",
          "ffn_0_output_LayerNorm",
          "",
          "ffn_0_output_LayerNorm_weight",
@@ -1147,7 +1159,7 @@ std::map<std::string, Files> gradientTestFiles{
 
     {"attention_output_LayerNorm_weight",
      {
-         "attention_output_residual",
+         "attention_output_dense",
          "attention_output_LayerNorm",
          "",
          "attention_output_LayerNorm_weight",

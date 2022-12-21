@@ -269,7 +269,9 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
                                        const Files& files,
                                        const MemoryMap& memoryMap,
                                        bool useDataFile) {
-  loadInputs(params, memoryMap.inputs, files.inputs_file, useDataFile);
+  if (!files.inputs_file.empty()) {
+    loadInputs(params, memoryMap.inputs, files.inputs_file, useDataFile);
+  }
 
   // TODO(fpedd): Revisit the params.WEIGHT_OFFSET != -1 logic here
   // We only want to load the 2nd input as weights if weights is false, but the

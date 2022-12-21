@@ -184,7 +184,7 @@ build/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryModel.h src/Ar
 build/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h test/mobilebert/mobilebert_tiny2/*
+build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/TestRunner.o: test/common/TestRunner.cc
@@ -202,7 +202,7 @@ build/networks.a: build/ResNet.o build/MobileBERT.o
 build/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h
+build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################

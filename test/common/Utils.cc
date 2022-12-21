@@ -224,7 +224,8 @@ int validateMapping(SimplifiedParams params) {
 
   if (params.FC || params.FC_GRAD || params.SOFTMAX || params.SOFTMAX_GRAD ||
       params.NO_NORM || params.NO_NORM_GRAD || params.CROSS_ENTROPY_GRAD ||
-      params.GRAD_CLIPPING_UNIT_TEST) {  // don't check for vector ops
+      params.GRAD_CLIPPING_UNIT_TEST ||
+      params.BIAS_GRAD) {  // don't check for vector ops
     return 0;
   }
 

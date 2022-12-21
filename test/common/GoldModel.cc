@@ -353,9 +353,8 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
 
     for (int x = 0; x < X; x++) {
       for (int y = 0; y < Y; y++) {
-        int index = x * Y + y;
-        outputMatrix[index] *= attentionProbs[index];
-        sums[x] += outputMatrix[index];
+        outputMatrix[x * Y + y] *= attentionProbs[x * Y + y];
+        sums[x] += outputMatrix[x * Y + y];
       }
     }
 
@@ -364,7 +363,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       for (int y = 0; y < Y; y++) {
         outputMatrix[x * Y + y] -=
             static_cast<ACC_T>(sums[x] * attentionProbs[x * Y + y]);
-        outputMatrix[x * Y + y] *= static_cast<ACC_T>(scale);
         saveOutput(matrixC, x * Y + y, outputMatrix[x * Y + y],
                    params.ACC_T_OUTPUT);
       }
@@ -497,6 +495,20 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int i = 0; i < X * C; i++) {
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
+  } else if (params.WEIGHT_UPDATE) {
+    INT_T *weight = new INT_T[FX * FY * C * K];
+    INT_T *gradient = new INT_T[FX * FY * C * K];
+    INT_T learningRate = params.learningRate;
+    for (int i = 0; i < FX * FY * C * K; i++) {
+      weight[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+      gradient[i] = readInput(matrixA, i, params.ACC_T_WEIGHT);
+      weight[i] -= learningRate * gradient[i];
+      // save 8-bit quantized weight
+      saveOutput(matrixB, i, weight[i], params.ACC_T_OUTPUT);
+      if (!params.ACC_T_OUTPUT) {
+        matrixA[i] = weight[i] - static_cast<INT_T>(matrixB[i]);
+      }
+    }
   } else {
     // Large arrays need to go on the heap
     INT_T *inputMatrixA = new INT_T[(STRIDE * X) * (STRIDE * Y) * C];
@@ -544,13 +556,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
           inputMatrixA[x * C + c] = copyMatrixA[c * X + x];
         }
       }
-    }
-
-    for (int x = 0; x < X; x++) {
-      for (int c = 0; c < C; c++) {
-        std::cerr << inputMatrixA[x * C + c] << '\t';
-      }
-      std::cerr << std::endl;
     }
 
     if (params.CONCAT_WEIGHT) {
