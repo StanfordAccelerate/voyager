@@ -115,16 +115,10 @@ def main():
     if args.model == "resnet":
         all_tests = resnet_networks.NETWORKS[args.model]
     elif args.model == "mobilebert":
-        if args.task == "inference":
-            all_tests = mobilebert_networks.NETWORKS[args.model]
-        elif args.task == "backprop":
-            all_tests = mobilebert_networks.NETWORKS[args.model+"_activation_gradient"]
-        elif args.task == "gradient":
-            all_tests = mobilebert_networks.NETWORKS[args.model+"_weight_gradient"]
-        elif args.task == "weight_update":
-            all_tests = mobilebert_networks.NETWORKS[args.model+"_weight_update"]
-        else:
+        name = f'{args.model}_{args.task}'
+        if name not in mobilebert_networks.NETWORKS.keys():
             raise ValueError(f"Task {args.task} no supported on mobilebert.")
+        all_tests = mobilebert_networks.NETWORKS[name]
     # If we can't find the model in any of the handwritten configs, we look in the codegen
     else:
         if "resnet" in args.model:

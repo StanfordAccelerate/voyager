@@ -42,35 +42,37 @@ MobileBERT::MobileBERT(const std::string modelName, const std::string task,
       it.second.residual_file.insert(0, this->dataDir);
     }
   } else {
-    if (this->task == "inference") {
+    if (task == "inference") {
       order = inferenceOrder;
       paramsMapping = inferenceParamsMapping;
       params = inferenceParams;
       memOffsets = inferenceMemOffsets;
       files = inferenceTestFiles;
-    } else if (this->task == "gradient") {
+    } else if (task == "gradient") {
       // NOTE: order is not defined for gradient
       paramsMapping = gradientParamsMapping;
       params = gradientParams;
       memOffsets = gradientMemOffsets;
       files = gradientTestFiles;
-    } else if (this->task == "backprop") {
+    } else if (task == "backprop") {
       order = backpropOrder;
       paramsMapping = backpropParamsMapping;
       params = backpropParams;
       memOffsets = backpropMemOffsets;
       files = backpropTestFiles;
-    } else if (this->task == "weight_update") {
+    } else if (task == "weight_update" || task == "weight_update_with_ef") {
       paramsMapping = weightParamsMapping;
       params = weightParams;
       memOffsets = weightMemOffsets;
+
       for (auto it = weightParamsMapping.begin();
            it != weightParamsMapping.end(); it++) {
         Files file = {it->first, it->first, "", it->first};
         files.insert({it->first, file});
       }
     } else {
-      std::cerr << "ERROR: Task must be one of: inference, gradient, backprop, weight_update."
+      std::cerr << "ERROR: Task must be one of: inference, gradient, backprop, "
+                   "weight_update."
                 << std::endl;
       std::abort();
     }
@@ -159,7 +161,9 @@ std::vector<Workload> MobileBERT::getWorkloads(
         // TODO: accelerator doesn't support these functionalities yet
         // this results in FP32<->Pytorch failing for backprop and gradients
         workload.params.ACC_T_OUTPUT = false;
-      } else if (task == "weight_update") {
+      } else if (task == "weight_update" || task == "weight_update_with_ef") {
+        workload.params.ERROR_FEEDBACK = task == "weight_update_with_ef";
+
         inputDataDir = "quantized_weight_gradients/";
         weightDataDir = "quantized_weights/";
         outputDataDir = workload.params.ERROR_FEEDBACK
@@ -200,6 +204,10 @@ std::vector<Workload> MobileBERT::getWorkloads(
       }
 
       if (workload.params.WEIGHT_UPDATE) {
+        // Offset only used for comparing outputs in unit tests
+        std::cerr << "workload.params.ERROR_FEEDBACK: "
+                  << (workload.params.ERROR_FEEDBACK ? "true" : "false")
+                  << std::endl;
         workload.params.OUTPUT_OFFSET = workload.params.ERROR_FEEDBACK
                                             ? workload.params.INPUT_OFFSET
                                             : workload.params.WEIGHT_OFFSET;

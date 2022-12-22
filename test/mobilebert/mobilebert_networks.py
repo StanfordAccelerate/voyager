@@ -1,5 +1,5 @@
 NETWORKS = {
-    "mobilebert":
+    "mobilebert_inference":
     [
         "bottleneck_input_dense",
         "bottleneck_input_LayerNorm",
@@ -36,7 +36,7 @@ NETWORKS = {
         "output_bottleneck_LayerNorm",
         "classifier",
     ],
-    "mobilebert_activation_gradient": [
+    "mobilebert_backprop": [
         "classifier",
         "output_bottleneck_LayerNorm",
         "output_bottleneck_dense",
@@ -77,7 +77,7 @@ NETWORKS = {
         # "value_to_hidden_states",
         # "bottlenecked_hidden_states",
     ],
-    "mobilebert_weight_gradient": [
+    "mobilebert_gradient": [
         "classifier_weight",
         "classifier_bias",
         "output_bottleneck_LayerNorm_weight",
@@ -152,5 +152,19 @@ NETWORKS = {
         "bottleneck_input_LayerNorm_bias",
         "bottleneck_input_dense_weight",
         "bottleneck_input_dense_bias",
+    ],
+    "mobilebert_weight_update_with_ef": [
+        "classifier_weight",
+        "output_bottleneck_dense_weight",
+        "output_dense_weight",
+        "intermediate_dense_weight",
+        "ffn_0_output_dense_weight",
+        "ffn_0_intermediate_dense_weight",
+        "attention_output_dense_weight",
+        "attention_self_value_weight",
+        "attention_self_query_weight",
+        "attention_self_key_weight",
+        "bottleneck_attention_dense_weight",
+        "bottleneck_input_dense_weight",
     ],
 }
