@@ -121,6 +121,8 @@ def main():
             all_tests = mobilebert_networks.NETWORKS[args.model+"_activation_gradient"]
         elif args.task == "gradient":
             all_tests = mobilebert_networks.NETWORKS[args.model+"_weight_gradient"]
+        elif args.task == "weight_update":
+            all_tests = mobilebert_networks.NETWORKS[args.model+"_weight_update"]
         else:
             raise ValueError(f"Task {args.task} no supported on mobilebert.")
     # If we can't find the model in any of the handwritten configs, we look in the codegen

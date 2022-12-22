@@ -60,13 +60,17 @@ MobileBERT::MobileBERT(const std::string modelName, const std::string task,
       params = backpropParams;
       memOffsets = backpropMemOffsets;
       files = backpropTestFiles;
-    } else if (this->task == "weight") {
+    } else if (this->task == "weight_update") {
       paramsMapping = weightParamsMapping;
       params = weightParams;
       memOffsets = weightMemOffsets;
-      files = weightTestFiles;
+      for (auto it = weightParamsMapping.begin();
+           it != weightParamsMapping.end(); it++) {
+        Files file = {it->first, it->first, "", it->first};
+        files.insert({it->first, file});
+      }
     } else {
-      std::cerr << "Task must be one of: inference, gradient, backprop"
+      std::cerr << "ERROR: Task must be one of: inference, gradient, backprop, weight_update."
                 << std::endl;
       std::abort();
     }
@@ -155,7 +159,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
         // TODO: accelerator doesn't support these functionalities yet
         // this results in FP32<->Pytorch failing for backprop and gradients
         workload.params.ACC_T_OUTPUT = false;
-      } else if (task == "weight") {
+      } else if (task == "weight_update") {
         inputDataDir = "quantized_weight_gradients/";
         weightDataDir = "quantized_weights/";
         outputDataDir = workload.params.ERROR_FEEDBACK
