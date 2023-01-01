@@ -156,7 +156,9 @@ SC_MODULE(OutputAddressGenerator) {
                   int address = params.VECTOR_OUTPUT_OFFSET + baseAddress;
                   if (params.DP_OUTPUT) {
                     for (int precision = 0; precision < 2; precision++) {
-                      vectorOutputAddress.Push(address + precision);
+                      vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
+                                               baseAddress * 2 +
+                                               precision * WIDTH);
                     }
                   } else {
                     vectorOutputAddress.Push(address);

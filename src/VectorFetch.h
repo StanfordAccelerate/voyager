@@ -79,7 +79,9 @@ SC_MODULE(VectorFetchUnit) {
                   if (params.DP_VEC0) {
                     K = K * 2;
                     for (int precision = 0; precision < 2; precision++) {
-                      int address = j * K + k + precision;
+                      int address =
+                          static_cast<ac_int<32, false> >((j * K + k) * 2) +
+                          precision * WIDTH;
                       // DLOG("addressgen0 " << j << " " << k << " " <<
                       // address);
                       MemoryRequest memRequest = {
@@ -211,6 +213,9 @@ SC_MODULE(VectorFetchUnit) {
                               temp);
                         }
                       }
+
+                      vectorFetch0DataResponseBroadcasted.Push(
+                          fullPrecisionVec);
                     } else {
                       // cast up to 16b
                       Pack1D<ODTYPE, WIDTH> originalVec =
