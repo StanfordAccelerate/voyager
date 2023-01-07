@@ -202,7 +202,7 @@ build/networks.a: build/ResNet.o build/MobileBERT.o
 build/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h
+build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################

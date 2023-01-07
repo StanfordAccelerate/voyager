@@ -4,12 +4,14 @@
 
 // By default we have 2MB of SRAM per MINOTAUR SoC
 // organized as 8x 256KB Banks with 2x 128KB Macros each
-constexpr int NUM_SRAM_BANKS = 8;
+// constexpr int NUM_SRAM_BANKS = 8;
+constexpr int NUM_SRAM_BANKS = 80;
 constexpr int SRAM_MEMORY_SIZE = NUM_SRAM_BANKS * 256 * 1024;
 
 // By default we have 12MB of RRAM per MINOTAUR SoC
 // organized as 12x 1MB Banks with 4x 256KB Macros each
-constexpr int NUM_RRAM_BANKS = 12;
+// constexpr int NUM_RRAM_BANKS = 12;
+constexpr int NUM_RRAM_BANKS = 20;
 constexpr int RRAM_MEMORY_SIZE = NUM_RRAM_BANKS * 1024 * 1024;
 
 // Bandwidth-mode for a RRAM memory bank
@@ -153,15 +155,14 @@ const int WEIGHT_INTERMEDIATE_SIZE = 128 * 512;  // 65536
 const int BIAS_HIDDEN_SIZE = 128 * 2;
 const int BIAS_INTERMEDIATE_SIZE = 512 * 2;
 
-// const int ENCODER_ACTIVATION_SIZE = 4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE;
-// const int ENCODER_WEIGHT_SIZE = 8 * WEIGHT_INTERMEDIATE_SIZE +
-//                                 5 * BIAS_INTERMEDIATE_SIZE +
-//                                 3 * WEIGHT_HIDDEN_SIZE + 18 *
-//                                 BIAS_HIDDEN_SIZE;
-const int ENCODER_ACTIVATION_SIZE = 4 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE;
-const int ENCODER_WEIGHT_SIZE =
-    6 * WEIGHT_INTERMEDIATE_SIZE + 4 * WEIGHT_HIDDEN_SIZE +
-    5 * BIAS_INTERMEDIATE_SIZE + 15 * BIAS_HIDDEN_SIZE;
+const int ENCODER_ACTIVATION_SIZE = 4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE;
+const int ENCODER_WEIGHT_SIZE = 8 * WEIGHT_INTERMEDIATE_SIZE +
+                                5 * BIAS_INTERMEDIATE_SIZE +
+                                3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE;
+// const int ENCODER_ACTIVATION_SIZE = 4 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE;
+// const int ENCODER_WEIGHT_SIZE =
+//     6 * WEIGHT_INTERMEDIATE_SIZE + 4 * WEIGHT_HIDDEN_SIZE +
+//     5 * BIAS_INTERMEDIATE_SIZE + 15 * BIAS_HIDDEN_SIZE;
 
 // SRAM Memory Offsets
 const int STACK_SIZE = 1024 * 1024;

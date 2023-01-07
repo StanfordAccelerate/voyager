@@ -70,11 +70,6 @@ std::map<std::string, std::string> inferenceParamsMapping{
     {"output_bottleneck_dense", "outputBottleneck"},
     {"output_bottleneck_LayerNorm", "outputLayerNorm"},
     {"classifier", "classifier"},
-    // Additional unit tests
-    {"attention_self_attention_probs_no_mask_0", "softmax_no_mask"},
-    {"attention_self_attention_probs_no_mask_1", "softmax_no_mask"},
-    {"attention_self_attention_probs_no_mask_2", "softmax_no_mask"},
-    {"attention_self_attention_probs_no_mask_3", "softmax_no_mask"},
 };
 
 std::map<std::string, SimplifiedParams> inferenceParams{
@@ -158,6 +153,7 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .fyIndex = 2,
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
+         .BIAS = true,
          .ATTENTION_SCALING = true,
      }},
 
@@ -174,7 +170,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .weightReuseIndex = {4, 5},
          .STRIDE = 1,
          .SOFTMAX = true,
-         .ATTENTION_MASK = true,
      }},
 
     // (128 x 128)
@@ -540,31 +535,6 @@ std::map<std::string, MemoryOffsets> inferenceMemOffsets{
          8 * WEIGHT_INTERMEDIATE_SIZE + 21 * BIAS_INTERMEDIATE_SIZE +
              3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
      }},
-
-    {"attention_self_attention_probs_no_mask_0",
-     {
-         INTERMEDIATE_SIZE + 7 * HIDDEN_SIZE,
-         0,
-         INTERMEDIATE_SIZE + 11 * HIDDEN_SIZE,
-     }},
-    {"attention_self_attention_probs_no_mask_1",
-     {
-         INTERMEDIATE_SIZE + 8 * HIDDEN_SIZE,
-         0,
-         INTERMEDIATE_SIZE + 12 * HIDDEN_SIZE,
-     }},
-    {"attention_self_attention_probs_no_mask_2",
-     {
-         INTERMEDIATE_SIZE + 9 * HIDDEN_SIZE,
-         0,
-         INTERMEDIATE_SIZE + 13 * HIDDEN_SIZE,
-     }},
-    {"attention_self_attention_probs_no_mask_3",
-     {
-         INTERMEDIATE_SIZE + 10 * HIDDEN_SIZE,
-         0,
-         INTERMEDIATE_SIZE + 14 * HIDDEN_SIZE,
-     }},
 };
 
 std::map<std::string, Files> inferenceTestFiles{
@@ -626,56 +596,56 @@ std::map<std::string, Files> inferenceTestFiles{
      {
          "attention_self_query_layer_0",
          "attention_self_key_layer_0",
-         "",
+         "mobilebert_attention_mask",
          "attention_self_attention_scores_0",
      }},
     {"attention_self_attention_scores_1",
      {
          "attention_self_query_layer_1",
          "attention_self_key_layer_1",
-         "",
+         "mobilebert_attention_mask",
          "attention_self_attention_scores_1",
      }},
     {"attention_self_attention_scores_2",
      {
          "attention_self_query_layer_2",
          "attention_self_key_layer_2",
-         "",
+         "mobilebert_attention_mask",
          "attention_self_attention_scores_2",
      }},
     {"attention_self_attention_scores_3",
      {
          "attention_self_query_layer_3",
          "attention_self_key_layer_3",
-         "",
+         "mobilebert_attention_mask",
          "attention_self_attention_scores_3",
      }},
 
     {"attention_self_attention_probs_0",
      {
          "attention_self_attention_scores_0",
-         "mobilebert_attention_mask",
+         "",
          "",
          "attention_self_attention_probs_0",
      }},
     {"attention_self_attention_probs_1",
      {
          "attention_self_attention_scores_1",
-         "mobilebert_attention_mask",
+         "",
          "",
          "attention_self_attention_probs_1",
      }},
     {"attention_self_attention_probs_2",
      {
          "attention_self_attention_scores_2",
-         "mobilebert_attention_mask",
+         "",
          "",
          "attention_self_attention_probs_2",
      }},
     {"attention_self_attention_probs_3",
      {
          "attention_self_attention_scores_3",
-         "mobilebert_attention_mask",
+         "",
          "",
          "attention_self_attention_probs_3",
      }},
@@ -794,35 +764,5 @@ std::map<std::string, Files> inferenceTestFiles{
          "classifier_weight",
          "classifier_bias",
          "classifier",
-     }},
-
-    // Additional unit tests
-    {"attention_self_attention_probs_no_mask_0",
-     {
-         "attention_self_attention_scores_0",
-         "",
-         "",
-         "attention_self_attention_probs_no_mask_0",
-     }},
-    {"attention_self_attention_probs_no_mask_1",
-     {
-         "attention_self_attention_scores_1",
-         "",
-         "",
-         "attention_self_attention_probs_no_mask_1",
-     }},
-    {"attention_self_attention_probs_no_mask_2",
-     {
-         "attention_self_attention_scores_2",
-         "",
-         "",
-         "attention_self_attention_probs_no_mask_2",
-     }},
-    {"attention_self_attention_probs_no_mask_3",
-     {
-         "attention_self_attention_scores_3",
-         "",
-         "",
-         "attention_self_attention_probs_no_mask_3",
      }},
 };

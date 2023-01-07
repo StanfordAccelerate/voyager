@@ -80,7 +80,8 @@ MobileBERT::MobileBERT(const std::string modelName, const std::string task,
 }
 
 std::vector<Workload> MobileBERT::getWorkloads(
-    const std::vector<std::string>& layers) const {
+    const std::vector<std::string>& layers, int layerIndex = 0,
+    bool useOffsets = false) const {
   std::vector<Workload> workloads;
   // Make "codgen"-matching case insensitive
   std::string& modelNameLower = const_cast<std::string&>(this->modelName);
@@ -102,9 +103,11 @@ std::vector<Workload> MobileBERT::getWorkloads(
   } else {
     for (const std::string& layer : layers) {
       const std::string& paramName = paramsMapping.at(layer);
+      std::string encLayerName =
+          "mobilebert_encoder_layer_" + std::to_string(layerIndex) + "_";
 
       Workload workload;
-      workload.name = layer;
+      workload.name = encLayerName + layer;
       workload.params = params.at(paramName);
       workload.files = files.at(layer);
 
@@ -121,7 +124,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
         outputDataDir = "activations/";
         residualDataDir = "activations/";
 
-        if (!workload.params.WEIGHT || workload.params.ATTENTION_MASK) {
+        if (!workload.params.WEIGHT) {
           weightDataDir = "activations/";
         }
       } else if (task == "backprop") {
@@ -183,7 +186,6 @@ std::vector<Workload> MobileBERT::getWorkloads(
         }
       }
 
-      std::string encLayerName = "mobilebert_encoder_layer_0_";
       if (layer.find("classifier") != std::string::npos ||
           (task == "backprop" && layer == "output_bottleneck_LayerNorm")) {
         encLayerName = "";
@@ -194,17 +196,20 @@ std::vector<Workload> MobileBERT::getWorkloads(
             0, dataDir + inputDataDir + encLayerName);
       }
 
-      if (workload.params.ATTENTION_MASK) {
-        workload.files.weights_file.insert(0, dataDir + weightDataDir);
-      } else if (!workload.files.weights_file.empty()) {
+      if (!workload.files.weights_file.empty()) {
         workload.files.weights_file.insert(
             0, dataDir + weightDataDir + encLayerName);
       }
 
+      if (workload.files.bias_file == "mobilebert_attention_mask") {
+        workload.files.bias_file.insert(0, dataDir + inputDataDir);
+      } else {
+        workload.files.bias_file.insert(0,
+                                        dataDir + weightDataDir + encLayerName);
+      }
+
       workload.files.outputs_file.insert(
           0, dataDir + outputDataDir + encLayerName);
-      workload.files.bias_file.insert(0,
-                                      dataDir + weightDataDir + encLayerName);
       workload.files.residual_file.insert(
           0, dataDir + residualDataDir + encLayerName);
       workload.files.weight_grad_file.insert(
@@ -212,28 +217,34 @@ std::vector<Workload> MobileBERT::getWorkloads(
       workload.files.bias_grad_file.insert(
           0, dataDir + gradientDataDir + encLayerName);
 
-      // Fake memory offsets used for unit tests
-      workload.params.INPUT_OFFSET = STACK_SIZE;
-      if (workload.params.SOFTMAX) {  // Softmax gets no weight address
-        workload.params.WEIGHT_OFFSET = -1;
+      if (useOffsets) {
+        MemoryOffsets offsets = memOffsets.at(layer);
+        workload.params.INPUT_OFFSET = offsets.INPUT_OFFSET;
+        workload.params.WEIGHT_OFFSET = offsets.WEIGHT_OFFSET;
+        workload.params.OUTPUT_OFFSET = offsets.OUTPUT_OFFSET;
+        workload.params.BIAS_OFFSET = offsets.BIAS_OFFSET;
+        workload.params.RESIDUAL_OFFSET = offsets.RESIDUAL_OFFSET;
       } else {
+        // Fake memory offsets used for unit tests
+        workload.params.INPUT_OFFSET = STACK_SIZE;
         workload.params.WEIGHT_OFFSET = STACK_SIZE + INTERMEDIATE_SIZE;
-      }
 
-      if (workload.params.WEIGHT_UPDATE) {
-        // Offset only used for comparing outputs in unit tests
-        workload.params.OUTPUT_OFFSET = workload.params.ERROR_FEEDBACK
-                                            ? workload.params.INPUT_OFFSET
-                                            : workload.params.WEIGHT_OFFSET;
-      } else {
-        workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
-      }
+        if (workload.params.WEIGHT_UPDATE) {
+          // Offset used for comparing outputs in weight update unit tests
+          workload.params.OUTPUT_OFFSET = workload.params.ERROR_FEEDBACK
+                                              ? workload.params.INPUT_OFFSET
+                                              : workload.params.WEIGHT_OFFSET;
+        } else {
+          workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
+        }
 
-      workload.params.BIAS_OFFSET = STACK_SIZE + 3 * INTERMEDIATE_SIZE;
-      workload.params.RESIDUAL_OFFSET = STACK_SIZE + 4 * INTERMEDIATE_SIZE;
-      workload.params.WEIGHT_GRADIENT_OFFSET =
-          STACK_SIZE + 5 * INTERMEDIATE_SIZE;
-      workload.params.BIAS_GRADIENT_OFFSET = STACK_SIZE + 6 * INTERMEDIATE_SIZE;
+        workload.params.BIAS_OFFSET = STACK_SIZE + 3 * INTERMEDIATE_SIZE;
+        workload.params.RESIDUAL_OFFSET = STACK_SIZE + 4 * INTERMEDIATE_SIZE;
+        workload.params.WEIGHT_GRADIENT_OFFSET =
+            STACK_SIZE + 5 * INTERMEDIATE_SIZE;
+        workload.params.BIAS_GRADIENT_OFFSET =
+            STACK_SIZE + 6 * INTERMEDIATE_SIZE;
+      }
 
       workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
                             SRAM, SRAM};
@@ -254,6 +265,9 @@ std::vector<Workload> MobileBERT::getWorkloadsInRange(
   // Expand layer vector to include intermediate layers, if necessary
   std::vector<std::string> layersInRange;
   if (layers.size() == 1) {  // Single layer
+    if (layers.front() == "all" && task == "inference") {
+      return getInferenceWorkloads();
+    }
     layersInRange.push_back(layers.front());
   } else {  // Range of layers
     if (task == "gradient") {
@@ -278,4 +292,56 @@ std::vector<Workload> MobileBERT::getWorkloadsInRange(
 
 std::vector<Workload> MobileBERT::getAllWorkloads() const {
   return getWorkloads(order);
+}
+
+std::vector<Workload> MobileBERT::getInferenceWorkloads() const {
+  std::vector<Workload> inferenceWorkloads;
+  auto encoderOrder = std::vector<std::string>(inferenceOrder.begin(),
+                                               inferenceOrder.end() - 1);
+
+  int inputOffset;
+  int weightOffset;
+  for (int layer = 0; layer < 24; layer++) {
+    std::vector<Workload> workloads = getWorkloads(encoderOrder, layer, true);
+
+    inputOffset = ACTIVATION_OFFSET + layer * ENCODER_ACTIVATION_SIZE;
+    weightOffset = layer * ENCODER_WEIGHT_SIZE;
+
+    for (auto workload : workloads) {
+      workload.params.INPUT_OFFSET += inputOffset;
+      workload.params.WEIGHT_OFFSET +=
+          workload.params.WEIGHT ? weightOffset : inputOffset;
+      workload.params.OUTPUT_OFFSET += inputOffset;
+      workload.params.BIAS_OFFSET += weightOffset;
+      workload.params.RESIDUAL_OFFSET += inputOffset;
+
+      if (workload.files.bias_file.find("mobilebert_attention_mask") !=
+          std::string::npos) {
+        workload.params.BIAS_OFFSET = STACK_SIZE;
+      }
+
+      inferenceWorkloads.push_back(workload);
+    }
+  }
+
+  std::vector<std::string> workloadInRange{"classifier"};
+  Workload classifier = getWorkloads(workloadInRange, 23, true).front();
+  classifier.params.INPUT_OFFSET += inputOffset;
+  classifier.params.WEIGHT_OFFSET +=
+      classifier.params.WEIGHT ? weightOffset : inputOffset;
+  classifier.params.OUTPUT_OFFSET += inputOffset;
+  classifier.params.BIAS_OFFSET += weightOffset;
+  classifier.params.RESIDUAL_OFFSET += inputOffset;
+
+  inferenceWorkloads.push_back(classifier);
+
+  // auto workloads = std::vector<Workload>(inferenceWorkloads.begin(),
+  //                                        inferenceWorkloads.begin() + 200);
+  // return workloads;
+  return inferenceWorkloads;
+}
+
+std::vector<Workload> MobileBERT::getBackpropWorkloads() const {
+  std::vector<Workload> backpropWorkloads;
+  return backpropWorkloads;
 }

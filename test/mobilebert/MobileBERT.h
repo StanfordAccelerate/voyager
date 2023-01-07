@@ -38,5 +38,7 @@ class MobileBERT : public Network {
   std::map<std::string, MemoryOffsets> memOffsets;
   std::map<std::string, Files> testFiles;
 
-  std::vector<Workload> getWorkloads(const std::vector<std::string> &) const;
+  std::vector<Workload> getWorkloads(const std::vector<std::string> &, int, bool) const;
+  std::vector<Workload> getInferenceWorkloads() const;
+  std::vector<Workload> getBackpropWorkloads() const;
 };

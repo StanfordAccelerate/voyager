@@ -499,20 +499,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     INT_T *weights = new INT_T[FX * FY * C * K];
     INT_T *gradients = new INT_T[FX * FY * C * K];
 
-    // for (int i = 0; i < C; i++) {
-    //   for (int j = 0; j < K; j++) {
-    //     std::cerr << (float)matrixA[i * K + j] << '\t';
-    //   }
-    //   std::cerr << std::endl;
-    // }
-    // std::cerr << std::endl << std::endl;
-    // for (int i = 0; i < C; i++) {
-    //   for (int j = 0; j < K; j++) {
-    //     std::cerr << (float)matrixB[i * K + j] << '\t';
-    //   }
-    //   std::cerr << std::endl;
-    // }
-
     for (int i = 0; i < FX * FY * C * K; i++) {
       gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
       weights[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
