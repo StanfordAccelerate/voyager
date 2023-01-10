@@ -172,12 +172,14 @@ void grad_clip_norm(ACC_T *matrix, int size, int expBias) {
     adjustExp(matrix[i], expBias);
   }
 
+  // TODO: perform this as a tree add
   ACC_T norm = 0;
   for (int i = 0; i < size; i++) {
     norm += static_cast<ACC_T>(matrix[i] * matrix[i]);
   }
 
   gold_inv_sqrt(norm);
+
   if (static_cast<float>(norm) < 1) {
     for (int i = 0; i < size; i++) {
       matrix[i] *= norm;
@@ -513,7 +515,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     //   }
     //   std::cerr << std::endl;
     // }
-
 
     for (int i = 0; i < FX * FY * C * K; i++) {
       gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
