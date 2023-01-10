@@ -16,12 +16,18 @@ void MapOperation(const SimplifiedParams &params,
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
-  if (params.SOFTMAX) {
+  if (params.GRAD_CLIPPING_UNIT_TEST) {
+    MapGradNormClipping(params, mappedParams, X * C);
+  } else if (params.SOFTMAX) {
     MapSoftmax(params, mappedParams);
   } else if (params.SOFTMAX_GRAD) {
     MapSoftmaxGrad(params, mappedParams);
   } else if (params.FC_GRAD) {
-    MapFCGrad(params, mappedParams);
+    if (params.GRAD_CLIPPING) {
+      MapFCGradWithNormClipping(params, mappedParams);
+    } else {
+      MapFCGrad(params, mappedParams);
+    }
   } else if (params.FC) {
     MapFC(params, mappedParams);
   } else if (params.NO_NORM) {

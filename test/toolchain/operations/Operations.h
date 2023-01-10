@@ -5,6 +5,9 @@
 #include "src/Params.h"
 #include "test/common/VerificationTypes.h"
 
+void MapGradNormClipping(const SimplifiedParams &params,
+                         std::deque<BaseParams *> &mappedParams, int size);
+
 void MapBiasGrad(const SimplifiedParams &params,
                  std::deque<BaseParams *> &mappedParams);
 
@@ -19,6 +22,9 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
 
 void MapFCGrad(const SimplifiedParams &params,
                std::deque<BaseParams *> &mappedParams);
+
+void MapFCGradWithNormClipping(const SimplifiedParams &params,
+                               std::deque<BaseParams *> &mappedParams);
 
 void MapFC(const SimplifiedParams &params,
            std::deque<BaseParams *> &mappedParams);
