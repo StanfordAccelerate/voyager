@@ -51,10 +51,12 @@ SC_MODULE(MatrixParamsDeserializer) {
       // This module gets instantiated 3 times:
       // inputController, weightController, matrixProcessor
       // But we only want to see the print once
+      #ifndef __SYNTHESIS__
       if (static_cast<std::string>(name()).find("matrixProcessor") != std::string::npos) {
         CCS_LOG("Matrix Params Received");
         std::cout << params << std::endl;
       }
+      #endif
       paramsOut.Push(params);
     }
   }
