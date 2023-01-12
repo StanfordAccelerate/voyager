@@ -42,45 +42,50 @@ MobileBERT::MobileBERT(const std::string modelName, const std::string task,
       it.second.residual_file.insert(0, this->dataDir);
     }
   } else {
-    if (task == "inference" || task == "weight_splitting") {
-      order = inferenceOrder;
-      paramsMapping = inferenceParamsMapping;
-      params = inferenceParams;
-      memOffsets = inferenceMemOffsets;
-      files = inferenceTestFiles;
-    } else if (task == "gradient") {
-      // NOTE: order is not defined for gradient
-      paramsMapping = gradientParamsMapping;
-      params = gradientParams;
-      memOffsets = gradientMemOffsets;
-      files = gradientTestFiles;
-    } else if (task == "backprop") {
-      order = backpropOrder;
-      paramsMapping = backpropParamsMapping;
-      params = backpropParams;
-      memOffsets = backpropMemOffsets;
-      files = backpropTestFiles;
-    } else if (task == "weight_update" || task == "error_feedback") {
-      paramsMapping = weightParamsMapping;
-      params = weightParams;
-      memOffsets = weightMemOffsets;
+    setTask(task);
+  }
+}
 
-      for (auto it = weightParamsMapping.begin();
-           it != weightParamsMapping.end(); it++) {
-        Files file = {it->first, it->first, "", it->first};
-        files.insert({it->first, file});
-      }
-    } else {
-      std::cerr << "ERROR: Task must be one of \"inference\", \"gradient\", "
-                   "\"backprop\", \"weight_update\", and \"weight_splitting\"."
-                << std::endl;
-      std::abort();
+void MobileBERT::setTask(std::string task) {
+  this->task = task;
+  if (task == "inference" || task == "weight_splitting") {
+    order = inferenceOrder;
+    paramsMapping = inferenceParamsMapping;
+    params = inferenceParams;
+    memOffsets = inferenceMemOffsets;
+    files = inferenceTestFiles;
+  } else if (task == "gradient") {
+    // NOTE: order is not defined for gradient
+    paramsMapping = gradientParamsMapping;
+    params = gradientParams;
+    memOffsets = gradientMemOffsets;
+    files = gradientTestFiles;
+  } else if (task == "backprop") {
+    order = backpropOrder;
+    paramsMapping = backpropParamsMapping;
+    params = backpropParams;
+    memOffsets = backpropMemOffsets;
+    files = backpropTestFiles;
+  } else if (task == "weight_update" || task == "error_feedback") {
+    paramsMapping = weightParamsMapping;
+    params = weightParams;
+    memOffsets = weightMemOffsets;
+
+    for (auto it = weightParamsMapping.begin(); it != weightParamsMapping.end();
+         it++) {
+      Files file = {it->first, it->first, "", it->first};
+      files.insert({it->first, file});
     }
+  } else {
+    std::cerr << "ERROR: Task must be one of \"inference\", \"gradient\", "
+                 "\"backprop\", \"weight_update\", and \"weight_splitting\"."
+              << std::endl;
+    std::abort();
   }
 }
 
 std::vector<Workload> MobileBERT::getWorkloads(
-    const std::vector<std::string>& layers, int layerIndex = 0,
+    const std::vector<std::string>& layers, int encoderIndex = 0,
     bool useOffsets = false) const {
   std::vector<Workload> workloads;
   // Make "codgen"-matching case insensitive
@@ -104,7 +109,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
     for (const std::string& layer : layers) {
       const std::string& paramName = paramsMapping.at(layer);
       std::string encLayerName =
-          "mobilebert_encoder_layer_" + std::to_string(layerIndex) + "_";
+          "mobilebert_encoder_layer_" + std::to_string(encoderIndex) + "_";
 
       Workload workload;
       workload.name = encLayerName + layer;
@@ -181,7 +186,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
         residualDataDir = "activations2/";
         gradientDataDir = "weight_gradients/";
 
-        if (!workload.params.WEIGHT || workload.params.ATTENTION_MASK) {
+        if (!workload.params.WEIGHT) {
           weightDataDir = "activations/";
         }
       }
@@ -261,12 +266,19 @@ std::vector<Workload> MobileBERT::getWorkloads(
  * Layers specifies either a single layer or range of layers.
  */
 std::vector<Workload> MobileBERT::getWorkloadsInRange(
-    const std::vector<std::string>& layers) const {
+    const std::vector<std::string>& layers) {
   // Expand layer vector to include intermediate layers, if necessary
   std::vector<std::string> layersInRange;
   if (layers.size() == 1) {  // Single layer
-    if (layers.front() == "all" && task == "inference") {
-      return getInferenceWorkloads();
+    if (layers.front() == "all") {
+      std::vector<Workload> workloads;
+      setTask("inference");
+      std::vector<Workload> inference = getInferenceWorkloads();
+      // setTask("backprop");
+      // std::vector<Workload> backprop = getBackpropWorkloads();
+      workloads.insert(workloads.end(), inference.begin(), inference.end());
+      // workloads.insert(workloads.end(), backprop.begin(), backprop.end());
+      return workloads;
     }
     layersInRange.push_back(layers.front());
   } else {  // Range of layers
@@ -290,7 +302,7 @@ std::vector<Workload> MobileBERT::getWorkloadsInRange(
   return getWorkloads(layersInRange);
 }
 
-std::vector<Workload> MobileBERT::getAllWorkloads() const {
+std::vector<Workload> MobileBERT::getAllWorkloads() {
   return getWorkloads(order);
 }
 
@@ -335,13 +347,50 @@ std::vector<Workload> MobileBERT::getInferenceWorkloads() const {
 
   inferenceWorkloads.push_back(classifier);
 
-  // auto workloads = std::vector<Workload>(inferenceWorkloads.begin(),
-  //                                        inferenceWorkloads.begin() + 200);
-  // return workloads;
   return inferenceWorkloads;
 }
 
 std::vector<Workload> MobileBERT::getBackpropWorkloads() const {
   std::vector<Workload> backpropWorkloads;
+
+  auto encoderOrder =
+      std::vector<std::string>(backpropOrder.begin() + 2, backpropOrder.end());
+
+  int inputOffset;
+  int weightOffset;
+  for (int layer = 23; layer >= 0; layer--) {
+    std::vector<Workload> workloads = getWorkloads(encoderOrder, layer, true);
+
+    inputOffset = ACTIVATION_OFFSET + layer * ENCODER_ACTIVATION_SIZE;
+    weightOffset = layer * ENCODER_WEIGHT_SIZE;
+
+    for (auto workload : workloads) {
+      workload.params.INPUT_OFFSET += ERROR_OFFSET;
+      workload.params.WEIGHT_OFFSET += weightOffset;
+      workload.params.OUTPUT_OFFSET += ERROR_OFFSET;
+      workload.params.RESIDUAL_OFFSET += ERROR_OFFSET;
+
+      if (!workload.params.WEIGHT) {
+        workload.params.WEIGHT_OFFSET += inputOffset - ERROR_OFFSET;
+      }
+
+      if (workload.params.RELU_GRAD || workload.params.SOFTMAX_GRAD) {
+        workload.params.RESIDUAL_OFFSET += inputOffset - ERROR_OFFSET;
+      }
+
+      if (workload.name.find("attention_self_value_layer") !=
+              std::string::npos ||
+          workload.params.CROSS_ENTROPY_GRAD) {
+        workload.params.INPUT_OFFSET += inputOffset - ERROR_OFFSET;
+        workload.params.WEIGHT_OFFSET += ERROR_OFFSET - weightOffset;
+      }
+
+      // std::cerr << workload.files.outputs_file << std::endl;
+      backpropWorkloads.push_back(workload);
+    }
+  }
+
+  backpropWorkloads = std::vector<Workload>(backpropWorkloads.begin(),
+                                            backpropWorkloads.begin() + 4);
   return backpropWorkloads;
 }

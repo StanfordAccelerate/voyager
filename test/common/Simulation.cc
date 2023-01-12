@@ -281,6 +281,8 @@ int Simulation::checkOutput() {
 
   if (currentParams.SOFTMAX) {
     K = 1;
+  } else if (currentParams.CROSS_ENTROPY_GRAD) {
+    Y = K = 1;
   }
 
   size_t size = X * Y * K;

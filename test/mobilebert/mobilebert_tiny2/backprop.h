@@ -144,7 +144,7 @@ std::map<std::string, SimplifiedParams> backpropParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
-         .outputExpBias = 5,
+         .outputExpBias = 12,
      }},
 
     // (128 x 16) x (16 x 512)

@@ -172,21 +172,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .SOFTMAX = true,
      }},
 
-    // (128 x 128)
-    {"softmax_no_mask",
-     {
-         .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},
-         .inputXLoopIndex = {0, 5},
-         .inputYLoopIndex = {1, 4},
-         .reductionLoopIndex = {3, 0},
-         .weightLoopIndex = {2, 1},
-         .fxIndex = 3,
-         .fyIndex = 2,
-         .weightReuseIndex = {4, 5},
-         .STRIDE = 1,
-         .SOFTMAX = true,
-     }},
-
     // (128 x 128) x (128 x 32)
     {"context",
      {

@@ -66,7 +66,7 @@ std::vector<Workload> ResNet::getWorkloads(
  * Layers specifies either a single layer or range of layers.
  */
 std::vector<Workload> ResNet::getWorkloadsInRange(
-    const std::vector<std::string>& layers) const {
+    const std::vector<std::string>& layers) {
   // Expand layer vector to include intermediate layers, if necessary
   std::vector<std::string> layersInRange;
   if (layers.size() == 1) {  // Single layer
@@ -84,6 +84,4 @@ std::vector<Workload> ResNet::getWorkloadsInRange(
   return getWorkloads(layersInRange);
 }
 
-std::vector<Workload> ResNet::getAllWorkloads() const {
-  return getWorkloads(order);
-}
+std::vector<Workload> ResNet::getAllWorkloads() { return getWorkloads(order); }

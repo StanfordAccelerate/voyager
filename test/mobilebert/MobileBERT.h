@@ -23,12 +23,13 @@ class MobileBERT : public Network {
   ~MobileBERT(void){};
 
   std::vector<Workload> getWorkloadsInRange(
-      const std::vector<std::string> &) const override;
+      const std::vector<std::string> &) override;
 
-  std::vector<Workload> getAllWorkloads() const override;
+  std::vector<Workload> getAllWorkloads() override;
 
  private:
-  const std::string task;
+  std::string task;
+  void setTask(std::string);
 
   std::vector<std::string> order;
   std::map<std::string, SimplifiedParams> params;
@@ -38,7 +39,8 @@ class MobileBERT : public Network {
   std::map<std::string, MemoryOffsets> memOffsets;
   std::map<std::string, Files> testFiles;
 
-  std::vector<Workload> getWorkloads(const std::vector<std::string> &, int, bool) const;
+  std::vector<Workload> getWorkloads(const std::vector<std::string> &, int,
+                                     bool) const;
   std::vector<Workload> getInferenceWorkloads() const;
   std::vector<Workload> getBackpropWorkloads() const;
 };

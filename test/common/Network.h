@@ -12,9 +12,9 @@ class Network {
   virtual ~Network(void){};
 
   virtual std::vector<Workload> getWorkloadsInRange(
-      const std::vector<std::string> &) const = 0;
+      const std::vector<std::string> &) = 0;
 
-  virtual std::vector<Workload> getAllWorkloads() const = 0;
+  virtual std::vector<Workload> getAllWorkloads() = 0;
 
   const std::string getDataDir() { return dataDir; }
 
