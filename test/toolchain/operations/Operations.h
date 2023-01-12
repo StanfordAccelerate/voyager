@@ -40,3 +40,6 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
 
 void MapMatrixOp(const SimplifiedParams &params,
                  std::deque<BaseParams *> &mappedParams);
+
+void MapWeightUpdate(const SimplifiedParams &params,
+                 std::deque<BaseParams *> &mappedParams);
