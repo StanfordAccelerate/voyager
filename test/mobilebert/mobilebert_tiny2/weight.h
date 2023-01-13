@@ -49,9 +49,6 @@ std::map<std::string, SimplifiedParams> weightParams{
     // (16 x 512)
     {"classifier_weight",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},
          .inputXLoopIndex = {0, 5},
@@ -98,15 +95,13 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 
     // (16)
     {"classifier_bias",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1}},
          .inputXLoopIndex = {0, 5},
@@ -153,15 +148,13 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 
     // (512 x 128)
     {"bottleneck",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{1, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 1}},
          .inputXLoopIndex = {0, 5},
@@ -208,6 +201,7 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 
@@ -263,6 +257,7 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 
@@ -318,6 +313,7 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 
@@ -373,6 +369,7 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 
@@ -428,6 +425,7 @@ std::map<std::string, SimplifiedParams> weightParams{
          .ACC_T_INPUT = false,
          .ACC_T_WEIGHT = false,
          .ACC_T_OUTPUT = false,
+         .outputExpBias = 0,
          .WEIGHT_UPDATE = true,
      }},
 };

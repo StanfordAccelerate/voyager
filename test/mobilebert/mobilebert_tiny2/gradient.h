@@ -49,9 +49,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
     // (16 x 1) x (1 x 512)
     {"classifier_weight",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
@@ -104,9 +101,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
     // (16 x 1)
     {"classifier_bias",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1}},
          .inputXLoopIndex = {0, 5},
@@ -159,9 +153,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
     // (128 x 512) * (128 x 512)
     {"outputLayerNorm",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{8, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 16}},
          .inputXLoopIndex = {0, 5},
@@ -214,9 +205,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
     // (128 x 128) x (128 x 512)
     {"outputBottleneck",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
          .inputXLoopIndex = {0, 5},
@@ -269,9 +257,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
     // (512 x 128) x (128 x 128)
     {"ffn2",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
          .inputXLoopIndex = {0, 5},
@@ -324,9 +309,6 @@ std::map<std::string, SimplifiedParams> gradientParams{
     // (128 x 128) x (128 x 128)
     {"outputAttention",
      {
-         .INPUT_OFFSET = 0,
-         .WEIGHT_OFFSET = 0,
-         .OUTPUT_OFFSET = 0,
          .WEIGHT_TRANSPOSE = false,
          .loops = {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
          .inputXLoopIndex = {0, 5},

@@ -320,8 +320,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .BCE_WITH_LOGITS_GRAD = false,
          .INPUT_TRANSPOSE = false,
          .CONCAT_INPUT = true,
-         .CONCAT_WEIGHT = false,
-         .SPLIT_OUTPUT = false,
      }},
 
     // (128 x 128) x (128 x 512)
@@ -453,7 +451,6 @@ std::map<std::string, SimplifiedParams> inferenceParams{
          .SOFTMAX = false,
          .ATTENTION_SCALING = false,
          .FC = true,
-         .NO_NORM = false,
      }},
 };
 
