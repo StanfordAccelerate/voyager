@@ -8,6 +8,9 @@
 
 // (16 x 1) x (1 x 512)
 const SimplifiedParams classifier_weight_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 16}},
     .inputXLoopIndex = {0, 5},
@@ -59,6 +62,9 @@ const SimplifiedParams classifier_weight_gradient = {
 
 // (16 x 1)
 const SimplifiedParams classifier_bias_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -110,6 +116,9 @@ const SimplifiedParams classifier_bias_gradient = {
 
 // (128 x 512) * (128 x 512)
 const SimplifiedParams output_bottleneck_LayerNorm_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{8, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 16}},
     .inputXLoopIndex = {0, 5},
@@ -161,6 +170,9 @@ const SimplifiedParams output_bottleneck_LayerNorm_gradient = {
 
 // (128 x 128) x (128 x 512)
 const SimplifiedParams intermediate_dense_weight_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -212,6 +224,9 @@ const SimplifiedParams intermediate_dense_weight_gradient = {
 
 // (512 x 128) x (128 x 128)
 const SimplifiedParams output_dense_weight_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{16, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -263,6 +278,9 @@ const SimplifiedParams output_dense_weight_gradient = {
 
 // (128 x 128) x (128 x 128)
 const SimplifiedParams attention_output_dense_weight_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 4, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},

@@ -41,6 +41,9 @@ std::vector<std::string> inferenceOrder{
 
 // (128 x 512) * (512 x 128)
 const SimplifiedParams input_bottleneck = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -64,6 +67,9 @@ const SimplifiedParams input_bottleneck = {
 
 // (128 x 128) * 128
 const SimplifiedParams input_bottleneck_LayerNorm = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 128}},
     .inputXLoopIndex = {0, 5},
@@ -93,6 +99,9 @@ const SimplifiedParams input_bottleneck_LayerNorm = {
 
 // (128 x 128) x (128 x 128)
 const SimplifiedParams query_key_projection = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -134,6 +143,9 @@ const SimplifiedParams query_key_projection = {
 
 // (128 x 512) x (512 x 128)
 const SimplifiedParams value_projection = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -175,6 +187,9 @@ const SimplifiedParams value_projection = {
 
 // (128 x 32) x (32 x 128)
 const SimplifiedParams attention_score = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {2, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -202,6 +217,9 @@ const SimplifiedParams attention_score = {
 
 // (128 x 128)
 const SimplifiedParams softmax = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},
     .inputXLoopIndex = {0, 5},
@@ -228,6 +246,9 @@ const SimplifiedParams softmax = {
 
 // (128 x 128) x (128 x 32)
 const SimplifiedParams context_layer = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -243,6 +264,9 @@ const SimplifiedParams context_layer = {
 
 // (128 x 128) x (128 x 128)
 const SimplifiedParams attention_output_dense = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -282,6 +306,9 @@ const SimplifiedParams attention_output_dense = {
 
 // (128 x 128) x (128 x 512)
 const SimplifiedParams intermediate_dense = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -305,6 +332,9 @@ const SimplifiedParams intermediate_dense = {
 
 // (128 x 512) x (512 x 128)
 const SimplifiedParams output_dense = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -328,6 +358,9 @@ const SimplifiedParams output_dense = {
 
 // (128 x 128) x (128 x 512)
 const SimplifiedParams output_bottleneck_dense = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -351,6 +384,9 @@ const SimplifiedParams output_bottleneck_dense = {
 
 // (128 x 512) * 512
 const SimplifiedParams output_bottleneck_LayerNorm = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -380,6 +416,9 @@ const SimplifiedParams output_bottleneck_LayerNorm = {
 
 // (1 x 512) x (512 x 16)
 const SimplifiedParams classifier = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {32, 1, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},

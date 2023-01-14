@@ -8,6 +8,9 @@
 
 // (16 x 512)
 const SimplifiedParams classifier_weight = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -60,6 +63,9 @@ const SimplifiedParams classifier_weight = {
 
 // (16)
 const SimplifiedParams classifier_bias = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -112,6 +118,9 @@ const SimplifiedParams classifier_bias = {
 
 // (512 x 128)
 const SimplifiedParams input_bottleneck_weight = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -164,6 +173,9 @@ const SimplifiedParams input_bottleneck_weight = {
 
 // (128 x 512)
 const SimplifiedParams intermediate_dense_weight = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -216,6 +228,9 @@ const SimplifiedParams intermediate_dense_weight = {
 
 // (512)
 const SimplifiedParams inter_bottleneck_bias = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -268,6 +283,9 @@ const SimplifiedParams inter_bottleneck_bias = {
 
 // (128 x 128)
 const SimplifiedParams bottleneck_projection_weight = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
@@ -320,6 +338,9 @@ const SimplifiedParams bottleneck_projection_weight = {
 
 // (128)
 const SimplifiedParams intra_bottleneck_bias = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 8, 1, 1, 1, 1}},
     .inputXLoopIndex = {0, 5},
