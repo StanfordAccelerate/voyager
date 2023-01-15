@@ -592,7 +592,6 @@ const SimplifiedParams fc_params = {
     .STORE_IN_ACC = false,
     .ACC_FROM_ACC = false,
     .SOFTMAX = false,
-    .ATTENTION_MASK = false,
     .ATTENTION_SCALING = false,
     .FC = true,
 };

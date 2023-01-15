@@ -50,29 +50,23 @@ void MobileBERT::setTask(std::string task) {
   this->task = task;
   if (task == "inference" || task == "weight_splitting") {
     order = inferenceOrder;
-    paramsMapping = inferenceParamsMapping;
     params = inferenceParams;
     memOffsets = inferenceMemOffsets;
     files = inferenceTestFiles;
-  } else if (task == "gradient") {
-    // NOTE: order is not defined for gradient
-    paramsMapping = gradientParamsMapping;
-    params = gradientParams;
-    memOffsets = gradientMemOffsets;
-    files = gradientTestFiles;
   } else if (task == "backprop") {
     order = backpropOrder;
-    paramsMapping = backpropParamsMapping;
     params = backpropParams;
     memOffsets = backpropMemOffsets;
     files = backpropTestFiles;
+  } else if (task == "gradient") {
+    params = gradientParams;
+    memOffsets = gradientMemOffsets;
+    files = gradientTestFiles;
   } else if (task == "weight_update" || task == "error_feedback") {
-    paramsMapping = weightParamsMapping;
     params = weightParams;
     memOffsets = weightMemOffsets;
 
-    for (auto it = weightParamsMapping.begin(); it != weightParamsMapping.end();
-         it++) {
+    for (auto it = weightParams.begin(); it != weightParams.end(); it++) {
       Files file = {it->first, it->first, "", it->first};
       files.insert({it->first, file});
     }
@@ -107,13 +101,12 @@ std::vector<Workload> MobileBERT::getWorkloads(
     }
   } else {
     for (const std::string& layer : layers) {
-      const std::string& paramName = paramsMapping.at(layer);
       std::string encLayerName =
           "mobilebert_encoder_layer_" + std::to_string(encoderIndex) + "_";
 
       Workload workload;
       workload.name = encLayerName + layer;
-      workload.params = params.at(paramName);
+      workload.params = params.at(layer);
       workload.files = files.at(layer);
 
       // adjust files path
@@ -162,10 +155,6 @@ std::vector<Workload> MobileBERT::getWorkloads(
           inputDataDir = "activation_gradients/";
           weightDataDir = "activations/";
         }
-
-        // TODO: accelerator doesn't support these functionalities yet
-        // this results in FP32<->Pytorch failing for backprop and gradients
-        workload.params.ACC_T_OUTPUT = false;
       } else if (task == "weight_update" || task == "error_feedback") {
         workload.params.ERROR_FEEDBACK = task == "error_feedback";
 

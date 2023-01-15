@@ -10,16 +10,10 @@ NETWORKS = {
         "attention_self_attention_scores_1",
         "attention_self_attention_scores_2",
         "attention_self_attention_scores_3",
-        # TODO(fpedd): Replaced with _no_mask for the time being (until we have 
-        # support for masking in accelerator)
-        # "attention_self_attention_probs_0",
-        # "attention_self_attention_probs_1",
-        # "attention_self_attention_probs_2",
-        # "attention_self_attention_probs_3",
-        "attention_self_attention_probs_no_mask_0",
-        "attention_self_attention_probs_no_mask_1",
-        "attention_self_attention_probs_no_mask_2",
-        "attention_self_attention_probs_no_mask_3",
+        "attention_self_attention_probs_0",
+        "attention_self_attention_probs_1",
+        "attention_self_attention_probs_2",
+        "attention_self_attention_probs_3",
         "attention_self_context_layer_0",
         "attention_self_context_layer_1",
         "attention_self_context_layer_2",
@@ -153,7 +147,7 @@ NETWORKS = {
         "bottleneck_input_dense_weight",
         "bottleneck_input_dense_bias",
     ],
-    "mobilebert_weight_update_with_ef": [
+    "mobilebert_error_feedback": [
         "classifier_weight",
         "output_bottleneck_dense_weight",
         "output_dense_weight",

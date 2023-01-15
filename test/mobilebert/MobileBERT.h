@@ -34,10 +34,7 @@ class MobileBERT : public Network {
   std::vector<std::string> order;
   std::map<std::string, SimplifiedParams> params;
   std::map<std::string, Files> files;
-
-  std::map<std::string, std::string> paramsMapping;
   std::map<std::string, MemoryOffsets> memOffsets;
-  std::map<std::string, Files> testFiles;
 
   std::vector<Workload> getWorkloads(const std::vector<std::string> &, int,
                                      bool) const;

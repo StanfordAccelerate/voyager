@@ -125,7 +125,7 @@ void MemoryModel::loadWeights(const SimplifiedParams& params,
   if (params.NO_NORM_GRAD) {
     C = X;
   }
-  if (params.CROSS_ENTROPY_GRAD || params.ATTENTION_MASK) {
+  if (params.CROSS_ENTROPY_GRAD) {
     C = X;
     K = 1;
   }

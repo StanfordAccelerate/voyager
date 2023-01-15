@@ -215,27 +215,19 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int x = 0; x < X; x++) {
       ACC_T outputMatrix[Y];
       for (int y = 0; y < Y; y++) {
-        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
-          outputMatrix[y] = readInput(matrixA, x * Y + y, params.ACC_T_INPUT);
-        } else {
-          outputMatrix[y] = 0;
-        }
+        outputMatrix[y] = readInput(matrixA, x * Y + y, params.ACC_T_INPUT);
       }
 
       ACC_T max = 0;
       for (int y = 0; y < Y; y++) {
-        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
-          max = outputMatrix[y] > max ? outputMatrix[y] : max;
-        }
+        max = outputMatrix[y] > max ? outputMatrix[y] : max;
       }
 
       ACC_T sum = 0;
       for (int y = 0; y < Y; y++) {
-        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
-          ACC_T exp = static_cast<ACC_T>(outputMatrix[y] - max);
-          gold_exp(exp);
-          outputMatrix[y] = exp;
-        }
+        ACC_T exp = static_cast<ACC_T>(outputMatrix[y] - max);
+        gold_exp(exp);
+        outputMatrix[y] = exp;
       }
 
       for (int reductionCount = 0; reductionCount < Y;
@@ -259,9 +251,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       ACC_T divisor = sum;
       gold_reciprocal(divisor);
       for (int y = 0; y < Y; y++) {
-        if (!params.ATTENTION_MASK || static_cast<float>(matrixB[y])) {
-          outputMatrix[y] *= divisor;
-        }
+        outputMatrix[y] *= divisor;
         saveOutput(matrixC, x * Y + y, outputMatrix[y], params.ACC_T_OUTPUT);
       }
     }

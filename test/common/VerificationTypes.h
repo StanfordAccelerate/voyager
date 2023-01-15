@@ -86,7 +86,6 @@ struct SimplifiedParams {
 
   // special vector ops
   bool SOFTMAX;
-  bool ATTENTION_MASK;
   bool ATTENTION_SCALING;
   bool FC;
   bool NO_NORM;
@@ -118,10 +117,10 @@ struct SimplifiedParams {
   bool ACC_T_WEIGHT;
   bool ACC_T_OUTPUT;
 
-  int inputExpBias;
-  int weightExpBias;
+  // int inputExpBias;
+  // int weightExpBias;
   int outputExpBias;
-  int residualExpBias;
+  // int residualExpBias;
 
   bool WEIGHT_UPDATE;
   bool ERROR_FEEDBACK;

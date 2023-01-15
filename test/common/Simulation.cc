@@ -279,7 +279,7 @@ int Simulation::checkOutput() {
     Y = 1;
   }
 
-  if (currentParams.SOFTMAX) {
+  if (currentParams.SOFTMAX || currentParams.SOFTMAX_GRAD) {
     K = 1;
   } else if (currentParams.CROSS_ENTROPY_GRAD) {
     Y = K = 1;
