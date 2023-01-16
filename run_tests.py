@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import functools
 import subprocess
 import argparse
@@ -13,7 +11,7 @@ import logging
 from test.mobilebert import mobilebert_networks
 from test.resnet import resnet_networks
 
-# Try to import generated network definitions, but only warn if they are not found
+# Try to import generated network definitions and warn user if they are not found
 try:
     from test.resnet import resnet_networks_codegen
 except ImportError:
@@ -45,7 +43,7 @@ def main():
                         help="Relative normalized error in % we allow [TOLERANCE].")
     parser.add_argument("--data_dir",
                         type=str,
-                        default=None,
+                        default=None, # None means we will lookup the default data dir below
                         help="Path to binary input data [DATA_DIR].")
     parser.add_argument("--output_dir",
                         type=str,
@@ -104,7 +102,7 @@ def main():
     subprocess.run(cmd, check=True)
     subprocess.run(cmd, check=True)
 
-    # Prepare and run all tests/layers simultaneously as different processes
+    # Prepare all tests/layers to be simultaneously run as individual processes
     results = []
     all_tests = None
     # Default models (with handwritten config)
@@ -113,7 +111,7 @@ def main():
     elif args.model == "mobilebert":
         name = f'{args.model}_{args.task}'
         if name not in mobilebert_networks.NETWORKS.keys():
-            raise ValueError(f"Task {args.task} no supported on mobilebert.")
+            raise ValueError(f"{name} not supported on mobilebert.")
         all_tests = mobilebert_networks.NETWORKS[name]
     # If we can't find the model in any of the handwritten configs, we look in the codegen
     else:
@@ -124,7 +122,7 @@ def main():
         else:
             raise ValueError(f"Model {args.model} not supported.")
 
-    # Ensure we found a tests for the model
+    # Ensure we found tests for the model
     assert all_tests is not None, f"Could not find any tests for model {args.model}."
 
     # Launch each test as a separate process

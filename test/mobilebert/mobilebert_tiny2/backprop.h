@@ -50,6 +50,10 @@ std::vector<std::string> backpropOrder{
 
 // (1 x 16)
 const SimplifiedParams cross_entropy_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 16}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -100,6 +104,10 @@ const SimplifiedParams cross_entropy_gradient = {
 
 // (128 x 16) x (16 x 512)
 const SimplifiedParams classifier_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {1, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -122,6 +130,10 @@ const SimplifiedParams classifier_backward = {
 
 // (128 x 512) * 512
 const SimplifiedParams output_bottleneck_LayerNorm_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -150,6 +162,9 @@ const SimplifiedParams output_bottleneck_LayerNorm_backward = {
 
 // (128 x 512) x (512 x 128)
 const SimplifiedParams output_bottleneck_dense_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -173,6 +188,10 @@ const SimplifiedParams output_bottleneck_dense_backward = {
 
 // (128 x 128) * 128
 const SimplifiedParams bottleneck_LayerNorm_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -201,6 +220,9 @@ const SimplifiedParams bottleneck_LayerNorm_backward = {
 
 // (128 x 128) x (128 x 512)
 const SimplifiedParams output_dense_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -234,6 +256,9 @@ const SimplifiedParams output_dense_backward = {
 
 // (128 x 512) x (512 x 128)
 const SimplifiedParams intermediate_dense_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {32, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -257,6 +282,9 @@ const SimplifiedParams intermediate_dense_backward = {
 
 // (128 x 128) x (128 x 128)
 const SimplifiedParams attention_output_dense_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -298,6 +326,9 @@ const SimplifiedParams attention_output_dense_backward = {
 
 // (128 x 32) * (32 x 128)
 const SimplifiedParams context_to_attention_probs = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {2, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -313,6 +344,10 @@ const SimplifiedParams context_to_attention_probs = {
 
 // (128 x 128) x (128 x 32)
 const SimplifiedParams context_to_value = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -350,6 +385,10 @@ const SimplifiedParams context_to_value = {
 
 // (128 x 128)
 const SimplifiedParams softmax_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 128, 128}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -379,6 +418,10 @@ const SimplifiedParams softmax_gradient = {
 
 // (128 x 128) x (128 x 32)
 const SimplifiedParams attention_score_to_query = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -405,6 +448,10 @@ const SimplifiedParams attention_score_to_query = {
 
 // (128 x 128) * (128 x 32)
 const SimplifiedParams attention_score_to_key = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -442,6 +489,9 @@ const SimplifiedParams attention_score_to_key = {
 
 // (4 x 128 x 32) x (128 x 128)
 const SimplifiedParams query_projection_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -481,6 +531,9 @@ const SimplifiedParams query_projection_backward = {
 
 // (4 x 128 x 32) x (128 x 128)
 const SimplifiedParams key_projection_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 8, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -520,6 +573,9 @@ const SimplifiedParams key_projection_backward = {
 
 // (128 x 128) x (128 x 512)
 const SimplifiedParams value_projection_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},
@@ -559,6 +615,9 @@ const SimplifiedParams value_projection_backward = {
 
 // (128 x 128) x (128 x 512)
 const SimplifiedParams input_bottleneck_backward = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
     .WEIGHT_TRANSPOSE = true,
     .loops = {{4, 1, 1, 1, 1, 1}, {8, 32, 1, 1, 1, 32}},
     .inputXLoopIndex = {0, 5},

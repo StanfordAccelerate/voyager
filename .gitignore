@@ -1,11 +1,7 @@
 build
 pybuild
-data/resnet
 .direnv
 .vscode
-test_outputs/
-test_outputs_e2e/
-logs/
 novas*
 *.fsdb*
 ucli.key
@@ -15,12 +11,16 @@ __pycache__
 venv
 .env
 .swp
+# Simulation output files
+test_outputs/
+test_outputs_e2e/
+logs/
+# "Manual" test data files
 models/resnet/binary_data*
 models/resnet/model_data/*
 !models/resnet/model_data/*.pth
 datafile
-test/resnet/*
-!test/resnet/ResNet.cc
-!test/resnet/ResNet.h
-!test/resnet/params.h
-!test/resnet/resnet_networks.py
+# ZagZig codegen files
+test/*/gen_data
+test/*/*_networks_codegen.py
+test/*/paramsCodeGen.h
