@@ -16,6 +16,21 @@ void MapWeightUpdate(const SimplifiedParams &params,
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
+  std::cout << "FX: " << FX << " FY: " << FY << " C: " << C << "K: " << K
+            << std::endl;
+
+  int factor0, factor1;
+  int totalSize = FX * FY * C * K / DIMENSION;
+  if (totalSize >
+      128) {  // address generator is 8 bit, so we need to split it up
+    factor0 = 128;
+    factor1 = totalSize / 128;
+
+  } else {
+    factor0 = totalSize;
+    factor1 = 1;
+  }
+
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
@@ -28,8 +43,8 @@ void MapWeightUpdate(const SimplifiedParams &params,
     vectorParams->addressGen0Loop[0][i] = 1;
   }
   vectorParams->addressGen0Loop[1][0] = 1;
-  vectorParams->addressGen0Loop[1][1] = FX * FY;
-  vectorParams->addressGen0Loop[1][2] = C * K / DIMENSION;
+  vectorParams->addressGen0Loop[1][1] = factor1;
+  vectorParams->addressGen0Loop[1][2] = factor0;
   vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
   // address gen 1 (weights)
@@ -41,9 +56,9 @@ void MapWeightUpdate(const SimplifiedParams &params,
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen2Loops[0][i] = 1;
   }
-  vectorParams->addressGen2Loops[1][0] = 1;
-  vectorParams->addressGen2Loops[1][1] = FX * FY;
-  vectorParams->addressGen2Loops[1][2] = C * K / DIMENSION;
+  vectorParams->addressGen2Loops[0][0] = 1;
+  vectorParams->addressGen2Loops[0][1] = factor1;
+  vectorParams->addressGen2Loops[0][2] = factor0;
 
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
@@ -62,8 +77,8 @@ void MapWeightUpdate(const SimplifiedParams &params,
   vectorParams->outputWeightLoopIndex[0] = params.weightLoopIndex[0];
 
   vectorParams->outputLoops[1][0] = 1;
-  vectorParams->outputLoops[1][1] = FX * FY;
-  vectorParams->outputLoops[1][2] = C * K / DIMENSION;
+  vectorParams->outputLoops[1][1] = factor1;
+  vectorParams->outputLoops[1][2] = factor0;
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->outputYLoopIndex[1] = 0;
   vectorParams->outputXLoopIndex[1] = 1;
