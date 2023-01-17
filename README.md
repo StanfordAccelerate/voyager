@@ -9,9 +9,9 @@ It is written in SystemC/C++ and can be used for simulation (which allows for fa
 We are using the build-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It triggers whenever someone pushes to a branch. 
 
 ### Runners
-- We are using three runners on `rsgvm9`
+- We are using a single gitlab runner on `rsgvm9` (two are inactive)
 - They can be configured using `/etc/gitlab-runner/config.toml`
-- The working-dir of the runners is `/pool0/minotaur-ci`
+- The working-dir of the runners is `/home/gitlab-runner/minotaur-ci`
 
 ## Setup
 1. Clone the repository `git@code.stanford.edu:tsmc40r/brainpower/accelerator.git`
@@ -20,7 +20,9 @@ We are using the build-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It trigge
     - You need to have [`git lfs`](https://git-lfs.github.com/) installed
     - You need a `g++` with at least C++17 support
     - Make sure you have set `LD_LIBRARY_PATH=/cad/mentor/2021.1/Mgc_home/shared/lib/`
-4. If you want to run more than just the `simple` model, you will need to generate data files. Please see `models/` for Python scripts that help you with that.
+4. Create a virtual env (conda or venv) and install the packages from `requirements.txt`
+5. If you want to run more than just the `simple` model, you will need to generate data files. Please see `models/` for Python scripts that help you with that.
+6. Alternatively, you can use the ZagZig coden. Please take a look at the GitLab CI files for what commnands to run.
 
 ## Test 
 1. After setup, use the `run_tests.py` script to run the tests
