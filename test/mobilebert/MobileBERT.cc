@@ -358,7 +358,7 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
   // Cross entropy gradient
   Workload workload = getWorkloads({"classifier"}, 23, true).front();
   workload.params.INPUT_OFFSET += inputOffset;
-  workload.params.WEIGHT_OFFSET = 2 * 128 + 16;
+  workload.params.WEIGHT_OFFSET = 2 * 128;
   workload.params.OUTPUT_OFFSET += ERROR_OFFSET;
   backpropWorkloads.push_back(workload);
 
@@ -407,6 +407,6 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
   }
 
   backpropWorkloads = std::vector<Workload>(backpropWorkloads.begin(),
-                                            backpropWorkloads.begin() + 2);
+                                            backpropWorkloads.begin() + 6);
   return backpropWorkloads;
 }

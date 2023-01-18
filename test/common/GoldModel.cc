@@ -234,6 +234,13 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       for (int c = 0; c < C; c++) {
         ACC_T a = readInput(matrixA, c, params.ACC_T_INPUT);
         ACC_T b = readInput(matrixB, k * C + c, params.ACC_T_WEIGHT);
+
+        if (params.WEIGHT_SPLITTING) {
+          ACC_T weightGrad =
+              readInput(weightGradMatrix, k * C + c, params.ACC_T_WEIGHT);
+          b -= learningRate * weightGrad;
+        }
+
         flattened_mult[c] =
             static_cast<ACC_T>(static_cast<ACC_T>(a) * static_cast<ACC_T>(b));
       }
@@ -255,12 +262,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
         }
         acc = static_cast<ACC_T>(acc + accum[0]);
       }
-
-      // FIXME
-      // if (params.WEIGHT_SPLITTING) {
-      //   ACC_T grad = weightGradMatrix[k * C + c];
-      //   b += static_cast<ACC_T>(learningRate * grad);
-      // }
 
       if (params.BIAS) {
         INT_T bias = readInput(biasMatrix, k, true);

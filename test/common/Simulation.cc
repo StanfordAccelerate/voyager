@@ -130,8 +130,18 @@ void Simulation::loadMemory() {
       if (workload.loadWeight) {
         memModel->loadModelParams(workload.params, workload.files,
                                   workload.memoryMap, true);
+
+        // std::cerr << workload.name << std::endl;
+        // for (int i = 0; i < 16; i++) {
+        //   std::cerr << floatMemory->sram[29536304 + i] << "\t";
+        // }
+        // std::cerr << std::endl;
       }
     }
+  }
+
+  for (int i = 0; i < 128 * 16; i++) {
+    floatMemory->sram[29536304 + i] = 0;
   }
 
   // Load last layer reference outputs
@@ -184,6 +194,18 @@ void Simulation::run() {
               << " * "
               << "(" << FX << "x" << FY << "x" << C << "x" << K << ")"
               << std::endl;
+
+    if (workload.name == "mobilebert_encoder_layer_23_intermediate_dense") {
+      std::cerr << params.OUTPUT_OFFSET << std::endl;
+      std::cerr << params.RESIDUAL_OFFSET << std::endl;
+      // for (int i = 0; i < X; i++) {
+      //   for (int j = 0; j < K; j++) {
+      //     std::cerr << floatMemory->sram[params.RESIDUAL_OFFSET + i * K + j]
+      //               << "\t";
+      //   }
+      //   std::cerr << std::endl;
+      // }
+    }
 
     // Run gold models
     if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
