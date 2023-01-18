@@ -459,10 +459,10 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
     }
   } else if (params.WEIGHT_UPDATE) {
-    INT_T *weights = new INT_T[FX * FY * C * K];
-    INT_T *gradients = new INT_T[FX * FY * C * K];
+    INT_T *weights = new INT_T[X * C];
+    INT_T *gradients = new INT_T[X * C];
 
-    for (int i = 0; i < FX * FY * C * K; i++) {
+    for (int i = 0; i < X * C; i++) {
       weights[i] = readInput(matrixA, i, params.ACC_T_INPUT);
       gradients[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
 
@@ -685,7 +685,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                   }
 
                   if (params.RELU_GRAD &&
-                      inputResidualMatrix[outputAddress] < 0) {
+                      inputResidualMatrix[outputAddress] == 0) {
                     outputMatrix[outputAddress] = 0;
                   }
 

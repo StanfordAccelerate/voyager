@@ -69,7 +69,7 @@ void SimpleMemoryModel<UniversalPosit>::writeToMemory(int address, double val,
                                                       bool doublePrecision) {
   UniversalPosit* memArray = (mem == SRAM) ? sram : rram;
 
-  if (!doublePrecision) {
+  if (doublePrecision) {
     UniversalPositAccum p16 = val;
     int bits = p16.encoding();
     memArray[address].setbits(bits & 0xFF);

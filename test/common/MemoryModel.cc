@@ -55,16 +55,13 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
     FX = 7;
     C = 3;
   }
-  if (params.SOFTMAX || params.SOFTMAX_GRAD || params.CROSS_ENTROPY_GRAD ||
-      params.FC_GRAD) {
-    C = 1;
-  }
-  if (params.WEIGHT_UPDATE) {
-    X = K;
-  }
 
   int size = STRIDE * Y * STRIDE * X * C;
-  // std::cout << "size of inputs: " << size << std::endl;
+  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
+    size = X * Y;
+  } else if (params.CROSS_ENTROPY_GRAD) {
+    size = X;
+  }
 
   double* tmpValues = readFileAsDouble(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
@@ -84,7 +81,11 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
               address = y * (STRIDE * X) * C + x * C + c;
             }
 
-            writeToMemory(params.INPUT_OFFSET + address, val, mem, false);
+            if (params.ACC_T_INPUT) {
+              writeToMemory(params.INPUT_OFFSET + 2 * address, val, mem, true);
+            } else {
+              writeToMemory(params.INPUT_OFFSET + address, val, mem, false);
+            }
           }
         }
       }
@@ -92,8 +93,11 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
   } else {
     for (int address = 0; address < size; address++) {
       double val = *(tmpValuePtr++);
-
-      writeToMemory(params.INPUT_OFFSET + address, val, mem, false);
+      if (params.ACC_T_INPUT) {
+        writeToMemory(params.INPUT_OFFSET + 2 * address, val, mem, true);
+      } else {
+        writeToMemory(params.INPUT_OFFSET + address, val, mem, false);
+      }
     }
   }
 
@@ -117,26 +121,28 @@ void MemoryModel::loadWeights(const SimplifiedParams& params,
     FX = 7;
     C = 3;
   }
-  if (params.NO_NORM) {
-    FX = 1;
-    FY = 1;
-    C = 1;
-  }
-  if (params.NO_NORM_GRAD) {
-    C = X;
-  }
-  if (params.CROSS_ENTROPY_GRAD) {
-    C = X;
-    K = 1;
-  }
 
   int size = FY * FX * C * K;
+  if (params.NO_NORM) {
+    size = C;
+  } else if (params.CROSS_ENTROPY_GRAD) {
+    size = X;
+  } else if (params.NO_NORM_GRAD) {
+    size = X * K;
+  } else if (params.WEIGHT_UPDATE) {
+    size = X * C;
+  }
+
   double* tmpValues = readFileAsDouble(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
 
   for (int address = 0; address < size; address++) {
     double val = *(tmpValuePtr++);
-    writeToMemory(params.WEIGHT_OFFSET + address, val, mem, false);
+    if (params.ACC_T_WEIGHT) {
+      writeToMemory(params.WEIGHT_OFFSET + 2 * address, val, mem, true);
+    } else {
+      writeToMemory(params.WEIGHT_OFFSET + address, val, mem, false);
+    }
   }
 
   delete[] tmpValues;
@@ -184,11 +190,12 @@ void MemoryModel::loadResiduals(const SimplifiedParams& params,
     FX = 7;
     C = 3;
   }
-  if (params.SOFTMAX_GRAD) {
-    K = 1;
-  }
 
   int size = X * Y * K;
+  if (params.SOFTMAX_GRAD) {
+    size = X * Y;
+  }
+
   double* tmpValues = readFileAsDouble(filename, size, useDataFile);
   double* tmpValuePtr = tmpValues;
 
@@ -227,15 +234,18 @@ void MemoryModel::loadReferenceOutput(const SimplifiedParams& params,
     X = 1;
     Y = 1;
   }
+
+  int size = X * Y * K;
   if (params.SOFTMAX || params.SOFTMAX_GRAD) {
-    K = 1;
-  }
-  if (params.NO_NORM_GRAD || params.CROSS_ENTROPY_GRAD) {
-    X = 1;
-    Y = 1;
+    size = X * Y;
+  } else if (params.CROSS_ENTROPY_GRAD) {
+    size = X;
+  } else if (params.NO_NORM_GRAD) {
+    size = C;
+  } else if (params.WEIGHT_UPDATE) {
+    size = X * C;
   }
 
-  int size = params.NO_NORM_GRAD ? C : X * Y * K;
   double* tmpValues = readFileAsDouble(files.outputs_file, size, true);
   double* tmpValuePtr = tmpValues;
 

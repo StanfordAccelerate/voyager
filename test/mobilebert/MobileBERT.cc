@@ -334,16 +334,7 @@ std::vector<Workload> MobileBERT::getInferenceWorkloads() {
   inferenceWorkloads.push_back(classifier);
 
   // inferenceWorkloads = std::vector<Workload>(inferenceWorkloads.begin(),
-  //                                            inferenceWorkloads.begin() +
-  //                                            20);
-
-  // for (auto workload : inferenceWorkloads) {
-  //   std::cerr << workload.files.outputs_file << "\t"
-  //             << workload.params.INPUT_OFFSET << "\t"
-  //             << workload.params.WEIGHT_OFFSET << "\t"
-  //             << workload.params.RESIDUAL_OFFSET << "\t"
-  //             << workload.params.OUTPUT_OFFSET << std::endl;
-  // }
+  //                                            inferenceWorkloads.end() - 266);
 
   return inferenceWorkloads;
 }
@@ -375,12 +366,13 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
 
   for (int layer = 23; layer >= 0; layer--) {
     std::vector<Workload> workloads = getWorkloads(encoderOrder, layer, true);
-    SimplifiedParams params = workload.params;
 
     inputOffset = ACTIVATION_OFFSET + layer * ENCODER_ACTIVATION_SIZE;
     weightOffset = WEIGHT_OFFSET + layer * ENCODER_WEIGHT_SIZE;
 
     for (auto workload : workloads) {
+      SimplifiedParams params = workload.params;
+
       workload.params.INPUT_OFFSET += ERROR_OFFSET;
       workload.params.WEIGHT_OFFSET += weightOffset;
       workload.params.OUTPUT_OFFSET += ERROR_OFFSET;
@@ -407,6 +399,7 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
   }
 
   backpropWorkloads = std::vector<Workload>(backpropWorkloads.begin(),
-                                            backpropWorkloads.begin() + 6);
+                                            backpropWorkloads.end() - 3);
+
   return backpropWorkloads;
 }

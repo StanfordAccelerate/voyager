@@ -1000,7 +1000,7 @@ std::map<std::string, Files> backpropTestFiles{
          "output_dense_weight",
          "",
          "intermediate_dense",
-         "intermediate_dense",
+         "intermediate_intermediate_act_fn",
      }},
 
     {"ffn_0_output_LayerNorm",
@@ -1024,7 +1024,7 @@ std::map<std::string, Files> backpropTestFiles{
          "ffn_0_output_dense_weight",
          "",
          "ffn_0_intermediate_dense",
-         "ffn_0_intermediate_dense",
+         "ffn_0_intermediate_intermediate_act_fn",
      }},
 
     {"attention_output_LayerNorm",

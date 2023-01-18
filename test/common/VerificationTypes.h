@@ -5,14 +5,15 @@
 // By default we have 2MB of SRAM per MINOTAUR SoC
 // organized as 8x 256KB Banks with 2x 128KB Macros each
 // constexpr int NUM_SRAM_BANKS = 8;
-constexpr int NUM_SRAM_BANKS = 80;
+constexpr int NUM_SRAM_BANKS = 120;
 constexpr int SRAM_MEMORY_SIZE = NUM_SRAM_BANKS * 256 * 1024;
 
 // By default we have 12MB of RRAM per MINOTAUR SoC
 // organized as 12x 1MB Banks with 4x 256KB Macros each
 // constexpr int NUM_RRAM_BANKS = 12;
-constexpr int NUM_RRAM_BANKS =
-    24;  // End 2 end tests require 24 banks, ie 2 chips
+
+// End 2 end tests require 24 banks, ie 2 chips
+constexpr int NUM_RRAM_BANKS = 14;
 constexpr int RRAM_MEMORY_SIZE = NUM_RRAM_BANKS * 1024 * 1024;
 
 // Bandwidth-mode for a RRAM memory bank
