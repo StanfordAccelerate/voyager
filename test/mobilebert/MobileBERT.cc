@@ -282,10 +282,10 @@ std::vector<Workload> MobileBERT::getWorkloadsInRange(
   if (layers.size() == 1) {  // Single layer
     if (layers.front() == "all") {
       std::vector<Workload> workloads;
-      std::vector<Workload> inference = getInferenceWorkloads();
-      workloads.insert(workloads.end(), inference.begin(), inference.end());
-      std::vector<Workload> backprop = getBackpropWorkloads();
-      workloads.insert(workloads.end(), backprop.begin(), backprop.end());
+      std::vector<Workload> forward = getForwardWorkloads();
+      workloads.insert(workloads.end(), forward.begin(), forward.end());
+      std::vector<Workload> backward = getBackwardWorkloads();
+      workloads.insert(workloads.end(), backward.begin(), backward.end());
       return workloads;
     }
     layersInRange.push_back(layers.front());
@@ -314,7 +314,7 @@ std::vector<Workload> MobileBERT::getAllWorkloads() {
   return getWorkloads(order);
 }
 
-std::vector<Workload> MobileBERT::getInferenceWorkloads() {
+std::vector<Workload> MobileBERT::getForwardWorkloads() {
   setTask("inference");
   std::vector<Workload> inferenceWorkloads;
 
@@ -360,9 +360,9 @@ std::vector<Workload> MobileBERT::getInferenceWorkloads() {
   return inferenceWorkloads;
 }
 
-std::vector<Workload> MobileBERT::getBackpropWorkloads() {
-  setTask("backprop");
-  std::vector<Workload> backpropWorkloads;
+std::vector<Workload> MobileBERT::getBackwardWorkloads() {
+  setTask("backward");
+  std::vector<Workload> backwardWorkloads;
 
   int inputOffset = ACTIVATION_OFFSET + 20 * ENCODER_ACTIVATION_SIZE;
   int weightOffset = WEIGHT_OFFSET + 20 * ENCODER_WEIGHT_SIZE;
@@ -370,9 +370,9 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
   // Cross entropy gradient
   Workload workload = getWorkloads({"classifier"}, 20, true).front();
   workload.params.INPUT_OFFSET += inputOffset;
-  workload.params.WEIGHT_OFFSET = 2 * 128;
+  workload.params.WEIGHT_OFFSET = ACTIVATION_OFFSET - 16;
   workload.params.OUTPUT_OFFSET += ERROR_OFFSET;
-  backpropWorkloads.push_back(workload);
+  backwardWorkloads.push_back(workload);
 
   // Classifier layer backprop
   workload = getWorkloads({"output_bottleneck_LayerNorm"}, 20, true).front();
@@ -380,7 +380,7 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
   workload.params.WEIGHT_OFFSET += weightOffset;
   workload.params.OUTPUT_OFFSET += ERROR_OFFSET;
   workload.loadWeight = false;
-  backpropWorkloads.push_back(workload);
+  backwardWorkloads.push_back(workload);
 
   auto encoderOrder =
       std::vector<std::string>(backpropOrder.begin() + 2, backpropOrder.end());
@@ -415,14 +415,14 @@ std::vector<Workload> MobileBERT::getBackpropWorkloads() {
 
       workload.loadWeight = false;
 
-      backpropWorkloads.push_back(workload);
+      backwardWorkloads.push_back(workload);
 
       // TODO: add gradient tests
     }
   }
 
-  backpropWorkloads = std::vector<Workload>(backpropWorkloads.begin(),
-                                            backpropWorkloads.end() - 3);
+  backwardWorkloads = std::vector<Workload>(backwardWorkloads.begin(),
+                                            backwardWorkloads.end() - 3);
 
-  return backpropWorkloads;
+  return backwardWorkloads;
 }

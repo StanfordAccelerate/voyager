@@ -262,8 +262,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       }
 
       if (params.BIAS) {
-        INT_T bias = readInput(biasMatrix, k, true);
-        acc = static_cast<ACC_T>(acc + static_cast<ACC_T>(bias));
+        acc += readInput(biasMatrix, k, true);
       }
 
       saveOutput(matrixC, k, acc, params.ACC_T_OUTPUT);
@@ -282,7 +281,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
 
         saveOutput(matrixC, x * K + k, acc, params.ACC_T_OUTPUT);
       }
-      std::cerr << std::endl;
     }
   } else if (params.SOFTMAX_GRAD) {
     ACC_T outputMatrix[X * Y];
