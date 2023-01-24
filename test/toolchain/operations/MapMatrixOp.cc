@@ -142,6 +142,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   // residual
   vectorParams->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
   vectorParams->addressGen1Mode = params.RESIDUAL || params.RELU_GRAD;
+  vectorParams->DP_VEC1 = false;
 
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen1Loops[0][i] = params.loops[0][i];

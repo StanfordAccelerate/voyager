@@ -37,6 +37,7 @@ void MapNoNorm(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][0] = X;
   vectorParams->addressGen1Loops[1][1] = 1;
   vectorParams->addressGen1Loops[1][2] = K / DIMENSION;
+  vectorParams->DP_VEC1 = true;
 
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
   vectorParams->addressGen2Mode = params.BIAS;  // use bias mode

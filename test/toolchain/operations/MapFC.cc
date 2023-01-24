@@ -32,6 +32,8 @@ void MapFC(const SimplifiedParams &params,
   // weights is a matrix of K x C
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
+  vectorParams->DP_VEC1 = false;
+
 
   // TODO: adjust bitwidths inside of addressGen1 so that
   // we can just use a single K loop

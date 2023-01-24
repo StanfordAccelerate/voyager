@@ -37,6 +37,8 @@ void MapNoNormGrad(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][0] = 1;
   vectorParams->addressGen1Loops[1][1] = X;
   vectorParams->addressGen1Loops[1][2] = 1;
+    vectorParams->DP_VEC1 = true;
+
 
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
   vectorParams->addressGen2Mode = 0;  // no bias
