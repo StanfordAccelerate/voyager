@@ -126,6 +126,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   matrixParams->CONCAT_INPUT = params.CONCAT_INPUT;
   matrixParams->CONCAT_HEAD_WEIGHTS = params.CONCAT_WEIGHT;
   matrixParams->TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
+  matrixParams->GRAD_OFFSET = params.WEIGHT_RESIDUAL_OFFSET;
   matrixParams->COMBINE_GRADS = params.WEIGHT_SPLITTING;
   P8 learningRate = static_cast<P8>(params.learningRate);
   matrixParams->learningRate = learningRate.bits;
@@ -141,6 +142,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   // residual
   vectorParams->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
   vectorParams->addressGen1Mode = params.RESIDUAL || params.RELU_GRAD;
+  vectorParams->DP_VEC1 = false;
 
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen1Loops[0][i] = params.loops[0][i];

@@ -1,7 +1,7 @@
 source scripts/architecture.tcl
 
 set block "WeightController"
-set full_block_name "WeightController<$IO_DATATYPE, $DIMENSION, $DIMENSION>"
+set full_block_name "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION>"
 set weight_controller_stripped [string map {" " ""} $full_block_name]
 
 source scripts/common.tcl

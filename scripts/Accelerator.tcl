@@ -14,7 +14,7 @@ go libraries
 
 directive set /Accelerator/MatrixProcessor<P8,P16,16,16,1024> -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
 directive set /Accelerator/InputController<P8,16> -MAP_TO_MODULE {[Block] InputController.v1}
-directive set /Accelerator/WeightController<P8,16,16> -MAP_TO_MODULE {[Block] WeightController.v1}
+directive set /Accelerator/WeightController<P8,P16,16,16> -MAP_TO_MODULE {[Block] WeightController.v1}
 directive set /Accelerator/VectorUnit<P8,P16,16> -MAP_TO_MODULE {[Block] VectorUnit.v1}
 
 directive set -CLOCKS $clocks

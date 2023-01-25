@@ -40,6 +40,7 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][0] = 1;
   vectorParams->addressGen1Loops[1][1] = 1;
   vectorParams->addressGen1Loops[1][2] = X / DIMENSION;
+  vectorParams->DP_VEC1 = false;
 
   vectorParams->ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen2Mode = 0;  // 2d tensor

@@ -23,7 +23,7 @@ SC_MODULE(VectorOpUnit) {
 
   Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(systolicArrayOutput);
   Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(vectorFetch0Output);
-  Connections::In<Pack1D<IDTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1Output);
+  Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1Output);
   Connections::In<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(vectorFetch2Output);
 
   Connections::Out<Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> >
@@ -161,7 +161,7 @@ SC_MODULE(VectorOpUnit) {
 
       Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH> op0Src1;
       if (inst.vOp0Src1 == VectorInstructions::readInterface) {
-        Pack1D<IDTYPE, WIDTH> tmp = vectorFetch1Output.Pop();
+        Pack1D<ACC_DTYPE, WIDTH> tmp = vectorFetch1Output.Pop();
 #pragma hls_unroll yes
         for (int i = 0; i < WIDTH; i++) {
           op0Src1[i] = tmp[i];
@@ -487,6 +487,8 @@ SC_MODULE(VectorUnit) {
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
   Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1DataResponse);
+  Connections::Combinational<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
+      vectorFetch1DataResponseConverted);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
   Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch2DataResponse);
@@ -543,6 +545,9 @@ SC_MODULE(VectorUnit) {
     vectorFetch.vectorFetch0DataResponseBroadcasted(
         vectorFetch0DataResponseBroadcasted);
     vectorFetch.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
+    vectorFetch.vectorFetch1DataResponse(vectorFetch1DataResponse);
+    vectorFetch.vectorFetch1DataResponseConverted(
+        vectorFetch1DataResponseConverted);
     vectorFetch.vectorFetch2AddressRequest(vectorFetch2AddressRequest);
     vectorFetch.vectorFetch2DataResponse(vectorFetch2DataResponse);
     vectorFetch.vectorFetch2DataResponseReplicated(
@@ -555,7 +560,7 @@ SC_MODULE(VectorUnit) {
     vectorOpUnit.reductionOpUnitInstructions(reduceOpInstructions);
     vectorOpUnit.systolicArrayOutput(systolicArrayOutput);
     vectorOpUnit.vectorFetch0Output(vectorFetch0DataResponseBroadcasted);
-    vectorOpUnit.vectorFetch1Output(vectorFetch1DataResponse);
+    vectorOpUnit.vectorFetch1Output(vectorFetch1DataResponseConverted);
     vectorOpUnit.vectorFetch2Output(vectorFetch2DataResponseReplicated);
     vectorOpUnit.vectorOpUnitOutput(vectorOpUnitOutput);
     vectorOpUnit.scalarOpUnitOutput(scalarUnitOutput);

@@ -9,7 +9,7 @@
 #define DIMENSION \
   16  // TODO(fpedd): Should probably come from ArchitectureParams.h
 
-template <typename DTYPE, int NROWS, int NCOLS>
+template <typename DTYPE, typename ACC_DTYPE, int NROWS, int NCOLS>
 SC_MODULE(WeightController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -992,21 +992,31 @@ SC_MODULE(WeightController) {
 
         if (params.COMBINE_GRADS) {
           Pack1D<DTYPE, NROWS> gradients = gradTransposeOut.Pop();
-          Pack1D<typename DTYPE::DecomposedPosit, NROWS> gradientsDecomposed;
+          Pack1D<typename ACC_DTYPE::DecomposedPosit, NROWS>
+              gradientsDecomposed;
 
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
             gradientsDecomposed[i] =
-                static_cast<typename DTYPE::DecomposedPosit>(
-                    learningRate *
-                    static_cast<typename DTYPE::DecomposedPosit>(gradients[i]));
+                static_cast<typename ACC_DTYPE::DecomposedPosit>(
+                    static_cast<typename ACC_DTYPE::DecomposedPosit>(
+                        learningRate) *
+                    static_cast<typename ACC_DTYPE::DecomposedPosit>(
+                        gradients[i]));
           }
 
+          // CCS_LOG("gradients:\t" << gradients << std::endl
+          //  << "--->\t" << gradientsDecomposed);
+
+          // CCS_LOG("weights\t " << weightsDecomposed);
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
             weightsDecomposed[i] = static_cast<typename DTYPE::DecomposedPosit>(
-                weightsDecomposed[i] - gradientsDecomposed[i]);
+                static_cast<typename ACC_DTYPE::DecomposedPosit>(
+                    weightsDecomposed[i]) -
+                gradientsDecomposed[i]);
           }
+          // CCS_LOG("--->\t" << weightsDecomposed);
         }
 
         weightsToSystolicArray.Push(weightsDecomposed);

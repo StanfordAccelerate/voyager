@@ -37,6 +37,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][0] = Y;  // repeat
   vectorParams->addressGen1Loops[1][1] = 1;
   vectorParams->addressGen1Loops[1][2] = Y;
+  vectorParams->DP_VEC1 = false;
 
   vectorParams->ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen2Mode = 2;  // 2d tensor
