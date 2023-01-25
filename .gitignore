@@ -11,6 +11,7 @@ __pycache__
 venv
 .env
 .swp
+.gitlab-ci-local
 # Simulation output files
 test_outputs/
 test_outputs_e2e/

@@ -10,7 +10,7 @@ constexpr int SRAM_MEMORY_SIZE = NUM_SRAM_BANKS * 256 * 1024;
 
 // By default we have 12MB of RRAM per MINOTAUR SoC
 // organized as 12x 1MB Banks with 4x 256KB Macros each
-constexpr int NUM_RRAM_BANKS = 12;
+constexpr int NUM_RRAM_BANKS = 24;
 constexpr int RRAM_MEMORY_SIZE = NUM_RRAM_BANKS * 1024 * 1024;
 
 // Bandwidth-mode for a RRAM memory bank
