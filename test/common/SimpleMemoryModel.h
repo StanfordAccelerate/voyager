@@ -15,5 +15,5 @@ class SimpleMemoryModel : public MemoryModel {
  private:
   void writeToMemory(int address, double val, const MemorySource& mem,
                      bool doublePrecision) override;
-  void writeToReference(int address, double val) override;
+  void writeToReference(int address, double val, bool doublePrecision) override;
 };

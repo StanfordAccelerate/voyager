@@ -408,7 +408,7 @@ class PositFP {
   }
 
   void masked_relu(const PositFP &mask) {
-    if (mask.sign == 1) setZero();
+    if (mask.isZero()) setZero();
   }
 
   PositFP<sbits, abits + 1> operator+(const PositFP &op) const;

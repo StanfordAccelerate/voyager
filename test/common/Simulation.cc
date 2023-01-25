@@ -125,17 +125,20 @@ void Simulation::loadMemory() {
   }
 
   // Load weights, biases for all layers
-  for (const Workload& workload : workloads) {
-    for (MemoryModel* memModel : memories) {
-      memModel->loadModelParams(workload.params, workload.files,
-                                workload.memoryMap, true);
+  for (MemoryModel* memModel : memories) {
+    for (const Workload& workload : workloads) {
+      if (workload.loadWeight) {
+        memModel->loadModelParams(workload.params, workload.files,
+                                  workload.memoryMap, true);
+      }
     }
   }
 
   // Load last layer reference outputs
   for (MemoryModel* memModel : memories) {
-    memModel->loadReferenceOutput(workloads.back().params,
-                                  workloads.back().files);
+    Workload workload = workloads.back();
+    memModel->loadReferenceOutput(workload.params, workload.files,
+                                  workload.params.ACC_T_OUTPUT);
   }
 }
 
@@ -143,35 +146,35 @@ void Simulation::run() {
   // Run tests in sequence
   int X, Y, C, K, FX, FY, STRIDE;
   for (const Workload& workload : workloads) {
-    SimplifiedParams currentParams = workload.params;
+    SimplifiedParams params = workload.params;
 
     // Check if mapping valid
-    if (validateMapping(currentParams) != 0) {
+    if (validateMapping(params) != 0) {
       std::abort();
     }
 
-    X = currentParams.loops[0][currentParams.inputXLoopIndex[0]] *
-        currentParams.loops[1][currentParams.inputXLoopIndex[1]];
-    Y = currentParams.loops[0][currentParams.inputYLoopIndex[0]] *
-        currentParams.loops[1][currentParams.inputYLoopIndex[1]];
-    C = currentParams.loops[1][currentParams.reductionLoopIndex[1]] * DIMENSION;
-    K = currentParams.loops[0][currentParams.weightLoopIndex[0]] *
-        currentParams.loops[1][currentParams.weightLoopIndex[1]] * DIMENSION;
-    FX = currentParams.loops[1][currentParams.fxIndex];
-    FY = currentParams.loops[1][currentParams.fyIndex];
-    STRIDE = currentParams.STRIDE;
+    X = params.loops[0][params.inputXLoopIndex[0]] *
+        params.loops[1][params.inputXLoopIndex[1]];
+    Y = params.loops[0][params.inputYLoopIndex[0]] *
+        params.loops[1][params.inputYLoopIndex[1]];
+    C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+    K = params.loops[0][params.weightLoopIndex[0]] *
+        params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+    FX = params.loops[1][params.fxIndex];
+    FY = params.loops[1][params.fyIndex];
+    STRIDE = params.STRIDE;
 
-    if (currentParams.REPLICATION) {
+    if (params.REPLICATION) {
       FX = 7;
       C = 3;
     }
 
-    if (currentParams.MAXPOOL) {
+    if (params.MAXPOOL) {
       X /= 2;
       Y /= 2;
     }
 
-    if (currentParams.AVGPOOL) {
+    if (params.AVGPOOL) {
       X = 1;
       Y = 1;
     }
@@ -185,38 +188,34 @@ void Simulation::run() {
     // Run gold models
     if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
       run_custom_posit_gold_model(
-          currentParams, positMemory->sram + currentParams.INPUT_OFFSET,
-          (currentParams.WEIGHT ? positMemory->rram : positMemory->sram) +
-              currentParams.WEIGHT_OFFSET,
-          positMemory->sram + currentParams.OUTPUT_OFFSET,
-          positMemory->rram + currentParams.BIAS_OFFSET,
-          positMemory->sram + currentParams.RESIDUAL_OFFSET,
-          positMemory->sram + currentParams.WEIGHT_GRADIENT_OFFSET,
-          positMemory->sram + currentParams.BIAS_GRADIENT_OFFSET);
+          params, positMemory->sram + params.INPUT_OFFSET,
+          (params.WEIGHT ? positMemory->rram : positMemory->sram) +
+              params.WEIGHT_OFFSET,
+          positMemory->sram + params.OUTPUT_OFFSET,
+          positMemory->rram + params.BIAS_OFFSET,
+          positMemory->sram + params.RESIDUAL_OFFSET,
+          positMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
     if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
       run_universal_posit_gold_model(
-          currentParams,
-          universalPositMemory->sram + currentParams.INPUT_OFFSET,
-          (currentParams.WEIGHT ? universalPositMemory->rram
-                                : universalPositMemory->sram) +
-              currentParams.WEIGHT_OFFSET,
-          universalPositMemory->sram + currentParams.OUTPUT_OFFSET,
-          universalPositMemory->rram + currentParams.BIAS_OFFSET,
-          universalPositMemory->sram + currentParams.RESIDUAL_OFFSET,
-          universalPositMemory->sram + currentParams.WEIGHT_GRADIENT_OFFSET,
-          universalPositMemory->sram + currentParams.BIAS_GRADIENT_OFFSET);
+          params, universalPositMemory->sram + params.INPUT_OFFSET,
+          (params.WEIGHT ? universalPositMemory->rram
+                         : universalPositMemory->sram) +
+              params.WEIGHT_OFFSET,
+          universalPositMemory->sram + params.OUTPUT_OFFSET,
+          universalPositMemory->rram + params.BIAS_OFFSET,
+          universalPositMemory->sram + params.RESIDUAL_OFFSET,
+          universalPositMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
     if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
       run_fp_gold_model(
-          currentParams, floatMemory->sram + currentParams.INPUT_OFFSET,
-          (currentParams.WEIGHT ? floatMemory->rram : floatMemory->sram) +
-              currentParams.WEIGHT_OFFSET,
-          floatMemory->sram + currentParams.OUTPUT_OFFSET,
-          floatMemory->rram + currentParams.BIAS_OFFSET,
-          floatMemory->sram + currentParams.RESIDUAL_OFFSET,
-          floatMemory->sram + currentParams.WEIGHT_GRADIENT_OFFSET,
-          floatMemory->sram + currentParams.BIAS_GRADIENT_OFFSET);
+          params, floatMemory->sram + params.INPUT_OFFSET,
+          (params.WEIGHT ? floatMemory->rram : floatMemory->sram) +
+              params.WEIGHT_OFFSET,
+          floatMemory->sram + params.OUTPUT_OFFSET,
+          floatMemory->rram + params.BIAS_OFFSET,
+          floatMemory->sram + params.RESIDUAL_OFFSET,
+          floatMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
   }
 
@@ -251,41 +250,45 @@ void Simulation::run() {
 }
 
 int Simulation::checkOutput() {
-  SimplifiedParams currentParams = workloads.back().params;
+  SimplifiedParams params = workloads.back().params;
   int X, Y, C, K, FX, FY, STRIDE;
-  X = currentParams.loops[0][currentParams.inputXLoopIndex[0]] *
-      currentParams.loops[1][currentParams.inputXLoopIndex[1]];
-  Y = currentParams.loops[0][currentParams.inputYLoopIndex[0]] *
-      currentParams.loops[1][currentParams.inputYLoopIndex[1]];
-  C = currentParams.loops[1][currentParams.reductionLoopIndex[1]] * DIMENSION;
-  K = currentParams.loops[0][currentParams.weightLoopIndex[0]] *
-      currentParams.loops[1][currentParams.weightLoopIndex[1]] * DIMENSION;
-  FX = currentParams.loops[1][currentParams.fxIndex];
-  FY = currentParams.loops[1][currentParams.fyIndex];
-  STRIDE = currentParams.STRIDE;
+  X = params.loops[0][params.inputXLoopIndex[0]] *
+      params.loops[1][params.inputXLoopIndex[1]];
+  Y = params.loops[0][params.inputYLoopIndex[0]] *
+      params.loops[1][params.inputYLoopIndex[1]];
+  C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+  K = params.loops[0][params.weightLoopIndex[0]] *
+      params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+  FX = params.loops[1][params.fxIndex];
+  FY = params.loops[1][params.fyIndex];
+  STRIDE = params.STRIDE;
 
-  if (currentParams.REPLICATION) {
+  if (params.REPLICATION) {
     FX = 7;
     C = 3;
   }
 
-  if (currentParams.MAXPOOL) {
+  if (params.MAXPOOL) {
     X /= 2;
     Y /= 2;
   }
 
-  if (currentParams.AVGPOOL) {
+  if (params.AVGPOOL) {
     X = 1;
     Y = 1;
   }
 
-  if (currentParams.SOFTMAX || currentParams.SOFTMAX_GRAD) {
-    K = 1;
-  } else if (currentParams.CROSS_ENTROPY_GRAD) {
-    Y = K = 1;
-  }
-
   size_t size = X * Y * K;
+
+  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
+    size = X * Y;
+  } else if (params.CROSS_ENTROPY_GRAD) {
+    size = X;
+  } else if (params.NO_NORM_GRAD) {
+    size = C;
+  } else if (params.WEIGHT_UPDATE) {
+    size = X * C;
+  }
 
   bool accelerator =
       std::find(sims.begin(), sims.end(), "accelerator") != sims.end();
@@ -312,9 +315,9 @@ int Simulation::checkOutput() {
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     std::string diffFile = outFilePrefix + "fpgold_vs_pytorch.txt";
 
-    rel_err +=
-        compare_arrays(floatMemory->sram + currentParams.OUTPUT_OFFSET, "fp32",
-                       floatMemory->reference, "file", size, diffFile, false);
+    rel_err += compare_arrays(floatMemory->sram + params.OUTPUT_OFFSET, "fp32",
+                              floatMemory->reference, "file", size, diffFile,
+                              params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -324,9 +327,9 @@ int Simulation::checkOutput() {
               << std::endl;
     std::string diffFile = outFilePrefix + "hlsgold_vs_pytorch.txt";
 
-    rel_err += compare_arrays(positMemory->sram + currentParams.OUTPUT_OFFSET,
+    rel_err += compare_arrays(positMemory->sram + params.OUTPUT_OFFSET,
                               "customposit", positMemory->reference, "file",
-                              size, diffFile, false);
+                              size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -335,9 +338,9 @@ int Simulation::checkOutput() {
     std::cout << "(reveals issues in representing float as Posit)" << std::endl;
     std::string diffFile = outFilePrefix + "universal_vs_pytorch.txt";
 
-    rel_err += compare_arrays(
-        universalPositMemory->sram + currentParams.OUTPUT_OFFSET, "universal",
-        universalPositMemory->reference, "file", size, diffFile, false);
+    rel_err += compare_arrays(universalPositMemory->sram + params.OUTPUT_OFFSET,
+                              "universal", universalPositMemory->reference,
+                              "file", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -347,9 +350,9 @@ int Simulation::checkOutput() {
               << std::endl;
     std::string diffFile = outFilePrefix + "accel_vs_pytorch.txt";
 
-    rel_err += compare_arrays(
-        acceleratorMemory->sram + currentParams.OUTPUT_OFFSET, "accelerator",
-        acceleratorMemory->reference, "file", size, diffFile, false);
+    rel_err += compare_arrays(acceleratorMemory->sram + params.OUTPUT_OFFSET,
+                              "accelerator", acceleratorMemory->reference,
+                              "file", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -359,10 +362,10 @@ int Simulation::checkOutput() {
               << std::endl;
     std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
 
-    rel_err += compare_arrays(
-        acceleratorMemory->sram + currentParams.OUTPUT_OFFSET, "accelerator",
-        positMemory->sram + currentParams.OUTPUT_OFFSET, "customposit", size,
-        diffFile, false);
+    rel_err +=
+        compare_arrays(acceleratorMemory->sram + params.OUTPUT_OFFSET,
+                       "accelerator", positMemory->sram + params.OUTPUT_OFFSET,
+                       "customposit", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -374,10 +377,10 @@ int Simulation::checkOutput() {
         << std::endl;
     std::string diffFile = outFilePrefix + "hlsgold_vs_universal.txt";
 
-    rel_err += compare_arrays(
-        positMemory->sram + currentParams.OUTPUT_OFFSET, "customposit",
-        universalPositMemory->sram + currentParams.OUTPUT_OFFSET, "universal",
-        size, diffFile, false);
+    rel_err +=
+        compare_arrays(positMemory->sram + params.OUTPUT_OFFSET, "customposit",
+                       universalPositMemory->sram + params.OUTPUT_OFFSET,
+                       "universal", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -388,10 +391,10 @@ int Simulation::checkOutput() {
         << std::endl;
     std::string diffFile = outFilePrefix + "hlsgold_vs_fpgold.txt";
 
-    rel_err += compare_arrays(positMemory->sram + currentParams.OUTPUT_OFFSET,
-                              "customposit",
-                              floatMemory->sram + currentParams.OUTPUT_OFFSET,
-                              "fp32", size, diffFile, false);
+    rel_err +=
+        compare_arrays(positMemory->sram + params.OUTPUT_OFFSET, "customposit",
+                       floatMemory->sram + params.OUTPUT_OFFSET, "fp32", size,
+                       diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -402,10 +405,10 @@ int Simulation::checkOutput() {
               << std::endl;
     std::string diffFile = outFilePrefix + "accel_vs_fpgold.txt";
 
-    rel_err += compare_arrays(
-        acceleratorMemory->sram + currentParams.OUTPUT_OFFSET, "accelerator",
-        floatMemory->sram + currentParams.OUTPUT_OFFSET, "fp32", size, diffFile,
-        false);
+    rel_err +=
+        compare_arrays(acceleratorMemory->sram + params.OUTPUT_OFFSET,
+                       "accelerator", floatMemory->sram + params.OUTPUT_OFFSET,
+                       "fp32", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 

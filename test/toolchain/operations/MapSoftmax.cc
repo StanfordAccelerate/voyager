@@ -26,7 +26,7 @@ void MapSoftmax(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][0] = 3;  // requires 3 passes
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = Y / DIMENSION;
-  vectorParams->DP_VEC0 = false;
+  vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
   // address gen 1 (weights)
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;

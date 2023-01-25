@@ -26,12 +26,7 @@ def write_fp64(filename, data):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate gold model datafile from pickle files.")
-    parser.add_argument(
-        "--datapath",
-        type=str,
-        required=True,
-        help="Input pickle datafiles.",
-    )
+    parser.add_argument("datapath", type=str, help="Input pickle datafiles.")
     parser.add_argument(
         "--output_dir",
         type=str,

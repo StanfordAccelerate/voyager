@@ -14,6 +14,10 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch0DataResponseBroadcasted);
 
+  Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1DataResponse);
+  Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
+      vectorFetch1DataResponseConverted);
+
   Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch2DataResponse);
   Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch2DataResponseReplicated);
@@ -23,6 +27,7 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(addressGen1Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(addressGen2Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(replicateBiasParams);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse1Params);
 
   SC_CTOR(VectorFetchUnit) {
     SC_THREAD(read_params);
@@ -46,6 +51,10 @@ SC_MODULE(VectorFetchUnit) {
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(fetch_residual);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(convert_dataResponse1);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -77,13 +86,14 @@ SC_MODULE(VectorFetchUnit) {
                                         params.addressGen0Loop[1][2] * WIDTH;
 
                   if (params.DP_VEC0) {
-                    K = K * 2;
                     for (int precision = 0; precision < 2; precision++) {
                       int address =
                           static_cast<ac_int<32, false> >((j * K + k) * 2) +
                           precision * WIDTH;
                       // DLOG("addressgen0 " << j << " " << k << " " <<
                       // address);
+
+                      // TODO: change this to burst
                       MemoryRequest memRequest = {
                           params.VECTOR_OFFSET + address, WIDTH};
                       vectorFetch0AddressRequest.Push(memRequest);
@@ -248,6 +258,7 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = addressGen1Params.Pop();
 
+      // TODO: i think these address generators could be merged
       if (params.addressGen1Mode == 1) {
         ac_int<8, false> loop_counters[2][3];
         ac_int<8, false> loop_bounds[2][3];
@@ -345,12 +356,141 @@ SC_MODULE(VectorFetchUnit) {
                     ac_int<16, false> K = params.addressGen1Loops[0][2] *
                                           params.addressGen1Loops[1][2] * WIDTH;
 
-                    int address = j * K + k;
+                    if (params.DP_VEC1) {
+                      K = K * 2;
+                      for (int precision = 0; precision < 2; precision++) {
+                        int address =
+                            static_cast<ac_int<32, false> >((j * K + k) * 2) +
+                            precision * WIDTH;
 
-                    DLOG("addressgen1 " << j << " " << k << " " << address);
-                    MemoryRequest memRequest = {
-                        params.ADDRESS_GEN1_OFFSET + address, WIDTH};
-                    vectorFetch1AddressRequest.Push(memRequest);
+                        // TODO: change this to burst
+                        MemoryRequest memRequest = {
+                            params.ADDRESS_GEN1_OFFSET + address, WIDTH};
+                        vectorFetch1AddressRequest.Push(memRequest);
+                      }
+                    } else {
+                      int address = j * K + k;
+
+                      DLOG("addressgen1 " << j << " " << k << " " << address);
+                      MemoryRequest memRequest = {
+                          params.ADDRESS_GEN1_OFFSET + address, WIDTH};
+                      vectorFetch1AddressRequest.Push(memRequest);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void convert_dataResponse1() {
+    dataResponse1Params.ResetRead();
+    vectorFetch1DataResponse.Reset();
+    vectorFetch1DataResponseConverted.Reset();
+
+    wait();
+
+    while (true) {
+      VectorParams params = dataResponse1Params.Pop();
+
+      if (params.addressGen1Mode == 1) {
+        ac_int<8, false> loop_counters[2][3];
+        ac_int<8, false> loop_bounds[2][3];
+
+        for (int i = 0; i < 2; i++) {
+          for (int j = 0; j < 3; j++) {
+            loop_bounds[i][j] = params.addressGen1Loops[i][j];
+          }
+        }
+
+#pragma hls_pipeline_init_interval 1
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    Pack1D<ACC_DTYPE, WIDTH> fullPrecisionDataResponse;
+
+                    Pack1D<ODTYPE, WIDTH> response =
+                        vectorFetch1DataResponse.Pop();
+#pragma hls_unroll yes
+                    for (int dim = 0; dim < WIDTH; dim++) {
+                      fullPrecisionDataResponse[dim] =
+                          static_cast<ACC_DTYPE>(response[dim]);
+                    }
+                    vectorFetch1DataResponseConverted.Push(
+                        fullPrecisionDataResponse);
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {  // 2d tensor
+#pragma hls_pipeline_init_interval 1
+        for (ac_int<8, false> i0 = 0; i0 < params.addressGen1Loops[0][0];
+             i0++) {
+          for (ac_int<8, false> j0 = 0; j0 < params.addressGen1Loops[0][1];
+               j0++) {
+            for (ac_int<8, false> k0 = 0; k0 < params.addressGen1Loops[0][2];
+                 k0++) {
+              for (ac_int<8, false> i1 = 0; i1 < params.addressGen1Loops[1][0];
+                   i1++) {
+                for (ac_int<8, false> j1 = 0;
+                     j1 < params.addressGen1Loops[1][1]; j1++) {
+                  for (ac_int<8, false> k1 = 0;
+                       k1 < params.addressGen1Loops[1][2]; k1++) {
+                    ac_int<16, false> j =
+                        j0 * params.addressGen1Loops[1][1] + j1;
+                    ac_int<16, false> k =
+                        k0 * params.addressGen1Loops[1][2] * WIDTH + k1 * WIDTH;
+                    ac_int<16, false> K = params.addressGen1Loops[0][2] *
+                                          params.addressGen1Loops[1][2] * WIDTH;
+
+                    Pack1D<ACC_DTYPE, WIDTH> fullPrecisionDataResponse;
+
+                    if (params.DP_VEC1) {
+                      for (int precision = 0; precision < 2; precision++) {
+                        Pack1D<ODTYPE, WIDTH> response =
+                            vectorFetch1DataResponse.Pop();
+
+#pragma hls_unroll yes
+                        for (int i = 0; i < WIDTH / 2; i++) {
+                          ac_int<16, false> temp;
+#pragma hls_unroll yes
+                          for (int byte = 0; byte < 2; byte++) {
+                            temp.set_slc(byte * 8, response[i * 2 + byte].bits);
+                          }
+                          fullPrecisionDataResponse[precision * (WIDTH / 2) + i]
+                              .setbits(temp);
+                        }
+                      }
+                    } else {
+                      Pack1D<ODTYPE, WIDTH> response =
+                          vectorFetch1DataResponse.Pop();
+#pragma hls_unroll yes
+                      for (int dim = 0; dim < WIDTH; dim++) {
+                        fullPrecisionDataResponse[dim] =
+                            static_cast<ACC_DTYPE>(response[dim]);
+                      }
+                    }
+
+                    vectorFetch1DataResponseConverted.Push(
+                        fullPrecisionDataResponse);
                   }
                 }
               }
@@ -529,6 +669,7 @@ SC_MODULE(VectorFetchUnit) {
     addressGen2Params.ResetWrite();
     replicateBiasParams.ResetWrite();
     vector0BroadcastParams.ResetWrite();
+    dataResponse1Params.ResetWrite();
 
     wait();
 
@@ -542,6 +683,7 @@ SC_MODULE(VectorFetchUnit) {
 
       if (params.addressGen1Mode != 0) {  // residual
         addressGen1Params.Push(params);
+        dataResponse1Params.Push(params);
       }
 
       if (params.addressGen2Mode != 0) {  // bias

@@ -40,11 +40,11 @@ SC_MODULE(MatrixUnit) {
 
 #ifdef SIM_WeightController
   // clang-format off
-  CCS_DESIGN( (WeightController<INPUT_DATATYPE, DIMENSION, DIMENSION>) ) CCS_INIT_S1(weightController);
+  CCS_DESIGN( (WeightController<INPUT_DATATYPE, ACCUM_DATATYPE, DIMENSION, DIMENSION>) ) CCS_INIT_S1(weightController);
 // clang-format on
 #else
-  WeightController<INPUT_DATATYPE, DIMENSION, DIMENSION> CCS_INIT_S1(
-      weightController);
+  WeightController<INPUT_DATATYPE, ACCUM_DATATYPE, DIMENSION, DIMENSION>
+      CCS_INIT_S1(weightController);
 #endif
 
   DoubleBuffer<INPUT_DATATYPE, DIMENSION, WEIGHT_BUFFER_SIZE> CCS_INIT_S1(

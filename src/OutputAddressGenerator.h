@@ -135,9 +135,6 @@ SC_MODULE(OutputAddressGenerator) {
                       params.outputLoops[1][params.outputWeightLoopIndex[1]];
                   ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
                   ac_int<16, false> K = K2 * K1 * WIDTH;
-                  if (params.DP_OUTPUT) {
-                    K = K * 2;
-                  }
 
                   ac_int<16, false> x = x0 + x1 * X0;
                   ac_int<16, false> X = X0 * X1;

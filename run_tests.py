@@ -109,9 +109,16 @@ def main():
     if args.model == "resnet":
         all_tests = resnet_networks.NETWORKS[args.model]
     elif args.model == "mobilebert":
-        name = f'{args.model}_{args.task}'
+        if args.task == "forward_with_weight_splitting":
+            name = 'mobilebert_inference'
+        elif args.task == "backward_with_weight_splitting":
+            name = 'mobilebert_backward'
+        else:
+            name = f'mobilebert_{args.task}'
+
         if name not in mobilebert_networks.NETWORKS.keys():
             raise ValueError(f"{name} not supported on mobilebert.")
+
         all_tests = mobilebert_networks.NETWORKS[name]
     # If we can't find the model in any of the handwritten configs, we look in the codegen
     else:

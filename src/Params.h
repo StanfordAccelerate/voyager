@@ -331,6 +331,7 @@ struct VectorParams : BaseParams {
   int addressGen1InputXLoopIndex[2];
   int addressGen1InputYLoopIndex[2];
   int addressGen1WeightLoopIndex[2];
+  bool DP_VEC1;
 
   // Address Gen 2 (bias/op3src1)
   int ADDRESS_GEN2_OFFSET;
@@ -363,7 +364,7 @@ struct VectorParams : BaseParams {
   bool AVGPOOL;
 
   static const unsigned int width =
-      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1;
+      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -390,6 +391,7 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& addressGen1WeightLoopIndex[i];
     }
+    m& DP_VEC1;
     m& ADDRESS_GEN2_OFFSET;
 
     for (int i = 0; i < 2; i++) {

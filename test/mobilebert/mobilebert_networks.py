@@ -1,8 +1,9 @@
 NETWORKS = {
-    "mobilebert_inference":
-    [
+    "mobilebert_inference": [
         "bottleneck_input_dense",
         "bottleneck_input_LayerNorm",
+        "bottleneck_attention_dense",
+        "bottleneck_attention_LayerNorm",
         "attention_self_query_layer",
         "attention_self_key_layer",
         "attention_self_value_layer",
@@ -30,7 +31,7 @@ NETWORKS = {
         "output_bottleneck_LayerNorm",
         "classifier",
     ],
-    "mobilebert_backprop": [
+    "mobilebert_backward": [
         "classifier",
         "output_bottleneck_LayerNorm",
         "output_bottleneck_dense",
@@ -64,8 +65,8 @@ NETWORKS = {
         "attention_self_key_layer_2",
         "attention_self_key_layer_1",
         "attention_self_key_layer_0",
-        # "bottleneck_attention_LayerNorm_q",
-        # "bottleneck_attention_LayerNorm_k",
+        # "query_to_bottleneck_attention_LayerNorm",
+        # "key_to_bottleneck_attention_LayerNorm",
         "bottleneck_attention_dense",
         # "shared_attention_input_to_hidden_states",
         # "value_to_hidden_states",

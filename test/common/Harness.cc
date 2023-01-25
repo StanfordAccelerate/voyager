@@ -148,7 +148,7 @@ void Harness::memAccessBurst(
   while (true) {
     MemoryRequest memRequest = addressRequest->Pop();
     INPUT_DATATYPE *memory;
-    if (currentParams.WEIGHT && memSource == RRAM) {
+    if (memSource == RRAM) {
       memory = rramMemory;
     } else {
       memory = sramMemory;
@@ -239,7 +239,7 @@ void Harness::memAccessInputs() {
 }
 
 void Harness::memAccessWeights() {
-  memAccessBurst(&weightAddressRequest, &weightDataResponse, RRAM);
+  memAccessBurst(&weightAddressRequest, &weightDataResponse, memoryMap.weights);
 }
 
 void Harness::memAccessGrad() {
@@ -312,8 +312,6 @@ void Harness::sendParams() {
       VectorParams *vectorParams = dynamic_cast<VectorParams *>(baseParam);
       VectorInstructionConfig *vectorInstructionConfig;
       vectorParamsValid = vectorParams != NULL;
-            std::cout << "vector: " << vectorParamsValid << std::endl;
-
 
       if (vectorParamsValid) {
         opParams.pop_front();

@@ -9,8 +9,9 @@
 // namespace plt = matplotlibcpp;
 
 #ifndef NO_UNIVERSAL
-inline float readValue(UniversalPosit *matrix, int index, bool accType) {
-  if (!accType) {
+inline float readValue(UniversalPosit *matrix, int index,
+                       bool doublePrecision) {
+  if (!doublePrecision) {
     return static_cast<float>(matrix[index]);
   }
 
@@ -22,8 +23,9 @@ inline float readValue(UniversalPosit *matrix, int index, bool accType) {
 }
 #endif
 
-inline float readValue(INPUT_DATATYPE *matrix, int index, bool accType) {
-  if (!accType) {
+inline float readValue(INPUT_DATATYPE *matrix, int index,
+                       bool doublePrecision) {
+  if (!doublePrecision) {
     return static_cast<float>(matrix[index]);
   }
 
@@ -34,8 +36,8 @@ inline float readValue(INPUT_DATATYPE *matrix, int index, bool accType) {
   return static_cast<float>(p16);
 }
 
-inline float readValue(float *matrix, int index, bool accType) {
-  return accType ? matrix[2 * index] : matrix[index];
+inline float readValue(float *matrix, int index, bool doublePrecision) {
+  return doublePrecision ? matrix[2 * index] : matrix[index];
 }
 
 // template <typename T>
@@ -62,7 +64,8 @@ inline float readValue(float *matrix, int index, bool accType) {
 template <typename TA, typename TB>
 float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
                               TB *matrixB, std::string matrixB_name,
-                              size_t size, std::string filename, bool accType) {
+                              size_t size, std::string filename,
+                              bool doublePrecision) {
   std::cout << "Writing comparison between " << matrixA_name << " and "
             << matrixB_name << " to file: " << filename << std::endl;
   std::ofstream diffFile(filename);
@@ -77,8 +80,8 @@ float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
 
   for (int index = 0; index < size; index++) {
     // Calculate absolute difference
-    float a = readValue(matrixA, index, accType);
-    float b = readValue(matrixB, index, accType);
+    float a = readValue(matrixA, index, doublePrecision);
+    float b = readValue(matrixB, index, doublePrecision);
     always_zero += abs(a) + abs(b);
     float abs_diff = abs(a - b);
 
@@ -171,46 +174,52 @@ float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
 
 float compare_arrays(INPUT_DATATYPE *matrixA, std::string matrixA_name,
                      INPUT_DATATYPE *matrixB, std::string matrixB_name,
-                     size_t size, std::string filename, bool accType) {
+                     size_t size, std::string filename, bool doublePrecision) {
   return compare_arrays_internal<INPUT_DATATYPE, INPUT_DATATYPE>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename, accType);
+      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
+      doublePrecision);
 }
 
 float compare_arrays(INPUT_DATATYPE *matrixA, std::string matrixA_name,
                      float *matrixB, std::string matrixB_name, size_t size,
-                     std::string filename, bool accType) {
+                     std::string filename, bool doublePrecision) {
   return compare_arrays_internal<INPUT_DATATYPE, float>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename, accType);
+      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
+      doublePrecision);
 }
 
 #ifndef NO_UNIVERSAL
 float compare_arrays(INPUT_DATATYPE *matrixA, std::string matrixA_name,
                      UniversalPosit *matrixB, std::string matrixB_name,
-                     size_t size, std::string filename, bool accType) {
+                     size_t size, std::string filename, bool doublePrecision) {
   return compare_arrays_internal<INPUT_DATATYPE, UniversalPosit>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename, accType);
+      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
+      doublePrecision);
 }
 
 float compare_arrays(UniversalPosit *matrixA, std::string matrixA_name,
                      UniversalPosit *matrixB, std::string matrixB_name,
-                     size_t size, std::string filename, bool accType) {
+                     size_t size, std::string filename, bool doublePrecision) {
   return compare_arrays_internal<UniversalPosit, UniversalPosit>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename, accType);
+      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
+      doublePrecision);
 }
 
 float compare_arrays(UniversalPosit *matrixA, std::string matrixA_name,
                      float *matrixB, std::string matrixB_name, size_t size,
-                     std::string filename, bool accType) {
+                     std::string filename, bool doublePrecision) {
   return compare_arrays_internal<UniversalPosit, float>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename, accType);
+      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
+      doublePrecision);
 }
 #endif
 
 float compare_arrays(float *matrixA, std::string matrixA_name, float *matrixB,
                      std::string matrixB_name, size_t size,
-                     std::string filename, bool accType) {
-  return compare_arrays_internal<float, float>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename, accType);
+                     std::string filename, bool doublePrecision) {
+  return compare_arrays_internal<float, float>(matrixA, matrixA_name, matrixB,
+                                               matrixB_name, size, filename,
+                                               doublePrecision);
 }
 
 int validateMapping(SimplifiedParams params) {

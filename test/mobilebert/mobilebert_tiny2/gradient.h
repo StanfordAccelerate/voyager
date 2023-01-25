@@ -49,15 +49,6 @@ const SimplifiedParams classifier_weight_gradient = {
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (16 x 1)
@@ -105,13 +96,12 @@ const SimplifiedParams classifier_bias_gradient = {
     .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = true,
     .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 512) * (128 x 512)
@@ -159,13 +149,12 @@ const SimplifiedParams output_bottleneck_LayerNorm_gradient = {
     .GRAD_CLIPPING = true,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 128) x (128 x 512)
@@ -211,15 +200,6 @@ const SimplifiedParams intermediate_dense_weight_gradient = {
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (512 x 128) x (128 x 128)
@@ -265,15 +245,6 @@ const SimplifiedParams output_dense_weight_gradient = {
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (128 x 128) x (128 x 128)
@@ -319,15 +290,6 @@ const SimplifiedParams attention_output_dense_weight_gradient = {
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (512 x 128) x (128 x 128)
@@ -373,15 +335,6 @@ const SimplifiedParams value_projection_weight_gradient = {
     .CONCAT_WEIGHT = true,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (128 x 128) x (128 x 128)
@@ -427,15 +380,6 @@ const SimplifiedParams query_key_projection_weight = {
     .CONCAT_WEIGHT = true,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (128 x 128) * (128 x 128)
@@ -483,13 +427,12 @@ const SimplifiedParams input_bottleneck_LayerNorm_gradient = {
     .GRAD_CLIPPING = true,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (512 x 128) x (128 x 128)
@@ -535,15 +478,6 @@ const SimplifiedParams input_bottleneck_weight_gradient = {
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = false,
-    .outputExpBias = -12,
 };
 
 // (128 x 128)
@@ -591,13 +525,12 @@ const SimplifiedParams intra_bottleneck_bias_gradient = {
     .GRAD_CLIPPING = true,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
-    .outputExpBias = -12,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 128)
@@ -645,13 +578,12 @@ const SimplifiedParams intra_bottleneck_bias_with_head_concat = {
     .GRAD_CLIPPING = true,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
-    .outputExpBias = -12,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 512)
@@ -699,19 +631,19 @@ const SimplifiedParams inter_bottleneck_bias_gradient = {
     .GRAD_CLIPPING = true,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
-    .WEIGHT_GRADIENT_OFFSET = 0,
-    .BIAS_GRADIENT_OFFSET = 0,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
-    .outputExpBias = -12,
+    .ACC_T_RESIDUAL = true,
 };
 
 std::map<std::string, SimplifiedParams> gradientParams{
     {"classifier_weight", classifier_weight_gradient},
     {"classifier_bias", classifier_bias_gradient},
-    {"output_bottleneck_LayerNorm", output_bottleneck_LayerNorm_gradient},
+    {"output_bottleneck_LayerNorm_weight",
+     output_bottleneck_LayerNorm_gradient},
     {"output_bottleneck_LayerNorm_bias", inter_bottleneck_bias_gradient},
     {"output_bottleneck_dense_weight", intermediate_dense_weight_gradient},
     {"output_bottleneck_dense_bias", inter_bottleneck_bias_gradient},
@@ -752,239 +684,239 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
     {"classifier_weight",
      {
          0,
-         4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
+         8 * INTERMEDIATE_SIZE + 5 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"classifier_bias",
      {
          0,
          0,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 21 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         8 * INTERMEDIATE_SIZE + 21 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
-    {"output_bottleneck_LayerNorm",
+    {"output_bottleneck_LayerNorm_weight",
      {
-         3 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
          0,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         8 * INTERMEDIATE_SIZE + 3 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_bottleneck_LayerNorm_bias",
      {
          0,
          0,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         8 * INTERMEDIATE_SIZE + 4 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_bottleneck_dense_weight",
      {
-         3 * INTERMEDIATE_SIZE + 21 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 17 * INTRA_BOTTLENECK_SIZE,
          0,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_bottleneck_dense_bias",
      {
          0,
          0,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         8 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
 
     {"output_LayerNorm_weight",
      {
-         3 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 16 * INTRA_BOTTLENECK_SIZE,
          0,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 16 * BIAS_HIDDEN_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 16 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_LayerNorm_bias",
      {
          0,
          0,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 17 * BIAS_HIDDEN_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 17 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_dense_weight",
      {
-         2 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 16 * INTRA_BOTTLENECK_SIZE,
          0,
-         6 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
+         6 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_dense_bias",
      {
          0,
          0,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"intermediate_dense_weight",
      {
-         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 15 * INTRA_BOTTLENECK_SIZE,
          0,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"intermediate_dense_bias",
      {
          0,
          0,
-         6 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
+         6 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
 
     {"ffn_0_output_LayerNorm_weight",
      {
-         2 * INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 14 * INTRA_BOTTLENECK_SIZE,
          0,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 13 * BIAS_HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 13 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_output_LayerNorm_bias",
      {
          0,
          0,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 14 * BIAS_HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 14 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_output_dense_weight",
      {
-         INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 14 * INTRA_BOTTLENECK_SIZE,
          0,
-         4 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 12 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_output_dense_bias",
      {
          0,
          0,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 12 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_intermediate_dense_weight",
      {
-         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 13 * INTRA_BOTTLENECK_SIZE,
          0,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             12 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             12 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_intermediate_dense_bias",
      {
          0,
          0,
-         4 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             12 * BIAS_HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             12 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
 
     {"attention_output_LayerNorm_weight",
      {
-         INTERMEDIATE_SIZE + 16 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 12 * INTRA_BOTTLENECK_SIZE,
          0,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             10 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             10 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_output_LayerNorm_bias",
      {
          0,
          0,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             11 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             11 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_output_dense_weight",
      {
-         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 11 * INTRA_BOTTLENECK_SIZE,
          0,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             9 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             9 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_output_dense_bias",
      {
          0,
          0,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             9 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             9 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
 
     {"attention_self_value_weight",
      {
          0,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             8 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             8 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_value_bias",
      {
          0,
          0,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             8 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             8 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_key_weight",
      {
-         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
-             7 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE +
+             7 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_key_bias",
      {
          0,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             7 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             7 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_query_weight",
      {
-         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 6 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_query_bias",
      {
          0,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
-             6 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE +
+             6 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
 
     {"bottleneck_attention_LayerNorm_weight",
      {
-         INTERMEDIATE_SIZE + HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_attention_LayerNorm_bias",
      {
 
          0,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_attention_dense_weight",
      {
          0,
          0,
-         WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_attention_dense_bias",
      {
          0,
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_input_LayerNorm_weight",
      {
          INTERMEDIATE_SIZE,
          0,
-         WEIGHT_INTERMEDIATE_SIZE + BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_input_LayerNorm_bias",
      {
          0,
          0,
-         WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_input_dense_weight",
      {
@@ -996,7 +928,7 @@ std::map<std::string, MemoryOffsets> gradientMemOffsets{
      {
          0,
          0,
-         WEIGHT_INTERMEDIATE_SIZE,
+         INTERMEDIATE_SIZE,
      }},
 };
 
@@ -1004,7 +936,7 @@ std::map<std::string, Files> gradientTestFiles{
     {"classifier_weight",
      {
          "classifier",
-         "mobilebert_encoder_layer_23_output_bottleneck_LayerNorm",
+         "mobilebert_encoder_layer_20_output_bottleneck_LayerNorm",
          "",
          "classifier_weight",
      }},
@@ -1015,12 +947,12 @@ std::map<std::string, Files> gradientTestFiles{
          "",
          "classifier_bias",
      }},
-    {"output_bottleneck_LayerNorm",
+    {"output_bottleneck_LayerNorm_weight",
      {
          "output_bottleneck_dense",
          "output_bottleneck_LayerNorm",
          "",
-         "output_bottleneck_LayerNorm",
+         "output_bottleneck_LayerNorm_weight",
      }},
     {"output_bottleneck_LayerNorm_bias",
      {
