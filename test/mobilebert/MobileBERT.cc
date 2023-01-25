@@ -236,12 +236,6 @@ std::vector<Workload> MobileBERT::getWorkloads(
       workload.files.weight_grad_file.insert(
           0, dataDir + gradientDataDir + encoderPrefix);
 
-      std::cerr << workload.files.inputs_file << std::endl;
-      std::cerr << workload.files.weights_file << std::endl;
-      std::cerr << workload.files.outputs_file << std::endl;
-      std::cerr << workload.files.bias_file << std::endl;
-      std::cerr << workload.files.residual_file << std::endl;
-
       if (useOffsets) {
         MemoryOffsets offsets = memOffsets.at(layer);
         workload.params.INPUT_OFFSET = offsets.INPUT_OFFSET;
@@ -363,7 +357,8 @@ std::vector<Workload> MobileBERT::getForwardWorkloads() {
   inferenceWorkloads.push_back(classifier);
 
   // inferenceWorkloads = std::vector<Workload>(inferenceWorkloads.begin(),
-  //                                            inferenceWorkloads.end() - 266);
+  //                                            inferenceWorkloads.begin() +
+  //                                            23);
 
   return inferenceWorkloads;
 }
@@ -429,6 +424,8 @@ std::vector<Workload> MobileBERT::getBackwardWorkloads() {
     }
   }
 
+  // backwardWorkloads = std::vector<Workload>(backwardWorkloads.begin(),
+  //                                           backwardWorkloads.begin() + 35);
   backwardWorkloads = std::vector<Workload>(backwardWorkloads.begin(),
                                             backwardWorkloads.end() - 3);
 

@@ -418,7 +418,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
   } else if (params.CROSS_ENTROPY_GRAD) {
     ACC_T labels[X];
     ACC_T logits[X];
-    ACC_T gradients[X];
+    ACC_T outputs[X];
 
     for (int i = 0; i < X; i++) {
       logits[i] = readInput(matrixA, i, params.ACC_T_INPUT);
@@ -434,19 +434,19 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int i = 0; i < X; i++) {
       ACC_T exp = static_cast<ACC_T>(logits[i] - max);
       gold_exp(exp);
-      gradients[i] = exp;
+      outputs[i] = exp;
       sum += exp;
     }
 
     ACC_T divisor = sum;
     gold_reciprocal(divisor);
     for (int i = 0; i < X; i++) {
-      gradients[i] *= divisor;
-      gradients[i] -= labels[i];
+      outputs[i] *= divisor;
+      outputs[i] -= labels[i];
       if (params.outputExpBias) {
-        adjustExp(gradients[i], params.outputExpBias);
+        adjustExp(outputs[i], params.outputExpBias);
       }
-      saveOutput(matrixC, i, gradients[i], params.ACC_T_OUTPUT);
+      saveOutput(matrixC, i, outputs[i], params.ACC_T_OUTPUT);
     }
   } else if (params.MSE_GRAD) {
     INT_T divisor = 2 / X;
@@ -688,6 +688,11 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                   int k = (k1 * K0 + k0) * DIMENSION + oc0;
                   int outputAddress = y * X * K + x * K + k;
 
+                  if (params.ATTENTION_SCALING) {
+                    T scale = 1.0f / sqrt(32);
+                    outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
+                  }
+
                   adjustExp(outputMatrix[outputAddress], params.outputExpBias);
 
                   if (params.RESIDUAL) {
@@ -707,11 +712,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                   if (params.RELU_GRAD &&
                       inputResidualMatrix[outputAddress] == 0) {
                     outputMatrix[outputAddress] = 0;
-                  }
-
-                  if (params.ATTENTION_SCALING) {
-                    T scale = 1.0f / sqrt(32);
-                    outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
                   }
                 }
               }

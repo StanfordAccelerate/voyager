@@ -16,15 +16,15 @@ std::vector<std::string> inferenceOrder{
     "attention_self_value_layer",
     "attention_self_attention_scores_0",
     "attention_self_attention_probs_0",
-    "attention_self_context_layer_0",
     "attention_self_attention_scores_1",
     "attention_self_attention_probs_1",
-    "attention_self_context_layer_1",
     "attention_self_attention_scores_2",
     "attention_self_attention_probs_2",
-    "attention_self_context_layer_2",
     "attention_self_attention_scores_3",
     "attention_self_attention_probs_3",
+    "attention_self_context_layer_0",
+    "attention_self_context_layer_1",
+    "attention_self_context_layer_2",
     "attention_self_context_layer_3",
     "attention_output_dense",
     "attention_output_LayerNorm",
@@ -213,6 +213,28 @@ const SimplifiedParams attention_score = {
     .ACC_FROM_ACC = false,
     .SOFTMAX = false,
     .ATTENTION_SCALING = true,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = false,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = true,
 };
 
 // (128 x 128)
@@ -242,6 +264,27 @@ const SimplifiedParams softmax = {
     .STORE_IN_ACC = false,
     .ACC_FROM_ACC = false,
     .SOFTMAX = true,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = true,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
 };
 
 // (128 x 128) x (128 x 32)
@@ -443,6 +486,27 @@ const SimplifiedParams classifier = {
     .SOFTMAX = false,
     .ATTENTION_SCALING = false,
     .FC = true,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = false,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = true,
 };
 
 std::map<std::string, SimplifiedParams> inferenceParams{
@@ -484,229 +548,241 @@ std::map<std::string, MemoryOffsets> inferenceMemOffsets{
          0,
          0,
          INTERMEDIATE_SIZE,
-         WEIGHT_INTERMEDIATE_SIZE,
+         INTERMEDIATE_SIZE,
      }},
     {"bottleneck_input_LayerNorm",
      {
          INTERMEDIATE_SIZE,
-         WEIGHT_INTERMEDIATE_SIZE + BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 3 * HIDDEN_SIZE,
-         WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_attention_dense",
      {
          0,
-         WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"bottleneck_attention_LayerNorm",
      {
-         INTERMEDIATE_SIZE + HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_query_layer",
      {
-         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 6 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
-             6 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE +
+             6 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_key_layer",
      {
-         INTERMEDIATE_SIZE + 4 * HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + WEIGHT_HIDDEN_SIZE +
-             7 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             7 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE +
+             7 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_SIZE,
+         2 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             7 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_value_layer",
      {
          0,
-         2 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             8 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             8 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             8 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+         3 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             8 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"attention_self_attention_scores_0",
      {
-         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 7 * HIDDEN_SIZE,
-     }},
-    {"attention_self_attention_scores_1",
-     {
-         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE + HEAD_SIZE,
-         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE + HEAD_SIZE,
-         INTERMEDIATE_SIZE + 8 * HIDDEN_SIZE,
-     }},
-    {"attention_self_attention_scores_2",
-     {
-         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE + 2 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE + 2 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 9 * HIDDEN_SIZE,
-     }},
-    {"attention_self_attention_scores_3",
-     {
-         INTERMEDIATE_SIZE + 5 * HIDDEN_SIZE + 3 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 6 * HIDDEN_SIZE + 3 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 10 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 7 * INTRA_BOTTLENECK_SIZE,
      }},
     {"attention_self_attention_probs_0",
      {
-         INTERMEDIATE_SIZE + 7 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 7 * INTRA_BOTTLENECK_SIZE,
          0,
-         INTERMEDIATE_SIZE + 11 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 7 * INTRA_BOTTLENECK_SIZE,
+     }},
+    {"attention_self_attention_scores_1",
+     {
+         INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_SIZE + ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_SIZE + ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 8 * INTRA_BOTTLENECK_SIZE,
      }},
     {"attention_self_attention_probs_1",
      {
-         INTERMEDIATE_SIZE + 8 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 8 * INTRA_BOTTLENECK_SIZE,
          0,
-         INTERMEDIATE_SIZE + 12 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 8 * INTRA_BOTTLENECK_SIZE,
+     }},
+    {"attention_self_attention_scores_2",
+     {
+         INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_SIZE +
+             2 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_SIZE +
+             2 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 9 * INTRA_BOTTLENECK_SIZE,
      }},
     {"attention_self_attention_probs_2",
      {
-         INTERMEDIATE_SIZE + 9 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 9 * INTRA_BOTTLENECK_SIZE,
          0,
-         INTERMEDIATE_SIZE + 13 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 9 * INTRA_BOTTLENECK_SIZE,
+     }},
+    {"attention_self_attention_scores_3",
+     {
+         INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_SIZE +
+             3 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_SIZE +
+             3 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 10 * INTRA_BOTTLENECK_SIZE,
      }},
     {"attention_self_attention_probs_3",
      {
-         INTERMEDIATE_SIZE + 10 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 10 * INTRA_BOTTLENECK_SIZE,
          0,
-         INTERMEDIATE_SIZE + 14 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 10 * INTRA_BOTTLENECK_SIZE,
      }},
+
     {"attention_self_context_layer_0",
      {
-         INTERMEDIATE_SIZE + 11 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 7 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 11 * INTRA_BOTTLENECK_SIZE,
      }},
     {"attention_self_context_layer_1",
      {
-         INTERMEDIATE_SIZE + 12 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE + 1 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE + 1 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 8 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             1 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 11 * INTRA_BOTTLENECK_SIZE +
+             1 * ATTENTION_HEAD_SIZE,
      }},
     {"attention_self_context_layer_2",
      {
-         INTERMEDIATE_SIZE + 13 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE + 2 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE + 2 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 9 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             2 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 11 * INTRA_BOTTLENECK_SIZE +
+             2 * ATTENTION_HEAD_SIZE,
      }},
     {"attention_self_context_layer_3",
      {
-         INTERMEDIATE_SIZE + 14 * HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 2 * HIDDEN_SIZE + 3 * HEAD_SIZE,
-         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE + 3 * HEAD_SIZE,
+         INTERMEDIATE_SIZE + 10 * INTRA_BOTTLENECK_SIZE,
+         INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             3 * ATTENTION_HEAD_SIZE,
+         INTERMEDIATE_SIZE + 11 * INTRA_BOTTLENECK_SIZE +
+             3 * ATTENTION_HEAD_SIZE,
      }},
+
     {"attention_output_dense",
      {
-         INTERMEDIATE_SIZE + 15 * HIDDEN_SIZE,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 2 * WEIGHT_HIDDEN_SIZE +
-             9 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 16 * HIDDEN_SIZE,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             9 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 3 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 11 * INTRA_BOTTLENECK_SIZE,
+         3 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
+             9 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 12 * INTRA_BOTTLENECK_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             9 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
      }},
     {"attention_output_LayerNorm",
      {
-         INTERMEDIATE_SIZE + 16 * HIDDEN_SIZE,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             10 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             11 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 12 * INTRA_BOTTLENECK_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             10 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 13 * INTRA_BOTTLENECK_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             11 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_intermediate_dense",
      {
-         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
-         3 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             12 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
-         4 * WEIGHT_INTERMEDIATE_SIZE + 3 * WEIGHT_HIDDEN_SIZE +
-             12 * BIAS_HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 13 * INTRA_BOTTLENECK_SIZE,
+         3 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             12 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 14 * INTRA_BOTTLENECK_SIZE,
+         4 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE +
+             12 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"ffn_0_output_dense",
      {
-         INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
-         4 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
-         2 * INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 12 * BIAS_HIDDEN_SIZE,
-         INTERMEDIATE_SIZE + 17 * HIDDEN_SIZE,
+         INTERMEDIATE_SIZE + 14 * INTRA_BOTTLENECK_SIZE,
+         4 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 12 * INTRA_BOTTLENECK_BIAS_SIZE,
+         2 * INTERMEDIATE_SIZE + 14 * INTRA_BOTTLENECK_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 12 * INTRA_BOTTLENECK_BIAS_SIZE,
+         INTERMEDIATE_SIZE + 13 * INTRA_BOTTLENECK_SIZE,
      }},
     {"ffn_0_output_LayerNorm",
      {
-         2 * INTERMEDIATE_SIZE + 18 * HIDDEN_SIZE,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 13 * BIAS_HIDDEN_SIZE,
-         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 14 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 14 * INTRA_BOTTLENECK_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 13 * INTRA_BOTTLENECK_BIAS_SIZE,
+         2 * INTERMEDIATE_SIZE + 15 * INTRA_BOTTLENECK_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 14 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"intermediate_dense",
      {
-         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
-         5 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
-         2 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
-         6 * WEIGHT_INTERMEDIATE_SIZE + BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 15 * INTRA_BOTTLENECK_SIZE,
+         5 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
+         2 * INTERMEDIATE_SIZE + 16 * INTRA_BOTTLENECK_SIZE,
+         6 * INTERMEDIATE_SIZE + INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_dense",
      {
-         2 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
-         6 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
-         3 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 15 * BIAS_HIDDEN_SIZE,
-         2 * INTERMEDIATE_SIZE + 19 * HIDDEN_SIZE,
+         2 * INTERMEDIATE_SIZE + 16 * INTRA_BOTTLENECK_SIZE,
+         6 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
+         3 * INTERMEDIATE_SIZE + 16 * INTRA_BOTTLENECK_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 15 * INTRA_BOTTLENECK_BIAS_SIZE,
+         2 * INTERMEDIATE_SIZE + 15 * INTRA_BOTTLENECK_SIZE,
      }},
     {"output_LayerNorm",
      {
-         3 * INTERMEDIATE_SIZE + 20 * HIDDEN_SIZE,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 16 * BIAS_HIDDEN_SIZE,
-         3 * INTERMEDIATE_SIZE + 21 * HIDDEN_SIZE,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 17 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 16 * INTRA_BOTTLENECK_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 16 * INTRA_BOTTLENECK_BIAS_SIZE,
+         3 * INTERMEDIATE_SIZE + 17 * INTRA_BOTTLENECK_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 17 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"output_bottleneck_dense",
      {
-         3 * INTERMEDIATE_SIZE + 21 * HIDDEN_SIZE,
-         7 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         3 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 2 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 17 * INTRA_BOTTLENECK_SIZE,
+         7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
+         3 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
+         8 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
          0,
      }},
     {"output_bottleneck_LayerNorm",
      {
-         3 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 3 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 4 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         3 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
+         8 * INTERMEDIATE_SIZE + 3 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
+         4 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
+         8 * INTERMEDIATE_SIZE + 4 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
     {"classifier",
      {
-         4 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 5 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
-         5 * INTERMEDIATE_SIZE + 22 * HIDDEN_SIZE,
-         8 * WEIGHT_INTERMEDIATE_SIZE + 21 * BIAS_INTERMEDIATE_SIZE +
-             3 * WEIGHT_HIDDEN_SIZE + 18 * BIAS_HIDDEN_SIZE,
+         4 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
+         8 * INTERMEDIATE_SIZE + 5 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
+         5 * INTERMEDIATE_SIZE + 18 * INTRA_BOTTLENECK_SIZE,
+         8 * INTERMEDIATE_SIZE + 21 * INTERMEDIATE_BIAS_SIZE +
+             3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
      }},
 };
 
