@@ -34,7 +34,6 @@ void MapFC(const SimplifiedParams &params,
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   vectorParams->DP_VEC1 = false;
 
-
   // TODO: adjust bitwidths inside of addressGen1 so that
   // we can just use a single K loop
   vectorParams->addressGen1Loops[0][0] = 1;
@@ -83,7 +82,7 @@ void MapFC(const SimplifiedParams &params,
   vectorParams->outputYLoopIndex[1] = 1;
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->SPLIT_OUTPUT = false;
-  vectorParams->DP_OUTPUT = false;
+  vectorParams->DP_OUTPUT = params.ACC_T_OUTPUT;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
