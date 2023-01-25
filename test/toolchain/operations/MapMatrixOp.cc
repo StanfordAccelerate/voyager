@@ -202,7 +202,7 @@ void MapMatrixOp(const SimplifiedParams &params,
 
   vectorParams->FULL_HEAD_SIZE = 0;
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
-  vectorParams->DP_OUTPUT = false;
+  vectorParams->DP_OUTPUT = params.ACC_T_OUTPUT;
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->scalarOutputCount = 0;
