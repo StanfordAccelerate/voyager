@@ -313,22 +313,32 @@ int Simulation::checkOutput() {
   double rel_err;
   bool any_comparison = false;
 
-  float* fp32Output =
-      memoryMaps.outputs ? floatMemory->rram : floatMemory->sram;
-  UniversalPosit* universalOutput = memoryMaps.outputs
-                                        ? universalPositMemory->rram
-                                        : universalPositMemory->sram;
-  INPUT_DATATYPE* positOutput =
-      memoryMaps.outputs ? positMemory->rram : positMemory->sram;
-  INPUT_DATATYPE* acceleratorOutput =
-      memoryMaps.outputs ? acceleratorMemory->rram : acceleratorMemory->sram;
+  float* floatOutput;
+  UniversalPosit* universalOutput;
+  INPUT_DATATYPE* positOutput;
+  INPUT_DATATYPE* acceleratorOutput;
+
+  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
+    acceleratorOutput =
+        memoryMaps.outputs ? acceleratorMemory->rram : acceleratorMemory->sram;
+  }
+  if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
+    positOutput = memoryMaps.outputs ? positMemory->rram : positMemory->sram;
+  }
+  if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
+    universalOutput = memoryMaps.outputs ? universalPositMemory->rram
+                                         : universalPositMemory->sram;
+  }
+  if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
+    floatOutput = memoryMaps.outputs ? floatMemory->rram : floatMemory->sram;
+  }
 
   if (fp32 && pytorch) {
     std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     std::string diffFile = outFilePrefix + "fpgold_vs_pytorch.txt";
 
-    rel_err += compare_arrays(fp32Output + params.OUTPUT_OFFSET, "fp32",
+    rel_err += compare_arrays(floatOutput + params.OUTPUT_OFFSET, "fp32",
                               floatMemory->reference, "file", size, diffFile,
                               params.ACC_T_OUTPUT);
     any_comparison = true;
@@ -404,7 +414,7 @@ int Simulation::checkOutput() {
     std::string diffFile = outFilePrefix + "hlsgold_vs_fpgold.txt";
 
     rel_err += compare_arrays(positOutput + params.OUTPUT_OFFSET, "customposit",
-                              fp32Output + params.OUTPUT_OFFSET, "fp32", size,
+                              floatOutput + params.OUTPUT_OFFSET, "fp32", size,
                               diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
@@ -417,7 +427,7 @@ int Simulation::checkOutput() {
     std::string diffFile = outFilePrefix + "accel_vs_fpgold.txt";
 
     rel_err += compare_arrays(acceleratorOutput + params.OUTPUT_OFFSET,
-                              "accelerator", fp32Output + params.OUTPUT_OFFSET,
+                              "accelerator", floatOutput + params.OUTPUT_OFFSET,
                               "fp32", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }

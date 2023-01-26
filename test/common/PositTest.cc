@@ -65,10 +65,13 @@ int main(int argc, char* argv[]) {
 #pragma omp parallel for reduction(+ : errors)
   for (unsigned int i = 0; i < 0xffffffff; i++) {
     data.input = i;
-    errors += testEncodeDecode<8, 0, 8, 5>(data.output);
-    // errors += testEncodeDecode<8, 1, 8, 4>(data.output);
-    // errors += testEncodeDecode<16, 1, 8, 12>(data.output);
+    // errors += testEncodeDecode<8, 0, 8, 5>(data.output);
+    errors += testEncodeDecode<8, 1, 8, 4>(data.output);
+    errors += testEncodeDecode<16, 1, 8, 12>(data.output);
     // errors += testEncodeDecode<32, 2, 8, 26>(data.output);
+    if (i % (unsigned int)1e7 == 0) {
+      std::cerr << ".";
+    }
   }
   std::cout << "done." << std::endl;
   std::cerr << errors << " errors found." << std::endl;
