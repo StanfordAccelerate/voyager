@@ -70,8 +70,8 @@ SC_MODULE(OutputAddressGenerator) {
     while (true) {
       VectorParams params = vectorOutputAddressParams.Pop();
 
-      ac_int<8, false> loop_counters[2][3];
-      ac_int<8, false> loop_bounds[2][3];
+      ac_int<10, false> loop_counters[2][3];
+      ac_int<10, false> loop_bounds[2][3];
 
       for (int i = 0; i < 2; i++) {
         for (int j = 0; j < 3; j++) {

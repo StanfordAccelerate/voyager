@@ -339,6 +339,7 @@ struct VectorParams : BaseParams {
   int addressGen2InputXLoopIndex[2];
   int addressGen2InputYLoopIndex[2];
   int addressGen2WeightLoopIndex[2];
+  bool DP_VEC2;
 
   int VECTOR_OUTPUT_OFFSET;
   int SCALAR_OUTPUT_OFFSET;
@@ -364,7 +365,7 @@ struct VectorParams : BaseParams {
   bool AVGPOOL;
 
   static const unsigned int width =
-      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1;
+      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1 + 1;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -408,6 +409,7 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& addressGen2WeightLoopIndex[i];
     }
+    m& DP_VEC2;
     m& VECTOR_OUTPUT_OFFSET;
     m& SCALAR_OUTPUT_OFFSET;
     m& scalarOutputCount;
