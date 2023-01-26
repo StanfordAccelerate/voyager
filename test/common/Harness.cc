@@ -369,7 +369,10 @@ void Harness::storeVectorOutputs() {
     int address = vectorOutputAddress.Pop();
     DLOG("address: " << address << " data: " << data);
     for (int i = 0; i < DIMENSION; i++) {
-      sramMemory[address + i] = data[i];
+      INPUT_DATATYPE *memory =
+          memoryMap.outputs == SRAM ? sramMemory : rramMemory;
+
+      memory[address + i] = data[i];
     }
   }
 }
