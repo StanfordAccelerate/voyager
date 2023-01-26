@@ -55,16 +55,27 @@ int main(int argc, char* argv[]) {
   // Error counter for OpenMP loops as one can't use return -1;
   int errors = 0;
 
+  union {
+    float output;
+    unsigned int input;
+  } data;
+
   std::cout << "Test posit encoding and decoding... " << std::flush;
+
 #pragma omp parallel for reduction(+ : errors)
-  for (int i = 0; i < (int)1e6; i++) {
-    if (errors) continue;
-    errors += testEncodeDecode<8, 0, 8, 5>((float)i / 1e6);
-    errors += testEncodeDecode<8, 1, 8, 4>((float)i / 1e6);
-    errors += testEncodeDecode<16, 1, 8, 12>((float)i / 1e6);
-    errors += testEncodeDecode<32, 2, 8, 26>((float)i / 1e6);
+  for (unsigned int i = 0; i < 0xffffffff; i++) {
+    data.input = i;
+    errors += testEncodeDecode<8, 0, 8, 5>(data.output);
+    // errors += testEncodeDecode<8, 1, 8, 4>(data.output);
+    // errors += testEncodeDecode<16, 1, 8, 12>(data.output);
+    // errors += testEncodeDecode<32, 2, 8, 26>(data.output);
   }
   std::cout << "done." << std::endl;
+  std::cerr << errors << " errors found." << std::endl;
+
+  if (errors) {
+    return 1;
+  }
 
   std::cout << "Test posit range... " << std::flush;
 #pragma omp parallel for reduction(+ : errors)

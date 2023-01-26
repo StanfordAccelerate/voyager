@@ -279,34 +279,49 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       }
     }
   } else if (params.SOFTMAX_GRAD) {
-    ACC_T outputMatrix[X * Y];
-    ACC_T attentionProbs[X * Y];
-    ACC_T sums[X];
-    for (int i = 0; i < X; i++) {
-      sums[i] = 0;
-    }
-
-    for (int i = 0; i < X * Y; i++) {
-      outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-      attentionProbs[i] = readInput(residualMatrix, i, params.ACC_T_OUTPUT);
-    }
-
     for (int x = 0; x < X; x++) {
       for (int y = 0; y < Y; y++) {
-        outputMatrix[x * Y + y] *= attentionProbs[x * Y + y];
-        sums[x] += outputMatrix[x * Y + y];
+        ACC_T acc = 0;
+        for (int k = 0; k < Y; k++) {
+          ACC_T prob_kj;
+          prob_kj = -residualMatrix[x * Y + k] * residualMatrix[x * Y + y];
+          if (k == y) {
+            prob_kj += residualMatrix[x * Y + y];
+          }
+          prob_kj *= matrixA[x * Y + k];
+          acc += prob_kj;
+        }
+        matrixC[x * Y + y] = acc;
       }
     }
 
-    T scale = 1.0f / std::sqrt(32);
-    for (int x = 0; x < X; x++) {
-      for (int y = 0; y < Y; y++) {
-        outputMatrix[x * Y + y] -=
-            static_cast<ACC_T>(sums[x] * attentionProbs[x * Y + y]);
-        saveOutput(matrixC, x * Y + y, outputMatrix[x * Y + y],
-                   params.ACC_T_OUTPUT);
-      }
-    }
+    // ACC_T outputMatrix[X * Y];
+    // ACC_T attentionProbs[X * Y];
+    // ACC_T sums[X];
+    // for (int i = 0; i < X; i++) {
+    //   sums[i] = 0;
+    // }
+
+    // for (int i = 0; i < X * Y; i++) {
+    //   outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+    //   attentionProbs[i] = readInput(residualMatrix, i, params.ACC_T_OUTPUT);
+    // }
+
+    // for (int x = 0; x < X; x++) {
+    //   for (int y = 0; y < Y; y++) {
+    //     outputMatrix[x * Y + y] *= attentionProbs[x * Y + y];
+    //     sums[x] += outputMatrix[x * Y + y];
+    //   }
+    // }
+
+    // for (int x = 0; x < X; x++) {
+    //   for (int y = 0; y < Y; y++) {
+    //     outputMatrix[x * Y + y] -=
+    //         static_cast<ACC_T>(sums[x] * attentionProbs[x * Y + y]);
+    //     saveOutput(matrixC, x * Y + y, outputMatrix[x * Y + y],
+    //                params.ACC_T_OUTPUT);
+    //   }
+    // }
   } else if (params.FC_GRAD) {
     ACC_T outputMatrix[X * K];
     for (int x = 0; x < X; x++) {
@@ -485,15 +500,17 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     INT_T *gradients = new INT_T[X * C];
 
     for (int i = 0; i < X * C; i++) {
-      weights[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-      gradients[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+      gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+      weights[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
+
+      // std::cerr << gradients[i] << "\t" << weights[i] << std::endl;
 
       // float val = (float)weights[i] - params.learningRate *
       // (float)gradients[i];
       weights[i] -= learningRate * gradients[i];
 
       // save 8-bit quantized weight to RRAM
-      saveOutput(matrixA, i, weights[i], params.ACC_T_OUTPUT);
+      saveOutput(matrixB, i, weights[i], params.ACC_T_WEIGHT);
 
       if (!params.ACC_T_OUTPUT && params.ERROR_FEEDBACK) {
         INT_T lr = learningRate;
@@ -501,7 +518,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
         // float feedback = ((float)matrixA[i] - val) / learningRate;
 
         // Save 8-bit weight residual to SRAM
-        saveOutput(matrixB, i, gradients[i], params.ACC_T_OUTPUT);
+        saveOutput(matrixA, i, gradients[i], params.ACC_T_OUTPUT);
       }
     }
   } else {

@@ -158,8 +158,9 @@ std::vector<Workload> MobileBERT::getWorkloads(
           weightDataDir = "step_51_activations/";
         }
       } else if (task == "weight_update") {
-        inputDataDir = "step_51_weights/";
-        weightDataDir = "step_51_weight_gradients/";
+        workload.params.learningRate = 0.02995417748587139;
+        inputDataDir = "step_51_weight_gradients/";
+        weightDataDir = "step_51_weights/";
         outputDataDir = "step_52_weights/";
       } else if (task == "forward_with_weight_splitting") {
         workload.params.WEIGHT_SPLITTING = workload.params.WEIGHT;
@@ -252,7 +253,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
           // Offset used for comparing outputs in weight update unit tests
           workload.params.OUTPUT_OFFSET = workload.params.ERROR_FEEDBACK
                                               ? workload.params.WEIGHT_OFFSET
-                                              : workload.params.INPUT_OFFSET;
+                                              : workload.params.WEIGHT_OFFSET;
         } else {
           workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
         }
@@ -263,8 +264,15 @@ std::vector<Workload> MobileBERT::getWorkloads(
             STACK_SIZE + 5 * INTERMEDIATE_SIZE;
       }
 
-      workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
-                            SRAM, SRAM};
+      workload.memoryMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
+
+      if (!workload.params.WEIGHT && !workload.params.WEIGHT_UPDATE) {
+        workload.memoryMap.weights = SRAM;
+      }
+
+      if (workload.params.WEIGHT_UPDATE) {
+        workload.memoryMap.outputs = RRAM;
+      }
 
       workloads.push_back(workload);
     }

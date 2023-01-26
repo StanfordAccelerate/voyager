@@ -189,7 +189,7 @@ void Simulation::run() {
     if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
       run_custom_posit_gold_model(
           params, positMemory->sram + params.INPUT_OFFSET,
-          (params.WEIGHT ? positMemory->rram : positMemory->sram) +
+          (workload.memoryMap.weights ? positMemory->rram : positMemory->sram) +
               params.WEIGHT_OFFSET,
           positMemory->sram + params.OUTPUT_OFFSET,
           positMemory->rram + params.BIAS_OFFSET,
@@ -199,8 +199,8 @@ void Simulation::run() {
     if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
       run_universal_posit_gold_model(
           params, universalPositMemory->sram + params.INPUT_OFFSET,
-          (params.WEIGHT ? universalPositMemory->rram
-                         : universalPositMemory->sram) +
+          (workload.memoryMap.weights ? universalPositMemory->rram
+                                      : universalPositMemory->sram) +
               params.WEIGHT_OFFSET,
           universalPositMemory->sram + params.OUTPUT_OFFSET,
           universalPositMemory->rram + params.BIAS_OFFSET,
@@ -210,7 +210,7 @@ void Simulation::run() {
     if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
       run_fp_gold_model(
           params, floatMemory->sram + params.INPUT_OFFSET,
-          (params.WEIGHT ? floatMemory->rram : floatMemory->sram) +
+          (workload.memoryMap.weights ? floatMemory->rram : floatMemory->sram) +
               params.WEIGHT_OFFSET,
           floatMemory->sram + params.OUTPUT_OFFSET,
           floatMemory->rram + params.BIAS_OFFSET,
@@ -251,6 +251,7 @@ void Simulation::run() {
 
 int Simulation::checkOutput() {
   SimplifiedParams params = workloads.back().params;
+  MemoryMap memoryMaps = workloads.back().memoryMap;
   int X, Y, C, K, FX, FY, STRIDE;
   X = params.loops[0][params.inputXLoopIndex[0]] *
       params.loops[1][params.inputXLoopIndex[1]];
@@ -315,7 +316,8 @@ int Simulation::checkOutput() {
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     std::string diffFile = outFilePrefix + "fpgold_vs_pytorch.txt";
 
-    rel_err += compare_arrays(floatMemory->sram + params.OUTPUT_OFFSET, "fp32",
+    float* output = memoryMaps.outputs ? floatMemory->rram : floatMemory->sram;
+    rel_err += compare_arrays(output + params.OUTPUT_OFFSET, "fp32",
                               floatMemory->reference, "file", size, diffFile,
                               params.ACC_T_OUTPUT);
     any_comparison = true;
@@ -327,9 +329,11 @@ int Simulation::checkOutput() {
               << std::endl;
     std::string diffFile = outFilePrefix + "hlsgold_vs_pytorch.txt";
 
-    rel_err += compare_arrays(positMemory->sram + params.OUTPUT_OFFSET,
-                              "customposit", positMemory->reference, "file",
-                              size, diffFile, params.ACC_T_OUTPUT);
+    INPUT_DATATYPE* positOutput =
+        memoryMaps.outputs ? positMemory->rram : positMemory->sram;
+    rel_err += compare_arrays(positOutput + params.OUTPUT_OFFSET, "customposit",
+                              positMemory->reference, "file", size, diffFile,
+                              params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
@@ -338,7 +342,10 @@ int Simulation::checkOutput() {
     std::cout << "(reveals issues in representing float as Posit)" << std::endl;
     std::string diffFile = outFilePrefix + "universal_vs_pytorch.txt";
 
-    rel_err += compare_arrays(universalPositMemory->sram + params.OUTPUT_OFFSET,
+    UniversalPosit* universalOutput = memoryMaps.outputs
+                                          ? universalPositMemory->rram
+                                          : universalPositMemory->sram;
+    rel_err += compare_arrays(universalOutput + params.OUTPUT_OFFSET,
                               "universal", universalPositMemory->reference,
                               "file", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;

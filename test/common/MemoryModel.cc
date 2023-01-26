@@ -264,13 +264,13 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
                                        const MemoryMap& memoryMap,
                                        bool useDataFile) {
   if (!files.inputs_file.empty()) {
-    loadInputs(params, SRAM, files.inputs_file, useDataFile);
+    loadInputs(params, memoryMap.inputs, files.inputs_file, useDataFile);
   }
   if (!params.WEIGHT && !files.weights_file.empty()) {
-    loadWeights(params, SRAM, files.weights_file, useDataFile);
+    loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
   }
   if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
-    loadResiduals(params, SRAM, files.residual_file, useDataFile);
+    loadResiduals(params, memoryMap.residual, files.residual_file, useDataFile);
   }
   if (params.WEIGHT_SPLITTING) {
     SimplifiedParams gradParams = params;
@@ -286,10 +286,10 @@ void MemoryModel::loadModelParams(const SimplifiedParams& params,
   // If weights is false, we don't load weights, but we load the second input as
   // weights from SRAM, see above
   if (params.WEIGHT) {
-    loadWeights(params, RRAM, files.weights_file, useDataFile);
+    loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
   }
   if (params.BIAS) {
-    loadBias(params, RRAM, files.bias_file, useDataFile);
+    loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
   }
   if (params.CROSS_ENTROPY_GRAD) {
     loadWeights(params, SRAM, files.weights_file, useDataFile);
