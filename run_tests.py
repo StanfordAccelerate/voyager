@@ -43,7 +43,7 @@ def main():
                         help="Relative normalized error in % we allow [TOLERANCE].")
     parser.add_argument("--data_dir",
                         type=str,
-                        default=None, # None means we will lookup the default data dir below
+                        default=None,  # None means we will lookup the default data dir below
                         help="Path to binary input data [DATA_DIR].")
     parser.add_argument("--output_dir",
                         type=str,
@@ -61,6 +61,14 @@ def main():
                         type=str,
                         default="build",
                         help="Name of build directory.")
+    parser.add_argument("--rram_banks",
+                        type=int,
+                        default=3,
+                        help="Configure the number of RRAM (super)banks.")
+    parser.add_argument("--sram_banks",
+                        type=int,
+                        default=8,
+                        help="Configure the number of SRAM banks.")
     args = parser.parse_args()
 
     # Create output directories for both test value and console output
@@ -94,14 +102,6 @@ def main():
     # Start timing before executing first "time-consuming" command
     start_time = time.time()
 
-    if args.make_clean:
-        subprocess.run(["make", "clean"], check=True)
-
-    # Build SystemC code (running make twice because of linker issues on NFS)
-    cmd = ["make", "-j"] + [args.target_name]
-    subprocess.run(cmd, check=True)
-    subprocess.run(cmd, check=True)
-
     # Prepare all tests/layers to be simultaneously run as individual processes
     results = []
     all_tests = None
@@ -132,6 +132,16 @@ def main():
     # Ensure we found tests for the model
     assert all_tests is not None, f"Could not find any tests for model {args.model}."
 
+    if args.make_clean:
+        subprocess.run(["make", "clean"], check=True)
+
+    # Build SystemC code (running make twice because of linker issues on NFS)
+    cmd = ["make", "-j"] + \
+        [f"BASE_FLAGS=-DNUM_SRAM_BANKS={args.sram_banks} -DNUM_RRAM_BANKS={args.rram_banks*4}"] + \
+        [args.target_name]
+    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True)
+
     # Launch each test as a separate process
     for test in all_tests:
         file_name = os.path.join(
@@ -148,6 +158,7 @@ def main():
         env["DATA_DIR"] = args.data_dir
         exec_path = os.path.join(args.build_dir, args.target_name)
         if len(all_tests) == 1:  # If we only run a single test, print the command for easier reproducibility
+            print("Run this to compile manually:", " ".join(cmd))
             print("Run this to reproduce:")
             print(f"NETWORK={env['NETWORK']} TESTS={env['TESTS']} SIMS={env['SIMS']} TASK={env['TASK']} TOLERANCE={env['TOLERANCE']} OUT_DIR={env['OUT_DIR']} DATA_DIR={env['DATA_DIR']} ./{exec_path}\n")
         # Spawn an new subprocess and grab its name, handle, and output file

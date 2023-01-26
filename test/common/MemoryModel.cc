@@ -266,7 +266,8 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
   if (!files.inputs_file.empty()) {
     loadInputs(params, memoryMap.inputs, files.inputs_file, useDataFile);
   }
-  if (!params.WEIGHT && !files.weights_file.empty()) {
+  if (!params.WEIGHT && params.WEIGHT_OFFSET != -1 &&
+      !files.weights_file.empty()) {
     loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
   }
   if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
