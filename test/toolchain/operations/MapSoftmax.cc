@@ -57,6 +57,7 @@ void MapSoftmax(const SimplifiedParams &params,
   vectorParams->outputYLoopIndex[1] = 1;
   vectorParams->outputXLoopIndex[1] = 0;
   vectorParams->DP_OUTPUT = false;
+  vectorParams->SPLIT_OUTPUT = false;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
