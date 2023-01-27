@@ -47,9 +47,12 @@ template <int nbits, int es, int fbits>
 void convert_(const bool sign, const int scale,
               const ac_int<fbits, false> fraction_in,
               ac_int<nbits, false> &bits) {
-  if (scale < -(nbits - 1) * (1 << es) + (1 << (es - 1))) {
-    bits = 0;
-  } else if ((scale >> es) > nbits - 2 || (scale >> es) < -(nbits - 2)) {
+  // if (scale < -(nbits - 1) * (1 << es) + (1 << (es - 1))) {
+  //   bits = 0;
+  //   return;
+  // }
+
+  if ((scale >> es) > nbits - 2 || (scale >> es) < -(nbits - 2)) {
     bits = 0;
     if (scale > 0) {
       bits = bits.bit_complement();
@@ -63,8 +66,7 @@ void convert_(const bool sign, const int scale,
 
     bool r = (scale >= 0);
     int run = r ? (1 + (scale >> es)) : -(scale >> es);
-    // FIXME:
-    regime = r ? (1 << (run + 1)) - 1 : 0;
+    regime = r ? (1l << (run + 1)) - 1 : 0;
     regime[0] = ~r;
 
     exponent = scale % (uint32_t(1) << es);

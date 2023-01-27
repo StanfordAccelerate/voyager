@@ -37,16 +37,15 @@ int testPositEncoding(const float f) {
   int errors = 0;
 
   // Round toward 0
-  if (f < -(nbits - 1) * pow(2, es) + pow(2, es - 1)) {
-    if (p.bits != 0) {
-      std::cerr << "ERROR: incorrect encoding produced!" << std::endl
-                << "Input: " << f << std::endl
-                << "Universal: " << bitstring.to_string() << std::endl
-                << "HLS Posit: " << p.bits.to_string(AC_BIN) << std::endl;
-      return 1;
-    }
-    return 0;
-  }
+  // if (f < -(nbits - 1) * pow(2, es) + pow(2, es - 1)) {
+  //   if (p.bits != 0) {
+  //     std::cerr << "ERROR: incorrect encoding produced!" << std::endl
+  //               << "Input: " << f << std::endl
+  //               << "HLS Posit: " << p.bits.to_string(AC_BIN) << std::endl;
+  //     return 1;
+  //   }
+  //   return 0;
+  // }
 
   // Encoding test
   long encoding = ref.encoding();
