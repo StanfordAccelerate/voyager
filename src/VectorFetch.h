@@ -360,7 +360,6 @@ SC_MODULE(VectorFetchUnit) {
                                           params.addressGen1Loops[1][2] * WIDTH;
 
                     if (params.DP_VEC1) {
-                      K = K * 2;
                       for (int precision = 0; precision < 2; precision++) {
                         int address =
                             static_cast<ac_int<32, false> >((j * K + k) * 2) +

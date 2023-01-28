@@ -279,49 +279,51 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       }
     }
   } else if (params.SOFTMAX_GRAD) {
+    ACC_T outputMatrix[X * Y];
+    ACC_T attentionProbs[X * Y];
+    ACC_T sums[X];
+    for (int i = 0; i < X; i++) {
+      sums[i] = 0;
+    }
+
+    for (int i = 0; i < X * Y; i++) {
+      outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+      attentionProbs[i] = readInput(residualMatrix, i, params.ACC_T_OUTPUT);
+    }
+
     for (int x = 0; x < X; x++) {
       for (int y = 0; y < Y; y++) {
-        ACC_T acc = 0;
-        for (int k = 0; k < Y; k++) {
-          ACC_T prob_kj;
-          prob_kj = -residualMatrix[x * Y + k] * residualMatrix[x * Y + y];
-          if (k == y) {
-            prob_kj += residualMatrix[x * Y + y];
-          }
-          prob_kj *= matrixA[x * Y + k];
-          acc += prob_kj;
+        outputMatrix[x * Y + y] *= attentionProbs[x * Y + y];
+      }
+
+      // perform sum with a tree addition
+      for (int reductionCount = 0; reductionCount < Y;
+           reductionCount += DIMENSION) {
+        // perform a tree addition
+        ACC_T accum[DIMENSION];
+        for (int i = 0; i < DIMENSION; i++) {
+          accum[i] = outputMatrix[x * Y + reductionCount + i];
         }
-        matrixC[x * Y + y] = acc;
+
+        int depth = DIMENSION;
+        while (depth > 1) {
+          for (int i = 0; i < depth; i += 2) {
+            accum[i / 2] = static_cast<ACC_T>(accum[i] + accum[i + 1]);
+          }
+          depth = depth / 2;
+        }
+        sums[x] = static_cast<ACC_T>(sums[x] + accum[0]);
       }
     }
 
-    // ACC_T outputMatrix[X * Y];
-    // ACC_T attentionProbs[X * Y];
-    // ACC_T sums[X];
-    // for (int i = 0; i < X; i++) {
-    //   sums[i] = 0;
-    // }
-
-    // for (int i = 0; i < X * Y; i++) {
-    //   outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-    //   attentionProbs[i] = readInput(residualMatrix, i, params.ACC_T_OUTPUT);
-    // }
-
-    // for (int x = 0; x < X; x++) {
-    //   for (int y = 0; y < Y; y++) {
-    //     outputMatrix[x * Y + y] *= attentionProbs[x * Y + y];
-    //     sums[x] += outputMatrix[x * Y + y];
-    //   }
-    // }
-
-    // for (int x = 0; x < X; x++) {
-    //   for (int y = 0; y < Y; y++) {
-    //     outputMatrix[x * Y + y] -=
-    //         static_cast<ACC_T>(sums[x] * attentionProbs[x * Y + y]);
-    //     saveOutput(matrixC, x * Y + y, outputMatrix[x * Y + y],
-    //                params.ACC_T_OUTPUT);
-    //   }
-    // }
+    for (int x = 0; x < X; x++) {
+      for (int y = 0; y < Y; y++) {
+        outputMatrix[x * Y + y] -=
+            static_cast<ACC_T>(sums[x] * attentionProbs[x * Y + y]);
+        saveOutput(matrixC, x * Y + y, outputMatrix[x * Y + y],
+                   params.ACC_T_OUTPUT);
+      }
+    }
   } else if (params.FC_GRAD) {
     ACC_T outputMatrix[X * K];
     for (int x = 0; x < X; x++) {
