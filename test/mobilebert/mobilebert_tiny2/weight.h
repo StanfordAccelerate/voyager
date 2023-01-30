@@ -56,6 +56,7 @@ const SimplifiedParams classifier_weight = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
@@ -110,6 +111,7 @@ const SimplifiedParams classifier_bias = {
     .ACC_T_INPUT = true,
     .ACC_T_WEIGHT = true,
     .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
@@ -164,6 +166,7 @@ const SimplifiedParams input_bottleneck_weight = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
@@ -218,6 +221,7 @@ const SimplifiedParams intermediate_dense_weight = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
@@ -272,6 +276,7 @@ const SimplifiedParams inter_bottleneck_bias = {
     .ACC_T_INPUT = true,
     .ACC_T_WEIGHT = true,
     .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
@@ -326,6 +331,7 @@ const SimplifiedParams bottleneck_projection_weight = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
@@ -380,6 +386,7 @@ const SimplifiedParams intra_bottleneck_bias = {
     .ACC_T_INPUT = true,
     .ACC_T_WEIGHT = true,
     .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
     .outputExpBias = 0,
     .WEIGHT_UPDATE = true,
 };
