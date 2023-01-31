@@ -24,12 +24,12 @@ class MobileBERT : public Network {
 
   std::vector<Workload> getWorkloadsInRange(
       const std::vector<std::string> &) override;
-
   std::vector<Workload> getAllWorkloads() override;
+
+  void setTask(std::string);
 
  private:
   std::string task;
-  void setTask(std::string);
 
   std::vector<std::string> order;
   std::map<std::string, SimplifiedParams> params;
