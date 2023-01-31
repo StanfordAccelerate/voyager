@@ -13,19 +13,23 @@ template <typename IDTYPE, typename WDTYPE, typename ODTYPE, int NROWS,
           int NCOLS>
 SC_MODULE(SystolicArray) {
  private:
-  Connections::Combinational<IDTYPE> inputConnection[NROWS][NCOLS];
+  Connections::Combinational<PEInput<IDTYPE> >
+      inputConnection[NROWS * NCOLS - 1];
+  Connections::Combinational<PEInput<IDTYPE> > inputConnectionFinal;
+
   Connections::Combinational<ODTYPE> psumConnection[NROWS - 1][NCOLS];
   sc_signal<WDTYPE> weightConnection[NROWS + 1][NCOLS];
   sc_signal<bool> weightValid;
-  Connections::Combinational<ac_int<1, false> > weightSwap[NROWS * NCOLS - 1];
-  Connections::Combinational<ac_int<1, false> > weightSwapFinal;
+  // Connections::Combinational<ac_int<1, false> > weightSwap[NROWS * NCOLS -
+  // 1];
+  // Connections::Combinational<ac_int<1, false> > weightSwapFinal;
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<IDTYPE> inputs[NROWS];
-  Connections::In<ac_int<1, false> > swapWeights[NROWS];
+  Connections::In<PEInput<IDTYPE> > inputs[NROWS];
+  // Connections::In<ac_int<1, false> > swapWeights[NROWS];
   Connections::In<Pack1D<WDTYPE, NCOLS> > CCS_INIT_S1(weights);
   Connections::In<ODTYPE> psums[NCOLS];
   Connections::Out<ODTYPE> outputs[NCOLS];
@@ -57,7 +61,7 @@ SC_MODULE(SystolicArray) {
         if (j == 0) {
           pe[i * NCOLS + j]->inputIn(inputs[i]);
         } else {
-          pe[i * NCOLS + j]->inputIn(inputConnection[i][j - 1]);
+          pe[i * NCOLS + j]->inputIn(inputConnection[i * NCOLS + j - 1]);
         }
         pe[i * NCOLS + j]->weightIn(weightConnection[i][j]);
         pe[i * NCOLS + j]->weightValid(weightValid);
@@ -66,17 +70,21 @@ SC_MODULE(SystolicArray) {
         } else {
           pe[i * NCOLS + j]->psumIn(psumConnection[i - 1][j]);
         }
-        if (j == 0) {
-          pe[i * NCOLS + j]->weightSwapIn(swapWeights[i]);
-        } else {
-          pe[i * NCOLS + j]->weightSwapIn(weightSwap[i * NCOLS + j - 1]);
-        }
+        // if (j == 0) {
+        //   pe[i * NCOLS + j]->weightSwapIn(swapWeights[i]);
+        // } else {
+        //   pe[i * NCOLS + j]->weightSwapIn(weightSwap[i * NCOLS + j - 1]);
+        // }
+        // if (i == NROWS - 1 && j == NCOLS - 1) {
+        //   pe[i * NCOLS + j]->weightSwapOut(weightSwapFinal);
+        // } else {
+        //   pe[i * NCOLS + j]->weightSwapOut(weightSwap[i * NCOLS + j]);
+        // }
         if (i == NROWS - 1 && j == NCOLS - 1) {
-          pe[i * NCOLS + j]->weightSwapOut(weightSwapFinal);
+          pe[i * NCOLS + j]->inputOut(inputConnectionFinal);
         } else {
-          pe[i * NCOLS + j]->weightSwapOut(weightSwap[i * NCOLS + j]);
+          pe[i * NCOLS + j]->inputOut(inputConnection[i * NCOLS + j]);
         }
-        pe[i * NCOLS + j]->inputOut(inputConnection[i][j]);
         pe[i * NCOLS + j]->weightOut(weightConnection[i + 1][j]);
         if (i == NROWS - 1) {
           pe[i * NCOLS + j]->psumOut(outputs[j]);
@@ -95,23 +103,23 @@ SC_MODULE(SystolicArray) {
     async_reset_signal_is(rstn, false);
 
     // Tie off unused Connections
-    Tieoff<IDTYPE> *inputConnectionTieoff[NROWS];
-    for (int i = 0; i < NROWS; i++) {
+    Tieoff<PEInput<IDTYPE> > *inputConnectionTieoff[NROWS - 1];
+    for (int i = 0; i < NROWS - 1; i++) {
       inputConnectionTieoff[i] =
-          new Tieoff<IDTYPE>(sc_gen_unique_name("tieoff"));
-      inputConnectionTieoff[i]->in(inputConnection[i][NCOLS - 1]);
+          new Tieoff<PEInput<IDTYPE> >(sc_gen_unique_name("tieoff"));
+      inputConnectionTieoff[i]->in(inputConnection[i * NCOLS + NCOLS - 1]);
     }
 
-    Tieoff<ac_int<1, false> > *weightSwapTieoff[NROWS - 1];
-    for (int i = 0; i < NROWS - 1; i++) {
-      weightSwapTieoff[i] =
-          new Tieoff<ac_int<1, false> >(sc_gen_unique_name("tieoff"));
-      weightSwapTieoff[i]->in(weightSwap[i * NCOLS + NCOLS - 1]);
-    }
+    // Tieoff<ac_int<1, false> > *weightSwapTieoff[NROWS - 1];
+    // for (int i = 0; i < NROWS - 1; i++) {
+    //   weightSwapTieoff[i] =
+    //       new Tieoff<ac_int<1, false> >(sc_gen_unique_name("tieoff"));
+    //   weightSwapTieoff[i]->in(weightSwap[i * NCOLS + NCOLS - 1]);
+    // }
   }
 
   void checkSwapDone() {
-    weightSwapFinal.ResetRead();
+    inputConnectionFinal.ResetRead();
     weightSwapDone.Reset();
 
     wait();
@@ -119,8 +127,8 @@ SC_MODULE(SystolicArray) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      ac_int<1, false> swap = weightSwapFinal.Pop();
-      if (swap) {
+      PEInput<IDTYPE> finalPEOut = inputConnectionFinal.Pop();
+      if (finalPEOut.swapWeights) {
         weightSwapDone.SyncPush();
       }
     }
@@ -128,13 +136,13 @@ SC_MODULE(SystolicArray) {
 
   void tieoff() {
     // Reset all the unused Connections
-    for (int i = 0; i < NROWS; i++) {
-      inputConnection[i][NCOLS - 1].ResetRead();
+    for (int i = 0; i < NROWS - 1; i++) {
+      inputConnection[i * NCOLS + NCOLS - 1].ResetRead();
     }
 
-    for (int i = 0; i < NROWS - 1; i++) {
-      weightSwap[i * NCOLS + NCOLS - 1].ResetRead();
-    }
+    // for (int i = 0; i < NROWS - 1; i++) {
+    //   weightSwap[i * NCOLS + NCOLS - 1].ResetRead();
+    // }
 
     wait();
 
@@ -143,14 +151,14 @@ SC_MODULE(SystolicArray) {
     while (true) {
 #pragma hls_unroll yes
       for (int i = 0; i < NROWS; i++) {
-        IDTYPE unusedInput;
-        inputConnection[i][NCOLS - 1].PopNB(unusedInput);
+        PEInput<IDTYPE> unusedInput;
+        inputConnection[i * NCOLS + NCOLS - 1].PopNB(unusedInput);
       }
-#pragma hls_unroll yes
-      for (int i = 0; i < NROWS - 1; i++) {
-        ac_int<1, false> unusedSwap;
-        weightSwap[i * NCOLS + NCOLS - 1].PopNB(unusedSwap);
-      }
+      // #pragma hls_unroll yes
+      //       for (int i = 0; i < NROWS - 1; i++) {
+      //         ac_int<1, false> unusedSwap;
+      //         weightSwap[i * NCOLS + NCOLS - 1].PopNB(unusedSwap);
+      //       }
       wait();
     }
   }
