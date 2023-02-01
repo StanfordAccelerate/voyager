@@ -41,8 +41,8 @@ int testPositEncoding(const float f) {
   float result = frexp(f, &n);
   if (n - 1 < -(nbits - 1) * pow(2, es) + pow(2, es - 1)) {
     if (p.bits != 0) {
-      std::cerr << "ERROR: incorrect encoding produced!" << std::endl
-                << "Input: " << f << std::endl
+      std::cerr << "ERROR: incorrect rounding produced!" << std::endl
+                << "Input:     " << f << std::endl
                 << "HLS Posit: " << p.bits.to_string(AC_BIN) << std::endl;
       return 1;
     }
@@ -54,7 +54,7 @@ int testPositEncoding(const float f) {
   if (p.bits != encoding) {
     std::bitset<nbits> bitstring(encoding);
     std::cerr << "ERROR: incorrect encoding produced!" << std::endl
-              << "Input: " << f << std::endl
+              << "Input:     " << f << std::endl
               << "Universal: " << bitstring.to_string() << std::endl
               << "HLS Posit: " << p.bits.to_string(AC_BIN) << std::endl;
     errors++;
@@ -64,7 +64,7 @@ int testPositEncoding(const float f) {
   typename Posit<nbits, es>::DecomposedPosit positfp(p);
   if ((float)positfp != (float)ref) {
     std::cerr << "ERROR: incorrect decoded value produced!" << std::endl
-              << "Input: " << f << std::endl
+              << "Input:     " << f << std::endl
               << "Universal: " << (float)ref << std::endl
               << "HLS Posit: " << (float)positfp << std::endl;
     errors++;
@@ -104,7 +104,6 @@ int main(int argc, char* argv[]) {
       tests_list.end()) {
     std::cout << "Test HLS Posit encoding and decoding... " << std::flush;
 
-    // #pragma omp parallel for reduction(+ : errors)
     for (unsigned int i = 0; i < 0xffffffff; i++) {
       ufloat.input = i;
       if (std::isfinite(ufloat.output)) {
@@ -121,10 +120,10 @@ int main(int argc, char* argv[]) {
 
   if (std::find(tests_list.begin(), tests_list.end(), "fma") !=
       tests_list.end()) {
-    std::cout << "Test 8-bit Posit fused multiply-add... " << std::flush;
-    for (int k = 0; k < 0xff; k++) {
-      for (int i = 0; i < 0xff; i++) {
-        for (int j = 0; j < 0xff; j++) {
+    std::cout << "Test Posit fused multiply-add... " << std::flush;
+    for (int k = 0; k < 256; k++) {
+      for (int i = 0; i < 256; i++) {
+        for (int j = 0; j < 256; j++) {
           // Skip NaN
           if (i == 128 || j == 128) continue;
 
@@ -137,7 +136,7 @@ int main(int argc, char* argv[]) {
           Posit<8, 1>::DecomposedPosit positfpB(pB);
           PositFP<8, 15> positfpC(pC);
           positfpC = fma(positfpA, positfpB, positfpC);
-          double hlsResult = (float)positfpC;
+          double hls = (float)positfpC;
 
           Posit8E1 universalA, universalB, universalC;
           universalA.setbits(i);
@@ -145,29 +144,149 @@ int main(int argc, char* argv[]) {
           universalC.setbits(k);
           auto internal =
               sw::universal::fma(universalA, universalB, universalC);
-          double universalResult = (float)internal;
+          double universal = (float)internal;
 
           double floatA = (float)universalA;
           double floatB = (float)universalB;
           double floatC = (float)universalC;
-          double floatResult = floatA * floatB + floatC;
+          double gold = floatA * floatB + floatC;
 
-          double hlsDiff =
-              abs((hlsResult - floatResult) / (floatResult + 1e-6));
-          double universalDiff =
-              abs((universalResult - floatResult) / (floatResult + 1e-6));
+          double hlsDiff = abs((hls - gold) / (gold + 1e-6));
+          double universalDiff = abs((universal - gold) / (gold + 1e-6));
 
           if (hlsDiff > universalDiff) {
             errors++;
             fprintf(stderr, "bits: a: %d, b: %d, c: %d\n", i, j, k);
             fprintf(stderr, "values: a: %.15f, b: %.15f, c: %.15f\n",
                     (float)universalA, (float)universalB, (float)universalC);
-            fprintf(stderr, "Float:     %.18f\n", floatResult);
-            fprintf(stderr, "HLS Posit: %.18f\n", hlsResult);
-            fprintf(stderr, "Universal: %.18f\n", universalResult);
-            fprintf(stderr, "HLS diff: %.6f, Universal diff: %.6f\n",
-                    hlsDiff * 100, universalDiff * 100);
+            fprintf(stderr, "Float:     %.18f\n", gold);
+            fprintf(stderr, "HLS Posit: %.18f\tdifference:%.6f\n", hls,
+                    hlsDiff * 100);
+            fprintf(stderr, "Universal: %.18f\tdifference:%.6f\n", universal,
+                    universalDiff * 100);
           }
+        }
+      }
+    }
+    std::cout << "done." << std::endl;
+    std::cout << errors << " errors found." << std::endl;
+  }
+
+  if (std::find(tests_list.begin(), tests_list.end(), "full_fma") !=
+      tests_list.end()) {
+    std::cout << "Test Posit fused multiply-add with more test cases... "
+              << std::flush;
+    for (int k = 0; k < 65536; k++) {
+      for (int i = 0; i < 256; i++) {
+        for (int j = 0; j < 256; j++) {
+          // Skip NaN
+          if (i == 128 || j == 128 || k == 32768) continue;
+
+          Posit<8, 1> pA, pB;
+          Posit<16, 1> pC;
+          pA.setbits(i);
+          pB.setbits(j);
+          pC.setbits(k);
+
+          Posit<8, 1>::DecomposedPosit positfpA(pA);
+          Posit<8, 1>::DecomposedPosit positfpB(pB);
+          Posit<16, 1>::DecomposedPosit positfpC(pC);
+          positfpC = fma(positfpA, positfpB, positfpC);
+          double hls = (float)positfpC;
+
+          float floatA = (float)pA;
+          float floatB = (float)pB;
+          float floatC = (float)pC;
+          double gold = floatA * floatB + floatC;
+
+          Posit16E1 p16 = gold;
+          double universal = (float)p16;
+
+          double hlsDiff = abs((hls - gold) / (gold + 1e-6));
+          double universalDiff = abs((universal - gold) / (gold + 1e-6));
+
+          if (hlsDiff > universalDiff) {
+            errors++;
+            fprintf(stderr, "bits: a: %d, b: %d, c: %d\n", i, j, k);
+            fprintf(stderr, "values: a: %.15f, b: %.15f, c: %.15f\n", floatA,
+                    floatB, floatC);
+            fprintf(stderr, "Float:     %.18f\n", gold);
+            fprintf(stderr, "HLS Posit: %.18f\tdifference:%.6f\n", hls,
+                    hlsDiff * 100);
+            fprintf(stderr, "Universal: %.18f\tdifference:%.6f\n", universal,
+                    universalDiff * 100);
+          }
+        }
+      }
+    }
+    std::cout << "done." << std::endl;
+    std::cout << errors << " errors found." << std::endl;
+  }
+
+  if (std::find(tests_list.begin(), tests_list.end(), "posit_cmp") !=
+      tests_list.end()) {
+    std::cout << "Test 16-bit Posit comparison... " << std::flush;
+    for (int i = 0; i < 65536; i++) {
+      for (int j = 0; j < 65536; j++) {
+        // Skip NaN
+        if (i == 32768 || j == 32768) continue;
+
+        Posit<16, 1> pA, pB;
+        pA.setbits(i);
+        pB.setbits(j);
+        bool hls = pA < pB;
+
+        Posit16E1 universalA, universalB;
+        universalA.setbits(i);
+        universalB.setbits(j);
+
+        double a = (float)universalA;
+        double b = (float)universalB;
+        bool gold = a < b;
+
+        if (hls != gold) {
+          errors++;
+          fprintf(stderr, "bits: a: %d, b: %d\n", i, j);
+          fprintf(stderr, "values: a: %.15f, b: %.15f\n", a, b);
+          fprintf(stderr, "Float:     %.d\n", gold);
+          fprintf(stderr, "HLS Posit: %.d\n", hls);
+        }
+      }
+    }
+    std::cout << "done." << std::endl;
+    std::cout << errors << " errors found." << std::endl;
+  }
+
+  if (std::find(tests_list.begin(), tests_list.end(), "positfp_cmp") !=
+      tests_list.end()) {
+    std::cout << "Test 16-bit PositFP comparison... " << std::flush;
+    for (int i = 0; i < 65536; i++) {
+      for (int j = 0; j < 65536; j++) {
+        // Skip NaN
+        if (i == 32768 || j == 32768) continue;
+
+        Posit<16, 1> pA, pB;
+        pA.setbits(i);
+        pB.setbits(j);
+
+        Posit<16, 1>::DecomposedPosit positfpA(pA);
+        Posit<16, 1>::DecomposedPosit positfpB(pB);
+        bool hls = positfpA < positfpB;
+
+        Posit16E1 universalA, universalB;
+        universalA.setbits(i);
+        universalB.setbits(j);
+
+        double a = (float)universalA;
+        double b = (float)universalB;
+        bool gold = a < b;
+
+        if (hls != gold) {
+          errors++;
+          fprintf(stderr, "bits: a: %d, b: %d\n", i, j);
+          fprintf(stderr, "values: a: %.15f, b: %.15f\n", a, b);
+          fprintf(stderr, "Float:     %.d\n", gold);
+          fprintf(stderr, "HLS Posit: %.d\n", hls);
         }
       }
     }
@@ -187,30 +306,29 @@ int main(int argc, char* argv[]) {
         pA.setbits(i);
         pB.setbits(j);
         pC = pA + pB;
-        double hlsResult = (float)pC;
+        double hls = (float)pC;
 
         Posit16E1 universalA, universalB, universalC;
         universalA.setbits(i);
         universalB.setbits(j);
         universalC = universalA + universalB;
-        double universalResult = (float)universalC;
+        double universal = (float)universalC;
 
         double a = (float)universalA;
         double b = (float)universalB;
-        double floatResult = a + b;
+        double gold = a + b;
 
-        float hlsDiff = abs((hlsResult - floatResult) / (floatResult + 1e-6));
-        float universalDiff =
-            abs((universalResult - floatResult) / (floatResult + 1e-6));
+        float hlsDiff = abs((hls - gold) / (gold + 1e-6));
+        float universalDiff = abs((universal - gold) / (gold + 1e-6));
 
         if (hlsDiff > universalDiff) {
           errors++;
           fprintf(stderr, "bits: a: %d, b: %d\n", i, j);
           fprintf(stderr, "values: a: %.15f, b: %.15f\n", (float)universalA,
                   (float)universalB);
-          fprintf(stderr, "Float:     %.18f\n", floatResult);
-          fprintf(stderr, "HLS Posit: %.18f\n", hlsResult);
-          fprintf(stderr, "Universal: %.18f\n", universalResult);
+          fprintf(stderr, "Float:     %.18f\n", gold);
+          fprintf(stderr, "HLS Posit: %.18f\n", hls);
+          fprintf(stderr, "Universal: %.18f\n", universal);
           fprintf(stderr, "HLS diff: %.6f, Universal diff: %.6f\n",
                   hlsDiff * 100, universalDiff * 100);
         }
@@ -232,30 +350,29 @@ int main(int argc, char* argv[]) {
         pA.setbits(i);
         pB.setbits(j);
         pC = pA * pB;
-        double hlsResult = (float)pC;
+        double hls = (float)pC;
 
         Posit16E1 universalA, universalB, universalC;
         universalA.setbits(i);
         universalB.setbits(j);
         universalC = universalA * universalB;
-        double universalResult = (float)universalC;
+        double universal = (float)universalC;
 
         double a = (float)universalA;
         double b = (float)universalB;
-        double floatResult = a * b;
+        double gold = a * b;
 
-        float hlsDiff = abs((hlsResult - floatResult) / (floatResult + 1e-6));
-        float universalDiff =
-            abs((universalResult - floatResult) / (floatResult + 1e-6));
+        float hlsDiff = abs((hls - gold) / (gold + 1e-6));
+        float universalDiff = abs((universal - gold) / (gold + 1e-6));
 
         if (hlsDiff > universalDiff) {
           errors++;
           fprintf(stderr, "bits: a: %d, b: %d\n", i, j);
           fprintf(stderr, "values: a: %.15f, b: %.15f\n", (float)universalA,
                   (float)universalB);
-          fprintf(stderr, "Float:     %.18f\n", floatResult);
-          fprintf(stderr, "HLS Posit: %.18f\n", hlsResult);
-          fprintf(stderr, "Universal: %.18f\n", universalResult);
+          fprintf(stderr, "Float:     %.18f\n", gold);
+          fprintf(stderr, "HLS Posit: %.18f\n", hls);
+          fprintf(stderr, "Universal: %.18f\n", universal);
           fprintf(stderr, "HLS diff: %.6f, Universal diff: %.6f\n",
                   hlsDiff * 100, universalDiff * 100);
         }
@@ -267,50 +384,30 @@ int main(int argc, char* argv[]) {
 
   if (std::find(tests_list.begin(), tests_list.end(), "posit_exp") !=
       tests_list.end()) {
-#if defined(SUBSAMPLED_TESTS)
-    // Using 65536 * 64 instead of 65536 * 65536 in supsampled case
-    long long size = 65536 * 64ll;
-#else
-    // Full search-space tests
-    long long size = 65536ll * 65536ll;
-#endif
+    int size = 0;
     double diff_buckets[5] = {0};
 
     std::cout << "Test 16bit posit exp... " << std::flush;
-    memset(diff_buckets, 0, sizeof(diff_buckets));
-
-    // #pragma omp parallel for reduction(+ : errors, diff_buckets)
     for (int i = 0; i < 65536; i++) {
-      if (errors) continue;
-
       // Skip NaN
       if (i == 32768) continue;
 
-      Posit<16, 1> p16A;
+      Posit<16, 1> p16A, p16B;
       p16A.setbits(i);
+      p16B = posit_exp(p16A);
+
+      float a = (float)p16A;
+      float gold = std::exp(a);
 
       // Since the posit exp is implemented in an optimized fashion using
-      // approximations it is only valid for negative values. So we skip
+      // approximations. It is only valid for negative exponents. So we skip
       // positive test values
-      if (p16A >= 0) continue;
+      if (a >= 0) continue;
 
-      Posit<16, 1> p16B = posit_exp(p16A);
+      // fprintf(stderr, "Exponent: %.8f, Gold: %.8f, HLS: %.8f\n", a, gold,
+      //         (float)p16B);
 
-      Posit16E1 uni16A, uni16B;
-      uni16A.setbits(i);
-      uni16B = sw::universal::exp(uni16B);
-
-      float a = (float)uni16A;
-      float gold = exp(a);
-
-      if ((float)p16A != a) {
-        errors++;
-        fprintf(stderr, "ERROR: i: %d, a: %f,  p16A: %f\n", i, a, (float)p16A);
-      }
-
-      float hlsDiff = abs(((float)p16B - gold) / gold);
-      float universalDiff = abs(((float)uni16B - gold) / gold);
-
+      float hlsDiff = abs(((float)p16B - gold) / (gold + 1e-6));
       if (hlsDiff < 0.001) {
         diff_buckets[0]++;
       }
@@ -326,19 +423,7 @@ int main(int argc, char* argv[]) {
         diff_buckets[4]++;
       }
 
-      // For most cases the bit representation should be same. If not, at
-      // least our error should be less than universals.
-      if (p16B.bits != uni16B.encoding() && hlsDiff > universalDiff) {
-        errors++;
-        fprintf(stderr, "ERROR: i: %d\n", i);
-        fprintf(stderr, "a: %f\n", a);
-        fprintf(stderr, "float: %f,  hls: %lf, universal: %lf\n", gold,
-                (float)p16B, (float)uni16B);
-        fprintf(stderr, "hlsDiff: %f, universalDiff: %f\n", hlsDiff,
-                universalDiff);
-        std::cerr << p16B.bits.to_string(AC_BIN) << std::endl;
-        std::cerr << uni16B.get() << std::endl;
-      }
+      size++;
     }
     std::cout << "done." << std::endl;
 

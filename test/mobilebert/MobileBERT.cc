@@ -58,17 +58,24 @@ void MobileBERT::setTask(std::string task) {
     params = backpropParams;
     memOffsets = backpropMemOffsets;
     files = backpropTestFiles;
-  } else if (task == "gradient" || task == "gradient_accumulation") {
+  } else if (task == "gradient") {
     params = gradientParams;
     memOffsets = gradientMemOffsets;
     files = gradientTestFiles;
-  } else if (task == "weight_update" || task == "error_feedback") {
+
+    order.clear();
+    for (auto it = gradientParams.begin(); it != gradientParams.end(); it++) {
+      order.push_back(it->first);
+    }
+  } else if (task == "weight_update") {
     params = weightParams;
     memOffsets = weightMemOffsets;
 
+    order.clear();
+    files.clear();
     for (auto it = weightParams.begin(); it != weightParams.end(); it++) {
-      Files file = {it->first, it->first, "", it->first};
-      files.insert({it->first, file});
+      order.push_back(it->first);
+      files.insert({it->first, Files{it->first, it->first, "", it->first}});
     }
   } else {
     std::cerr << "ERROR: unrecognized task: " << task << std::endl;
@@ -281,12 +288,6 @@ std::vector<Workload> MobileBERT::getWorkloads(
             STACK_SIZE + 5 * INTERMEDIATE_SIZE;
       }
 
-      std::cerr << workload.params.INPUT_OFFSET << std::endl;
-      std::cerr << workload.params.WEIGHT_OFFSET << std::endl;
-      std::cerr << workload.params.OUTPUT_OFFSET << std::endl;
-      std::cerr << workload.params.BIAS_OFFSET << std::endl;
-      std::cerr << workload.params.RESIDUAL_OFFSET << std::endl;
-
       workloads.push_back(workload);
     }
   }
@@ -442,6 +443,20 @@ std::vector<Workload> MobileBERT::getBackwardWorkloads() {
       backwardWorkloads.push_back(workload);
 
       // TODO: add gradient tests
+      // std::cerr << workload.files.output_file << std::endl;
+
+      // std::string operation = backOp;
+      // if (backOp == "bottlenecked_hidden_states" && layer > 0) {
+      //   operation = "output_bottleneck_LayerNorm";
+      // } else if (backOp == "attention_self_query_layer_0") {
+      //   operation = "attention_self_query";
+      // } else if (backOp == "attention_self_key_layer_0") {
+      //   operation = "attention_self_key";
+      // } else if (backOp == "attention_self_value_layer_0") {
+      //   operation = "attention_self_value";
+      // } else if (backOp == "bottleneck_attention_LayerNorm_k") {
+      //   operation = "bottleneck_attention_LayerNorm";
+      // }
     }
   }
 
