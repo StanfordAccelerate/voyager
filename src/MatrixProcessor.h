@@ -196,11 +196,14 @@ SC_MODULE(MatrixProcessor) {
 
         // Pack1D<ac_int<1, false>, NROWS> weightSwap;
         Pack1D<PEInput<IDTYPE>, NROWS> inputs;
+        bool stallInputs = false;
         bool newWeights = loop_counters[1][params.weightReuseIndex[0]] == 0 &&
                           loop_counters[1][params.weightReuseIndex[1]] == 0;
         if (newWeights && step < totalOps) {
           // wait for weight loading to finish
-          weightLoadDone.SyncPop();
+          if (!weightLoadDone.SyncPopNB()) {
+            stallInputs = true;
+          }
 
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
@@ -216,7 +219,7 @@ SC_MODULE(MatrixProcessor) {
         }
 
         // Pack1D<IDTYPE, NROWS> inputs;
-        if (step < totalOps) {
+        if (step < totalOps && !stallInputs) {
           Pack1D<IDTYPE, NROWS> inputsData = inputsChannel.Pop();
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
@@ -235,7 +238,8 @@ SC_MODULE(MatrixProcessor) {
             loop_counters[1][params.fxIndex] == 0 &&
             loop_counters[1][params.fyIndex] == 0;
 
-        if ((!firstAccumulation || params.ACC_FROM_ACC) && step < totalOps) {
+        if ((!firstAccumulation || params.ACC_FROM_ACC) && step < totalOps &&
+            !stallInputs) {
           int readAddress = static_cast<ac_int<10, false> >(
                                 loop_counters[1][params.weightLoopIndex[1]] *
                                 params.loops[1][params.inputXLoopIndex[1]] *
@@ -251,9 +255,11 @@ SC_MODULE(MatrixProcessor) {
           // DLOG("readAddress: " << readAddress << " psum " << psum);
         }
 
-        inputSkewerDin.Push(inputs);
-        // weightSwapSkewerDin.Push(weightSwap);
-        psumInSkewerDin.Push(psum);
+        if (!stallInputs) {
+          inputSkewerDin.Push(inputs);
+          // weightSwapSkewerDin.Push(weightSwap);
+          psumInSkewerDin.Push(psum);
+        }
 
         Pack1D<ODTYPE, NCOLS> outputs;
         if (psumOutSkewerDout.PopNB(outputs)) {
@@ -309,19 +315,21 @@ SC_MODULE(MatrixProcessor) {
           }
         }
 
-        step++;
-        loop_counters[1][5]++;
+        if (!stallInputs) {
+          step++;
+          loop_counters[1][5]++;
 #pragma hls_unroll yes
-        for (int i = 1; i >= 0; i--) {
+          for (int i = 1; i >= 0; i--) {
 #pragma hls_unroll yes
-          for (int j = 5; j >= 0; j--) {
-            if (loop_counters[i][j] == params.loops[i][j]) {
-              loop_counters[i][j] = 0;
-              if (j > 0) {
-                loop_counters[i][j - 1]++;
-              } else {
-                if (i > 0) {
-                  loop_counters[i - 1][5]++;
+            for (int j = 5; j >= 0; j--) {
+              if (loop_counters[i][j] == params.loops[i][j]) {
+                loop_counters[i][j] = 0;
+                if (j > 0) {
+                  loop_counters[i][j - 1]++;
+                } else {
+                  if (i > 0) {
+                    loop_counters[i - 1][5]++;
+                  }
                 }
               }
             }
