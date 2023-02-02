@@ -189,7 +189,7 @@ def main():
             while line := res[1].stdout.readline():
                 line = line.decode("utf-8")
                 res[2].write(line)
-                # If format is right, print to console once per second
+                # If format is right, print to console
                 nums = [int(s) for s in line.split() if s.isdigit()]
                 if len(nums) == 3 and nums[2] != 0:
                     print("{} -> {} out of {} cycle ({:0.2f}%)".format(

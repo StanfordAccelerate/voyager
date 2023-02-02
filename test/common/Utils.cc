@@ -238,6 +238,7 @@ int validateMapping(SimplifiedParams params) {
     return 0;
   }
 
+  // TODO(fpedd): Fix and re-enable these checks
   // // Input buffer
   // int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy -
   // 1); if (params.REPLICATION) {
@@ -251,6 +252,9 @@ int validateMapping(SimplifiedParams params) {
   // }
 
   // Weight buffer
+  // TODO(fpedd): The constraint should be c0, not 16. But this is causing
+  // issues with the the last 3 conv layers of the ResNet18 model. Need to
+  // investigate...
   if (fx * fy * k0 * (params.REPLICATION ? 3 : 16) > WEIGHT_BUFFER_SIZE) {
     std::cerr << "ERROR: Weight buffer tile size violation." << std::endl
               << "Constraint " << WEIGHT_BUFFER_SIZE << " but is " << fx
