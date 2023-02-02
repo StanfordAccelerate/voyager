@@ -32,8 +32,8 @@ SC_MODULE(MaxpoolUnit) {
     while (true) {
       VectorParams params = paramsIn.Pop();
 
-      int loop_counters[2][3];
-      int loop_bounds[2][3];
+      ac_int<10, false> loop_counters[2][3];
+      ac_int<10, false> loop_bounds[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -69,28 +69,38 @@ SC_MODULE(MaxpoolUnit) {
                   for (loop_counters[1][2] = 0;
                        loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
-                    int x0 = loop_counters[1][params.outputXLoopIndex[1]];
-                    int x1 = loop_counters[0][params.outputXLoopIndex[0]];
-                    int X0 = params.outputLoops[1][params.outputXLoopIndex[1]];
-                    int X1 = params.outputLoops[0][params.outputXLoopIndex[0]];
-                    int y0 = loop_counters[1][params.outputYLoopIndex[1]];
-                    int y1 = loop_counters[0][params.outputYLoopIndex[0]];
-                    int Y0 = params.outputLoops[1][params.outputYLoopIndex[1]];
-                    int Y1 = params.outputLoops[0][params.outputYLoopIndex[0]];
-                    int k2 = loop_counters[0][params.outputWeightLoopIndex[0]];
-                    int K2 =
+                    ac_int<10, false> x0 =
+                        loop_counters[1][params.outputXLoopIndex[1]];
+                    ac_int<10, false> x1 =
+                        loop_counters[0][params.outputXLoopIndex[0]];
+                    ac_int<10, false> X0 =
+                        params.outputLoops[1][params.outputXLoopIndex[1]];
+                    ac_int<10, false> X1 =
+                        params.outputLoops[0][params.outputXLoopIndex[0]];
+                    ac_int<10, false> y0 =
+                        loop_counters[1][params.outputYLoopIndex[1]];
+                    ac_int<10, false> y1 =
+                        loop_counters[0][params.outputYLoopIndex[0]];
+                    ac_int<10, false> Y0 =
+                        params.outputLoops[1][params.outputYLoopIndex[1]];
+                    ac_int<10, false> Y1 =
+                        params.outputLoops[0][params.outputYLoopIndex[0]];
+                    ac_int<10, false> k2 =
+                        loop_counters[0][params.outputWeightLoopIndex[0]];
+                    ac_int<10, false> K2 =
                         params.outputLoops[0][params.outputWeightLoopIndex[0]];
-                    int k1 = loop_counters[1][params.outputWeightLoopIndex[1]];
-                    int K1 =
+                    ac_int<10, false> k1 =
+                        loop_counters[1][params.outputWeightLoopIndex[1]];
+                    ac_int<10, false> K1 =
                         params.outputLoops[1][params.outputWeightLoopIndex[1]];
-                    int k = k2 * K1 * WIDTH + k1 * WIDTH;
-                    int K = K2 * K1 * WIDTH;
+                    ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
+                    ac_int<16, false> K = K2 * K1 * WIDTH;
 
-                    int x = x0 + x1 * X0;
-                    int X = X0 * X1;
+                    ac_int<16, false> x = x0 + x1 * X0;
+                    ac_int<16, false> X = X0 * X1;
 
-                    int y = y0 + y1 * Y0;
-                    int Y = Y0 * Y1;
+                    ac_int<16, false> y = y0 + y1 * Y0;
+                    ac_int<16, false> Y = Y0 * Y1;
 
                     Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
@@ -161,28 +171,38 @@ SC_MODULE(MaxpoolUnit) {
                   for (loop_counters[1][2] = 0;
                        loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
-                    int x0 = loop_counters[1][params.outputXLoopIndex[1]];
-                    int x1 = loop_counters[0][params.outputXLoopIndex[0]];
-                    int X0 = params.outputLoops[1][params.outputXLoopIndex[1]];
-                    int X1 = params.outputLoops[0][params.outputXLoopIndex[0]];
-                    int y0 = loop_counters[1][params.outputYLoopIndex[1]];
-                    int y1 = loop_counters[0][params.outputYLoopIndex[0]];
-                    int Y0 = params.outputLoops[1][params.outputYLoopIndex[1]];
-                    int Y1 = params.outputLoops[0][params.outputYLoopIndex[0]];
-                    int k2 = loop_counters[0][params.outputWeightLoopIndex[0]];
-                    int K2 =
+                    ac_int<10, false> x0 =
+                        loop_counters[1][params.outputXLoopIndex[1]];
+                    ac_int<10, false> x1 =
+                        loop_counters[0][params.outputXLoopIndex[0]];
+                    ac_int<10, false> X0 =
+                        params.outputLoops[1][params.outputXLoopIndex[1]];
+                    ac_int<10, false> X1 =
+                        params.outputLoops[0][params.outputXLoopIndex[0]];
+                    ac_int<10, false> y0 =
+                        loop_counters[1][params.outputYLoopIndex[1]];
+                    ac_int<10, false> y1 =
+                        loop_counters[0][params.outputYLoopIndex[0]];
+                    ac_int<10, false> Y0 =
+                        params.outputLoops[1][params.outputYLoopIndex[1]];
+                    ac_int<10, false> Y1 =
+                        params.outputLoops[0][params.outputYLoopIndex[0]];
+                    ac_int<10, false> k2 =
+                        loop_counters[0][params.outputWeightLoopIndex[0]];
+                    ac_int<10, false> K2 =
                         params.outputLoops[0][params.outputWeightLoopIndex[0]];
-                    int k1 = loop_counters[1][params.outputWeightLoopIndex[1]];
-                    int K1 =
+                    ac_int<10, false> k1 =
+                        loop_counters[1][params.outputWeightLoopIndex[1]];
+                    ac_int<10, false> K1 =
                         params.outputLoops[1][params.outputWeightLoopIndex[1]];
-                    int k = k2 * K1 * WIDTH + k1 * WIDTH;
-                    int K = K2 * K1 * WIDTH;
+                    ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
+                    ac_int<16, false> K = K2 * K1 * WIDTH;
 
-                    int x = x0 + x1 * X0;
-                    int X = X0 * X1;
+                    ac_int<16, false> x = x0 + x1 * X0;
+                    ac_int<16, false> X = X0 * X1;
 
-                    int y = y0 + y1 * Y0;
-                    int Y = Y0 * Y1;
+                    ac_int<16, false> y = y0 + y1 * Y0;
+                    ac_int<16, false> Y = Y0 * Y1;
 
                     Pack1D<typename ACC_DTYPE::DecomposedPosit, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
