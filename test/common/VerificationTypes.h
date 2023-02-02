@@ -17,6 +17,10 @@
 #endif
 #define RRAM_MEMORY_SIZE (NUM_RRAM_BANKS * 1024 * 1024)
 
+// Size of the reference memory used for verification in MB
+// Should be at least as large as the SRAM memory
+#define REFERENCE_MEMORY_SIZE (1024 * 1024 * 8)
+
 // Bandwidth-mode for a RRAM memory bank
 // QUAD -> 1 clock cycle acces using 4 banks
 // DOUBLE -> 2 clock cycle acces using 2 banks
