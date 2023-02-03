@@ -45,7 +45,6 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_0->addressGen0Loop[1][1] = X;
   vectorParams_0->addressGen0Loop[1][2] = Y / DIMENSION;
   vectorParams_0->addressGen0Broadcast = false;
-  vectorParams_0->SOFTMAX_GRAD_NEGATE = false;
   vectorParams_0->DP_VEC0 = params.ACC_T_INPUT;
 
   vectorParams_0->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
@@ -158,7 +157,6 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_1->addressGen0Loop[1][1] = X;
   vectorParams_1->addressGen0Loop[1][2] = Y / DIMENSION;
   vectorParams_1->addressGen0Broadcast = false;
-  vectorParams_1->SOFTMAX_GRAD_NEGATE = false;
   vectorParams_1->DP_VEC0 = true;
 
   vectorParams_1->ADDRESS_GEN1_OFFSET = params.OUTPUT_OFFSET + 2 * (X * Y);

@@ -358,14 +358,13 @@ struct VectorParams : BaseParams {
   bool addressGen0Enable;
   bool addressGen0Broadcast;
   int addressGen0BroadcastCount;
-  bool SOFTMAX_GRAD_NEGATE;
   ac_int<2, false> addressGen1Mode;  // 1- residual, 2- 2dtensor
   ac_int<2, false> addressGen2Mode;  // 1- bias, 2- 2dtensor
   bool MAXPOOL;
   bool AVGPOOL;
 
   static const unsigned int width =
-      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1 + 1;
+      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -433,7 +432,6 @@ struct VectorParams : BaseParams {
     m& addressGen0Enable;
     m& addressGen0Broadcast;
     m& addressGen0BroadcastCount;
-    m& SOFTMAX_GRAD_NEGATE;
     m& addressGen1Mode;
     m& addressGen2Mode;
     m& MAXPOOL;
