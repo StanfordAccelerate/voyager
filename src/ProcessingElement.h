@@ -78,30 +78,30 @@ SC_MODULE(ProcessingElement) {
     wait();
 
 #pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
+#pragma hls_pipeline_stall_mode bubble
     while (true) {
-      ODTYPE psum = psumIn.Pop();
       PEInput<IDTYPE> inputStruct = inputIn.Pop();
 
       // IDTYPE input = inputIn.Pop();
       // ac_int<1, false> weightSwap = weightSwapIn.Pop();
       // needed for better scheduling
-      // #ifdef __SYNTHESIS__
-      //      inputOut.Push(input);
+       #ifdef __SYNTHESIS__
+            inputOut.Push(inputStruct);
       //      weightSwapOut.Push(weightSwap);
-      // #endif
+       #endif
 
       if (inputStruct.swapWeights) {
         weight_reg = updatedWeight;
       }
 
+      ODTYPE psum = psumIn.Pop();
       ODTYPE output = pe_fma(inputStruct.data, weight_reg, psum);
 
-      inputOut.Push(inputStruct);
-      // #ifndef __SYNTHESIS__
-      // inputOut.Push(input);
+      //inputOut.Push(inputStruct);
+      #ifndef __SYNTHESIS__
+       inputOut.Push(inputStruct);
       // weightSwapOut.Push(weightSwap);
-      // #endif
+      #endif
 
       psumOut.Push(output);
     }
