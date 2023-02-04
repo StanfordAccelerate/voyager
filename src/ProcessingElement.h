@@ -82,14 +82,6 @@ SC_MODULE(ProcessingElement) {
     while (true) {
       PEInput<IDTYPE> inputStruct = inputIn.Pop();
 
-      // IDTYPE input = inputIn.Pop();
-      // ac_int<1, false> weightSwap = weightSwapIn.Pop();
-      // needed for better scheduling
-       #ifdef __SYNTHESIS__
-            inputOut.Push(inputStruct);
-      //      weightSwapOut.Push(weightSwap);
-       #endif
-
       if (inputStruct.swapWeights) {
         weight_reg = updatedWeight;
       }
@@ -97,12 +89,7 @@ SC_MODULE(ProcessingElement) {
       ODTYPE psum = psumIn.Pop();
       ODTYPE output = pe_fma(inputStruct.data, weight_reg, psum);
 
-      //inputOut.Push(inputStruct);
-      #ifndef __SYNTHESIS__
-       inputOut.Push(inputStruct);
-      // weightSwapOut.Push(weightSwap);
-      #endif
-
+      inputOut.Push(inputStruct);
       psumOut.Push(output);
     }
   }
