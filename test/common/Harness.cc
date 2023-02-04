@@ -334,7 +334,7 @@ void Harness::sendParams() {
         vectorUnitStartSignal.SyncPop();
       }
 
-      CCS_LOG("Accelerator Layer Started.");
+      CCS_LOG("----- Accelerator Layer '" << params.name << "' Started. -----");
 
       if (matrixParamsValid) {
         matrixUnitDoneSignal.SyncPop();
@@ -342,7 +342,7 @@ void Harness::sendParams() {
       if (vectorParamsValid) {
         vectorUnitDoneSignal.SyncPop();
       }
-      CCS_LOG("Accelerator Layer Finished.");
+      CCS_LOG("----- Accelerator Layer '" << params.name << "' Finished. -----");
     }
 
 #ifdef SOC_COSIM

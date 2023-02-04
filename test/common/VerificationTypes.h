@@ -141,6 +141,9 @@ struct SimplifiedParams {
   // Bandwidth-aware (RRAM only)
   BandwidthMode bandwidth_mode;
   int bank_offsets[NUM_RRAM_BANKS];
+
+  // Layer name
+  std::string name;
 };
 
 struct MemoryOffsets {
