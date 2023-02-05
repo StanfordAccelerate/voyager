@@ -91,10 +91,10 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   vInst0.vInput = VectorInstructions::readFromVectorFetch;
   vInst0.vOp0Src1 = VectorInstructions::readInterface;
   vInst0.vOp0 = VectorInstructions::vsub;
-  vInst0.vOp1 = VectorInstructions::nop;
+  vInst0.vOp1 = VectorInstructions::vscaleexp;
+  vInst0.vOp1Src1 = VectorInstructions::op1immediate0;
   vInst0.vOp2 = VectorInstructions::nop;
-  vInst0.vOp3Src1 = VectorInstructions::op3immediate0;
-  vInst0.vOp3 = VectorInstructions::vscaleexp;
+  vInst0.vOp3 = VectorInstructions::nop;
   vInst0.immediate0 = params.outputExpBias;
   vInst0.vOp4 = VectorInstructions::nop;
   vInst0.vAccumulatePush = 0;

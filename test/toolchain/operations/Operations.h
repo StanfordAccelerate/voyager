@@ -23,8 +23,8 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
 void MapFCGrad(const SimplifiedParams &params,
                std::deque<BaseParams *> &mappedParams);
 
-void MapFCGradWithNormClipping(const SimplifiedParams &params,
-                               std::deque<BaseParams *> &mappedParams);
+void MapFCGradFusedWithNormClipping(const SimplifiedParams &params,
+                                    std::deque<BaseParams *> &mappedParams);
 
 void MapFC(const SimplifiedParams &params,
            std::deque<BaseParams *> &mappedParams);
@@ -42,4 +42,4 @@ void MapMatrixOp(const SimplifiedParams &params,
                  std::deque<BaseParams *> &mappedParams);
 
 void MapWeightUpdate(const SimplifiedParams &params,
-                 std::deque<BaseParams *> &mappedParams);
+                     std::deque<BaseParams *> &mappedParams);

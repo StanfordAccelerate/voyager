@@ -1,9 +1,5 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapFusedGradNormClippingInstructions(
-    VectorInstructionConfig *vectorInstructionConfig, int instructionCount,
-    int size) {}
-
 void MapGradNormClipping(const SimplifiedParams &params,
                          std::deque<BaseParams *> &mappedParams, int size) {
   // TODO: enable biasing exponent
@@ -11,7 +7,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
 
-  vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
+  vectorParams->VECTOR_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;
@@ -21,7 +17,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = size / DIMENSION;
   vectorParams->addressGen0Broadcast = false;
-  vectorParams->DP_VEC0 = false;
+  vectorParams->DP_VEC0 = true;
 
   // address gen 1 (weights)
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
@@ -51,7 +47,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->outputYLoopIndex[1] = 1;
   vectorParams->outputXLoopIndex[1] = 0;
-  vectorParams->DP_OUTPUT = false;
+  vectorParams->DP_OUTPUT = params.ACC_T_OUTPUT;
 
   // reduce entire tensor, and take inv sqrt of value
   // configure reduction unit
@@ -61,14 +57,15 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vInst0.rOp = VectorInstructions::radd;
   vInst0.rDuplicate = 1;
   vInst0.rInvSqrt = 1;
-  vInst0.rDest = VectorInstructions::toVectorOp0Src1;
+  vInst0.rDest = VectorInstructions::toVectorOp3Src1;
   vInst0.rBroadcast = 1;
-  vInst0.immediate0 = size / DIMENSION;
-  vInst0.immediate1 = 0;
+  ac_int<16, false> size16b = size / DIMENSION;
+  vInst0.immediate0 = size16b.slc<8>(0);
+  vInst0.immediate1 = size16b.slc<8>(8);
   vectorInstructionConfig->inst[0] = vInst0;
   vectorInstructionConfig->instCount[0] = 1;
 
-  // send tensor to reduction
+  // send tensor squared to reduction
   VectorInstructions vInst1;
   vInst1.instType = VectorInstructions::vector;
   vInst1.vInput = VectorInstructions::readFromVectorFetch;
@@ -90,12 +87,10 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vInst2.instType = VectorInstructions::vector;
   vInst2.vInput = VectorInstructions::readFromVectorFetch;
   vInst2.vAccumulatePush = VectorInstructions::nop;
-  vInst2.vOp0Src1 = VectorInstructions::readFromReduce;
   vInst2.vOp0 = VectorInstructions::nop;
   vInst2.vOp1 = VectorInstructions::nop;
   vInst2.vOp2 = VectorInstructions::nop;
-
-  vInst2.vOp3Src1 = VectorInstructions::nop;
+  vInst2.vOp3Src1 = VectorInstructions::readReduceInterface;
   vInst2.vOp3 = VectorInstructions::vmult;
   vInst2.vOp4 = VectorInstructions::nop;
   vInst2.vDest = VectorInstructions::vWriteOut;

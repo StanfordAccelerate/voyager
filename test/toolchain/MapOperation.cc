@@ -23,11 +23,7 @@ void MapOperation(const SimplifiedParams &params,
   } else if (params.SOFTMAX_GRAD) {
     MapSoftmaxGrad(params, mappedParams);
   } else if (params.FC_GRAD) {
-    if (params.GRAD_CLIPPING) {
-      MapFCGradWithNormClipping(params, mappedParams);
-    } else {
-      MapFCGrad(params, mappedParams);
-    }
+    MapFCGrad(params, mappedParams);
   } else if (params.FC) {
     MapFC(params, mappedParams);
   } else if (params.NO_NORM) {

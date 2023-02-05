@@ -214,6 +214,15 @@ SC_MODULE(VectorOpUnit) {
        */
       if (inst.vOp1 == VectorInstructions::vexp) {
         vexp<typename ACC_DTYPE::DecomposedPosit, WIDTH>(res0, res1);
+      } else if (inst.vOp1 == VectorInstructions::vscaleexp) {
+        ac_int<8, true> scaleVal;
+        if (inst.vOp1Src1 == VectorInstructions::op1immediate0) {
+          scaleVal = inst.immediate0;
+        } else {
+          scaleVal = inst.immediate1;
+        }
+        vscaleexp<typename ACC_DTYPE::DecomposedPosit, WIDTH>(res0, scaleVal,
+                                                              res1);
       } else {
         res1 = res0;
       }
@@ -422,6 +431,7 @@ SC_MODULE(VectorOpUnit) {
       if (inst.rInvSqrt) {
         scalarResult = scalarResult.inv_sqrt();
       }
+
 
       if (inst.rDuplicate) {
         // Duplicate the scalar result into a vector

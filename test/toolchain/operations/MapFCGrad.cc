@@ -26,8 +26,8 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = X;
   vectorParams->addressGen0Broadcast = true;
-  vectorParams->addressGen0BroadcastCount = K;
-  vectorParams->DP_VEC0 = false;
+  vectorParams->addressGen0BroadcastCount = K/DIMENSION;
+  vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
   // address gen 1 (weights)
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
@@ -38,10 +38,14 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][0] = X;
   vectorParams->addressGen1Loops[1][1] = 1;
   vectorParams->addressGen1Loops[1][2] = K / DIMENSION;
-  vectorParams->DP_VEC1 = false;
+  vectorParams->DP_VEC1 = params.ACC_T_WEIGHT;
 
-  vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams->addressGen2Mode = 0;  // use bias mode
+  vectorParams->ADDRESS_GEN2_OFFSET = params.RESIDUAL_OFFSET;
+  vectorParams->addressGen2Mode = params.RESIDUAL ? 2 : 0;
+  vectorParams->addressGen2Loops[0][0] = 1;
+  vectorParams->addressGen2Loops[0][1] = X;
+  vectorParams->addressGen2Loops[0][2] = K / DIMENSION;
+  vectorParams->DP_VEC2 = params.ACC_T_RESIDUAL;
 
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
@@ -65,7 +69,9 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->outputYLoopIndex[1] = 0;
   vectorParams->outputXLoopIndex[1] = 1;
-  vectorParams->DP_OUTPUT = false;
+  // vectorParams->DP_OUTPUT = params.ACC_T_OUTPUT;
+  vectorParams->DP_OUTPUT = params.GRAD_CLIPPING ? true : params.ACC_T_OUTPUT;
+  std::cout << "DP OUT: " << vectorParams->DP_OUTPUT;
 
   // inst 1- (inputs x weights)
   VectorInstructions vInst0;
@@ -74,12 +80,16 @@ void MapFCGrad(const SimplifiedParams &params,
   vInst0.vAccumulatePush = VectorInstructions::nop;
   vInst0.vOp0Src1 = VectorInstructions::readInterface;
   vInst0.vOp0 = VectorInstructions::vmult;
-  vInst0.vOp1 = VectorInstructions::nop;
+  vInst0.vOp1 = VectorInstructions::vscaleexp;
+  vInst0.vOp1Src1 = VectorInstructions::op1immediate0;
   vInst0.vOp2 = VectorInstructions::nop;
-  vInst0.vOp3Src1 = VectorInstructions::nop;
-  vInst0.vOp3 = VectorInstructions::nop;
+  vInst0.vOp3 =
+      params.RESIDUAL ? VectorInstructions::vadd : VectorInstructions::nop;
+  vInst0.vOp3Src1 = params.RESIDUAL ? VectorInstructions::readNormalInterface
+                                    : VectorInstructions::nop;
   vInst0.vOp4 = params.RELU;
   vInst0.vDest = VectorInstructions::vWriteOut;
+  vInst0.immediate0 = params.outputExpBias;
   vectorInstructionConfig->inst[0] = vInst0;
 
   // C/DIMENSION to do the complete reduction
@@ -91,6 +101,10 @@ void MapFCGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+
+  if (params.GRAD_CLIPPING) {
+    MapGradNormClipping(params, mappedParams, X * K);
+  }
 }
 
 void MapFCGradWithNormClipping(const SimplifiedParams &params,
@@ -167,10 +181,10 @@ void MapFCGradWithNormClipping(const SimplifiedParams &params,
   vInst0.vAccumulatePush = VectorInstructions::nop;
   vInst0.vOp0Src1 = VectorInstructions::readInterface;
   vInst0.vOp0 = VectorInstructions::vmult;
-  vInst0.vOp1 = VectorInstructions::nop;
-  vInst0.vOp2 = VectorInstructions::nop;
-  vInst0.vOp3Src1 = VectorInstructions::op3immediate0;
-  vInst0.vOp3 = VectorInstructions::vscaleexp;
+  vInst0.vOp1 = VectorInstructions::vscaleexp;
+  vInst0.vOp1Src1 = VectorInstructions::op1immediate0;
+  vInst0.vOp2 = VectorInstructions::vscaleexp;
+  vInst0.vOp3 = VectorInstructions::nop;
   vInst0.vOp4 = params.RELU;
   vInst0.immediate0 = params.outputExpBias;
   vInst0.vDest = VectorInstructions::vWriteOut;

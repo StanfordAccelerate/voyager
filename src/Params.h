@@ -194,8 +194,13 @@ struct VectorInstructions {
   static const unsigned int vsub = 3;
 
   // Stage 1: exp
-  ac_int<1, false> vOp1;
+  ac_int<2, false> vOp1;
   static const unsigned int vexp = 1;
+  static const unsigned int vscaleexp = 2;
+
+  ac_int<1, false> vOp1Src1;
+  static const unsigned int op1immediate0 = 0;
+  static const unsigned int op1immediate1 = 1;
 
   // Stage 2: send to reduce unit
   ac_int<1, false> vOp2;
@@ -213,7 +218,6 @@ struct VectorInstructions {
   // static const unsigned int vmult = 2;
   static const unsigned int vdiv = 3;
   static const unsigned int vsquare = 4;
-  static const unsigned int vscaleexp = 5;
 
   // Stage 4: relu
   ac_int<2, false> vOp4;
@@ -246,7 +250,7 @@ struct VectorInstructions {
   ac_int<8, false> immediate0;
   ac_int<8, false> immediate1;
 
-  static const unsigned int width = 56;
+  static const unsigned int width = 58;
   VectorInstructions() {}
 
 #ifndef NO_SYSC
@@ -272,6 +276,7 @@ struct VectorInstructions {
     m& vOp0Src1;
     m& vOp0;
     m& vOp1;
+    m& vOp1Src1;
     m& vOp2;
     m& vOp3Src1;
     m& vOp3;
@@ -477,6 +482,9 @@ struct VectorInstructionConfig : BaseParams {
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vOp1;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].vOp1Src1;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vOp2;
