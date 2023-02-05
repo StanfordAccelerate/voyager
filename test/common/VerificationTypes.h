@@ -57,6 +57,15 @@ struct MemoryMap {
   MemorySource outputs;
 };
 
+inline std::ostream& operator<<(std::ostream& os, MemoryMap& memoryMap) {
+  os << "Inputs: " << memoryMap.inputs << std::endl;
+  os << "Weights: " << memoryMap.weights << std::endl;
+  os << "Bias: " << memoryMap.bias << std::endl;
+  os << "Residual: " << memoryMap.residual << std::endl;
+  os << "Outputs: " << memoryMap.outputs << std::endl;
+  return os;
+}
+
 struct SimplifiedParams {
   int INPUT_OFFSET;
   int WEIGHT_OFFSET;
