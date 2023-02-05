@@ -48,7 +48,7 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams->scalarOutputCount = 0;
+  // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
 

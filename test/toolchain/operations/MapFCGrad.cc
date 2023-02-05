@@ -46,7 +46,7 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams->scalarOutputCount = 0;
+  // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
@@ -139,7 +139,7 @@ void MapFCGradWithNormClipping(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams->scalarOutputCount = 0;
+  // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
@@ -207,7 +207,7 @@ void MapFCGradWithNormClipping(const SimplifiedParams &params,
   vectorParams_reread->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams_reread->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams_reread->scalarOutputCount = 0;
+  // vectorParams_reread->scalarOutputCount = 0;
   vectorParams_reread->MAXPOOL = params.MAXPOOL;
   vectorParams_reread->AVGPOOL = params.AVGPOOL;
   vectorParams_reread->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
