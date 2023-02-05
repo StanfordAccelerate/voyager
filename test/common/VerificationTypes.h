@@ -17,6 +17,10 @@
 #endif
 #define RRAM_MEMORY_SIZE (NUM_RRAM_BANKS * 1024 * 1024)
 
+// Size of the reference memory used for verification in MB
+// Should be at least as large as the SRAM memory
+#define REFERENCE_MEMORY_SIZE (1024 * 1024 * 8)
+
 // Bandwidth-mode for a RRAM memory bank
 // QUAD -> 1 clock cycle acces using 4 banks
 // DOUBLE -> 2 clock cycle acces using 2 banks
@@ -52,6 +56,15 @@ struct MemoryMap {
   MemorySource residual;
   MemorySource outputs;
 };
+
+inline std::ostream& operator<<(std::ostream& os, MemoryMap& memoryMap) {
+  os << "Inputs: " << memoryMap.inputs << std::endl;
+  os << "Weights: " << memoryMap.weights << std::endl;
+  os << "Bias: " << memoryMap.bias << std::endl;
+  os << "Residual: " << memoryMap.residual << std::endl;
+  os << "Outputs: " << memoryMap.outputs << std::endl;
+  return os;
+}
 
 struct SimplifiedParams {
   int INPUT_OFFSET;
@@ -137,6 +150,9 @@ struct SimplifiedParams {
   // Bandwidth-aware (RRAM only)
   BandwidthMode bandwidth_mode;
   int bank_offsets[NUM_RRAM_BANKS];
+
+  // Layer name
+  std::string name;
 };
 
 struct MemoryOffsets {

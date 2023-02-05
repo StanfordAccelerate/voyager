@@ -6,6 +6,7 @@
 
 #include <deque>
 #include <vector>
+#include <string>
 
 #include "AccelTypes.h"
 #include "Accelerator.h"
@@ -98,14 +99,15 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(vectorUnitDoneSignal);
 
   Harness(sc_module_name, std::vector<SimplifiedParams>, INPUT_DATATYPE *,
-          INPUT_DATATYPE *, MemoryMap);
+          INPUT_DATATYPE *, std::vector<MemoryMap>);
   SC_HAS_PROCESS(Harness);
 
  private:
   std::vector<SimplifiedParams> params_list;
   SimplifiedParams currentParams;
   INPUT_DATATYPE *sramMemory, *rramMemory;
-  MemoryMap memoryMap;
+  std::vector<MemoryMap> memoryMap;
+  MemoryMap currentMemoryMap;
 
 #ifdef SIM_Accelerator
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
@@ -116,18 +118,18 @@ SC_MODULE(Harness) {
   void memAccessBurst(
       CombinationalInterface<MemoryRequest> * addressRequest,
       CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse,
-      MemorySource memSource);
+      std::string memSourceType);
   void memAccessBurstVariable(
       CombinationalInterface<MemoryRequest> * addressRequest,
       CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
           dataResponse);
-  void memAccessPack(
-      CombinationalInterface<int> * addressRequest,
-      CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse,
-      MemorySource memSource);
-  void memAccess(CombinationalInterface<int> * addressRequest,
-                 CombinationalInterface<INPUT_DATATYPE> * dataResponse,
-                 MemorySource memSource);
+  // void memAccessPack(
+  //     CombinationalInterface<int> * addressRequest,
+  //     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse,
+  //     MemorySource memSource);
+  // void memAccess(CombinationalInterface<int> * addressRequest,
+  //                CombinationalInterface<INPUT_DATATYPE> * dataResponse,
+  //                MemorySource memSource);
 
   void memAccessInputs();
   void memAccessWeights();

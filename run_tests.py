@@ -49,6 +49,10 @@ def main():
                         type=str,
                         default="./test_outputs/",
                         help="Path to output data [OUT_DIR].")
+    parser.add_argument("--num_tests",
+                        type=int,
+                        default=-1,
+                        help="Number of tests from the list of tests to run (-1 -> run all).")
     parser.add_argument("--make_clean",
                         default=False,
                         action="store_true",
@@ -70,6 +74,8 @@ def main():
                         default=8,
                         help="Configure the number of SRAM banks.")
     args = parser.parse_args()
+
+    print(10*'=' + " MINOTAUR Test Runner " + 10*'=')
 
     # Create output directories for both test value and console output
     script_output_dir = os.path.join(args.output_dir, "console_outputs")
@@ -132,6 +138,11 @@ def main():
     # Ensure we found tests for the model
     assert all_tests is not None, f"Could not find any tests for model {args.model}."
 
+    # Limit number of tests to run
+    if args.num_tests > 0:
+        all_tests = all_tests[:args.num_tests]
+
+    # Clean build directory
     if args.make_clean:
         subprocess.run(["make", "clean"], check=True)
 
@@ -178,9 +189,9 @@ def main():
             while line := res[1].stdout.readline():
                 line = line.decode("utf-8")
                 res[2].write(line)
-                # If format is right, print to console once per second
+                # If format is right, print to console
                 nums = [int(s) for s in line.split() if s.isdigit()]
-                if len(nums) == 3 and nums[2] != 0:
+                if len(nums) == 3 and nums[1] != 0 and nums[2] != 0:
                     print("{} -> {} out of {} cycle ({:0.2f}%)".format(
                         res[0], nums[1], nums[2], nums[1]/nums[2]*100.0))
             # Check if proc is still running
@@ -204,17 +215,30 @@ def main():
         # Free-running while loops are not good
         time.sleep(0.1)
 
+    left_justify = max([len(res[0]) for res in results])
     print("--- Tests done ---")
-    print('\n'.join(["{} returned with {}".format(
-        res[0], res[1].returncode) for res in results]))
+    print('\n'.join([u"{:<{x}} {y:>3}  {z}".format(
+        res[0],
+        x=left_justify,
+        y=res[1].returncode,
+        z=u'\u2714' if res[1].returncode == 0 else u'\u2718',
+    ) for res in results]))
     failures = functools.reduce(
         (lambda acc, res: acc + bool(res[1].returncode)), results, 0)
-    print("-> Total {} failed {}".format(len(results), failures))
+
+    # Print a checkmark green or an x red depending on whether the tests passed or failed
+    if failures == 0:
+        print(u'\u001b[32m' + 10*'=' + u" Total {} Failed {} ".format(
+            len(results), failures) + 10*'=' + u'\u001b[0m')
+    else:
+        print(u'\u001b[31m' + 10*u'x' + u" Total {} Failed {} ".format(
+            len(results), failures) + 10*u'x' + u' \u001b[0m')
 
     # Also log info to logfile
-    logging.info('\n'.join(["{} returned with {}".format(
-        res[0], res[1].returncode) for res in results]))
-    logging.info("-> Total {} failed {}".format(len(results), failures))
+    logging.info('\n'.join([u"{} returned with {} \t {}".format(
+        res[0], res[1].returncode, u'\u2714' if res[1].returncode == 0 else u'\u2718') for res in results]))
+    logging.info(
+        10*'=' + "Total {} failed {}".format(len(results), failures) + 10*'=')
 
     sys.exit(failures)
 

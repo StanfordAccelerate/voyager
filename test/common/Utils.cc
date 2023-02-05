@@ -238,6 +238,7 @@ int validateMapping(SimplifiedParams params) {
     return 0;
   }
 
+  // TODO(fpedd): Fix and re-enable these checks
   // // Input buffer
   // int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy -
   // 1); if (params.REPLICATION) {
@@ -251,14 +252,24 @@ int validateMapping(SimplifiedParams params) {
   // }
 
   // Weight buffer
+  // TODO(fpedd): The constraint should be c0, not 16. But this is causing
+  // issues with the the last 3 conv layers of the ResNet18 model. Need to
+  // investigate...
   if (fx * fy * k0 * (params.REPLICATION ? 3 : 16) > WEIGHT_BUFFER_SIZE) {
-    std::cerr << "ERROR: Weight buffer tile size violation." << std::endl;
+    std::cerr << "ERROR: Weight buffer tile size violation." << std::endl
+              << "Constraint " << WEIGHT_BUFFER_SIZE << " but is " << fx
+              << " * " << fy << " * " << k0 << " * "
+              << (params.REPLICATION ? 3 : 16) << " = "
+              << fx * fy * k0 * (params.REPLICATION ? 3 : 16) << std::endl;
     return -1;
   }
 
   // Accumulation buffer
   if (x0 * y0 * k0 > ACCUMULATION_BUFFER_SIZE) {
-    std::cerr << "ERROR: Accumulation buffer tile size violation." << std::endl;
+    std::cerr << "ERROR: Accumulation buffer tile size violation." << std::endl
+              << "Constraint " << ACCUMULATION_BUFFER_SIZE << " but is " << x0
+              << " * " << y0 << " * " << k0 << " = " << x0 * y0 * k0
+              << std::endl;
     return -1;
   }
 
@@ -281,9 +292,9 @@ int validateMapping(SimplifiedParams params) {
   }
 
   if (params.reductionLoopIndex[1] != 0) {
-    std::cerr
-        << "ERROR: Input channel needs to be outermost loop of buffer level."
-        << std::endl;
+    std::cerr << "ERROR: Input channel needs to be outermost loop of buffer "
+                 "level. But is "
+              << params.reductionLoopIndex[1] << std::endl;
     return -1;
   }
 

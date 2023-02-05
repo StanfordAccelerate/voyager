@@ -15,7 +15,7 @@
 
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
-            MemoryMap memoryMap);
+            std::vector<MemoryMap> memoryMap);
 
 class Simulation {
  public:

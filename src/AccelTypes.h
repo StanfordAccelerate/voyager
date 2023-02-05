@@ -45,6 +45,33 @@ struct MemoryRequest {
   }
 };
 
+template <typename TYPE>
+struct PEInput {
+  TYPE data;
+  ac_int<1, false> swapWeights;
+
+  static const unsigned int width = TYPE::width + 1;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m &data;
+    m &swapWeights;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf, const PEInput &peInput,
+                              const std::string &name) {
+    sc_trace(tf, peInput.data, name + ".data");
+    sc_trace(tf, peInput.swapWeights, name + ".swapWeights");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os, const PEInput &peInput) {
+    os << peInput.data << " ";
+    os << peInput.swapWeights << " ";
+
+    return os;
+  }
+};
+
 template <typename TYPE, size_t SIZE>
 class Pack1D {
  public:
@@ -65,6 +92,37 @@ class Pack1D {
 #pragma hls_unroll yes
     for (unsigned int i = 0; i < SIZE; i++) {
       m &value[i];
+    }
+  }
+};
+
+template <size_t SIZE, int nbits, int es>
+class Pack1D<PEInput<Posit<nbits, es> >, SIZE> {
+ public:
+  PEInput<Posit<nbits, es> > value[SIZE];
+
+  static const unsigned int width = PEInput<Posit<nbits, es> >::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const { return Pack1D<PEInput<Posit<nbits, es> >, SIZE>(); }
+
+  PEInput<Posit<nbits, es> > &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEInput<Posit<nbits, es> > &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.bits;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].swapWeights;
     }
   }
 };

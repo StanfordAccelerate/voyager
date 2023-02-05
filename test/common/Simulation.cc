@@ -223,30 +223,15 @@ void Simulation::run() {
   // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     std::vector<SimplifiedParams> params_list;
-
-    // Exlude weights from memory map comparison. They are allowed to differ as
-    // we additionally check the SimplifiedParams.WEIGHT in accelerator
-    auto memoryMapCompare = [](const MemoryMap& lhs, const MemoryMap& rhs) {
-      return lhs.inputs == rhs.inputs && /* lhs.weights == rhs.weights && */
-             lhs.bias == rhs.bias && lhs.residual == rhs.residual &&
-             lhs.outputs == rhs.outputs;
-    };
-    MemoryMap memoryMap = workloads.front().memoryMap;
+    std::vector<MemoryMap> memoryMap;
 
     for (const Workload& workload : workloads) {
       params_list.push_back(workload.params);
-
-      if (!memoryMapCompare(workload.memoryMap, memoryMap)) {
-        std::cerr << "Memory map mismatch for layer: " << workload.name
-                  << std::endl;
-        std::abort();
-      }
+      memoryMap.push_back(workload.memoryMap);
     }
 
-    // TODO: Currently assumes that all layers have the same memory map, except
-    // for weights memory map, which is allowed to differ. See memoryMapCompare
     run_op(params_list, acceleratorMemory->sram, acceleratorMemory->rram,
-           workloads.front().memoryMap);
+           memoryMap);
   }
 }
 

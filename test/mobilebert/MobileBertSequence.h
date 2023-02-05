@@ -41,7 +41,7 @@ float learningRate = 2e-3;
 
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE* acc_sram_memory, INPUT_DATATYPE* acc_rram_memory,
-            MemoryMap memoryMap);
+            std::vector<MemoryMap> memoryMap);
 
 SimplifiedParams paramsLookup(std::string operation, std::string task) {
   std::map<std::string, std::string> paramsMapping;
@@ -478,6 +478,7 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
 
   std::vector<SimplifiedParams> params_list;
   std::vector<std::string> files_list;
+  std::vector<MemoryMap> memMap;
 
   for (int layer = 0; layer < 24; layer++) {
     for (const auto& op : inferenceOrder) {
@@ -524,6 +525,8 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
 
       params_list.push_back(params);
       files_list.push_back(datafile);
+      // TODO(fpedd): Actually use this for something useful
+      files_list.push_back({SRAM, RRAM, RRAM, SRAM, SRAM});
 
 #ifdef DUMP_PARAMS
       if (layer == 0 || op == "classifier") {
@@ -539,7 +542,6 @@ int runForward(std::string datapath, std::vector<std::string> groups) {
   }
 
   if (std::find(groups.begin(), groups.end(), "accelerator") != groups.end()) {
-    const MemoryMap memMap = {SRAM, RRAM, RRAM, SRAM, SRAM};
     run_op(params_list, acc_sram_memory, acc_rram_memory, memMap);
 
     // FIXME: only check the outputs of last encoder layer

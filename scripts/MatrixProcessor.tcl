@@ -25,4 +25,7 @@ go architect
 
 ignore_memory_precedences -from WRITE_ACC_BUFFER* -to READ_ACC_BUFFER*
 
+# to prevent stuttering issues, schedule inputDin and psumIn to happen in the same cycle
+cycle set inputSkewerDin.Push() -from psumInSkewerDin.Push() -equal 0
+
 go extract

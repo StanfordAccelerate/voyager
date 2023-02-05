@@ -12,6 +12,55 @@ struct BaseParams {
 };
 
 struct MatrixParams : BaseParams {
+#ifndef NO_SYSC
+  MatrixParams() {
+    INPUT_OFFSET = 0;
+    WEIGHT_OFFSET = 0;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 6; j++) {
+        loops[i][j] = 0;
+      }
+    }
+    for (int i = 0; i < 2; i++) {
+      inputXLoopIndex[i] = 0;
+      inputYLoopIndex[i] = 0;
+      reductionLoopIndex[i] = 0;
+      weightLoopIndex[i] = 0;
+      weightReuseIndex[i] = 0;
+    }
+    fxIndex = 0;
+    fyIndex = 0;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 5; j++) {
+        weightAddressGenLoops[i][j] = 0;
+      }
+    }
+    for (int i = 0; i < 2; i++) {
+      weightAddressGenReductionLoopIndex[i] = 0;
+      weightAddressGenWeightLoopIndex[i] = 0;
+    }
+    weightAddressGenFxIndex = 0;
+    weightAddressGenFyIndex = 0;
+
+    STRIDE = 1;
+
+    WEIGHT_TRANSPOSE = false;
+    REPLICATION = false;
+
+    STORE_IN_ACC = false;
+    ACC_FROM_ACC = false;
+    CONCAT_INPUT = false;
+    CONCAT_HEAD_WEIGHTS = false;
+    TRANPOSE_INPUTS = false;
+
+    GRAD_OFFSET = 0;
+    COMBINE_GRADS = false;
+    learningRate = 0;
+  }
+#endif
+
   int INPUT_OFFSET;
   int WEIGHT_OFFSET;
 
@@ -167,6 +216,30 @@ struct VectorInstructions {
    * Reduce Unit Configuration
    */
 
+#ifndef NO_SYSC
+  VectorInstructions() {
+    ac_int<2, false> instType = 0;
+    ac_int<3, false> vInput = 0;
+    ac_int<3, false> vOp0Src1 = 0;
+    ac_int<2, false> vOp0 = 0;
+    ac_int<1, false> vOp1 = 0;
+    ac_int<1, false> vOp2 = 0;
+    ac_int<3, false> vOp3Src1 = 0;
+    ac_int<3, false> vOp3 = 0;
+    ac_int<2, false> vOp4 = 0;
+    ac_int<1, false> vAccumulatePush = 0;
+    ac_int<1, false> vDest = 0;
+    ac_int<10, false> rCount = 0;
+    ac_int<2, false> rOp = 0;
+    ac_int<1, false> rInvSqrt = 0;
+    ac_int<1, false> rDuplicate = 0;
+    ac_int<3, false> rDest = 0;
+    ac_int<1, false> rBroadcast = 0;
+    ac_int<8, false> immediate0 = 0;
+    ac_int<8, false> immediate1 = 0;
+  }
+#endif
+
   ac_int<2, false> instType;
   static const unsigned int vector = 0;
   static const unsigned int reduction = 1;
@@ -247,7 +320,6 @@ struct VectorInstructions {
   ac_int<8, false> immediate1;
 
   static const unsigned int width = 56;
-  VectorInstructions() {}
 
 #ifndef NO_SYSC
   VectorInstructions(const int a) {
@@ -320,6 +392,69 @@ struct VectorParams : BaseParams {
   // - Residual/Op0Src1
   // - Bias/Op3Src1
 
+#ifndef NO_SYSC
+  VectorParams() {
+    VECTOR_OFFSET = 0;
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        addressGen0Loop[i][j] = 0;
+      }
+    }
+    DP_VEC0 = false;
+
+    ADDRESS_GEN1_OFFSET = 0;
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        addressGen1Loops[i][j] = 0;
+      }
+    }
+    for (int i = 0; i < 2; i++) {
+      addressGen1InputXLoopIndex[i] = 0;
+      addressGen1InputYLoopIndex[i] = 0;
+      addressGen1WeightLoopIndex[i] = 0;
+    }
+    DP_VEC1 = false;
+
+    ADDRESS_GEN2_OFFSET = 0;
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        addressGen2Loops[i][j] = 0;
+      }
+    }
+    for (int i = 0; i < 2; i++) {
+      addressGen2InputXLoopIndex[i] = 0;
+      addressGen2InputYLoopIndex[i] = 0;
+      addressGen2WeightLoopIndex[i] = 0;
+    }
+    DP_VEC2 = false;
+
+    VECTOR_OUTPUT_OFFSET = 0;
+    SCALAR_OUTPUT_OFFSET = 0;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        outputLoops[i][j] = 0;
+      }
+    }
+    for (int i = 0; i < 2; i++) {
+      outputXLoopIndex[i] = 0;
+      outputYLoopIndex[i] = 0;
+      outputWeightLoopIndex[i] = 0;
+    }
+    SPLIT_OUTPUT = false;
+
+    DP_OUTPUT = false;
+
+    addressGen0Enable = false;
+    addressGen0Broadcast = false;
+    addressGen0BroadcastCount = 0;
+    addressGen1Mode = 0;
+    addressGen2Mode = 0;
+    MAXPOOL = false;
+    AVGPOOL = false;
+  }
+#endif
+
   // Address Gen 0 (vector input)
   int VECTOR_OFFSET;
   int addressGen0Loop[2][3];  // tiled 2d tensor
@@ -358,14 +493,13 @@ struct VectorParams : BaseParams {
   bool addressGen0Enable;
   bool addressGen0Broadcast;
   int addressGen0BroadcastCount;
-  bool SOFTMAX_GRAD_NEGATE;
   ac_int<2, false> addressGen1Mode;  // 1- residual, 2- 2dtensor
   ac_int<2, false> addressGen2Mode;  // 1- bias, 2- 2dtensor
   bool MAXPOOL;
   bool AVGPOOL;
 
   static const unsigned int width =
-      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1 + 1;
+      13 * 32 + 1 + 1 + 2 + 2 + 1 + 1 + 37 * 32 + 2 + 1 + 1 + 1;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -433,7 +567,6 @@ struct VectorParams : BaseParams {
     m& addressGen0Enable;
     m& addressGen0Broadcast;
     m& addressGen0BroadcastCount;
-    m& SOFTMAX_GRAD_NEGATE;
     m& addressGen1Mode;
     m& addressGen2Mode;
     m& MAXPOOL;
@@ -454,6 +587,16 @@ struct VectorParams : BaseParams {
 };
 
 struct VectorInstructionConfig : BaseParams {
+#ifndef NO_SYSC
+  VectorInstructionConfig() {
+    for (int i = 0; i < 8; i++) {
+      instCount[i] = 0;
+    }
+    instLen = 0;
+    instLoopCount = 0;
+  }
+#endif
+
   VectorInstructions inst[8];
   int instCount[8];
   int instLen;

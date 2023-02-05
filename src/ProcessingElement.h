@@ -22,11 +22,14 @@ SC_MODULE(ProcessingElement) {
 
   sc_out<WDTYPE> CCS_INIT_S1(weightOut);
 
-  Connections::In<ac_int<1, false> > CCS_INIT_S1(weightSwapIn);
-  Connections::Out<ac_int<1, false> > CCS_INIT_S1(weightSwapOut);
+  Connections::In<PEInput<IDTYPE> > CCS_INIT_S1(inputIn);
+  Connections::Out<PEInput<IDTYPE> > CCS_INIT_S1(inputOut);
 
-  Connections::In<IDTYPE> CCS_INIT_S1(inputIn);
-  Connections::Out<IDTYPE> CCS_INIT_S1(inputOut);
+  // Connections::In<ac_int<1, false> > CCS_INIT_S1(weightSwapIn);
+  // Connections::Out<ac_int<1, false> > CCS_INIT_S1(weightSwapOut);
+
+  // Connections::In<IDTYPE> CCS_INIT_S1(inputIn);
+  // Connections::Out<IDTYPE> CCS_INIT_S1(inputOut);
 
   Connections::In<ODTYPE> CCS_INIT_S1(psumIn);
   Connections::Out<ODTYPE> CCS_INIT_S1(psumOut);
@@ -69,34 +72,24 @@ SC_MODULE(ProcessingElement) {
     psumIn.Reset();
     inputOut.Reset();
     psumOut.Reset();
-    weightSwapIn.Reset();
-    weightSwapOut.Reset();
+    // weightSwapIn.Reset();
+    // weightSwapOut.Reset();
 
     wait();
 
 #pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
+#pragma hls_pipeline_stall_mode bubble
     while (true) {
-      IDTYPE input = inputIn.Pop();
-      ac_int<1, false> weightSwap = weightSwapIn.Pop();
-      // needed for better scheduling
-      //#ifdef __SYNTHESIS__
-      //      inputOut.Push(input);
-      //      weightSwapOut.Push(weightSwap);
-      //#endif
+      PEInput<IDTYPE> inputStruct = inputIn.Pop();
 
-      ODTYPE psum = psumIn.Pop();
-
-      if (weightSwap) {
+      if (inputStruct.swapWeights) {
         weight_reg = updatedWeight;
       }
 
-      ODTYPE output = pe_fma(input, weight_reg, psum);
-      //#ifndef __SYNTHESIS__
-      inputOut.Push(input);
-      weightSwapOut.Push(weightSwap);
-      //#endif
+      ODTYPE psum = psumIn.Pop();
+      ODTYPE output = pe_fma(inputStruct.data, weight_reg, psum);
 
+      inputOut.Push(inputStruct);
       psumOut.Push(output);
     }
   }

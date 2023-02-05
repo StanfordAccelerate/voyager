@@ -14,7 +14,7 @@ SimpleMemoryModel<T>::SimpleMemoryModel(bool isDut) : MemoryModel(isDut) {
   try {
     sram = new T[SRAM_MEMORY_SIZE]();
     rram = new T[RRAM_MEMORY_SIZE]();
-    reference = new T[1024 * 1024]();
+    reference = new T[REFERENCE_MEMORY_SIZE]();
   } catch (const std::bad_alloc&) {
     throw std::runtime_error("ERROR: Failed to allocate simulation memory");
   }
