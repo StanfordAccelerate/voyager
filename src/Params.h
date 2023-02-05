@@ -12,7 +12,7 @@ struct BaseParams {
 };
 
 struct MatrixParams : BaseParams {
-#ifndef NO_SYSC
+#ifndef __SYNTHESIS__
   MatrixParams() {
     INPUT_OFFSET = 0;
     WEIGHT_OFFSET = 0;
@@ -211,27 +211,29 @@ struct VectorInstructions {
    * Reduce Unit Configuration
    */
 
-#ifndef NO_SYSC
+#ifndef __SYNTHESIS__
   VectorInstructions() {
-    ac_int<2, false> instType = 0;
-    ac_int<3, false> vInput = 0;
-    ac_int<3, false> vOp0Src1 = 0;
-    ac_int<2, false> vOp0 = 0;
-    ac_int<1, false> vOp1 = 0;
-    ac_int<1, false> vOp2 = 0;
-    ac_int<3, false> vOp3Src1 = 0;
-    ac_int<3, false> vOp3 = 0;
-    ac_int<2, false> vOp4 = 0;
-    ac_int<1, false> vAccumulatePush = 0;
-    ac_int<1, false> vDest = 0;
-    ac_int<10, false> rCount = 0;
-    ac_int<2, false> rOp = 0;
-    ac_int<1, false> rInvSqrt = 0;
-    ac_int<1, false> rDuplicate = 0;
-    ac_int<3, false> rDest = 0;
-    ac_int<1, false> rBroadcast = 0;
-    ac_int<8, false> immediate0 = 0;
-    ac_int<8, false> immediate1 = 0;
+    instType = 0;
+    vInput = 0;
+    vOp0Src1 = 0;
+    vOp0 = 0;
+    vOp1 = 0;
+    vOp1Src1 = 0;
+    vOp2 = 0;
+    vOp3Src1 = 0;
+    vOp3 = 0;
+    vOp4 = 0;
+    vAccumulatePush = 0;
+    vDest = 0;
+    rCount = 0;
+    rOp = 0;
+    rInvSqrt = 0;
+    rMax1 = 0;
+    rDuplicate = 0;
+    rDest = 0;
+    rBroadcast = 0;
+    immediate0 = 0;
+    immediate1 = 0;
   }
 #endif
 
@@ -322,21 +324,6 @@ struct VectorInstructions {
   static const unsigned int width = 59;
 
 #ifndef NO_SYSC
-  VectorInstructions(const int a) {
-    ac_int<width, false> val = a;
-    sc_lv<width> valLV;
-    type_to_vector(val, width, valLV);
-    *this = BitsToType<VectorInstructions>(valLV);
-  }
-
-  explicit operator int() const {
-    ac_int<32, false> val;
-    vector_to_type(TypeToBits<VectorInstructions>(*this), false, &val);
-
-    int a = val;
-    return a;
-  }
-
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m& instType;
@@ -394,7 +381,7 @@ struct VectorParams : BaseParams {
   // - Residual/Op0Src1
   // - Bias/Op3Src1
 
-#ifndef NO_SYSC
+#ifndef __SYNTHESIS__
   VectorParams() {
     VECTOR_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
@@ -585,7 +572,7 @@ struct VectorParams : BaseParams {
 };
 
 struct VectorInstructionConfig : BaseParams {
-#ifndef NO_SYSC
+#ifndef __SYNTHESIS__
   VectorInstructionConfig() {
     for (int i = 0; i < 8; i++) {
       instCount[i] = 0;
