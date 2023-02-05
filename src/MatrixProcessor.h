@@ -203,7 +203,7 @@ SC_MODULE(MatrixProcessor) {
 #pragma hls_pipeline_stall_mode flush
       while (step < totalOps) {
 #ifndef __SYNTHESIS__
-        if (step % 1000 == 0) {
+        if (step % 1000 == 0 and step > 0) {
           CCS_LOG("step " << step << " out of " << totalOps);
         }
 #endif

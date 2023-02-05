@@ -3,6 +3,8 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include <cassert>
+
 #include "AccelTypes.h"
 #include "test/toolchain/MapOperation.h"
 
@@ -41,7 +43,7 @@ void register_interface(
 
 Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
                  INPUT_DATATYPE *sram, INPUT_DATATYPE *rram,
-                 MemoryMap memoryMap)
+                 std::vector<MemoryMap> memoryMap)
     : sc_module(name),
       clk("clk", 1, SC_NS, 0.5, 0, SC_NS, true),
       params_list(params_list),
@@ -139,7 +141,7 @@ void Harness::reset() {
 void Harness::memAccessBurst(
     CombinationalInterface<MemoryRequest> *addressRequest,
     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse,
-    MemorySource memSource) {
+    std::string memSourceType) {
   addressRequest->ResetRead();
   dataResponse->ResetWrite();
 
@@ -147,6 +149,21 @@ void Harness::memAccessBurst(
 
   while (true) {
     MemoryRequest memRequest = addressRequest->Pop();
+    MemorySource memSource;
+    if (memSourceType == "inputs") {
+      memSource = SRAM;
+    } else if (memSourceType == "weights") {
+      memSource = currentMemoryMap.weights;
+    } else if (memSourceType == "grad") {
+      memSource = SRAM;
+    } else if (memSourceType == "vector0") {
+      memSource = currentMemoryMap.inputs;
+    } else if (memSourceType == "vector2") {
+      memSource = currentMemoryMap.bias;
+    } else {
+      std::cout << "Invalid memory source type: " << memSourceType << std::endl;
+      exit(1);
+    }
     INPUT_DATATYPE *memory;
     if (memSource == RRAM) {
       memory = rramMemory;
@@ -195,60 +212,60 @@ void Harness::memAccessBurstVariable(
   }
 }
 
-void Harness::memAccessPack(
-    CombinationalInterface<int> *addressRequest,
-    CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse,
-    MemorySource memSource) {
-  INPUT_DATATYPE *memory = memSource == SRAM ? sramMemory : rramMemory;
+// void Harness::memAccessPack(
+//     CombinationalInterface<int> *addressRequest,
+//     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse,
+//     MemorySource memSource) {
+//   INPUT_DATATYPE *memory = memSource == SRAM ? sramMemory : rramMemory;
 
-  addressRequest->ResetRead();
-  dataResponse->ResetWrite();
+//   addressRequest->ResetRead();
+//   dataResponse->ResetWrite();
 
-  wait();
+//   wait();
 
-  while (true) {
-    Pack1D<INPUT_DATATYPE, DIMENSION> data;
-    int count = 0;
-    while (count < DIMENSION) {
-      int address = addressRequest->Pop();
-      data[count] = memory[address];
-      count++;
-    }
-    dataResponse->Push(data);
-  }
-}
+//   while (true) {
+//     Pack1D<INPUT_DATATYPE, DIMENSION> data;
+//     int count = 0;
+//     while (count < DIMENSION) {
+//       int address = addressRequest->Pop();
+//       data[count] = memory[address];
+//       count++;
+//     }
+//     dataResponse->Push(data);
+//   }
+// }
 
-void Harness::memAccess(CombinationalInterface<int> *addressRequest,
-                        CombinationalInterface<INPUT_DATATYPE> *dataResponse,
-                        MemorySource memSource) {
-  INPUT_DATATYPE *memory = memSource == SRAM ? sramMemory : rramMemory;
+// void Harness::memAccess(CombinationalInterface<int> *addressRequest,
+//                         CombinationalInterface<INPUT_DATATYPE> *dataResponse,
+//                         MemorySource memSource) {
+//   INPUT_DATATYPE *memory = memSource == SRAM ? sramMemory : rramMemory;
 
-  addressRequest->ResetRead();
-  dataResponse->ResetWrite();
+//   addressRequest->ResetRead();
+//   dataResponse->ResetWrite();
 
-  wait();
+//   wait();
 
-  while (true) {
-    int address = addressRequest->Pop();
-    dataResponse->Push(memory[address]);
-  }
-}
+//   while (true) {
+//     int address = addressRequest->Pop();
+//     dataResponse->Push(memory[address]);
+//   }
+// }
 
 void Harness::memAccessInputs() {
-  memAccessBurst(&inputAddressRequest, &inputDataResponse, SRAM);
+  memAccessBurst(&inputAddressRequest, &inputDataResponse, "inputs");
 }
 
 void Harness::memAccessWeights() {
-  memAccessBurst(&weightAddressRequest, &weightDataResponse, memoryMap.weights);
+  memAccessBurst(&weightAddressRequest, &weightDataResponse, "weights");
 }
 
 void Harness::memAccessGrad() {
-  memAccessBurst(&gradAddressRequest, &gradDataResponse, SRAM);
+  memAccessBurst(&gradAddressRequest, &gradDataResponse, "grad");
 }
 
 void Harness::memAccessVector0() {
   memAccessBurst(&vectorFetch0AddressRequest, &vectorFetch0DataResponse,
-                 memoryMap.inputs);
+                 "vector0");
 }
 
 void Harness::memAccessVector1() {
@@ -258,7 +275,7 @@ void Harness::memAccessVector1() {
 
 void Harness::memAccessVector2() {
   memAccessBurst(&vectorFetch2AddressRequest, &vectorFetch2DataResponse,
-                 memoryMap.bias);
+                 "vector2");
 }
 
 template <typename T, unsigned int interfaceWidth>
@@ -289,11 +306,13 @@ void Harness::sendParams() {
 
   wait();
 
-  for (SimplifiedParams params : params_list) {
-    currentParams = params;
+  // Iterate through all params, ie all layers
+  for (int i = 0; i < params_list.size(); i++) {
+    currentParams = params_list.at(i);
+    currentMemoryMap = memoryMap.at(i);
 
     std::deque<BaseParams *> opParams;
-    MapOperation(params, opParams);
+    MapOperation(currentParams, opParams);
 
     while (opParams.size() > 0) {
       bool matrixParamsValid, vectorParamsValid;
@@ -302,7 +321,6 @@ void Harness::sendParams() {
 
       MatrixParams *matrixParams = dynamic_cast<MatrixParams *>(baseParam);
       matrixParamsValid = matrixParams != NULL;
-      std::cout << "matrix: " << matrixParamsValid << std::endl;
 
       if (matrixParamsValid) {
         opParams.pop_front();
@@ -335,7 +353,8 @@ void Harness::sendParams() {
         vectorUnitStartSignal.SyncPop();
       }
 
-      CCS_LOG("Accelerator Layer Started.");
+      CCS_LOG("----- Accelerator Layer '" << currentParams.name
+                                          << "' Started. -----");
 
       if (matrixParamsValid) {
         matrixUnitDoneSignal.SyncPop();
@@ -343,7 +362,8 @@ void Harness::sendParams() {
       if (vectorParamsValid) {
         vectorUnitDoneSignal.SyncPop();
       }
-      CCS_LOG("Accelerator Layer Finished.");
+      CCS_LOG("----- Accelerator Layer '" << currentParams.name
+                                          << "' Finished. -----");
     }
 
 #ifdef SOC_COSIM
@@ -370,7 +390,7 @@ void Harness::storeVectorOutputs() {
     DLOG("address: " << address << " data: " << data);
     for (int i = 0; i < DIMENSION; i++) {
       INPUT_DATATYPE *memory =
-          memoryMap.outputs == SRAM ? sramMemory : rramMemory;
+          currentMemoryMap.outputs == SRAM ? sramMemory : rramMemory;
 
       memory[address + i] = data[i];
     }
@@ -391,7 +411,9 @@ void Harness::storeScalarOutputs() {
 
 void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
-            MemoryMap memoryMap) {
+            std::vector<MemoryMap> memoryMap) {
+  assert(params_list.size() == memoryMap.size() &&
+         "params_list and memoryMap must be the same size");
   Harness harness("harness", params_list, sramMemory, rramMemory, memoryMap);
   sc_start();
 }

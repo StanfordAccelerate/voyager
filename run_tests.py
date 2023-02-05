@@ -191,7 +191,7 @@ def main():
                 res[2].write(line)
                 # If format is right, print to console
                 nums = [int(s) for s in line.split() if s.isdigit()]
-                if len(nums) == 3 and nums[2] != 0:
+                if len(nums) == 3 and nums[1] != 0 and nums[2] != 0:
                     print("{} -> {} out of {} cycle ({:0.2f}%)".format(
                         res[0], nums[1], nums[2], nums[1]/nums[2]*100.0))
             # Check if proc is still running

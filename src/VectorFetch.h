@@ -148,27 +148,7 @@ SC_MODULE(VectorFetchUnit) {
 
                     Pack1D<ODTYPE, WIDTH> data = vectorFetch0DataResponse.Pop();
                     for (int dim = 0; dim < WIDTH; dim++) {
-                      ac_int<16, false> K_unpacked = K + dim;
-
-                      // negate
                       ACC_DTYPE singleVal = data[dim];
-
-                      ACC_DTYPE negated = singleVal;
-                      ACC_DTYPE negatedPlusOne = singleVal;
-
-                      if (params.SOFTMAX_GRAD_NEGATE) {
-                        typename ACC_DTYPE::DecomposedPosit one;
-                        one.sign = 0;
-                        one.fraction = 0;
-                        one.scale = 0;
-                        one._zero = false;
-
-                        singleVal.negate();
-                        negatedPlusOne =
-                            static_cast<typename ACC_DTYPE::DecomposedPosit>(
-                                singleVal) +
-                            one;
-                      }
 
                       for (int broadcast = 0;
                            broadcast < broadcastCount / WIDTH; broadcast++) {
@@ -177,11 +157,7 @@ SC_MODULE(VectorFetchUnit) {
 #pragma hls_unroll yes
                         for (int broadcastDim = 0; broadcastDim < WIDTH;
                              broadcastDim++) {
-                          if (broadcast * WIDTH + broadcastDim == K_unpacked) {
-                            broadcastVec[broadcastDim] = negatedPlusOne;
-                          } else {
-                            broadcastVec[broadcastDim] = negated;
-                          }
+                          broadcastVec[broadcastDim] = singleVal;
                         }
 
                         vectorFetch0DataResponseBroadcasted.Push(broadcastVec);

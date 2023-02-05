@@ -27,9 +27,9 @@ SimpleMemoryModel<T>::~SimpleMemoryModel() {
   delete[] reference;
 }
 
-template <class T>
-void SimpleMemoryModel<T>::writeToReference(int address, double val,
-                                            bool doublePrecision) {
+template <>
+void SimpleMemoryModel<float>::writeToReference(int address, double val,
+                                                bool doublePrecision) {
   if (doublePrecision) {
     reference[2 * address] = val;
   } else {
@@ -38,10 +38,40 @@ void SimpleMemoryModel<T>::writeToReference(int address, double val,
 }
 
 template <>
+void SimpleMemoryModel<INPUT_DATATYPE>::writeToReference(int address,
+                                                         double val,
+                                                         bool doublePrecision) {
+  if (doublePrecision) {
+    ACCUM_DATATYPE p16 = val;
+    int bits = p16.bits;
+    reference[2 * address].setbits(bits & 0xFF);
+    reference[2 * address + 1].setbits((bits >> 8) & 0xFF);
+  } else {
+    reference[address] = val;
+  }
+}
+
+#ifndef NO_UNIVERSAL
+template <>
+void SimpleMemoryModel<UniversalPosit>::writeToReference(int address,
+                                                         double val,
+                                                         bool doublePrecision) {
+  if (doublePrecision) {
+    UniversalPositAccum p16 = val;
+    int bits = p16.encoding();
+    reference[2 * address].setbits(bits & 0xFF);
+    reference[2 * address + 1].setbits((bits >> 8) & 0xFF);
+  } else {
+    reference[address] = val;
+  }
+}
+#endif
+
+template <>
 void SimpleMemoryModel<INPUT_DATATYPE>::writeToMemory(int address, double val,
                                                       const MemorySource& mem,
                                                       bool doublePrecision) {
-  INPUT_DATATYPE* memArray = mem == SRAM ? sram : rram;
+  INPUT_DATATYPE* memArray = (mem == SRAM) ? sram : rram;
 
   if (doublePrecision) {
     ACCUM_DATATYPE p16 = val;

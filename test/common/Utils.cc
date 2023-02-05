@@ -15,10 +15,10 @@ inline float readValue(UniversalPosit *matrix, int index,
     return static_cast<float>(matrix[index]);
   }
 
-  int encoding1 = matrix[2 * index].encoding();
-  int encoding2 = matrix[2 * index + 1].encoding();
+  int lower = matrix[2 * index].encoding();
+  int upper = matrix[2 * index + 1].encoding();
   UniversalPositAccum p16;
-  p16.setbits((encoding2 << 8) + encoding1);
+  p16.setbits((upper << 8) + lower);
   return static_cast<float>(p16);
 }
 #endif
@@ -29,10 +29,10 @@ inline float readValue(INPUT_DATATYPE *matrix, int index,
     return static_cast<float>(matrix[index]);
   }
 
-  int encoding1 = matrix[2 * index].bits;
-  int encoding2 = matrix[2 * index + 1].bits;
+  int lower = matrix[2 * index].bits;
+  int upper = matrix[2 * index + 1].bits;
   ACCUM_DATATYPE p16;
-  p16.setbits((encoding2 << 8) + encoding1);
+  p16.setbits((upper << 8) + lower);
   return static_cast<float>(p16);
 }
 
