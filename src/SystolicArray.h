@@ -13,27 +13,18 @@ template <typename IDTYPE, typename WDTYPE, typename ODTYPE, int NROWS,
           int NCOLS>
 SC_MODULE(SystolicArray) {
  private:
-  Connections::Combinational<PEInput<IDTYPE> >
-      inputConnection[NROWS * NCOLS - 1];
-  Connections::Combinational<PEInput<IDTYPE> > inputConnectionFinal;
-
+  Connections::Combinational<PEInput<IDTYPE> > inputConnection[NROWS][NCOLS];
   Connections::Combinational<ODTYPE> psumConnection[NROWS - 1][NCOLS];
-  sc_signal<WDTYPE> weightConnection[NROWS + 1][NCOLS];
-  sc_signal<bool> weightValid;
-  // Connections::Combinational<ac_int<1, false> > weightSwap[NROWS * NCOLS -
-  // 1];
-  // Connections::Combinational<ac_int<1, false> > weightSwapFinal;
+  Connections::Combinational<PEWeight<WDTYPE> > weightConnection[NROWS][NCOLS];
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<PEInput<IDTYPE> > inputs[NROWS];
-  // Connections::In<ac_int<1, false> > swapWeights[NROWS];
-  Connections::In<Pack1D<WDTYPE, NCOLS> > CCS_INIT_S1(weights);
+  Connections::In<PEWeight<WDTYPE> > weights[NCOLS];
   Connections::In<ODTYPE> psums[NCOLS];
   Connections::Out<ODTYPE> outputs[NCOLS];
-  Connections::SyncOut CCS_INIT_S1(weightSwapDone);
 
   SC_CTOR(SystolicArray) {
 #ifdef SIM_ProcessingElement
@@ -58,34 +49,28 @@ SC_MODULE(SystolicArray) {
                 (sc_gen_unique_name("pe_inst"));
         pe[i * NCOLS + j]->clk(clk);
         pe[i * NCOLS + j]->rstn(rstn);
+
         if (j == 0) {
           pe[i * NCOLS + j]->inputIn(inputs[i]);
         } else {
-          pe[i * NCOLS + j]->inputIn(inputConnection[i * NCOLS + j - 1]);
+          pe[i * NCOLS + j]->inputIn(inputConnection[i][j - 1]);
         }
-        pe[i * NCOLS + j]->weightIn(weightConnection[i][j]);
-        pe[i * NCOLS + j]->weightValid(weightValid);
+
         if (i == 0) {
           pe[i * NCOLS + j]->psumIn(psums[j]);
         } else {
           pe[i * NCOLS + j]->psumIn(psumConnection[i - 1][j]);
         }
-        // if (j == 0) {
-        //   pe[i * NCOLS + j]->weightSwapIn(swapWeights[i]);
-        // } else {
-        //   pe[i * NCOLS + j]->weightSwapIn(weightSwap[i * NCOLS + j - 1]);
-        // }
-        // if (i == NROWS - 1 && j == NCOLS - 1) {
-        //   pe[i * NCOLS + j]->weightSwapOut(weightSwapFinal);
-        // } else {
-        //   pe[i * NCOLS + j]->weightSwapOut(weightSwap[i * NCOLS + j]);
-        // }
-        if (i == NROWS - 1 && j == NCOLS - 1) {
-          pe[i * NCOLS + j]->inputOut(inputConnectionFinal);
+
+        if (i == 0) {
+          pe[i * NCOLS + j]->weightIn(weights[j]);
         } else {
-          pe[i * NCOLS + j]->inputOut(inputConnection[i * NCOLS + j]);
+          pe[i * NCOLS + j]->weightIn(weightConnection[i - 1][j]);
         }
-        pe[i * NCOLS + j]->weightOut(weightConnection[i + 1][j]);
+
+        pe[i * NCOLS + j]->weightOut(weightConnection[i][j]);
+        pe[i * NCOLS + j]->inputOut(inputConnection[i][j]);
+
         if (i == NROWS - 1) {
           pe[i * NCOLS + j]->psumOut(outputs[j]);
         } else {
@@ -94,100 +79,22 @@ SC_MODULE(SystolicArray) {
       }
     }
 
-    SC_THREAD(sendWeights);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
-    SC_THREAD(checkSwapDone);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
     // Tie off unused Connections
-    Tieoff<PEInput<IDTYPE> > *inputConnectionTieoff[NROWS - 1];
-    for (int i = 0; i < NROWS - 1; i++) {
+
+    // last column of array for inputs
+    Tieoff<PEInput<IDTYPE> > *inputConnectionTieoff[NROWS];
+    for (int i = 0; i < NROWS; i++) {
       inputConnectionTieoff[i] =
           new Tieoff<PEInput<IDTYPE> >(sc_gen_unique_name("tieoff"));
-      inputConnectionTieoff[i]->in(inputConnection[i * NCOLS + NCOLS - 1]);
+      inputConnectionTieoff[i]->in(inputConnection[i][NCOLS - 1]);
     }
 
-    // Tieoff<ac_int<1, false> > *weightSwapTieoff[NROWS - 1];
-    // for (int i = 0; i < NROWS - 1; i++) {
-    //   weightSwapTieoff[i] =
-    //       new Tieoff<ac_int<1, false> >(sc_gen_unique_name("tieoff"));
-    //   weightSwapTieoff[i]->in(weightSwap[i * NCOLS + NCOLS - 1]);
-    // }
-  }
-
-  void checkSwapDone() {
-    inputConnectionFinal.ResetRead();
-    weightSwapDone.Reset();
-
-    wait();
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-    while (true) {
-      PEInput<IDTYPE> finalPEOut = inputConnectionFinal.Pop();
-      if (finalPEOut.swapWeights) {
-        weightSwapDone.SyncPush();
-      }
-    }
-  }
-
-  void tieoff() {
-    // Reset all the unused Connections
-    for (int i = 0; i < NROWS - 1; i++) {
-      inputConnection[i * NCOLS + NCOLS - 1].ResetRead();
-    }
-
-    // for (int i = 0; i < NROWS - 1; i++) {
-    //   weightSwap[i * NCOLS + NCOLS - 1].ResetRead();
-    // }
-
-    wait();
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-    while (true) {
-#pragma hls_unroll yes
-      for (int i = 0; i < NROWS; i++) {
-        PEInput<IDTYPE> unusedInput;
-        inputConnection[i * NCOLS + NCOLS - 1].PopNB(unusedInput);
-      }
-      // #pragma hls_unroll yes
-      //       for (int i = 0; i < NROWS - 1; i++) {
-      //         ac_int<1, false> unusedSwap;
-      //         weightSwap[i * NCOLS + NCOLS - 1].PopNB(unusedSwap);
-      //       }
-      wait();
-    }
-  }
-
-  void sendWeights() {
-    for (int j = 0; j < NCOLS; j++) {
-      weightConnection[0][j].write(WDTYPE());
-    }
-    weightValid.write(false);
-
-    weights.Reset();
-
-    wait();
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-    while (true) {
-      Pack1D<WDTYPE, NCOLS> arrayWeights;
-      if (weights.PopNB(arrayWeights)) {
-        weightValid.write(true);
-      } else {
-        weightValid.write(false);
-      }
-#pragma hls_unroll yes
-      for (int i = 0; i < NCOLS; i++) {
-        weightConnection[0][i].write(arrayWeights[i]);
-      }
-
-      wait();
+    // last row for weights
+    Tieoff<PEWeight<IDTYPE> > *weightConnectionTieoff[NCOLS];
+    for (int i = 0; i < NCOLS; i++) {
+      weightConnectionTieoff[i] =
+          new Tieoff<PEWeight<IDTYPE> >(sc_gen_unique_name("tieoff"));
+      weightConnectionTieoff[i]->in(weightConnection[NROWS - 1][i]);
     }
   }
 };

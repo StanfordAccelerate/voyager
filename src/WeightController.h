@@ -430,8 +430,10 @@ SC_MODULE(WeightController) {
                         ac_int<8, false> numPadding = 0;
                         ac_int<4, false> replicationBound = 1;
                         ac_int<8, false> startingC = NROWS - 1;
+                        ac_int<8, false> endingC = NROWS;
                         if (params.REPLICATION) {
                           startingC = 3 - 1;
+                          endingC = 3;
                           if (loop_counters[1][params.fxIndex] == 0) {
                             numPadding = NROWS - 12;
                             replicationBound = 4;
@@ -439,21 +441,13 @@ SC_MODULE(WeightController) {
                             numPadding = NROWS - 9;
                             replicationBound = 3;
                           }
-                          // zero_padding
-                          for (ac_int<8, false> i = 0; i < numPadding; i++) {
-                            // readControl[bankSel].Push(1);
-                            readAddress[bankSel].Push(-1);
-
-                            if (i >= numPadding - 1) {
-                              break;
-                            }
-                          }
+                          
                         }
 
-                        for (ac_int<4, false> fx_repl = replicationBound - 1;
-                             fx_repl >= 0; fx_repl--) {
-                          for (ac_int<8, false> c = startingC; c >= 0;
-                               c--) {  // reverse order
+                        for (ac_int<4, false> fx_repl = 0; fx_repl < replicationBound;
+                             fx_repl++) {
+                          for (ac_int<8, false> c = 0; c < endingC;
+                               c++) {  // reverse order
                             ac_int<8, false> k2 =
                                 loop_counters[0][params.weightLoopIndex[0]];
                             ac_int<8, false> K2 =
@@ -507,14 +501,26 @@ SC_MODULE(WeightController) {
                             // readControl[bankSel].Push(!swapBank);
                             readAddress[bankSel].Push(address);
 
-                            if (c == 0) {
+                            if (c >= endingC - 1) {
                               break;
                             }
                           }
-                          if (fx_repl == 0) {
+                          if (fx_repl == replicationBound - 1) {
                             break;
                           }
                         }
+                        if(params.REPLICATION){
+                        // zero_padding
+                          for (ac_int<8, false> i = 0; i < numPadding; i++) {
+                            // readControl[bankSel].Push(1);
+                            readAddress[bankSel].Push(-1);
+
+                            if (i >= numPadding - 1) {
+                              break;
+                            }
+                          }
+                        }
+
                         if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                           break;
                         }

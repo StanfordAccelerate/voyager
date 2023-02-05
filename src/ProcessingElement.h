@@ -8,34 +8,30 @@
 template <typename IDTYPE, typename WDTYPE, typename ODTYPE>
 SC_MODULE(ProcessingElement) {
  private:
-  sc_signal<WDTYPE> updatedWeight;
-
   IDTYPE weight_reg;
-  WDTYPE weight_fifo;
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  sc_in<WDTYPE> CCS_INIT_S1(weightIn);
-  sc_in<bool> CCS_INIT_S1(weightValid);
-
-  sc_out<WDTYPE> CCS_INIT_S1(weightOut);
+  Connections::In<PEWeight<WDTYPE> > CCS_INIT_S1(weightIn);
+  Connections::Out<PEWeight<WDTYPE> > CCS_INIT_S1(weightOut);
 
   Connections::In<PEInput<IDTYPE> > CCS_INIT_S1(inputIn);
   Connections::Out<PEInput<IDTYPE> > CCS_INIT_S1(inputOut);
 
-  // Connections::In<ac_int<1, false> > CCS_INIT_S1(weightSwapIn);
-  // Connections::Out<ac_int<1, false> > CCS_INIT_S1(weightSwapOut);
-
-  // Connections::In<IDTYPE> CCS_INIT_S1(inputIn);
-  // Connections::Out<IDTYPE> CCS_INIT_S1(inputOut);
-
   Connections::In<ODTYPE> CCS_INIT_S1(psumIn);
   Connections::Out<ODTYPE> CCS_INIT_S1(psumOut);
 
+  Connections::Combinational<WDTYPE> CCS_INIT_S1(newWeightFifo);
+  Connections::Combinational<WDTYPE> CCS_INIT_S1(storedWeight);
+
   SC_CTOR(ProcessingElement) {
-    SC_THREAD(weights);
+    SC_THREAD(storeWeights);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(weightFifo);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
@@ -44,26 +40,33 @@ SC_MODULE(ProcessingElement) {
     async_reset_signal_is(rstn, false);
   }
 
-  void weights() {
-    weightOut.write(WDTYPE());
+  void weightFifo() {
+    weightIn.Reset();
+    weightOut.Reset();
+    newWeightFifo.ResetWrite();
 
     wait();
 
     while (true) {
-      if (weightValid.read()) {
-        weight_fifo = weightIn.read();
-        updatedWeight = weight_fifo;
+      PEWeight<WDTYPE> weightStruct = weightIn.Pop();
+
+      if (weightStruct.tag == 0) {
+        newWeightFifo.Push(weightStruct.data);
+      } else {
+        weightStruct.tag--;
+        weightOut.Push(weightStruct);
       }
-      weightOut.write(weight_fifo);
+    }
+  }
 
-      wait();
+  void storeWeights() {
+    storedWeight.ResetWrite();
+    newWeightFifo.ResetRead();
 
-      // weightOut.Push(weight_fifo);
-      // CCS_LOG("pushed: " << weight_fifo);
+    wait();
 
-      // weight_fifo = weightIn.Pop();
-      // CCS_LOG("popped: " << weight_fifo);
-      // updatedWeight = weight_fifo;
+    while (true) {
+      storedWeight.Push(newWeightFifo.Pop());
     }
   }
 
@@ -72,25 +75,43 @@ SC_MODULE(ProcessingElement) {
     psumIn.Reset();
     inputOut.Reset();
     psumOut.Reset();
-    // weightSwapIn.Reset();
-    // weightSwapOut.Reset();
+
+    storedWeight.ResetRead();
+
+    WDTYPE nextWeight0 = WDTYPE();
+    WDTYPE nextWeight1 = WDTYPE();
+    WDTYPE nextWeight2 = WDTYPE();
+    bool swapWeight0 = false;
+    bool swapWeight1 = false;
+    bool swapWeight2 = false;
 
     wait();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode bubble
     while (true) {
-      PEInput<IDTYPE> inputStruct = inputIn.Pop();
-
-      if (inputStruct.swapWeights) {
-        weight_reg = updatedWeight;
+      if (swapWeight0) {
+        weight_reg = nextWeight0;
       }
 
+      swapWeight0 = swapWeight1;
+      swapWeight1 = swapWeight2;
+
+      nextWeight0 = nextWeight1;
+      nextWeight1 = nextWeight2;
+      
+      PEInput<IDTYPE> inputStruct = inputIn.Pop();
+
       ODTYPE psum = psumIn.Pop();
+      inputOut.Push(inputStruct);
       ODTYPE output = pe_fma(inputStruct.data, weight_reg, psum);
 
-      inputOut.Push(inputStruct);
       psumOut.Push(output);
+
+      swapWeight2 = inputStruct.swapWeights;
+      if (inputStruct.swapWeights) {  // for next iteration
+        nextWeight2 = storedWeight.Pop();
+      }
     }
   }
 

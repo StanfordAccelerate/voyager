@@ -72,6 +72,34 @@ struct PEInput {
   }
 };
 
+template <typename TYPE>
+struct PEWeight {
+  TYPE data;
+  ac_int<4, false> tag;
+
+  static const unsigned int width = TYPE::width + 4;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m &data;
+    m &tag;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf, const PEWeight &peWeight,
+                              const std::string &name) {
+    sc_trace(tf, peWeight.data, name + ".data");
+    sc_trace(tf, peWeight.tag, name + ".tag");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os,
+                                         const PEWeight &peWeight) {
+    os << peWeight.data << " ";
+    os << peWeight.tag << " ";
+
+    return os;
+  }
+};
+
 template <typename TYPE, size_t SIZE>
 class Pack1D {
  public:
@@ -123,6 +151,49 @@ class Pack1D<PEInput<Posit<nbits, es> >, SIZE> {
 #pragma hls_unroll yes
     for (unsigned int i = 0; i < SIZE; i++) {
       m &value[i].swapWeights;
+    }
+  }
+};
+
+template <size_t SIZE, int sbits, int fbits>
+class Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE> {
+ public:
+  PEWeight<PositFP<sbits, fbits> > value[SIZE];
+
+  static const unsigned int width = PEWeight<PositFP<sbits, fbits> >::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const { return Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE>(); }
+
+  PEWeight<PositFP<sbits, fbits> > &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEWeight<PositFP<sbits, fbits> > &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.sign;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.scale;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.fraction;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data._zero;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].tag;
     }
   }
 };
