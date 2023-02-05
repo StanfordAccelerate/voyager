@@ -39,8 +39,8 @@ void MapMatrixOp(const SimplifiedParams &params,
   for (int j = 0; j < 5; j++) {
     matrixParams->weightAddressGenLoops[0][j] = params.loops[0][j];
   }
-  matrixParams->weightAddressGenInputXLoopIndex = params.inputXLoopIndex[0];
-  matrixParams->weightAddressGenInputYLoopIndex = params.inputYLoopIndex[0];
+  // matrixParams->weightAddressGenInputXLoopIndex = params.inputXLoopIndex[0];
+  // matrixParams->weightAddressGenInputYLoopIndex = params.inputYLoopIndex[0];
   matrixParams->weightAddressGenWeightLoopIndex[0] = params.weightLoopIndex[0];
 
   // set inner loop values
@@ -119,7 +119,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   }
 
   matrixParams->STRIDE = params.STRIDE;
-  matrixParams->HEAD_SIZE_LG2 = 0;
+  // matrixParams->HEAD_SIZE_LG2 = 0;
   matrixParams->REPLICATION = params.REPLICATION;
   matrixParams->STORE_IN_ACC = params.STORE_IN_ACC;
   matrixParams->ACC_FROM_ACC = params.ACC_FROM_ACC;
@@ -200,12 +200,12 @@ void MapMatrixOp(const SimplifiedParams &params,
     }
   }
 
-  vectorParams->FULL_HEAD_SIZE = 0;
+  // vectorParams->FULL_HEAD_SIZE = 0;
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
   vectorParams->DP_OUTPUT = params.ACC_T_OUTPUT;
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams->scalarOutputCount = 0;
+  // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
 

@@ -63,7 +63,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_0->SCALAR_OUTPUT_OFFSET =
       params.OUTPUT_OFFSET + X * Y / DIMENSION;
 
-  vectorParams_0->scalarOutputCount = 0;
+  // vectorParams_0->scalarOutputCount = 0;
   vectorParams_0->MAXPOOL = false;
   vectorParams_0->AVGPOOL = false;
 
@@ -177,7 +177,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_1->SCALAR_OUTPUT_OFFSET =
       params.OUTPUT_OFFSET + X * Y / DIMENSION;
 
-  vectorParams_1->scalarOutputCount = 0;
+  // vectorParams_1->scalarOutputCount = 0;
   vectorParams_1->MAXPOOL = false;
   vectorParams_1->AVGPOOL = false;
 

@@ -40,12 +40,14 @@ SC_MODULE(OutputAddressGenerator) {
 
       vectorOutputAddressParams.Push(params);
 
-      if (params.scalarOutputCount != 0) {
-        scalarOutputAddressParams.Push(params);
-      }
+      // if (params.scalarOutputCount != 0) {
+      //   scalarOutputAddressParams.Push(params);
+      // }
     }
   }
 
+  // TODO(fpedd): This SC_THREAD seems dead since I removed the for loop in the
+  // while loop...
   void scalarAddressGen() {
     scalarOutputAddress.Reset();
     scalarOutputAddressParams.ResetRead();
@@ -55,9 +57,9 @@ SC_MODULE(OutputAddressGenerator) {
     while (true) {
       VectorParams params = scalarOutputAddressParams.Pop();
 
-      for (int i = 0; i < params.scalarOutputCount; i++) {
-        scalarOutputAddress.Push(params.SCALAR_OUTPUT_OFFSET + i * WIDTH);
-      }
+      // for (int i = 0; i < params.scalarOutputCount; i++) {
+      //   scalarOutputAddress.Push(params.SCALAR_OUTPUT_OFFSET + i * WIDTH);
+      // }
     }
   }
 

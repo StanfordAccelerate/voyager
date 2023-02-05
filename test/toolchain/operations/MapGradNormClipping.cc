@@ -33,7 +33,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  vectorParams->scalarOutputCount = 0;
+  // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = 0;
   vectorParams->AVGPOOL = 0;
 
