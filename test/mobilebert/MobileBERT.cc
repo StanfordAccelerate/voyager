@@ -157,8 +157,10 @@ std::vector<Workload> MobileBERT::getWorkloads(
         workload.memoryMap = {SRAM, workload.params.WEIGHT ? RRAM : SRAM, RRAM,
                               SRAM, SRAM};
       } else if (task == "gradient") {
-        workload.params.RESIDUAL = true;
         workload.params.outputExpBias = -13;
+        workload.params.RESIDUAL = true;
+        workload.params.GRAD_CLIPPING = true;
+        workload.params.ACC_T_OUTPUT = true;
         workload.files.residual_file = workload.files.outputs_file;
 
         inputDataDir = "step_51_activations/";

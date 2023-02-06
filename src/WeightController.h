@@ -441,11 +441,10 @@ SC_MODULE(WeightController) {
                             numPadding = NROWS - 9;
                             replicationBound = 3;
                           }
-                          
                         }
 
-                        for (ac_int<4, false> fx_repl = 0; fx_repl < replicationBound;
-                             fx_repl++) {
+                        for (ac_int<4, false> fx_repl = 0;
+                             fx_repl < replicationBound; fx_repl++) {
                           for (ac_int<8, false> c = 0; c < endingC;
                                c++) {  // reverse order
                             ac_int<8, false> k2 =
@@ -509,8 +508,8 @@ SC_MODULE(WeightController) {
                             break;
                           }
                         }
-                        if(params.REPLICATION){
-                        // zero_padding
+                        if (params.REPLICATION) {
+                          // zero_padding
                           for (ac_int<8, false> i = 0; i < numPadding; i++) {
                             // readControl[bankSel].Push(1);
                             readAddress[bankSel].Push(-1);
@@ -728,9 +727,7 @@ SC_MODULE(WeightController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        for (ac_int<8, false> c0 = NROWS - 1; c0 >= 0;
-                             c0--) {  // reverse order
-
+                        for (ac_int<8, false> c0 = 0; c0 < NROWS; c0++) {
                           ac_int<8, false> k2 = loop_counters
                               [0][params.weightAddressGenWeightLoopIndex[0]];
                           ac_int<8, false> K2 = loop_bounds
@@ -776,10 +773,6 @@ SC_MODULE(WeightController) {
                           MemoryRequest memRequest = {
                               params.GRAD_OFFSET + baseAddress, burstSize};
                           gradAddressRequest.Push(memRequest);
-
-                          if (c == 0) {
-                            break;
-                          }
                         }
 
                         if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
@@ -879,7 +872,7 @@ SC_MODULE(WeightController) {
                              loop_counters[1][5] < loop_bounds[1][5];
                              loop_counters[1][5]++) {
                           // Fill up transposeBuffer
-                          for (int c0 = NROWS - 1; c0 >= 0; c0--) {
+                          for (int c0 = 0; c0 < NROWS; c0++) {
                             Pack1D<DTYPE, NCOLS> originalValue =
                                 gradDataResponse.Pop();
 #pragma hls_unroll yes
@@ -889,7 +882,7 @@ SC_MODULE(WeightController) {
                           }
 
                           // Write out from tranposeBuffer
-                          for (int c0 = NROWS - 1; c0 >= 0; c0--) {
+                          for (int c0 = 0; c0 < NROWS; c0++) {
                             Pack1D<DTYPE, NCOLS> transposedValue;
 
 #pragma hls_unroll yes
