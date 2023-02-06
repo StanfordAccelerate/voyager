@@ -139,13 +139,14 @@ inline void adjustExp(float &value, int expBias) { value *= pow(2, expBias); }
 template <typename ACC_T>
 void grad_clip_norm(ACC_T *matrix, int size) {
   // tree add
-  ACC_T norm = 0;
+  ACC_T norm;
   for (int reductionCount = 0; reductionCount < size;
        reductionCount += DIMENSION) {
     // perform a tree addition
     ACC_T accum[DIMENSION];
     for (int i = 0; i < DIMENSION; i++) {
-      accum[i] = static_cast<ACC_T>(matrix[i] * matrix[i]);
+      accum[i] = static_cast<ACC_T>(matrix[reductionCount + i] *
+                                    matrix[reductionCount + i]);
     }
 
     int depth = DIMENSION;
