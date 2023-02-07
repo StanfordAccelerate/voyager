@@ -38,14 +38,12 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   vectorParams->DP_VEC1 = false;
 
-  // TODO: adjust bitwidths inside of addressGen1 so that
-  // we can just use a single K loop
   vectorParams->addressGen1Loops[0][0] = 1;
   vectorParams->addressGen1Loops[0][1] = K / DIMENSION;
   vectorParams->addressGen1Loops[0][2] = 1;
   vectorParams->addressGen1Loops[1][0] = 1;
-  vectorParams->addressGen1Loops[1][1] = DIMENSION;
-  vectorParams->addressGen1Loops[1][2] = C / DIMENSION;
+  vectorParams->addressGen1Loops[1][1] = 1;
+  vectorParams->addressGen1Loops[1][2] = C;
 
   // bias
   acceleratorMemoryMap["vector2"] = memoryMap.bias;
@@ -155,6 +153,23 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
   //     vectorUnitDoneSignal.SyncPop();
   //     CCS_LOG("Accelerator
   //     Layer Finished.");
+
+  if (params.WEIGHT_SPLITTING) {
+    // if we need to do weight_splitting, we need to combine the weights and
+    // gradients first in an operation
+    // but we need to output it in DP
+    SimplifiedParams weightUpdateParams = params;
+    weightUpdateParams.INPUT_OFFSET = params.WEIGHT_RESIDUAL_OFFSET;
+    // weight update is expecting a size of X*C, so make X = K
+    weightUpdateParams.loops[1][params.inputXLoopIndex[1]] = K;
+    MapWeightUpdate(weightUpdateParams, memoryMap, mappedParams, opMemoryMaps);
+    dynamic_cast<VectorParams *>(mappedParams.at(0))->DP_OUTPUT = true;
+
+    // then we need to modify the weights to be coming from SRAM
+    vectorParams->ADDRESS_GEN1_OFFSET = params.OUTPUT_OFFSET;
+    vectorParams->DP_VEC1 = true;
+    acceleratorMemoryMap["vector1"] = SRAM;
+  }
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
