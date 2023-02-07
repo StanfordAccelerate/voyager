@@ -38,7 +38,9 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
+  acceleratorMemoryMap["vector0"] = memoryMap.outputs;
   vectorParams->VECTOR_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   vectorParams->addressGen0Broadcast = false;
@@ -51,6 +53,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   vectorParams->DP_VEC0 = true;
 
   // address gen 1 (weights)
+  acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   vectorParams->addressGen1Loops[0][0] = 1;
@@ -71,6 +74,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -112,4 +116,5 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

@@ -353,6 +353,8 @@ void Harness::sendParams() {
       }
       CCS_LOG("----- Accelerator Layer '" << currentParams.name
                                           << "' Finished. -----");
+
+      opMemoryMaps.pop_front();
     }
 
 #ifdef SOC_COSIM

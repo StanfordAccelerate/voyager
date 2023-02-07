@@ -132,6 +132,9 @@ void MapMatrixOp(const SimplifiedParams &params, const MemoryMap &memoryMap,
   matrixParams->TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
   matrixParams->GRAD_OFFSET = params.WEIGHT_RESIDUAL_OFFSET;
   matrixParams->COMBINE_GRADS = params.WEIGHT_SPLITTING;
+
+  acceleratorMemoryMap["grad"] = memoryMap.inputs;
+
   P8 learningRate = static_cast<P8>(params.learningRate);
   matrixParams->learningRate = learningRate.bits;
 
