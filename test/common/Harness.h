@@ -5,8 +5,8 @@
 #include <systemc.h>
 
 #include <deque>
-#include <vector>
 #include <string>
+#include <vector>
 
 #include "AccelTypes.h"
 #include "Accelerator.h"
@@ -103,7 +103,7 @@ SC_MODULE(Harness) {
   SimplifiedParams currentParams;
   INPUT_DATATYPE *sramMemory, *rramMemory;
   std::vector<MemoryMap> memoryMap;
-  MemoryMap currentMemoryMap;
+  AcceleratorMemoryMap currentMemoryMap;
 
 #ifdef SIM_Accelerator
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
@@ -121,8 +121,8 @@ SC_MODULE(Harness) {
           dataResponse);
   // void memAccessPack(
   //     CombinationalInterface<int> * addressRequest,
-  //     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse,
-  //     MemorySource memSource);
+  //     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
+  //     dataResponse, MemorySource memSource);
   // void memAccess(CombinationalInterface<int> * addressRequest,
   //                CombinationalInterface<INPUT_DATATYPE> * dataResponse,
   //                MemorySource memSource);

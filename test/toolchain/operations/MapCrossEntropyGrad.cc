@@ -1,7 +1,9 @@
 #include "test/toolchain/operations/Operations.h"
 
 void MapCrossEntropyGrad(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams) {
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -23,7 +25,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   SimplifiedParams modifiedSoftmaxParams = params;
   modifiedSoftmaxParams.loops[1][modifiedSoftmaxParams.inputYLoopIndex[1]] = X;
   modifiedSoftmaxParams.loops[1][modifiedSoftmaxParams.inputXLoopIndex[1]] = 1;
-  MapSoftmax(modifiedSoftmaxParams, mappedParams);
+  MapSoftmax(modifiedSoftmaxParams, memoryMap, mappedParams, opMemoryMaps);
 
   VectorParams *softmaxVectorParams =
       dynamic_cast<VectorParams *>(mappedParams.at(0));

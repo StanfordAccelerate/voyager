@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapFCGrad(const SimplifiedParams &params,
-               std::deque<BaseParams *> &mappedParams) {
+void MapFCGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+               std::deque<BaseParams *> &mappedParams,
+               std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -16,7 +17,9 @@ void MapFCGrad(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
@@ -26,10 +29,11 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = X;
   vectorParams->addressGen0Broadcast = true;
-  vectorParams->addressGen0BroadcastCount = K/DIMENSION;
+  vectorParams->addressGen0BroadcastCount = K / DIMENSION;
   vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
   // address gen 1 (weights)
+  acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   for (int i = 0; i < 3; i++) {
@@ -40,6 +44,7 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][2] = K / DIMENSION;
   vectorParams->DP_VEC1 = params.ACC_T_WEIGHT;
 
+  acceleratorMemoryMap["vector2"] = memoryMap.residual;
   vectorParams->ADDRESS_GEN2_OFFSET = params.RESIDUAL_OFFSET;
   vectorParams->addressGen2Mode = params.RESIDUAL ? 2 : 0;
   vectorParams->addressGen2Loops[0][0] = 1;
@@ -56,6 +61,7 @@ void MapFCGrad(const SimplifiedParams &params,
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -101,9 +107,10 @@ void MapFCGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 
   if (params.GRAD_CLIPPING) {
-    MapGradNormClipping(params, mappedParams, X * K);
+    MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps, X * K);
   }
 }
 

@@ -1,7 +1,9 @@
 #include "test/toolchain/operations/Operations.h"
 
 void MapGenericErrorGrad(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams) {
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -16,12 +18,14 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
   /*
    * Subtract vector from vector, and multiply with factor
    * 2/X for MSE_GRAD and 1/X for BCE_WITH_LOGITS_GRAD
    */
 
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
@@ -32,6 +36,7 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][2] = X / DIMENSION;
   vectorParams->addressGen0Broadcast = false;
 
+  acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   vectorParams->addressGen1Loops[0][0] = 1;
@@ -53,6 +58,7 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -96,4 +102,5 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

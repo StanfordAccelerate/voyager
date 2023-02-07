@@ -3,8 +3,9 @@
 // This operation performs:
 // weight = weight - learningRate * gradient;
 // it handles the case when the weight is 8b or 16b
-void MapWeightUpdate(const SimplifiedParams &params,
-                     std::deque<BaseParams *> &mappedParams) {
+void MapWeightUpdate(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                     std::deque<BaseParams *> &mappedParams,
+                     std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -34,8 +35,10 @@ void MapWeightUpdate(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
   // this are gradients (called inputs in the gold model)
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   vectorParams->addressGen0Broadcast = false;
@@ -52,6 +55,7 @@ void MapWeightUpdate(const SimplifiedParams &params,
   vectorParams->addressGen1Mode = 0;  // disable
 
   // these are weights (called weights in the gold model)
+  acceleratorMemoryMap["vector2"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN2_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen2Mode = 2;  // 2d tensor
   vectorParams->addressGen2Loops[0][0] = 1;
@@ -68,6 +72,7 @@ void MapWeightUpdate(const SimplifiedParams &params,
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -108,4 +113,5 @@ void MapWeightUpdate(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

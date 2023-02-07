@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapBiasGrad(const SimplifiedParams &params,
-                 std::deque<BaseParams *> &mappedParams) {
+void MapBiasGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                 std::deque<BaseParams *> &mappedParams,
+                 std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -16,6 +17,7 @@ void MapBiasGrad(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
   // Columnwide reduction (accumulation op)
 
@@ -30,6 +32,7 @@ void MapBiasGrad(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][1] = C;
   vectorParams->addressGen0Loop[1][2] = 1;
   vectorParams->DP_VEC0 = false;
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
 
   // address gen 1 (weights)
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
@@ -44,7 +47,7 @@ void MapBiasGrad(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-//   vectorParams->scalarOutputCount = 0;
+  //   vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
@@ -64,6 +67,7 @@ void MapBiasGrad(const SimplifiedParams &params,
   vectorParams->outputYLoopIndex[1] = 0;
   vectorParams->outputXLoopIndex[1] = 1;
   vectorParams->DP_OUTPUT = true;
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
@@ -107,11 +111,11 @@ void MapBiasGrad(const SimplifiedParams &params,
   vInst2.vDest = VectorInstructions::vWriteOut;
   vectorInstructionConfig->inst[2] = vInst2;
   vectorInstructionConfig->instCount[2] = 1;
-  
 
   vectorInstructionConfig->instLen = 3;
   vectorInstructionConfig->instLoopCount = 1;
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

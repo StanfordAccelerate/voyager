@@ -140,20 +140,18 @@ void Harness::memAccessBurst(
   while (true) {
     MemoryRequest memRequest = addressRequest->Pop();
     MemorySource memSource;
-    if (memSourceType == "inputs") {
-      memSource = SRAM;
-    } else if (memSourceType == "weights") {
-      memSource = currentMemoryMap.weights;
-    } else if (memSourceType == "grad") {
-      memSource = SRAM;
-    } else if (memSourceType == "vector0") {
-      memSource = currentMemoryMap.inputs;
-    } else if (memSourceType == "vector2") {
-      memSource = currentMemoryMap.bias;
+
+    auto it = currentMemoryMap.find(memSourceType);
+    if (it != currentMemoryMap.end()) {
+      memSource = it->second;
     } else {
-      std::cout << "Invalid memory source type: " << memSourceType << std::endl;
-      exit(1);
+      std::cerr << "Memory interface " << memSourceType
+                << " has not been specified for layer " << currentParams.name
+                << " but received memory requests. Fix the operation mapping."
+                << std::endl;
+      std::abort();
     }
+
     INPUT_DATATYPE *memory;
     if (memSource == RRAM) {
       memory = rramMemory;
@@ -259,8 +257,8 @@ void Harness::memAccessVector0() {
 }
 
 void Harness::memAccessVector1() {
-  memAccessBurstVariable(&vectorFetch1AddressRequest,
-                         &vectorFetch1DataResponse);
+  memAccessBurst(&vectorFetch1AddressRequest, &vectorFetch1DataResponse,
+                 "vector1");
 }
 
 void Harness::memAccessVector2() {
@@ -299,15 +297,16 @@ void Harness::sendParams() {
   // Iterate through all params, ie all layers
   for (int i = 0; i < params_list.size(); i++) {
     currentParams = params_list.at(i);
-    currentMemoryMap = memoryMap.at(i);
 
+    std::deque<AcceleratorMemoryMap> opMemoryMaps;
     std::deque<BaseParams *> opParams;
-    MapOperation(currentParams, opParams);
+    MapOperation(currentParams, memoryMap.at(i), opParams, opMemoryMaps);
 
     while (opParams.size() > 0) {
       bool matrixParamsValid, vectorParamsValid;
 
       BaseParams *baseParam = opParams.front();
+      currentMemoryMap = opMemoryMaps.front();
 
       MatrixParams *matrixParams = dynamic_cast<MatrixParams *>(baseParam);
       matrixParamsValid = matrixParams != NULL;
@@ -380,7 +379,7 @@ void Harness::storeVectorOutputs() {
     DLOG("address: " << address << " data: " << data);
     for (int i = 0; i < DIMENSION; i++) {
       INPUT_DATATYPE *memory =
-          currentMemoryMap.outputs == SRAM ? sramMemory : rramMemory;
+          currentMemoryMap.at("outputs") == SRAM ? sramMemory : rramMemory;
 
       memory[address + i] = data[i];
     }

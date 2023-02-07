@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <map>
 #include <string>
 
 // By default we have 2MB of SRAM per MINOTAUR SoC
@@ -56,6 +57,12 @@ struct MemoryMap {
   MemorySource residual;
   MemorySource outputs;
 };
+
+// The accelerator has several interfaces for accessing memory, but
+// these interfaces aren't always standard. For example, for some layers,
+// an interface may access the residual, but for other layers, access weights.
+// This data structure maps the accelerator interface to the MemorySource.
+typedef std::map<std::string, MemorySource> AcceleratorMemoryMap;
 
 inline std::ostream& operator<<(std::ostream& os, MemoryMap& memoryMap) {
   os << "Inputs: " << memoryMap.inputs << std::endl;
@@ -189,5 +196,6 @@ struct Workload {
   SimplifiedParams params;
   Files files;
   MemoryMap memoryMap;
+  AcceleratorMemoryMap acceleratorMemoryMap;
   bool loadWeight = true;
 };

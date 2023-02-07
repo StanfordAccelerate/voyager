@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapNoNormGrad(const SimplifiedParams &params,
-                   std::deque<BaseParams *> &mappedParams) {
+void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                   std::deque<BaseParams *> &mappedParams,
+                   std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -12,11 +13,13 @@ void MapNoNormGrad(const SimplifiedParams &params,
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
-  
+
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   vectorParams->addressGen0Broadcast = false;
@@ -29,6 +32,7 @@ void MapNoNormGrad(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][2] = 1;
 
   // address gen 1 (weights)
+  acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   vectorParams->addressGen1Loops[0][0] = 1;
@@ -37,8 +41,7 @@ void MapNoNormGrad(const SimplifiedParams &params,
   vectorParams->addressGen1Loops[1][0] = 1;
   vectorParams->addressGen1Loops[1][1] = X;
   vectorParams->addressGen1Loops[1][2] = 1;
-    vectorParams->DP_VEC1 = true;
-
+  vectorParams->DP_VEC1 = true;
 
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
   vectorParams->addressGen2Mode = 0;  // no bias
@@ -46,12 +49,13 @@ void MapNoNormGrad(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-//   vectorParams->scalarOutputCount = 0;
+  //   vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = false;
   vectorParams->AVGPOOL = false;
   vectorParams->SPLIT_OUTPUT = false;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -131,4 +135,5 @@ void MapNoNormGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

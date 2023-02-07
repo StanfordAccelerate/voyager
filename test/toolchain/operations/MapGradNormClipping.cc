@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapGradNormClipping(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams, int size) {
+void MapGradNormClipping(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                 std::deque<BaseParams *> &mappedParams,
+                 std::deque<AcceleratorMemoryMap> &opMemoryMaps, int size) {
   // TODO: enable biasing exponent
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =

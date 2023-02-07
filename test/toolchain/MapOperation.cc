@@ -3,8 +3,9 @@
 #include "test/toolchain/operations/Operations.h"
 
 // create Matrix and Vector Params from SimplifiedParams
-void MapOperation(const SimplifiedParams &params,
-                  std::deque<BaseParams *> &mappedParams) {
+void MapOperation(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                  std::deque<BaseParams *> &mappedParams,
+                  std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -17,28 +18,28 @@ void MapOperation(const SimplifiedParams &params,
   int STRIDE = params.STRIDE;
 
   if (params.GRAD_CLIPPING_UNIT_TEST) {
-    MapGradNormClipping(params, mappedParams, X * C);
+    MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps, X * C);
   } else if (params.SOFTMAX) {
-    MapSoftmax(params, mappedParams);
+    MapSoftmax(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.SOFTMAX_GRAD) {
-    MapSoftmaxGrad(params, mappedParams);
+    MapSoftmaxGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.FC_GRAD) {
-    MapFCGrad(params, mappedParams);
+    MapFCGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.FC) {
-    MapFC(params, mappedParams);
+    MapFC(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.NO_NORM) {
-    MapNoNorm(params, mappedParams);
+    MapNoNorm(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.NO_NORM_GRAD) {
-    MapNoNormGrad(params, mappedParams);
+    MapNoNormGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.MSE_GRAD || params.BCE_WITH_LOGITS_GRAD) {
-    MapGenericErrorGrad(params, mappedParams);
+    MapGenericErrorGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.BIAS_GRAD) {
-    MapBiasGrad(params, mappedParams);
+    MapBiasGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.CROSS_ENTROPY_GRAD) {
-    MapCrossEntropyGrad(params, mappedParams);
+    MapCrossEntropyGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.WEIGHT_UPDATE) {
-    MapWeightUpdate(params, mappedParams);
+    MapWeightUpdate(params, memoryMap, mappedParams, opMemoryMaps);
   } else {
-    MapMatrixOp(params, mappedParams);
+    MapMatrixOp(params, memoryMap, mappedParams, opMemoryMaps);
   }
 }
