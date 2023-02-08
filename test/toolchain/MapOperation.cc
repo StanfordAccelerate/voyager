@@ -18,7 +18,7 @@ void MapOperation(const SimplifiedParams &params, const MemoryMap &memoryMap,
   int STRIDE = params.STRIDE;
 
   if (params.GRAD_CLIPPING_UNIT_TEST) {
-    MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps, X * C);
+    MapGradNormUnitTest(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.SOFTMAX) {
     MapSoftmax(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.SOFTMAX_GRAD) {

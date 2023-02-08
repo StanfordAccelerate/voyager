@@ -5,6 +5,11 @@
 #include "src/Params.h"
 #include "test/common/VerificationTypes.h"
 
+void MapGradNormUnitTest(const SimplifiedParams &params,
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps);
+
 void MapGradNormClipping(const SimplifiedParams &params,
                          const MemoryMap &memoryMap,
                          std::deque<BaseParams *> &mappedParams,
