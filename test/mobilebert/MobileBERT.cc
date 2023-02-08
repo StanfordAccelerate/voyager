@@ -346,6 +346,26 @@ std::vector<Workload> MobileBERT::getWorkloadsInRange(
 }
 
 std::vector<Workload> MobileBERT::getAllWorkloads() {
+  if (task == "inference") {
+    return getWorkloads(order, 0, true);
+  }
+  if (task == "backward") {
+    std::vector<std::string> tests;
+    std::vector<std::string> skipTests{
+        "query_to_bottleneck_attention_LayerNorm",
+        "key_to_bottleneck_attention_LayerNorm",
+        "shared_attention_input_to_hidden_states",
+        "value_to_hidden_states",
+        "bottlenecked_hidden_states",
+    };
+    for (auto it = order.begin(); it != order.end(); it++) {
+      if (std::find(skipTests.begin(), skipTests.end(), *it) ==
+          skipTests.end()) {
+        tests.push_back(*it);
+      }
+    }
+    return getWorkloads(tests);
+  }
   return getWorkloads(order);
 }
 
