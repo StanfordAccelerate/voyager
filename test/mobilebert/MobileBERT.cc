@@ -121,6 +121,15 @@ std::vector<Workload> MobileBERT::getWorkloads(
       std::string residualDataDir;
       std::string gradientDataDir;
 
+      int inputOffset = 0;
+      int weightOffset = 0;
+      int outputOffset = 0;
+      int residualOffset = 0;
+
+      const int activationSize =
+          ENCODER_ACTIVATION_SIZE + INTERMEDIATE_SIZE + 32;
+      const int weightSize = ENCODER_WEIGHT_SIZE + 16 * 512 * 2;
+
       if (task == "inference") {
         inputDataDir = "step_51_activations/";
         weightDataDir = "step_51_weights/";
@@ -139,19 +148,28 @@ std::vector<Workload> MobileBERT::getWorkloads(
         outputDataDir = "step_51_activation_gradients/";
         residualDataDir = "step_51_activation_gradients/";
 
+        inputOffset = activationSize + weightSize;
+        outputOffset = activationSize + weightSize;
+        residualOffset = activationSize + weightSize;
+
         if (!workload.params.WEIGHT) {
           weightDataDir = "step_51_activations/";
         }
         if (workload.params.SOFTMAX_GRAD || workload.params.RELU_GRAD) {
           residualDataDir = "step_51_activations/";
+          residualOffset = 0;
         }
         if (layer.find("attention_self_value_layer") != std::string::npos) {
           inputDataDir = "step_51_activations/";
           weightDataDir = "step_51_activation_gradients/";
+          inputOffset = 0;
+          weightOffset = activationSize + weightSize;
         }
         if (workload.params.CROSS_ENTROPY_GRAD) {
           inputDataDir = "step_51_activations/";
           weightDataDir = "step_51_activations/";
+          inputOffset = 0;
+          weightOffset = 0;
         }
 
         workload.memoryMap = {SRAM, workload.params.WEIGHT ? RRAM : SRAM, RRAM,
@@ -168,9 +186,16 @@ std::vector<Workload> MobileBERT::getWorkloads(
         outputDataDir = "step_51_weight_gradients/";
         residualDataDir = "step_50_weight_gradients/";
 
+        weightOffset = activationSize + weightSize;
+        outputOffset = activationSize;
+        residualOffset = activationSize;
+
         if (layer.find("classifier") != std::string::npos) {
           inputDataDir = "step_51_activation_gradients/";
           weightDataDir = "step_51_activations/";
+
+          inputOffset = activationSize + weightSize;
+          weightOffset = 0;
         }
 
         workload.memoryMap = {SRAM, SRAM, RRAM, SRAM, SRAM};
@@ -180,6 +205,8 @@ std::vector<Workload> MobileBERT::getWorkloads(
         inputDataDir = "step_51_weight_gradients/";
         weightDataDir = "step_51_weights/";
         outputDataDir = "step_52_weights/";
+
+        inputOffset = activationSize;
 
         workload.memoryMap = {SRAM, RRAM, RRAM, SRAM, RRAM};
       } else if (task == "sram_weight_update") {
@@ -223,19 +250,28 @@ std::vector<Workload> MobileBERT::getWorkloads(
         residualDataDir = "step_52_activation_gradients/";
         gradientDataDir = "step_51_weight_gradients/";
 
+        inputOffset = activationSize + weightSize;
+        outputOffset = activationSize + weightSize;
+        residualOffset = activationSize + weightSize;
+
         if (!workload.params.WEIGHT) {
           weightDataDir = "step_52_activations/";
         }
         if (workload.params.SOFTMAX_GRAD || workload.params.RELU_GRAD) {
           residualDataDir = "step_52_activations/";
+          residualOffset = 0;
         }
         if (layer.find("attention_self_value_layer") != std::string::npos) {
           inputDataDir = "step_52_activations/";
           weightDataDir = "step_52_activation_gradients/";
+          inputOffset = 0;
+          weightOffset = activationSize + weightSize;
         }
         if (workload.params.CROSS_ENTROPY_GRAD) {
           inputDataDir = "step_52_activations/";
           weightDataDir = "step_52_activations/";
+          inputOffset = 0;
+          weightOffset = 0;
         }
 
         workload.memoryMap = {SRAM, workload.params.WEIGHT ? RRAM : SRAM, RRAM,
@@ -272,31 +308,42 @@ std::vector<Workload> MobileBERT::getWorkloads(
       workload.files.weight_grad_file.insert(
           0, dataDir + gradientDataDir + encoderPrefix);
 
-      if (useOffsets) {
-        MemoryOffsets offsets = memOffsets.at(layer);
-        workload.params.INPUT_OFFSET = offsets.INPUT_OFFSET;
-        workload.params.WEIGHT_OFFSET = offsets.WEIGHT_OFFSET;
-        workload.params.OUTPUT_OFFSET = offsets.OUTPUT_OFFSET;
-        workload.params.BIAS_OFFSET = offsets.BIAS_OFFSET;
-        workload.params.RESIDUAL_OFFSET = offsets.RESIDUAL_OFFSET;
-      } else {
-        // Fake memory offsets used for unit tests
-        workload.params.INPUT_OFFSET = STACK_SIZE;
-        workload.params.WEIGHT_OFFSET = STACK_SIZE + INTERMEDIATE_SIZE;
+      MemoryOffsets offsets = memOffsets.at(layer);
+      workload.params.INPUT_OFFSET = offsets.INPUT_OFFSET;
+      workload.params.WEIGHT_OFFSET = offsets.WEIGHT_OFFSET;
+      workload.params.OUTPUT_OFFSET = offsets.OUTPUT_OFFSET;
+      workload.params.BIAS_OFFSET = offsets.BIAS_OFFSET;
+      workload.params.RESIDUAL_OFFSET = offsets.RESIDUAL_OFFSET;
+
+      if (!useOffsets) {
+        if (!workload.memoryMap.inputs) {
+          workload.params.INPUT_OFFSET += STACK_SIZE + inputOffset;
+        }
+        if (!workload.memoryMap.weights) {
+          workload.params.WEIGHT_OFFSET += STACK_SIZE + weightOffset;
+        }
+        if (!workload.memoryMap.outputs) {
+          workload.params.OUTPUT_OFFSET += STACK_SIZE + outputOffset;
+        }
+        if (!workload.memoryMap.residual) {
+          workload.params.RESIDUAL_OFFSET += STACK_SIZE + residualOffset;
+        }
+        workload.params.WEIGHT_RESIDUAL_OFFSET += STACK_SIZE + activationSize;
 
         if (workload.params.WEIGHT_UPDATE) {
-          // Offset used for comparing outputs in weight update unit tests
-          workload.params.OUTPUT_OFFSET = workload.params.ERROR_FEEDBACK
-                                              ? workload.params.WEIGHT_OFFSET
-                                              : workload.params.WEIGHT_OFFSET;
-        } else {
-          workload.params.OUTPUT_OFFSET = STACK_SIZE + 2 * INTERMEDIATE_SIZE;
+          workload.params.OUTPUT_OFFSET = workload.params.WEIGHT_OFFSET;
         }
 
-        workload.params.BIAS_OFFSET = STACK_SIZE + 3 * INTERMEDIATE_SIZE;
-        workload.params.RESIDUAL_OFFSET = STACK_SIZE + 4 * INTERMEDIATE_SIZE;
-        workload.params.WEIGHT_RESIDUAL_OFFSET =
-            STACK_SIZE + 5 * INTERMEDIATE_SIZE;
+        std::cerr << "Input offset: " << workload.params.INPUT_OFFSET
+                  << std::endl;
+        std::cerr << "Weight offset: " << workload.params.WEIGHT_OFFSET
+                  << std::endl;
+        std::cerr << "Output offset: " << workload.params.OUTPUT_OFFSET
+                  << std::endl;
+        std::cerr << "Residual offset: " << workload.params.RESIDUAL_OFFSET
+                  << std::endl;
+        std::cerr << "Gradient offset: "
+                  << workload.params.WEIGHT_RESIDUAL_OFFSET << std::endl;
       }
 
       workloads.push_back(workload);
