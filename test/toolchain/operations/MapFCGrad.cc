@@ -27,9 +27,9 @@ void MapFCGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   }
   vectorParams->addressGen0Loop[1][0] = 1;
   vectorParams->addressGen0Loop[1][1] = 1;
-  vectorParams->addressGen0Loop[1][2] = X;
+  vectorParams->addressGen0Loop[1][2] = X / DIMENSION;
   vectorParams->addressGen0Broadcast = true;
-  vectorParams->addressGen0BroadcastCount = K / DIMENSION;
+  vectorParams->addressGen0BroadcastCount = K;
   vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
   // address gen 1 (weights)
@@ -75,9 +75,7 @@ void MapFCGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->outputYLoopIndex[1] = 0;
   vectorParams->outputXLoopIndex[1] = 1;
-  // vectorParams->DP_OUTPUT = params.ACC_T_OUTPUT;
   vectorParams->DP_OUTPUT = params.GRAD_CLIPPING ? true : params.ACC_T_OUTPUT;
-  std::cout << "DP OUT: " << vectorParams->DP_OUTPUT;
 
   // inst 1- (inputs x weights)
   VectorInstructions vInst0;
