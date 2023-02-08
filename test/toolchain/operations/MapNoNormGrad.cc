@@ -23,13 +23,13 @@ void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   vectorParams->addressGen0Broadcast = false;
-
   vectorParams->addressGen0Loop[0][0] = 1;
   vectorParams->addressGen0Loop[0][1] = 1;
   vectorParams->addressGen0Loop[0][2] = K / DIMENSION;
   vectorParams->addressGen0Loop[1][0] = 1;
   vectorParams->addressGen0Loop[1][1] = X;
   vectorParams->addressGen0Loop[1][2] = 1;
+  vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
   // address gen 1 (weights)
   acceleratorMemoryMap["vector1"] = memoryMap.weights;
@@ -41,10 +41,15 @@ void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->addressGen1Loops[1][0] = 1;
   vectorParams->addressGen1Loops[1][1] = X;
   vectorParams->addressGen1Loops[1][2] = 1;
-  vectorParams->DP_VEC1 = true;
+  vectorParams->DP_VEC1 = params.ACC_T_WEIGHT;
 
-  vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams->addressGen2Mode = 0;  // no bias
+  acceleratorMemoryMap["vector2"] = memoryMap.residual;
+  vectorParams->ADDRESS_GEN2_OFFSET = params.RESIDUAL_OFFSET;
+  vectorParams->addressGen2Mode = params.RESIDUAL ? 2 : 0;
+  vectorParams->addressGen2Loops[0][0] = 1;
+  vectorParams->addressGen2Loops[0][1] = 1;
+  vectorParams->addressGen2Loops[0][2] = K / DIMENSION;
+  vectorParams->DP_VEC2 = params.ACC_T_RESIDUAL;
 
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
@@ -69,6 +74,7 @@ void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->outputYLoopIndex[1] = 0;
   vectorParams->outputXLoopIndex[1] = 1;
+  vectorParams->DP_OUTPUT = params.GRAD_CLIPPING ? true : params.ACC_T_OUTPUT;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
   // &serialVectorParamsIn);
@@ -109,18 +115,22 @@ void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vInst2.vInput = VectorInstructions::readFromAccumulation;
   vInst2.vOp0Src1 = VectorInstructions::nop;
   vInst2.vOp0 = VectorInstructions::nop;
-  vInst2.vOp1 = VectorInstructions::nop;
+  vInst2.vOp1 = VectorInstructions::vscaleexp;
+  vInst2.vOp1Src1 = VectorInstructions::op1immediate0;
   vInst2.vOp2 = VectorInstructions::nop;
-  vInst2.vOp3Src1 = VectorInstructions::nop;
-  vInst2.vOp3 = VectorInstructions::nop;
+  vInst2.vOp3 =
+      params.RESIDUAL ? VectorInstructions::vadd : VectorInstructions::nop;
+  vInst2.vOp3Src1 = params.RESIDUAL ? VectorInstructions::readNormalInterface
+                                    : VectorInstructions::nop;
   vInst2.vOp4 = VectorInstructions::nop;
   vInst2.vAccumulatePush = 0;
   vInst2.vDest = VectorInstructions::vWriteOut;
+  vInst2.immediate0 = params.outputExpBias;
   vectorInstructionConfig->inst[2] = vInst2;
   vectorInstructionConfig->instCount[2] = 1;
 
   vectorInstructionConfig->instLen = 3;
-  vectorInstructionConfig->instLoopCount = C / DIMENSION;
+  vectorInstructionConfig->instLoopCount = K / DIMENSION;
 
   // sendSerializedParams<VectorInstructionConfig,
   // 32>(vectorInstructionConfig,
@@ -136,4 +146,8 @@ void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
   opMemoryMaps.push_back(acceleratorMemoryMap);
+
+  if (params.GRAD_CLIPPING) {
+    MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps, K);
+  }
 }
