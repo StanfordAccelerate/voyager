@@ -312,37 +312,41 @@ std::vector<Workload> MobileBERT::getWorkloads(
  */
 std::vector<Workload> MobileBERT::getWorkloadsInRange(
     const std::vector<std::string>& layers) {
-  // Expand layer vector to include intermediate layers, if necessary
   std::vector<std::string> layersInRange;
-  if (layers.size() == 1) {  // Single layer
-    if (layers.front() == "all") {
-      std::vector<Workload> workloads;
-      std::vector<Workload> forward = getForwardWorkloads();
-      workloads.insert(workloads.end(), forward.begin(), forward.end());
-      std::vector<Workload> backward = getBackwardWorkloads();
-      workloads.insert(workloads.end(), backward.begin(), backward.end());
-      return workloads;
-    }
-    layersInRange.push_back(layers.front());
-  } else {  // Range of layers
-    if (task == "gradient") {
-      std::cerr << "Task gradient "
-                << " does not have an order defined. Please define one before "
-                   "attempting to run a sequence."
-                << std::endl;
-      std::abort();
-    }
 
-    auto firstLayer = std::find(order.begin(), order.end(), layers.at(0));
-    auto lastLayer = std::find(order.begin(), order.end(), layers.at(1));
-    layersInRange = std::vector<std::string>(firstLayer, lastLayer + 1);
+  // End to end tests
+  if (layers.front() == "all") {
+    std::vector<Workload> workloads;
+    std::vector<Workload> forward = getForwardWorkloads();
+    workloads.insert(workloads.end(), forward.begin(), forward.end());
+    std::vector<Workload> backward = getBackwardWorkloads();
+    workloads.insert(workloads.end(), backward.begin(), backward.end());
+    return workloads;
   }
+
+  // Single layer
+  if (layers.size() == 1) {
+    layersInRange.push_back(layers.front());
+    return getWorkloads(layersInRange);
+  }
+
+  // Multi-layer test
+  if (task == "gradient") {
+    std::cerr << "Task gradient does not have an order defined. Please define "
+                 "one before attempting to run a sequence."
+              << std::endl;
+    std::abort();
+  }
+
+  auto firstLayer = std::find(order.begin(), order.end(), layers.at(0));
+  auto lastLayer = std::find(order.begin(), order.end(), layers.at(1));
+  layersInRange = std::vector<std::string>(firstLayer, lastLayer + 1);
 
   if (layersInRange.empty()) {
     throw std::runtime_error("Layer list is empty.");
   }
 
-  return getWorkloads(layersInRange);
+  return getWorkloads(layersInRange, 0, true);
 }
 
 std::vector<Workload> MobileBERT::getAllWorkloads() {
