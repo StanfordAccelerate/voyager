@@ -429,18 +429,17 @@ SC_MODULE(VectorOpUnit) {
         scalarResult = scalarResult.inv_sqrt();
       }
 
-      if(inst.rMax1){
+      if (inst.rMax1) {
         typename ACC_DTYPE::DecomposedPosit one;
         one._zero = false;
         one.fraction = 0;
         one.scale = 0;
         one.sign = false;
-        
-        if(scalarResult > one){
+
+        if (scalarResult > one) {
           scalarResult = one;
         }
       }
-
 
       if (inst.rDuplicate) {
         // Duplicate the scalar result into a vector
