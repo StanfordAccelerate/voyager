@@ -121,7 +121,7 @@ SC_MODULE(VectorOpUnit) {
     wait();
 
 #pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
+#pragma hls_pipeline_stall_mode bubble
     while (true) {
       VectorInstructions inst = vectorOpUnitInstructions.Pop();
 
