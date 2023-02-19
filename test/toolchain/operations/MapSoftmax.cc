@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapSoftmax(const SimplifiedParams &params,
-                std::deque<BaseParams *> &mappedParams) {
+void MapSoftmax(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                std::deque<BaseParams *> &mappedParams,
+                std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -16,7 +17,9 @@ void MapSoftmax(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   vectorParams->addressGen0Broadcast = false;
@@ -38,11 +41,12 @@ void MapSoftmax(const SimplifiedParams &params,
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-//   vectorParams->scalarOutputCount = 0;
+  //   vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -152,4 +156,5 @@ void MapSoftmax(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

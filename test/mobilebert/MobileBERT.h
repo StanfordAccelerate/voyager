@@ -36,8 +36,8 @@ class MobileBERT : public Network {
   std::map<std::string, Files> files;
   std::map<std::string, MemoryOffsets> memOffsets;
 
-  std::vector<Workload> getWorkloads(const std::vector<std::string> &, int,
-                                     bool) const;
+  std::vector<Workload> getWorkloads(const std::vector<std::string> &, bool,
+                                     int) const;
   std::vector<Workload> getForwardWorkloads();
   std::vector<Workload> getBackwardWorkloads();
   std::vector<Workload> getWeightUpdateWorkloads();

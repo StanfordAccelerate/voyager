@@ -121,7 +121,7 @@ SC_MODULE(VectorOpUnit) {
     wait();
 
 #pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
+#pragma hls_pipeline_stall_mode bubble
     while (true) {
       VectorInstructions inst = vectorOpUnitInstructions.Pop();
 
@@ -429,18 +429,17 @@ SC_MODULE(VectorOpUnit) {
         scalarResult = scalarResult.inv_sqrt();
       }
 
-      if(inst.rMax1){
+      if (inst.rMax1) {
         typename ACC_DTYPE::DecomposedPosit one;
         one._zero = false;
         one.fraction = 0;
         one.scale = 0;
         one.sign = false;
-        
-        if(scalarResult > one){
+
+        if (scalarResult > one) {
           scalarResult = one;
         }
       }
-
 
       if (inst.rDuplicate) {
         // Duplicate the scalar result into a vector
@@ -642,7 +641,7 @@ SC_MODULE(VectorUnit) {
             }
           }
 
-          if (instAddress >= instConfig.instLen) {
+          if (instAddress >= instConfig.instLen - 1) {
             break;
           }
         }

@@ -55,6 +55,10 @@ std::vector<Workload> ResNet::getWorkloads(
     workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
                           SRAM, SRAM};
 
+    workload.params.INPUT_OFFSET += STACK_SIZE;
+    workload.params.OUTPUT_OFFSET += STACK_SIZE;
+    workload.params.RESIDUAL_OFFSET += STACK_SIZE;
+
     workloads.push_back(workload);
   }
 

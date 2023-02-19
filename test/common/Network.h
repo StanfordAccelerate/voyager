@@ -16,6 +16,7 @@ class Network {
 
   virtual std::vector<Workload> getAllWorkloads() = 0;
 
+  const std::string getName() { return modelName; }
   const std::string getDataDir() { return dataDir; }
 
  protected:

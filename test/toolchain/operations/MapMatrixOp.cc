@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapMatrixOp(const SimplifiedParams &params,
-                 std::deque<BaseParams *> &mappedParams) {
+void MapMatrixOp(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                 std::deque<BaseParams *> &mappedParams,
+                 std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -17,9 +18,12 @@ void MapMatrixOp(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
   // matrix params
+  acceleratorMemoryMap["inputs"] = memoryMap.inputs;
   matrixParams->INPUT_OFFSET = params.INPUT_OFFSET;
+  acceleratorMemoryMap["weights"] = memoryMap.weights;
   matrixParams->WEIGHT_OFFSET = params.WEIGHT_OFFSET;
   matrixParams->WEIGHT_TRANSPOSE = params.WEIGHT_TRANSPOSE;
   for (int i = 0; i < 2; i++) {
@@ -128,6 +132,9 @@ void MapMatrixOp(const SimplifiedParams &params,
   matrixParams->TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
   matrixParams->GRAD_OFFSET = params.WEIGHT_RESIDUAL_OFFSET;
   matrixParams->COMBINE_GRADS = params.WEIGHT_SPLITTING;
+
+  acceleratorMemoryMap["grad"] = memoryMap.inputs;
+
   P8 learningRate = static_cast<P8>(params.learningRate);
   matrixParams->learningRate = learningRate.bits;
 
@@ -140,6 +147,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   vectorParams->addressGen0Enable = false;  // use matrix unit outputs
 
   // residual
+  acceleratorMemoryMap["vector1"] = memoryMap.residual;
   vectorParams->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
   vectorParams->addressGen1Mode = params.RESIDUAL || params.RELU_GRAD;
   vectorParams->DP_VEC1 = false;
@@ -171,6 +179,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   }
 
   // bias
+  acceleratorMemoryMap["vector2"] = memoryMap.bias;
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
   vectorParams->addressGen2Mode = params.BIAS;
   for (int i = 0; i < 3; i++) {
@@ -210,6 +219,7 @@ void MapMatrixOp(const SimplifiedParams &params,
   vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = params.loops[0][i];
   }
@@ -340,4 +350,5 @@ void MapMatrixOp(const SimplifiedParams &params,
   mappedParams.push_back(matrixParams);
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

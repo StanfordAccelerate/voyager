@@ -1,7 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapFC(const SimplifiedParams &params,
-           std::deque<BaseParams *> &mappedParams) {
+void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
+           std::deque<BaseParams *> &mappedParams,
+           std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -16,8 +17,10 @@ void MapFC(const SimplifiedParams &params,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
   // input is a vector of size C
+  acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
@@ -30,20 +33,20 @@ void MapFC(const SimplifiedParams &params,
   vectorParams->DP_VEC0 = false;
 
   // weights is a matrix of K x C
+  acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
   vectorParams->DP_VEC1 = false;
 
-  // TODO: adjust bitwidths inside of addressGen1 so that
-  // we can just use a single K loop
   vectorParams->addressGen1Loops[0][0] = 1;
   vectorParams->addressGen1Loops[0][1] = K / DIMENSION;
   vectorParams->addressGen1Loops[0][2] = 1;
   vectorParams->addressGen1Loops[1][0] = 1;
-  vectorParams->addressGen1Loops[1][1] = DIMENSION;
-  vectorParams->addressGen1Loops[1][2] = C / DIMENSION;
+  vectorParams->addressGen1Loops[1][1] = 1;
+  vectorParams->addressGen1Loops[1][2] = C;
 
   // bias
+  acceleratorMemoryMap["vector2"] = memoryMap.bias;
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
   vectorParams->addressGen2Mode = 1;  // 2d tensor
   for (int i = 0; i < 3; i++) {
@@ -68,6 +71,7 @@ void MapFC(const SimplifiedParams &params,
   vectorParams->AVGPOOL = params.AVGPOOL;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -150,6 +154,24 @@ void MapFC(const SimplifiedParams &params,
   //     CCS_LOG("Accelerator
   //     Layer Finished.");
 
+  if (params.WEIGHT_SPLITTING) {
+    // if we need to do weight_splitting, we need to combine the weights and
+    // gradients first in an operation
+    // but we need to output it in DP
+    SimplifiedParams weightUpdateParams = params;
+    weightUpdateParams.INPUT_OFFSET = params.WEIGHT_RESIDUAL_OFFSET;
+    // weight update is expecting a size of X*C, so make X = K
+    weightUpdateParams.loops[1][params.inputXLoopIndex[1]] = K;
+    MapWeightUpdate(weightUpdateParams, memoryMap, mappedParams, opMemoryMaps);
+    dynamic_cast<VectorParams *>(mappedParams.at(0))->DP_OUTPUT = true;
+
+    // then we need to modify the weights to be coming from SRAM
+    vectorParams->ADDRESS_GEN1_OFFSET = params.OUTPUT_OFFSET;
+    vectorParams->DP_VEC1 = true;
+    acceleratorMemoryMap["vector1"] = SRAM;
+  }
+
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

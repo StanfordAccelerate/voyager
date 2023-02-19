@@ -15,8 +15,9 @@
  *     output[x,y] = tmp0[x,y] - tmp1[x,y]
  *
  */
-void MapSoftmaxGrad(const SimplifiedParams &params,
-                    std::deque<BaseParams *> &mappedParams) {
+void MapSoftmaxGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                    std::deque<BaseParams *> &mappedParams,
+                    std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -35,7 +36,9 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   VectorParams *vectorParams_0 = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig_0 =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap_0;
 
+  acceleratorMemoryMap_0["vector0"] = memoryMap.inputs;
   vectorParams_0->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams_0->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
@@ -47,6 +50,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_0->addressGen0Broadcast = false;
   vectorParams_0->DP_VEC0 = params.ACC_T_INPUT;
 
+  acceleratorMemoryMap_0["vector1"] = memoryMap.residual;
   vectorParams_0->ADDRESS_GEN1_OFFSET = params.RESIDUAL_OFFSET;
   vectorParams_0->addressGen1Mode = 2;  // 2d tensor
   vectorParams_0->addressGen1Loops[0][0] = 1;
@@ -68,6 +72,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_0->AVGPOOL = false;
 
   // output
+  acceleratorMemoryMap_0["outputs"] = memoryMap.outputs;
   // we are producting two output tensors (tmp0, tmp1)
   // in order to get them placed in memory consecutively,
   // we need to mess with the output loop bounds
@@ -142,12 +147,15 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams_0);
   mappedParams.push_back(vectorInstructionConfig_0);
+  opMemoryMaps.push_back(acceleratorMemoryMap_0);
 
   //================================================
   VectorParams *vectorParams_1 = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig_1 =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap_1;
 
+  acceleratorMemoryMap_1["vector0"] = memoryMap.outputs;
   vectorParams_1->VECTOR_OFFSET = params.OUTPUT_OFFSET;
   vectorParams_1->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
@@ -159,6 +167,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_1->addressGen0Broadcast = false;
   vectorParams_1->DP_VEC0 = true;
 
+  acceleratorMemoryMap_1["vector1"] = memoryMap.outputs;
   vectorParams_1->ADDRESS_GEN1_OFFSET = params.OUTPUT_OFFSET + 2 * (X * Y);
   std::cout << "Second op tmp1: " << vectorParams_1->ADDRESS_GEN1_OFFSET
             << std::endl;
@@ -182,6 +191,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
   vectorParams_1->AVGPOOL = false;
 
   // output
+  acceleratorMemoryMap_1["outputs"] = memoryMap.outputs;
   vectorParams_1->outputLoops[0][0] = 1;
   vectorParams_1->outputYLoopIndex[0] = 0;
 
@@ -222,4 +232,5 @@ void MapSoftmaxGrad(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams_1);
   mappedParams.push_back(vectorInstructionConfig_1);
+  opMemoryMaps.push_back(acceleratorMemoryMap_1);
 }

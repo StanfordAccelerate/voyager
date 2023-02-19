@@ -1,12 +1,16 @@
 #include "test/toolchain/operations/Operations.h"
 
 void MapGradNormClipping(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams, int size) {
-  // TODO: enable biasing exponent
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps,
+                         int size) {
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
+  acceleratorMemoryMap["vector0"] = memoryMap.outputs;
   vectorParams->VECTOR_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
   for (int i = 0; i < 3; i++) {
@@ -16,6 +20,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
       2;  // two passes over tensor are required
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = size / DIMENSION;
+  std::cout << "size: " << size / DIMENSION << std::endl;
   vectorParams->addressGen0Broadcast = false;
   vectorParams->DP_VEC0 = true;
 
@@ -34,6 +39,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vectorParams->AVGPOOL = 0;
 
   // output
+  acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
@@ -103,4 +109,5 @@ void MapGradNormClipping(const SimplifiedParams &params,
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
 }

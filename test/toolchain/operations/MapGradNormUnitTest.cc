@@ -1,6 +1,6 @@
 #include "test/toolchain/operations/Operations.h"
 
-void MapGenericErrorGrad(const SimplifiedParams &params,
+void MapGradNormUnitTest(const SimplifiedParams &params,
                          const MemoryMap &memoryMap,
                          std::deque<BaseParams *> &mappedParams,
                          std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
@@ -20,11 +20,6 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
       new VectorInstructionConfig;
   AcceleratorMemoryMap acceleratorMemoryMap;
 
-  /*
-   * Subtract vector from vector, and multiply with factor
-   * 2/X for MSE_GRAD and 1/X for BCE_WITH_LOGITS_GRAD
-   */
-
   acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
@@ -33,69 +28,68 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   }
   vectorParams->addressGen0Loop[1][0] = 1;
   vectorParams->addressGen0Loop[1][1] = 1;
-  vectorParams->addressGen0Loop[1][2] = X / DIMENSION;
+  vectorParams->addressGen0Loop[1][2] = X * C / DIMENSION;
   vectorParams->addressGen0Broadcast = false;
+  vectorParams->DP_VEC0 = params.ACC_T_INPUT;
 
-  acceleratorMemoryMap["vector1"] = memoryMap.weights;
+  // address gen 1 (weights)
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
-  vectorParams->addressGen1Mode = 2;  // 2d tensor
-  vectorParams->addressGen1Loops[0][0] = 1;
-  vectorParams->addressGen1Loops[0][1] = 1;
-  vectorParams->addressGen1Loops[0][2] = 1;
-  vectorParams->addressGen1Loops[1][0] = 1;
-  vectorParams->addressGen1Loops[1][1] = 1;
-  vectorParams->addressGen1Loops[1][2] = X / DIMENSION;
-  vectorParams->DP_VEC1 = false;
+  vectorParams->addressGen1Mode = 0;
 
-  vectorParams->ADDRESS_GEN2_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen2Mode = 0;  // 2d tensor
+  acceleratorMemoryMap["vector2"] = memoryMap.residual;
+  vectorParams->ADDRESS_GEN2_OFFSET = params.RESIDUAL_OFFSET;
+  vectorParams->addressGen2Mode = params.RESIDUAL ? 2 : 0;
+  vectorParams->addressGen2Loops[0][0] = 1;
+  vectorParams->addressGen2Loops[0][1] = 1;
+  vectorParams->addressGen2Loops[0][2] = X * K / DIMENSION;
+  vectorParams->DP_VEC2 = params.ACC_T_RESIDUAL;
 
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
 
-  // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
+  vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
 
   // output
   acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
-  vectorParams->outputXLoopIndex[0] = 0;
-  vectorParams->outputYLoopIndex[0] = 1;
-  vectorParams->outputWeightLoopIndex[0] = 2;
+  vectorParams->outputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->outputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->outputWeightLoopIndex[0] = params.weightLoopIndex[0];
+
   vectorParams->outputLoops[1][0] = 1;
   vectorParams->outputLoops[1][1] = 1;
-  vectorParams->outputLoops[1][2] = X / DIMENSION;
+  vectorParams->outputLoops[1][2] = X * C / DIMENSION;
   vectorParams->outputWeightLoopIndex[1] = 2;
-  vectorParams->outputXLoopIndex[1] = 1;
   vectorParams->outputYLoopIndex[1] = 0;
+  vectorParams->outputXLoopIndex[1] = 1;
+  vectorParams->DP_OUTPUT = true;
 
-  // subtract, multiply by divisor
+  // inst 1- (inputs x weights)
   VectorInstructions vInst0;
   vInst0.instType = VectorInstructions::vector;
   vInst0.vInput = VectorInstructions::readFromVectorFetch;
   vInst0.vAccumulatePush = VectorInstructions::nop;
-  vInst0.vOp0Src1 = VectorInstructions::readInterface;
-  vInst0.vOp0 = VectorInstructions::vsub;
-  vInst0.vOp1 = VectorInstructions::nop;
+  vInst0.vOp0Src1 = VectorInstructions::nop;
+  vInst0.vOp0 = VectorInstructions::nop;
+  vInst0.vOp1 = VectorInstructions::vscaleexp;
+  vInst0.vOp1Src1 = VectorInstructions::op1immediate0;
   vInst0.vOp2 = VectorInstructions::nop;
-  vInst0.vOp3Src1 = VectorInstructions::op3immediate0;
-  vInst0.vOp3 = VectorInstructions::nop;
-  vInst0.vOp4 = VectorInstructions::nop;
+  vInst0.vOp3 =
+      params.RESIDUAL ? VectorInstructions::vadd : VectorInstructions::nop;
+  vInst0.vOp3Src1 = params.RESIDUAL ? VectorInstructions::readNormalInterface
+                                    : VectorInstructions::nop;
+  vInst0.vOp4 = params.RELU;
   vInst0.vDest = VectorInstructions::vWriteOut;
-
-  float divisor;
-  if (params.MSE_GRAD) {
-    divisor = 2.0 / X;
-  } else {
-    divisor = 1.0 / X;
-  }
-  vInst0.immediate0 = (Posit<8, 1>(divisor)).bits;
-
+  vInst0.immediate0 = params.outputExpBias;
   vectorInstructionConfig->inst[0] = vInst0;
-  vectorInstructionConfig->instCount[0] = X / DIMENSION;
+
+  // C/DIMENSION to do the complete reduction
+  // DIMENSION to fill up the entire vector
+  vectorInstructionConfig->instCount[0] = X * K / DIMENSION;
 
   vectorInstructionConfig->instLen = 1;
   vectorInstructionConfig->instLoopCount = 1;
@@ -103,4 +97,11 @@ void MapGenericErrorGrad(const SimplifiedParams &params,
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
   opMemoryMaps.push_back(acceleratorMemoryMap);
+
+  mappedParams.push_back(vectorParams);
+  mappedParams.push_back(vectorInstructionConfig);
+  opMemoryMaps.push_back(acceleratorMemoryMap);
+
+  MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps,
+                      X * C / DIMENSION);
 }

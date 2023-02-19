@@ -5,41 +5,64 @@
 #include "src/Params.h"
 #include "test/common/VerificationTypes.h"
 
-void MapGradNormClipping(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams, int size);
+void MapGradNormUnitTest(const SimplifiedParams &params,
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapBiasGrad(const SimplifiedParams &params,
-                 std::deque<BaseParams *> &mappedParams);
+void MapGradNormClipping(const SimplifiedParams &params,
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps,
+                         int size);
+
+void MapBiasGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                 std::deque<BaseParams *> &mappedParams,
+                 std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
 void MapCrossEntropyGrad(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams);
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapSoftmax(const SimplifiedParams &params,
-                std::deque<BaseParams *> &mappedParams);
+void MapSoftmax(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                std::deque<BaseParams *> &mappedParams,
+                std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapSoftmaxGrad(const SimplifiedParams &params,
-                    std::deque<BaseParams *> &mappedParams);
+void MapSoftmaxGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                    std::deque<BaseParams *> &mappedParams,
+                    std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapFCGrad(const SimplifiedParams &params,
-               std::deque<BaseParams *> &mappedParams);
+void MapFCGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+               std::deque<BaseParams *> &mappedParams,
+               std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapFCGradFusedWithNormClipping(const SimplifiedParams &params,
-                                    std::deque<BaseParams *> &mappedParams);
+void MapFCGradFusedWithNormClipping(
+    const SimplifiedParams &params, const MemoryMap &memoryMap,
+    std::deque<BaseParams *> &mappedParams,
+    std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapFC(const SimplifiedParams &params,
-           std::deque<BaseParams *> &mappedParams);
+void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
+           std::deque<BaseParams *> &mappedParams,
+           std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapNoNorm(const SimplifiedParams &params,
-               std::deque<BaseParams *> &mappedParams);
+void MapNoNorm(const SimplifiedParams &params, const MemoryMap &memoryMap,
+               std::deque<BaseParams *> &mappedParams,
+               std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapNoNormGrad(const SimplifiedParams &params,
-                   std::deque<BaseParams *> &mappedParams);
+void MapNoNormGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                   std::deque<BaseParams *> &mappedParams,
+                   std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
 void MapGenericErrorGrad(const SimplifiedParams &params,
-                         std::deque<BaseParams *> &mappedParams);
+                         const MemoryMap &memoryMap,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapMatrixOp(const SimplifiedParams &params,
-                 std::deque<BaseParams *> &mappedParams);
+void MapMatrixOp(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                 std::deque<BaseParams *> &mappedParams,
+                 std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 
-void MapWeightUpdate(const SimplifiedParams &params,
-                     std::deque<BaseParams *> &mappedParams);
+void MapWeightUpdate(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                     std::deque<BaseParams *> &mappedParams,
+                     std::deque<AcceleratorMemoryMap> &opMemoryMaps);
