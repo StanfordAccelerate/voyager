@@ -29,9 +29,12 @@ class Simulation {
  protected:
   std::vector<Workload> workloads;
   std::vector<std::string> sims;
+  std::vector<MemoryModel *> memories;
   std::string out_dir;
   std::string modelName;
   float tolerance = 0.1;
+
+  int workloadCount;
 
   SimpleMemoryModel<INPUT_DATATYPE> *acceleratorMemory;
   SimpleMemoryModel<INPUT_DATATYPE> *positMemory;
