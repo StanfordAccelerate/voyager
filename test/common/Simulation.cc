@@ -19,7 +19,7 @@ namespace filesystem = experimental::filesystem;
 }
 #endif
 
-Simulation::Simulation() : workloadCount(0) {
+Simulation::Simulation() {
   modelName = get_env_var("NETWORK");
   if (modelName.empty()) modelName = "resnet";
 
@@ -82,7 +82,6 @@ Simulation::Simulation() : workloadCount(0) {
 
   // Collect workloads (aka. layers) from Network
   workloads = network->getWorkloadsInRange(tests_list);
-  workloads.back().checkOutputs = true;
 
   std::cout << "Starting new simulation with config:";
   std::cout << "\n> Model: " << modelName;
@@ -100,6 +99,7 @@ Simulation::Simulation() : workloadCount(0) {
 }
 
 void Simulation::loadMemory() {
+  std::vector<MemoryModel*> memories;
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     acceleratorMemory = new SimpleMemoryModel<INPUT_DATATYPE>(true);
     memories.push_back(acceleratorMemory);
@@ -127,7 +127,7 @@ void Simulation::loadMemory() {
   // Load weights, biases for all layers
   for (MemoryModel* memModel : memories) {
     for (const Workload& workload : workloads) {
-      if (workload.loadWeightsAndBiases) {
+      if (workload.loadWeight) {
         memModel->loadModelParams(workload.params, workload.files,
                                   workload.memoryMap, true);
       }
@@ -135,11 +135,11 @@ void Simulation::loadMemory() {
   }
 
   // Load last layer reference outputs
-  // for (MemoryModel* memModel : memories) {
-  //   Workload workload = workloads.back();
-  //   memModel->loadReferenceOutput(workload.params, workload.files,
-  //                                 workload.params.ACC_T_OUTPUT);
-  // }
+  for (MemoryModel* memModel : memories) {
+    Workload workload = workloads.back();
+    memModel->loadReferenceOutput(workload.params, workload.files,
+                                  workload.params.ACC_T_OUTPUT);
+  }
 }
 
 void Simulation::run() {
@@ -197,7 +197,6 @@ void Simulation::run() {
           positMemory->sram + params.RESIDUAL_OFFSET,
           positMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
-
     if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
       run_universal_posit_gold_model(
           params, universalPositMemory->sram + params.INPUT_OFFSET,
@@ -209,7 +208,6 @@ void Simulation::run() {
           universalPositMemory->sram + params.RESIDUAL_OFFSET,
           universalPositMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
-
     if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
       run_fp_gold_model(
           params, floatMemory->sram + params.INPUT_OFFSET,
@@ -220,44 +218,26 @@ void Simulation::run() {
           floatMemory->sram + params.RESIDUAL_OFFSET,
           floatMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
-
-    if (checkOutput()) return;
-    workloadCount++;
   }
 
   // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    std::vector<SimplifiedParams> paramsList;
-    std::vector<MemoryMap> memoryMapList;
+    std::vector<SimplifiedParams> params_list;
+    std::vector<MemoryMap> memoryMap;
 
     for (const Workload& workload : workloads) {
-      paramsList.push_back(workload.params);
-      memoryMapList.push_back(workload.memoryMap);
+      params_list.push_back(workload.params);
+      memoryMap.push_back(workload.memoryMap);
     }
 
-    run_op(paramsList, acceleratorMemory->sram, acceleratorMemory->rram,
-           memoryMapList);
+    run_op(params_list, acceleratorMemory->sram, acceleratorMemory->rram,
+           memoryMap);
   }
-
-  // Setting workloadCount to the last workload
-  workloadCount = workloads.size() - 1;
 }
 
 int Simulation::checkOutput() {
-  Workload workload = workloads.at(workloadCount);
-
-  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end() ||
-      !workload.checkOutputs) {
-    return 0;
-  }
-
-  for (MemoryModel* memModel : memories) {
-    memModel->loadReferenceOutput(workload.params, workload.files,
-                                  workload.params.ACC_T_OUTPUT);
-  }
-
-  SimplifiedParams params = workload.params;
-  MemoryMap memoryMaps = workload.memoryMap;
+  SimplifiedParams params = workloads.back().params;
+  MemoryMap memoryMaps = workloads.back().memoryMap;
 
   int X, Y, C, K, FX, FY, STRIDE;
   X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -322,6 +302,10 @@ int Simulation::checkOutput() {
   UniversalPosit* universalOutput;
   INPUT_DATATYPE* positOutput;
   INPUT_DATATYPE* acceleratorOutput;
+
+  std::cerr << "Input: " << memoryMaps.inputs << std::endl;
+  std::cerr << "Weight: " << memoryMaps.weights << std::endl;
+  std::cerr << "Output: " << memoryMaps.outputs << std::endl;
 
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     acceleratorOutput =
