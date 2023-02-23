@@ -53,7 +53,7 @@ endif
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C11FLAGS += $(BASE_FLAGS) -std=c++11 -Wno-deprecated-declarations
 C17FLAGS += $(BASE_FLAGS) -std=c++17
-LDFLAGS += -lsystemc
+LDFLAGS += -lsystemc -lstdc++fs
 LDLIBS += -L/cad/mentor/2021.1/Mgc_home/shared/lib/
 
 ###########################################################
