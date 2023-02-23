@@ -46,22 +46,43 @@ ResNet::ResNet(const std::string modelName, const std::string dataDir)
 std::vector<Workload> ResNet::getWorkloads(
     const std::vector<std::string>& layers) const {
   std::vector<Workload> workloads;
+  // Make "codgen"-matching case insensitive
+  std::string& modelNameLower = const_cast<std::string&>(this->modelName);
+  std::transform(modelNameLower.begin(), modelNameLower.end(),
+                 modelNameLower.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
 
-  for (const std::string& layer : layers) {
-    Workload workload;
-    workload.name = layer;
-    workload.params = params.at(layer);
-    workload.files = files.at(layer);
-    workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
-                          SRAM, SRAM};
+  // Hacky way to check if we are using codegen
+  if (modelNameLower.find("codegen") != std::string::npos) {
+    for (const std::string& layer : layers) {
+      Workload workload;
+      workload.name = layer;
+      workload.params = params.at(layer);
+      workload.files = files.at(layer);
+      workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
+                            SRAM, SRAM};
 
-    workload.params.INPUT_OFFSET += STACK_SIZE;
-    workload.params.OUTPUT_OFFSET += STACK_SIZE;
-    workload.params.RESIDUAL_OFFSET += STACK_SIZE;
+      workloads.push_back(workload);
+    }
 
-    workloads.push_back(workload);
+    // Otherwise, use handwritten models
+  } else {
+    for (const std::string& layer : layers) {
+      Workload workload;
+      workload.name = layer;
+      workload.params = params.at(layer);
+      workload.files = files.at(layer);
+      workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
+                            SRAM, SRAM};
+
+      // Handwritten model offsets don't account for stack, thus offset here
+      workload.params.INPUT_OFFSET += STACK_SIZE;
+      workload.params.OUTPUT_OFFSET += STACK_SIZE;
+      workload.params.RESIDUAL_OFFSET += STACK_SIZE;
+
+      workloads.push_back(workload);
+    }
   }
-
   return workloads;
 }
 

@@ -93,6 +93,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
                  modelNameLower.begin(),
                  [](unsigned char c) { return std::tolower(c); });
 
+  // Hacky way to check if we are using codegen
   if (modelNameLower.find("codegen") != std::string::npos) {
     for (const std::string& layer : layers) {
       Workload workload;
@@ -104,6 +105,8 @@ std::vector<Workload> MobileBERT::getWorkloads(
 
       workloads.push_back(workload);
     }
+
+    // Otherwise, use handwritten models
   } else {
     for (const std::string& layer : layers) {
       std::string encoderPrefix =
