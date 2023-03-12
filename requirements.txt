@@ -1,7 +1,2 @@
-torch
-torchvision
-protobuf
-onnx
-numpy
-tqdm
-dill
+# We include the (minimal) packages needed for ZagZig
+-r zagzig/requirements_ci.txt
