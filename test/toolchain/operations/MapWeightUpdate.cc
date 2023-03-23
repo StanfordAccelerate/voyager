@@ -17,8 +17,8 @@ void MapWeightUpdate(const SimplifiedParams &params, const MemoryMap &memoryMap,
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
 
-  std::cout << "FX: " << FX << " FY: " << FY << " C: " << C << "K: " << K
-            << std::endl;
+  // std::cout << "FX: " << FX << " FY: " << FY << " C: " << C << "K: " << K
+  //           << std::endl;
 
   int factor0, factor1;
   int totalSize = X * C / DIMENSION;

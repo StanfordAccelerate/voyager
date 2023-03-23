@@ -169,8 +169,8 @@ void MapSoftmaxGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap_1["vector1"] = memoryMap.outputs;
   vectorParams_1->ADDRESS_GEN1_OFFSET = params.OUTPUT_OFFSET + 2 * (X * Y);
-  std::cout << "Second op tmp1: " << vectorParams_1->ADDRESS_GEN1_OFFSET
-            << std::endl;
+  // std::cout << "Second op tmp1: " << vectorParams_1->ADDRESS_GEN1_OFFSET
+  //           << std::endl;
   vectorParams_1->addressGen1Mode = 2;  // 2d tensor
   vectorParams_1->addressGen1Loops[0][0] = 1;
   vectorParams_1->addressGen1Loops[0][1] = 1;

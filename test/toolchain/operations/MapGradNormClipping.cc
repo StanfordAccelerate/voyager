@@ -20,7 +20,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
       2;  // two passes over tensor are required
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = size / DIMENSION;
-  std::cout << "size: " << size / DIMENSION << std::endl;
+  // std::cout << "size: " << size / DIMENSION << std::endl;
   vectorParams->addressGen0Broadcast = false;
   vectorParams->DP_VEC0 = true;
 
