@@ -23,14 +23,14 @@ Simulation::Simulation() {
   modelName = get_env_var("NETWORK");
   if (modelName.empty()) modelName = "resnet";
 
-  std::string tests(get_env_var("TESTS"));
+  tests = get_env_var("TESTS");
   if (tests.empty()) tests = "fc";
 
   std::string simsEnv(get_env_var("SIMS"));
   if (simsEnv.empty()) simsEnv = "accelerator,customposit";
 
   // Only applicable when NETWORK=mobilebert
-  std::string task(get_env_var("TASK"));
+  task = get_env_var("TASK");
   if (task.empty()) task = "inference";
 
   std::string tolerance_str(get_env_var("TOLERANCE"));
