@@ -1,5 +1,5 @@
 NETWORKS = {
-    "resnet":
+    "resnet18":
     [
         "conv1",
         "layer1_0_conv1",
