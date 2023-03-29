@@ -226,7 +226,7 @@ build/toolchain.a: $(TOOLCHAIN_OBJ)
 ###########################################################
 
 clean:
-	rm -rf build/*.o build/TestRunner build/PositTest build/test/*.o build/test/toolchain/*.o build/test/toolchain/operations/*.o build/toolchain.a
+	rm -rf build/*
 
 clean-test:
 	rm -rf test_outputs/*
