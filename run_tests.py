@@ -169,7 +169,7 @@ def main():
     # Check if data_dir exists
     assert os.path.isdir(
         args.data_dir
-    ), f"Data dir {args.data_dir} does not exist. Please provide a valid data and/or run ZagZig first."
+    ), f"Data dir {args.data_dir} does not exist. Please provide a valid data directory and/or run ZagZig first."
 
     assert args.num_tests == -1 or args.num_tests > 0, "num_tests must be -1 (all) or > 0."
 
