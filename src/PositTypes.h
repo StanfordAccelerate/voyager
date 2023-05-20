@@ -346,14 +346,6 @@ inline bool Posit<nbits, es>::operator<(const Posit<nbits, es> &rhs) const {
   return lhs_fraction < rhs_fraction;
 }
 
-#ifndef __SYNTHESIS__
-template <int nbits, int es>
-Posit<nbits, es>::operator float() const {
-  PositFP<8, 23> fp(*this);
-  return (float)fp;
-}
-#endif
-
 template <int nbits, int es>
 inline std::ostream &operator<<(std::ostream &os, const Posit<nbits, es> &val) {
 #ifndef __SYNTHESIS__
@@ -858,3 +850,11 @@ inline bool operator==(const Posit<nbits, es> &lhs,
                        const Posit<nbits, es> &rhs) {
   return lhs.bits == rhs.bits;
 }
+
+#ifndef __SYNTHESIS__
+template <int nbits, int es>
+Posit<nbits, es>::operator float() const {
+  PositFP<8, 23> fp(*this);
+  return (float)fp;
+}
+#endif

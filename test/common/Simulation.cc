@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <memory>
+#include <sstream>
 
 #include "test/common/GoldModel.h"
 #include "test/common/UniversalPosit.h"
