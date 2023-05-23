@@ -18,16 +18,11 @@ const std::vector<std::string> orderCodeGen;
 MobileBERT::MobileBERT(const std::string modelName, const std::string task,
                        const std::string dataDir)
     : Network(modelName, dataDir), task(task) {
-  // Make "codgen"-matching case insensitive
-  std::string& modelNameLower = const_cast<std::string&>(this->modelName);
-  std::transform(modelNameLower.begin(), modelNameLower.end(),
-                 modelNameLower.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-
-  if (modelNameLower.find("codegen") != std::string::npos) {
+  if (codegen) {
     if (paramsCodeGen.empty() || filesCodeGen.empty() || orderCodeGen.empty()) {
       throw std::runtime_error(
-          "Codegen files for MobileBERT not found. Did you run the codegen script?");
+          "Codegen files for MobileBERT not found. Did you run the codegen "
+          "script?");
     }
     this->order = ::orderCodeGen;
     this->params = ::paramsCodeGen;
@@ -102,6 +97,20 @@ std::vector<Workload> MobileBERT::getWorkloads(
       workload.files = files.at(layer);
       workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
                             SRAM, SRAM};
+
+      if (opt == O0) {
+        // force all banks to be on
+        for (int i = 0; i < NUM_SRAM_BANKS; i++) {
+          workload.params.sram_banks[i] = ON;
+        }
+        for (int i = 0; i < NUM_RRAM_BANKS; i++) {
+          workload.params.rram_banks[i] = ON;
+        }
+      }
+      if (opt == O0 || opt == O1) {
+        // force full bandwidth mode
+        workload.params.bandwidth_mode = QUAD;
+      }
 
       workloads.push_back(workload);
     }

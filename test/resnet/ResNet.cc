@@ -13,16 +13,11 @@ const std::vector<std::string> orderCodeGen;
 
 ResNet::ResNet(const std::string modelName, const std::string dataDir)
     : Network(modelName, dataDir) {
-  // Make "codgen"-matching case insensitive
-  std::string& modelNameLower = const_cast<std::string&>(this->modelName);
-  std::transform(modelNameLower.begin(), modelNameLower.end(),
-                 modelNameLower.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-
-  if (modelNameLower.find("codegen") != std::string::npos) {
+  if (codegen) {
     if (paramsCodeGen.empty() || filesCodeGen.empty() || orderCodeGen.empty()) {
       throw std::runtime_error(
-          "Codegen files for ResNet not found. Did you run the codegen script?");
+          "Codegen files for ResNet not found. Did you run the codegen "
+          "script?");
     }
     this->order = ::orderCodeGen;
     this->params = ::paramsCodeGen;
@@ -46,43 +41,39 @@ ResNet::ResNet(const std::string modelName, const std::string dataDir)
 std::vector<Workload> ResNet::getWorkloads(
     const std::vector<std::string>& layers) const {
   std::vector<Workload> workloads;
-  // Make "codgen"-matching case insensitive
-  std::string& modelNameLower = const_cast<std::string&>(this->modelName);
-  std::transform(modelNameLower.begin(), modelNameLower.end(),
-                 modelNameLower.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
 
-  // Hacky way to check if we are using codegen
-  if (modelNameLower.find("codegen") != std::string::npos) {
-    for (const std::string& layer : layers) {
-      Workload workload;
-      workload.name = layer;
-      workload.params = params.at(layer);
-      workload.files = files.at(layer);
-      workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
-                            SRAM, SRAM};
+  for (const std::string& layer : layers) {
+    Workload workload;
+    workload.name = layer;
+    workload.params = params.at(layer);
+    workload.files = files.at(layer);
+    workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
+                          SRAM, SRAM};
 
-      workloads.push_back(workload);
-    }
-
-    // Otherwise, use handwritten models
-  } else {
-    for (const std::string& layer : layers) {
-      Workload workload;
-      workload.name = layer;
-      workload.params = params.at(layer);
-      workload.files = files.at(layer);
-      workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
-                            SRAM, SRAM};
-
+    if (!codegen) {
       // Handwritten model offsets don't account for stack, thus offset here
       workload.params.INPUT_OFFSET += STACK_SIZE;
       workload.params.OUTPUT_OFFSET += STACK_SIZE;
       workload.params.RESIDUAL_OFFSET += STACK_SIZE;
-
-      workloads.push_back(workload);
     }
+
+    if (opt == O0) {
+      // force all banks to be on
+      for (int i = 0; i < NUM_SRAM_BANKS; i++) {
+        workload.params.sram_banks[i] = ON;
+      }
+      for (int i = 0; i < NUM_RRAM_BANKS; i++) {
+        workload.params.rram_banks[i] = ON;
+      }
+    }
+    if (opt == O0 || opt == O1) {
+      // force full bandwidth mode
+      workload.params.bandwidth_mode = QUAD;
+    }
+
+    workloads.push_back(workload);
   }
+
   return workloads;
 }
 
