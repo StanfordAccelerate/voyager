@@ -82,49 +82,38 @@ std::vector<Workload> MobileBERT::getWorkloads(
     const std::vector<std::string>& layers, bool useOffsets,
     int encoderIndex = 0) const {
   std::vector<Workload> workloads;
-  // Make "codgen"-matching case insensitive
-  std::string& modelNameLower = const_cast<std::string&>(this->modelName);
-  std::transform(modelNameLower.begin(), modelNameLower.end(),
-                 modelNameLower.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
 
-  // Hacky way to check if we are using codegen
-  if (modelNameLower.find("codegen") != std::string::npos) {
-    for (const std::string& layer : layers) {
-      Workload workload;
-      workload.name = layer;
-      workload.params = params.at(layer);
-      workload.files = files.at(layer);
+  for (const std::string& layer : layers) {
+    // Setup workload
+    Workload workload;
+    workload.name = layer;
+    workload.params = params.at(layer);
+    workload.files = files.at(layer);
+
+    // Handle hardcoded optimizations
+    if (opt == O0) {
+      // force all banks to be on
+      for (int i = 0; i < NUM_SRAM_BANKS; i++) {
+        workload.params.sram_banks[i] = ON;
+      }
+      for (int i = 0; i < NUM_RRAM_BANKS; i++) {
+        workload.params.rram_banks[i] = ON;
+      }
+    }
+    if (opt == O0 || opt == O1) {
+      // force full bandwidth mode
+      workload.params.bandwidth_mode = QUAD;
+    }
+
+    // If codegen, use generated models
+    if (codegen) {
       workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM), RRAM,
                             SRAM, SRAM};
 
-      if (opt == O0) {
-        // force all banks to be on
-        for (int i = 0; i < NUM_SRAM_BANKS; i++) {
-          workload.params.sram_banks[i] = ON;
-        }
-        for (int i = 0; i < NUM_RRAM_BANKS; i++) {
-          workload.params.rram_banks[i] = ON;
-        }
-      }
-      if (opt == O0 || opt == O1) {
-        // force full bandwidth mode
-        workload.params.bandwidth_mode = QUAD;
-      }
-
-      workloads.push_back(workload);
-    }
-
-    // Otherwise, use handwritten models
-  } else {
-    for (const std::string& layer : layers) {
+      // Otherwise, use handwritten models
+    } else {
       std::string encoderPrefix =
           "mobilebert_encoder_layer_" + std::to_string(encoderIndex) + "_";
-
-      Workload workload;
-      workload.name = layer;
-      workload.params = params.at(layer);
-      workload.files = files.at(layer);
 
       // adjust files path
       std::string inputDataDir;
@@ -346,11 +335,10 @@ std::vector<Workload> MobileBERT::getWorkloads(
           workload.params.OUTPUT_OFFSET = workload.params.WEIGHT_OFFSET;
         }
       }
-
-      workloads.push_back(workload);
     }
-  }
 
+    workloads.push_back(workload);
+  }
   return workloads;
 }
 
@@ -541,7 +529,8 @@ std::vector<Workload> MobileBERT::getBackwardWorkloads() {
   }
 
   // backwardWorkloads = std::vector<Workload>(backwardWorkloads.begin(),
-  //                                           backwardWorkloads.begin() + 35);
+  //                                           backwardWorkloads.begin() +
+  //                                           35);
   backwardWorkloads = std::vector<Workload>(backwardWorkloads.begin(),
                                             backwardWorkloads.end() - 3);
 
