@@ -2,9 +2,9 @@
 
 #include <algorithm>
 #include <iostream>
-#include <string>
 #include <memory>
 #include <sstream>
+#include <string>
 
 #include "test/common/GoldModel.h"
 #include "test/common/UniversalPosit.h"
@@ -98,6 +98,7 @@ Simulation::Simulation() {
   std::cout << "\n> Out dir: " << out_dir << "\n";
   std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
   std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n" << std::endl;
+  std::cout << "> Opt level: " << network->opt << std::endl;
 }
 
 void Simulation::loadMemory() {

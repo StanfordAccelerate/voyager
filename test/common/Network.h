@@ -40,10 +40,10 @@ class Network {
     O1,  // minimal optimization (power gating for capacity)
     O2   // full optimization (power gating for bandwidth)
   };
+  Optimization opt;
 
  protected:
   const std::string modelName;
   const std::string dataDir;
-  Optimization opt;
   bool codegen;
 };
