@@ -86,7 +86,8 @@ std::vector<Workload> MobileBERT::getWorkloads(
   for (const std::string& layer : layers) {
     // Setup workload
     Workload workload;
-    workload.name = layer;
+    workload.name = "mobilebert_encoder_layer_" + std::to_string(encoderIndex) +
+                    "_" + layer;
     workload.params = params.at(layer);
     workload.files = files.at(layer);
 
