@@ -80,7 +80,7 @@ void MobileBERT::setTask(std::string task) {
 
 std::vector<Workload> MobileBERT::getWorkloads(
     const std::vector<std::string>& layers, bool useOffsets,
-    int encoderIndex = 0) const {
+    int encoderIndex = 0, bool useCustomDataDir = false) const {
   std::vector<Workload> workloads;
 
   for (const std::string& layer : layers) {
@@ -133,13 +133,15 @@ std::vector<Workload> MobileBERT::getWorkloads(
       const int weightSize = ENCODER_WEIGHT_SIZE + 16 * 512 * 2;
 
       if (task == "inference") {
-        inputDataDir = "step_51_activations/";
-        weightDataDir = "step_51_weights/";
-        outputDataDir = "step_51_activations/";
-        residualDataDir = "step_51_activations/";
+        if (!useCustomDataDir) {
+          inputDataDir = "step_51_activations/";
+          weightDataDir = "step_51_weights/";
+          outputDataDir = "step_51_activations/";
+          residualDataDir = "step_51_activations/";
 
-        if (!workload.params.WEIGHT) {
-          weightDataDir = "step_51_activations/";
+          if (!workload.params.WEIGHT) {
+            weightDataDir = "step_51_activations/";
+          }
         }
 
         workload.memoryMap = {SRAM, workload.params.WEIGHT ? RRAM : SRAM, RRAM,
