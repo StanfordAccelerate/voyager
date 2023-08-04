@@ -143,6 +143,12 @@ std::vector<Workload> MobileBERT::getWorkloads(
 
         workload.memoryMap = {SRAM, workload.params.WEIGHT ? RRAM : SRAM, RRAM,
                               SRAM, SRAM};
+        // if operation involves attention mask, use SRAM as bias
+        if (workload.files.bias_file.find("mobilebert_attention_mask") !=
+            std::string::npos) {
+          workload.memoryMap.bias = SRAM;
+          workload.params.ATTENTION_MASK = true;
+        }
       } else if (task == "backward") {
         inputDataDir = "step_51_activation_gradients/";
         weightDataDir = "step_51_weights/";

@@ -160,6 +160,8 @@ struct SimplifiedParams {
 
   // Layer name
   std::string name;
+
+  bool ATTENTION_MASK;
 };
 
 struct MemoryOffsets {
@@ -183,13 +185,19 @@ const int ENCODER_WEIGHT_SIZE =
     3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE;
 
 // SRAM Memory Offsets
+// Memory looks like:
+// [STACK]
+// [LABEL]
+// [ATTENTION_MASK]
+// [ACTIVATION]
 const int STACK_SIZE = 0.25 * 1024 * 1024;
-const int ACTIVATION_OFFSET = STACK_SIZE + 16;
+const int ATTENTION_MASK_OFFSET = STACK_SIZE + 16;
+const int ACTIVATION_OFFSET = ATTENTION_MASK_OFFSET + 128 * 2;
 const int GRADIENT_OFFSET =
     ACTIVATION_OFFSET + 24 * ENCODER_ACTIVATION_SIZE + INTERMEDIATE_SIZE + 16;
 const int ERROR_OFFSET =
     GRADIENT_OFFSET + 24 * ENCODER_WEIGHT_SIZE + 512 * 16 + 2 * 16;
-const int WEIGHT_OFFSET = 128 * 2;
+const int WEIGHT_OFFSET = 0;
 
 struct Workload {
   std::string name;
