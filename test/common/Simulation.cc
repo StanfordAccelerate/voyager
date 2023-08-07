@@ -86,12 +86,12 @@ Simulation::Simulation() {
   // present. Makes it possible to run the same model with different opt levels
   std::string opt(get_env_var("OPT_LEVEL"));
   if (!opt.empty()) {
-    if (opt == "O1") {
+    if (opt == "O0") {
+      network->opt = Network::O0;
+    } else if (opt == "O1") {
       network->opt = Network::O1;
     } else if (opt == "O2") {
       network->opt = Network::O2;
-    } else if (opt == "O3") {
-      network->opt = Network::O0;
     } else {
       throw std::runtime_error("Unknown opt level: " + opt);
     }
