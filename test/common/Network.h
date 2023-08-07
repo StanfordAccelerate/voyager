@@ -11,11 +11,11 @@ class Network {
   Network(const std::string modelName, const std::string dataDir)
       : modelName(modelName), dataDir(dataDir) {
     if (modelName.find("O1") != std::string::npos) {
-      opt = O1;
+      this->opt = O1;
     } else if (modelName.find("O2") != std::string::npos) {
-      opt = O2;
+      this->opt = O2;
     } else {
-      opt = O0;
+      this->opt = O0;
     }
 
     // Make "codegen"-matching case insensitive
@@ -41,6 +41,17 @@ class Network {
     O2   // full optimization (power gating for bandwidth)
   };
   Optimization opt;
+
+  const std::string optToString() {
+    switch (opt) {
+      case O0:
+        return "O0";
+      case O1:
+        return "O1";
+      case O2:
+        return "O2";
+    }
+  }
 
  protected:
   const std::string modelName;

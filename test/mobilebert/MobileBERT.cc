@@ -86,8 +86,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
   for (const std::string& layer : layers) {
     // Setup workload
     Workload workload;
-    workload.name = "mobilebert_encoder_layer_" + std::to_string(encoderIndex) +
-                    "_" + layer;
+    workload.name = layer;
     workload.params = params.at(layer);
     workload.files = files.at(layer);
 
@@ -115,6 +114,10 @@ std::vector<Workload> MobileBERT::getWorkloads(
     } else {
       std::string encoderPrefix =
           "mobilebert_encoder_layer_" + std::to_string(encoderIndex) + "_";
+      // Prepend encoder prefix to workload name in order to avoid name
+      // collisions across encoders (codegen doesnt need that since it uses
+      // unique names directly from the ONNX model)
+      workload.name = encoderPrefix + workload.name;
 
       // adjust files path
       std::string inputDataDir;
