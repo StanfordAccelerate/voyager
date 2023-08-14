@@ -82,6 +82,21 @@ Simulation::Simulation() {
     throw std::runtime_error("Unknown model: " + modelName);
   }
 
+  // Override opt level present in the modelName using the OPT env var, if
+  // present. Makes it possible to run the same model with different opt levels
+  std::string opt(get_env_var("OPT_LEVEL"));
+  if (!opt.empty()) {
+    if (opt == "O0") {
+      network->opt = Network::O0;
+    } else if (opt == "O1") {
+      network->opt = Network::O1;
+    } else if (opt == "O2") {
+      network->opt = Network::O2;
+    } else {
+      throw std::runtime_error("Unknown opt level: " + opt);
+    }
+  }
+
   // Collect workloads (aka. layers) from Network
   workloads = network->getWorkloadsInRange(tests_list);
 
@@ -97,8 +112,8 @@ Simulation::Simulation() {
   std::cout << "\n> Data dir: " << network->getDataDir();
   std::cout << "\n> Out dir: " << out_dir << "\n";
   std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
-  std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n" << std::endl;
-  std::cout << "> Opt level: " << network->opt << std::endl;
+  std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n";
+  std::cout << "> Opt level: " << network->optToString() << std::endl;
 }
 
 void Simulation::loadMemory() {

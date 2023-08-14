@@ -2,6 +2,8 @@
 
 #define NO_SYSC
 
+#include <vector>
+
 // clang-format off
 #include "src/PositTypes.h"
 // clang-format on

@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 // #include "matplotlib-cpp/matplotlibcpp.h"
 // namespace plt = matplotlibcpp;
