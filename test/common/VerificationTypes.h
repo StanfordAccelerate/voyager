@@ -162,6 +162,7 @@ struct SimplifiedParams {
   std::string name;
 
   bool ATTENTION_MASK;
+  bool LORA_WEIGHT;
 };
 
 struct MemoryOffsets {
