@@ -65,8 +65,10 @@ void run_layer(const std::string &layerName, const std::string &task,
   runWorkload(params, memoryMap);
 }
 
-#include "backward_pass.h"
+// clang-format off
 #include "forward_pass.h"
+#include "backward_pass.h"
+// clang-format on
 
 void load_sample(DatasetIterator &dataset) {
   std::string sampleFolder = dataset.getSample();
