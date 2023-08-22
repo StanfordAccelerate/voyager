@@ -1,0 +1,19 @@
+#pragma once
+
+#define NUM_ENCODER_LAYERS 21
+#define NUM_HEADS 4
+#define NUM_FFN 2
+
+#define ATTENTION_HEAD_SIZE (128 * 32)
+#define INTRA_BOTTLENECK_SIZE (128 * 128)
+#define INTRA_BOTTLENECK_BIAS_SIZE (128 * 2)
+#define INTERMEDIATE_SIZE (128 * 512)
+#define INTERMEDIATE_BIAS_SIZE (512 * 2)
+#define ENCODER_WEIGHT_SIZE                             \
+  (8 * INTERMEDIATE_SIZE + 5 * INTERMEDIATE_BIAS_SIZE + \
+   3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE)
+#define LORA_WQ_B_SIZE (128 * 16 * 2)     // 16b precision
+#define LORA_WQ_A_SIZE (16 * 128 * 2)     // 16b precision
+#define LORA_WV_B_SIZE (512 * 16 * 2)     // 16b precision
+#define LORA_WV_A_SIZE (16 * 128 * 2)     // 16b precision
+#define CLASSIFIER_W_SIZE (512 * 16 * 2)  // 16b precision

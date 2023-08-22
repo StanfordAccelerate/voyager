@@ -1,0 +1,25 @@
+#pragma once
+
+#include "model_arch.h"
+
+// memory map
+#define LABEL (0)
+#define LABEL_SIZE 16
+#define INPUT (LABEL + LABEL_SIZE)
+#define INPUT_SIZE (128 * 512)
+#define MASK (INPUT + INPUT_SIZE)
+#define MASK_SIZE (128 * 2)
+#define CHECKPOINT (MASK + MASK_SIZE)
+#define CHECKPOINT_SIZE (128 * 512 * 4)  // 4 checkpoints
+#define ENCODER_SCRATCH (CHECKPOINT + CHECKPOINT_SIZE)
+#define ENCODER_SCRATCH_SIZE (128 * 512 + 128 * 128 * 7)
+#define BACKPROP_SCRATCH (ENCODER_SCRATCH + ENCODER_SCRATCH_SIZE)
+#define BACKPROP_SCRATCH_SIZE (128 * 512 + 128 * 128 * 7)
+#define LORA_W (BACKPROP_SCRATCH + BACKPROP_SCRATCH_SIZE)
+#define LORA_W_SIZE                                                      \
+  ((LORA_WQ_B_SIZE + LORA_WQ_A_SIZE + LORA_WV_B_SIZE + LORA_WV_A_SIZE) * \
+   NUM_ENCODER_LAYERS)
+#define CLASSIFIER_W (LORA_W + LORA_W_SIZE)
+#define LORA_G (CLASSIFIER_W + CLASSIFIER_W_SIZE)
+#define LORA_G_SIZE (LORA_W_SIZE)
+#define CLASSIFIER_G (LORA_G + LORA_G_SIZE)
