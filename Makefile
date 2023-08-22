@@ -217,7 +217,7 @@ build/AccuracyTester.o: test/common/AccuracyTester.cc
 build/Finetuning.o: test/training/Finetuning.cc
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-build/FinetuningWithFWPass.o: test/training/FinetuningWithFWPass.cc
+build/FinetuningWithFWPass.o: test/training/FinetuningWithFWPass.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 build/MobileBERTParams.o: test/training/MobileBERTParams.cc
