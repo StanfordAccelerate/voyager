@@ -391,46 +391,46 @@ const SimplifiedParams intra_bottleneck_bias = {
     .WEIGHT_UPDATE = true,
 };
 
-std::map<std::string, SimplifiedParams> weightParams{
-    {"classifier_weight", classifier_weight},
-    {"classifier_bias", classifier_bias},
-    {"output_bottleneck_LayerNorm_weight", inter_bottleneck_bias},
-    {"output_bottleneck_LayerNorm_bias", inter_bottleneck_bias},
-    {"output_bottleneck_dense_weight", intermediate_dense_weight},
-    {"output_bottleneck_dense_bias", inter_bottleneck_bias},
-    {"output_LayerNorm_weight", intra_bottleneck_bias},
-    {"output_LayerNorm_bias", intra_bottleneck_bias},
-    {"output_dense_weight", input_bottleneck_weight},
-    {"output_dense_bias", intra_bottleneck_bias},
-    {"intermediate_dense_weight", intermediate_dense_weight},
-    {"intermediate_dense_bias", inter_bottleneck_bias},
-    {"ffn_0_output_LayerNorm_weight", intra_bottleneck_bias},
-    {"ffn_0_output_LayerNorm_bias", intra_bottleneck_bias},
-    {"ffn_0_output_dense_weight", input_bottleneck_weight},
-    {"ffn_0_output_dense_bias", intra_bottleneck_bias},
-    {"ffn_0_intermediate_dense_weight", intermediate_dense_weight},
-    {"ffn_0_intermediate_dense_bias", inter_bottleneck_bias},
-    {"attention_output_LayerNorm_weight", intra_bottleneck_bias},
-    {"attention_output_LayerNorm_bias", intra_bottleneck_bias},
-    {"attention_output_dense_weight", bottleneck_projection_weight},
-    {"attention_output_dense_bias", intra_bottleneck_bias},
-    {"attention_self_value_weight", bottleneck_projection_weight},
-    {"attention_self_value_bias", intra_bottleneck_bias},
-    {"attention_self_query_weight", bottleneck_projection_weight},
-    {"attention_self_query_bias", intra_bottleneck_bias},
-    {"attention_self_key_weight", bottleneck_projection_weight},
-    {"attention_self_key_bias", intra_bottleneck_bias},
-    {"bottleneck_attention_LayerNorm_weight", intra_bottleneck_bias},
-    {"bottleneck_attention_LayerNorm_bias", intra_bottleneck_bias},
-    {"bottleneck_attention_dense_weight", input_bottleneck_weight},
-    {"bottleneck_attention_dense_bias", intra_bottleneck_bias},
-    {"bottleneck_input_LayerNorm_weight", intra_bottleneck_bias},
-    {"bottleneck_input_LayerNorm_bias", intra_bottleneck_bias},
-    {"bottleneck_input_dense_weight", input_bottleneck_weight},
-    {"bottleneck_input_dense_bias", intra_bottleneck_bias},
-};
+std::map<std::string, SimplifiedParams> weightParams;
 
-std::map<std::string, MemoryOffsets> weightMemOffsets{
+weightParams["classifier_weight"] = classifier_weight;
+weightParams["classifier_bias"] = classifier_bias;
+weightParams["output_bottleneck_LayerNorm_weight"] = inter_bottleneck_bias;
+weightParams["output_bottleneck_LayerNorm_bias"] = inter_bottleneck_bias;
+weightParams["output_bottleneck_dense_weight"] = intermediate_dense_weight;
+weightParams["output_bottleneck_dense_bias"] = inter_bottleneck_bias;
+weightParams["output_LayerNorm_weight"] = intra_bottleneck_bias;
+weightParams["output_LayerNorm_bias"] = intra_bottleneck_bias;
+weightParams["output_dense_weight"] = input_bottleneck_weight;
+weightParams["output_dense_bias"] = intra_bottleneck_bias;
+weightParams["intermediate_dense_weight"] = intermediate_dense_weight;
+weightParams["intermediate_dense_bias"] = inter_bottleneck_bias;
+weightParams["ffn_0_output_LayerNorm_weight"] = intra_bottleneck_bias;
+weightParams["ffn_0_output_LayerNorm_bias"] = intra_bottleneck_bias;
+weightParams["ffn_0_output_dense_weight"] = input_bottleneck_weight;
+weightParams["ffn_0_output_dense_bias"] = intra_bottleneck_bias;
+weightParams["ffn_0_intermediate_dense_weight"] = intermediate_dense_weight;
+weightParams["ffn_0_intermediate_dense_bias"] = inter_bottleneck_bias;
+weightParams["attention_output_LayerNorm_weight"] = intra_bottleneck_bias;
+weightParams["attention_output_LayerNorm_bias"] = intra_bottleneck_bias;
+weightParams["attention_output_dense_weight"] = bottleneck_projection_weight;
+weightParams["attention_output_dense_bias"] = intra_bottleneck_bias;
+weightParams["attention_self_value_weight"] = bottleneck_projection_weight;
+weightParams["attention_self_value_bias"] = intra_bottleneck_bias;
+weightParams["attention_self_query_weight"] = bottleneck_projection_weight;
+weightParams["attention_self_query_bias"] = intra_bottleneck_bias;
+weightParams["attention_self_key_weight"] = bottleneck_projection_weight;
+weightParams["attention_self_key_bias"] = intra_bottleneck_bias;
+weightParams["bottleneck_attention_LayerNorm_weight"] = intra_bottleneck_bias;
+weightParams["bottleneck_attention_LayerNorm_bias"] = intra_bottleneck_bias;
+weightParams["bottleneck_attention_dense_weight"] = input_bottleneck_weight;
+weightParams["bottleneck_attention_dense_bias"] = intra_bottleneck_bias;
+weightParams["bottleneck_input_LayerNorm_weight"] = intra_bottleneck_bias;
+weightParams["bottleneck_input_LayerNorm_bias"] = intra_bottleneck_bias;
+weightParams["bottleneck_input_dense_weight"] = input_bottleneck_weight;
+weightParams["bottleneck_input_dense_bias"] = intra_bottleneck_bias;
+
+const std::map<std::string, MemoryOffsets> weightMemOffsets{
     {"classifier_weight",
      {
          0,

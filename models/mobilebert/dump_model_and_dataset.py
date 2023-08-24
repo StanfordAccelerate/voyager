@@ -136,12 +136,16 @@ def main():
         help="Path to output datafiles.",
         required=True
     )
+    parser.add_argument("--dump_model", action="store_true", help="Dump model parameters.")
+    parser.add_argument("--dump_dataset", action="store_true", help="Dump dataset.")
     args = parser.parse_args()
 
-    model = AutoModelForSequenceClassification.from_pretrained(args.model_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_dir, ignore_mismatched_sizes=True)
 
-    write_model_params(model, args.output_dir)
-    write_dataset(model, args.model_dir, args.output_dir)
+    if args.dump_model:
+        write_model_params(model, args.output_dir)
+    if args.dump_dataset:
+        write_dataset(model, args.model_dir, args.output_dir)
     
     # export_to_onnx(model, args.model_dir, "model.onnx")
     

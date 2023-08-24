@@ -162,6 +162,7 @@ struct SimplifiedParams {
   std::string name;
 
   bool ATTENTION_MASK;
+  bool LORA_WEIGHT;
 };
 
 struct MemoryOffsets {
@@ -190,7 +191,7 @@ const int ENCODER_WEIGHT_SIZE =
 // [LABEL]
 // [ATTENTION_MASK]
 // [ACTIVATION]
-const int STACK_SIZE = 0.25 * 1024 * 1024;
+const int STACK_SIZE = 0.5 * 1024 * 1024;
 const int ATTENTION_MASK_OFFSET = STACK_SIZE + 16;
 const int ACTIVATION_OFFSET = ATTENTION_MASK_OFFSET + 128 * 2;
 const int GRADIENT_OFFSET =

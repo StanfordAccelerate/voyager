@@ -166,6 +166,20 @@ MobileBERTAccuracy: build/AccuracyTester
 build/AccuracyTester: build/AccuracyTester.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
 	$(CC) -o $@ $^ -lstdc++fs
 
+.PHONY: MobileBERTFinetuning
+MobileBERTFinetuning: build/Finetuning
+	./build/Finetuning
+
+build/Finetuning: build/Finetuning.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
+	$(CC) -o $@ $^ -lstdc++fs
+
+.PHONY: MobileBERTFinetuningWithFWPass
+MobileBERTFinetuningWithFWPass: build/FinetuningWithFWPass
+	./build/FinetuningWithFWPass
+
+build/FinetuningWithFWPass: build/FinetuningWithFWPass.o build/MobileBERTParams.o build/DatasetIterator.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
+	$(CC) -o $@ $^ -lstdc++fs
+
 # Unit tests for custom Posit implementation
 .PHONY: PositTest
 PositTest: build/PositTest
@@ -180,7 +194,7 @@ build/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h
 	$(CC) $(C11FLAGS) -c -o $@ $<
 
 build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
+	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
@@ -199,6 +213,18 @@ build/TestRunner.o: test/common/TestRunner.cc
 
 build/AccuracyTester.o: test/common/AccuracyTester.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
+
+build/Finetuning.o: test/training/Finetuning.cc
+	$(CC) $(C17FLAGS) -g -c -o $@ $<
+
+build/FinetuningWithFWPass.o: test/training/FinetuningWithFWPass.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h
+	$(CC) $(C17FLAGS) -g -c -o $@ $<
+
+build/MobileBERTParams.o: test/training/MobileBERTParams.cc
+	$(CC) $(C17FLAGS) -g -c -o $@ $<
+
+build/DatasetIterator.o: test/training/DatasetIterator.cc
+	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 ###########################################################
 # Networks
