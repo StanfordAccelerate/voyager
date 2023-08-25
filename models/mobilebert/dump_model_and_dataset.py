@@ -88,6 +88,44 @@ def write_dataset(model, model_dir, data_dir):
         write_fp64(os.path.join(folder, "attention_mask"), attention_mask)
 
 
+def export_to_onnx(model, model_dir, output_onnx_path):
+    
+    # Create dummy inputs for the model
+    tokenizer = AutoTokenizer.from_pretrained(model_dir)
+    dummy_sentence = "This is a sample sentence for ONNX export."
+    tokens = tokenizer(dummy_sentence, return_tensors="pt")
+    input_ids = tokens["input_ids"]
+    token_type_ids = tokens["token_type_ids"]
+    
+    # Move model to the appropriate device
+    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+    model.to(device)
+    
+    # Set the model to evaluation mode
+    model.eval()
+
+    # # create two dummy inputs for the model with shapes (1, 128, 512) and (1, 128)
+    input_ids = torch.ones((1, 128, 512), dtype=torch.float32)
+    token_type_ids = torch.ones((1, 128), dtype=torch.float32)
+
+    # # access only the encoder part of the model
+    # model = model.mobilebert.encoder
+    model = model
+
+    # Export the model to ONNX
+    torch.onnx.export(
+        model,
+        (input_ids.to(device), token_type_ids.to(device)),
+        output_onnx_path,
+        verbose=True,
+        opset_version=11,
+        input_names=['input', 'masks'],
+        output_names=['output']
+    )
+
+    print(f"Model exported to {output_onnx_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Generate datafiles from model.")
     parser.add_argument("--model_dir", type=str, help="Path to model directory.", default=None, required=True)
@@ -108,6 +146,8 @@ def main():
         write_model_params(model, args.output_dir)
     if args.dump_dataset:
         write_dataset(model, args.model_dir, args.output_dir)
+    
+    # export_to_onnx(model, args.model_dir, "model.onnx")
     
 
 if __name__ == "__main__":
