@@ -50,7 +50,8 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
       variant == FORWARD_PASS_MHA_0 ||
       variant == FORWARD_PASS_BOTTLENECK_ATTENTION) {
     // bottleneck_input_dense
-    run_op(OPERATION(bottleneck_attention_dense, inference), encoderLayerInput,
+    run_op(OPERATION(bottleneck_attention_dense, inference),
+           encoderLayerInput,
            weightBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
            activationBase + INTERMEDIATE_SIZE,
            weightBase + 2 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
@@ -62,6 +63,16 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
            weightBase + 2 * INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
+
+    // std::cerr << "bottleneck attention LayerNorm" << std::endl;
+    // int offsets = activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE;
+    // for (int i = 0; i < 128; i++) {
+    //   for (int j = 0; j < 128; j++) {
+    //     std::cerr << memory->sram[offsets + i * 128 + j] << "\t";
+    //   }
+    //   std::cerr << std::endl;
+    // }
+    // std::cerr << std::endl << std::endl;
 
     if (variant == FORWARD_PASS_BOTTLENECK_ATTENTION) {
       return;

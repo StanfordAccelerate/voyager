@@ -141,8 +141,7 @@ void initialize_model(const std::string &modelPath) {
     // load query LoRA weight
     std::string w_q_lora_file =
         "models/mobilebert/binary_data/tiny_pretrained/step_0/weights/"
-        "mobilebert_encoder_layer_" +
-        std::to_string(encoderLayer) +
+        "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
         "_attention_self_query_lora_A_default_weight";
     double *w_q_lora_weights =
         readFileAsDouble(w_q_lora_file, LORA_WQ_A_SIZE / 2, true);
@@ -162,8 +161,7 @@ void initialize_model(const std::string &modelPath) {
     // load value LoRA weight
     std::string w_v_lora_file =
         "models/mobilebert/binary_data/tiny_pretrained/step_0/weights/"
-        "mobilebert_encoder_layer_" +
-        std::to_string(encoderLayer) +
+        "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
         "_attention_self_value_lora_A_default_weight";
     double *w_v_lora_weights =
         readFileAsDouble(w_v_lora_file, LORA_WV_A_SIZE / 2, true);
