@@ -514,6 +514,10 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
   } else if (params.MERGE_LORA_WEIGHT) {
     ACC_T outputMatrix[X * K];
+    for (int i = 0; i < X * K; i++) {
+      outputMatrix[i] = 0;
+    }
+
     for (int x = 0; x < X; x++) {
       for (int k = 0; k < K; k++) {
         for (int c = 0; c < C; c++) {
@@ -539,7 +543,8 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     ACC_T outputMatrix[X * C];
     // Read double precision inputs
     for (int i = 0; i < X * C; i++) {
-      outputMatrix[i] = readInput(matrixA, i, true);;
+      outputMatrix[i] = readInput(matrixA, i, true);
+      ;
     }
 
     // Save quantized single precision outputs
