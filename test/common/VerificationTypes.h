@@ -162,7 +162,8 @@ struct SimplifiedParams {
   std::string name;
 
   bool ATTENTION_MASK;
-  bool LORA_WEIGHT;
+  bool MERGE_LORA_WEIGHT;
+  bool QUANTIZE_TO_P8;
 };
 
 struct MemoryOffsets {

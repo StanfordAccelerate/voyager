@@ -4,7 +4,8 @@
 
 #define DIMENSION 16
 
-void readFileAsDouble();
+double* readFileAsDouble(const std::string& filename, int size,
+                         bool useDataFile);
 
 class MemoryModel {
  public:

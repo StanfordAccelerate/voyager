@@ -171,7 +171,7 @@ void grad_clip_norm(ACC_T *matrix, int size) {
 template <typename T, typename ACC_T, typename INT_T>
 void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                  T *biasMatrix, T *residualMatrix, T *weightResidualMatrix) {
-  std::cerr << "Running gold model " << std::endl;
+  // std::cerr << "Running gold model " << std::endl;
 
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
@@ -198,7 +198,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
         outputMatrix[y] = readInput(matrixA, x * Y + y, params.ACC_T_INPUT);
       }
 
-      ACC_T max = 0;
+      ACC_T max = -9999;
       for (int y = 0; y < Y; y++) {
         max = outputMatrix[y] > max ? outputMatrix[y] : max;
       }
@@ -511,6 +511,39 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
 
     for (int i = 0; i < X * C; i++) {
       saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
+    }
+  } else if (params.MERGE_LORA_WEIGHT) {
+    ACC_T outputMatrix[X * K];
+    for (int i = 0; i < X * K; i++) {
+      outputMatrix[i] = 0;
+    }
+
+    for (int x = 0; x < X; x++) {
+      for (int k = 0; k < K; k++) {
+        for (int c = 0; c < C; c++) {
+          ACC_T lora_a = readInput(matrixA, x * C + c, true);
+          // lora b is stored in tranposed order in memory
+          ACC_T lora_b = readInput(matrixB, k * C + c, true);
+          outputMatrix[x * K + k] += static_cast<ACC_T>(lora_a * lora_b);
+        }
+      }
+    }
+
+    if (params.RESIDUAL) {
+      for (int i = 0; i < X * K; i++) {
+        ACC_T weight = readInput(residualMatrix, i, false);
+        outputMatrix[i] += weight;
+      }
+    }
+
+    for (int i = 0; i < X * K; i++) {
+      saveOutput(matrixC, i, outputMatrix[i], false);
+    }
+  } else if (params.QUANTIZE_TO_P8) {
+    // Read double precision inputs and save in single precision format
+    for (int i = 0; i < X * C; i++) {
+      ACC_T val = readInput(matrixA, i, true);
+      saveOutput(matrixC, i, val, false);
     }
   } else if (params.WEIGHT_UPDATE) {
     ACC_T *weights = new ACC_T[X * C];

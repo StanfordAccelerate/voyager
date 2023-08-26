@@ -11,10 +11,8 @@ std::vector<std::string> inferenceOrder{
     "bottleneck_input_LayerNorm",
     "bottleneck_attention_dense",
     "bottleneck_attention_LayerNorm",
-    // "attention_self.query_weight",
     "attention_self_query_layer",
     "attention_self_key_layer",
-    // "attention_self.value_weight",
     "attention_self_value_layer",
     "attention_self_attention_scores_0",
     "attention_self_attention_probs_0",
@@ -100,7 +98,7 @@ const SimplifiedParams input_bottleneck_LayerNorm = {
 };
 
 // (128 x 16) x (16 x 128) + (128 x 128)
-const SimplifiedParams query_weight = {
+const SimplifiedParams merged_query_weight = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
@@ -141,10 +139,10 @@ const SimplifiedParams query_weight = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .LORA_WEIGHT = true,
+    .MERGE_LORA_WEIGHT = true,
 };
 
-// (512 x 16) x (16 x 128) + (128 x 128)
+// (512 x 16) x (16 x 128) + (512 x 128)
 const SimplifiedParams value_weight = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
@@ -186,7 +184,7 @@ const SimplifiedParams value_weight = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .LORA_WEIGHT = true,
+    .MERGE_LORA_WEIGHT = true,
 };
 
 const SimplifiedParams query_key_projection = {
@@ -605,7 +603,7 @@ inferenceParams["bottleneck_input_dense"] = input_bottleneck;
 inferenceParams["bottleneck_input_LayerNorm"] = input_bottleneck_LayerNorm;
 inferenceParams["bottleneck_attention_dense"] = input_bottleneck;
 inferenceParams["bottleneck_attention_LayerNorm"] = input_bottleneck_LayerNorm;
-inferenceParams["attention_self_query_weight"] = query_weight;
+inferenceParams["attention_self_query_weight"] = merged_query_weight;
 inferenceParams["attention_self_query_layer"] = query_key_projection;
 inferenceParams["attention_self_key_layer"] = query_key_projection;
 inferenceParams["attention_self_value_weight"] = value_weight;
@@ -912,6 +910,10 @@ const std::map<std::string, Files> inferenceTestFiles{
          "bottleneck_input_LayerNorm_bias",
          "bottleneck_input_LayerNorm",
      }},
+    // TODO: query lora weights
+    {"attention_self_query_weight", {"", "", "", ""}},
+    // TODO: value lora weights
+    {"attention_self_value_weight", {"", "", "", ""}},
     {"bottleneck_attention_dense",
      {
          "hidden_states",

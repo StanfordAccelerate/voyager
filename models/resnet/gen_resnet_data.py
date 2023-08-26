@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
+import argparse
+import functools
+import os
+import pickle
+import re
+import struct
 
 import numpy as np
+import onnx
 import torch
 import torchvision
-from torchvision import transforms
 from PIL import Image
-import argparse
-import onnx
-import functools
-import pickle
-import struct
-import os
-import re
-import tqdm
+from tqdm import tqdm
+
+import torchvision.models as models
+from torchvision import transforms
+
 
 try:
     from torch.hub import load_state_dict_from_url
@@ -23,6 +26,8 @@ except ImportError:
 import resnet_reference
 import vision_models
 import bn_folding
+
+from vision_models import arrange_data
 
 # TODO(fpedd): Re-implement the int8 part (what is that used for, actually?)
 # TODO(fpedd): What are the datatypes supposed to mean, anyway?
@@ -56,26 +61,32 @@ def prepare_data(args: argparse.Namespace):
 
 
 def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref_labels: str):
-
     # Force PyTorch to CPU
     torch.device("cpu")
 
     # Create reference model and fill with weights
     model_ref = resnet_reference.ResNet(
         block=resnet_reference.BasicBlock, layers=[2, 2, 2, 2])
-    ref_state_dict = load_state_dict_from_url(
-        "https://download.pytorch.org/models/resnet18-5c106cde.pth")
-    model_ref.load_state_dict(ref_state_dict)
+    # ref_state_dict = load_state_dict_from_url(
+    #     "https://download.pytorch.org/models/resnet18-5c106cde.pth")
+    # model_ref.load_state_dict(ref_state_dict)
     model_ref.eval()
 
+    ckpt_file = f'{args.model_dir}/model_best.pth.tar'
+    if os.path.isfile(ckpt_file):
+        print("=> loading checkpoint '{}'".format(ckpt_file))
+        checkpoint = torch.load(ckpt_file, map_location=torch.device('cpu'))
+        model_ref.load_state_dict(checkpoint['state_dict'])
+    else:
+        model_ref = vision_models.ResNet(
+            block=vision_models.BasicBlock, layers=[2, 2, 2, 2])
+        model_path = os.path.join(args.model_dir, 'resnet18_mp2.pth')
+        bnfold_state_dict = torch.load(model_path).state_dict()
+        model_ref.load_state_dict(bnfold_state_dict)
+        model_ref.eval()
+
     # Create bn folded + maxpool 2x2 model (bn folded into conv)
-    model_bnfold = vision_models.ResNet(
-        block=vision_models.BasicBlock, layers=[2, 2, 2, 2])
-    model_path = os.path.join(args.model_dir, 'resnet18_mp2.pth')
-    bnfold_state_dict = torch.load(model_path).state_dict()
-    model_bnfold.load_state_dict(bnfold_state_dict)
-    model_bnfold.eval()
-    model_bnfold = bn_folding.bn_folding_model(model_bnfold)
+    model_bnfold = bn_folding.bn_folding_model(model_ref)
 
     preprocess = transforms.Compose([
         transforms.Resize(256),
@@ -190,13 +201,13 @@ def write_binary(args: argparse.Namespace, pkl_file_paths):
         os.makedirs(output_dir, exist_ok=True)
 
         # Load pickle file and write binary layer files
-        with open(pkl_file_path, 'rb') as input:
+        with open(pkl_file_path, 'rb') as f:
 
             # Working with posit8 datatypes
             if args.data_type == 'posit8':
 
                 # Iterate over all entries in the pickled dictionary
-                for name, data in pickle.load(input).items():
+                for name, data in pickle.load(f).items():
 
                     # Convert name to filename (special case for downsample)
                     file_name = re.sub('downsample.0', 'downsample', name)
@@ -208,7 +219,29 @@ def write_binary(args: argparse.Namespace, pkl_file_paths):
             else:
                 raise ValueError(
                     "Unsupported datatype {}!".format(args.data_type))
-    return
+
+
+def dump_model_weights(args):
+    model = models.__dict__['resnet18']()
+
+    ckpt_file = os.path.join(args.model_dir, 'model_best.pth.tar')
+    if os.path.isfile(ckpt_file):
+        print("=> loading checkpoint '{}'".format(ckpt_file))
+        checkpoint = torch.load(ckpt_file, map_location=torch.device('cpu'))
+        model.load_state_dict(checkpoint['state_dict'])
+
+    model.eval()
+    model = bn_folding.bn_folding_model(model)
+
+    weights = {}
+    for name, param in model.named_parameters():
+        weights[name] = arrange_data(name, param.data)
+
+    pkl_file = os.path.join(args.binary_dir, "weights.pkl")
+    with open(pkl_file, "wb") as f:
+        pickle.dump(weights, f)
+
+    return [pkl_file]
 
 
 def main():
@@ -251,7 +284,8 @@ def main():
     image_paths, image_labels, ref_labels = prepare_data(args)
     assert len(
         image_paths) >= args.samples, f'Can not generate {args.samples}, only {len(image_paths)} samples available.'
-    pkl_file_paths = run_model(args, image_paths, image_labels, ref_labels)
+    # pkl_file_paths = run_model(args, image_paths, image_labels, ref_labels)
+    pkl_file_paths = dump_model_weights(args)
     write_binary(args, pkl_file_paths)
 
     print("ResNet data generator done!")

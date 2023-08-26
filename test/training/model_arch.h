@@ -14,6 +14,6 @@
    3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE)
 #define LORA_WQ_B_SIZE (128 * 16 * 2)     // 16b precision
 #define LORA_WQ_A_SIZE (16 * 128 * 2)     // 16b precision
-#define LORA_WV_B_SIZE (512 * 16 * 2)     // 16b precision
-#define LORA_WV_A_SIZE (16 * 128 * 2)     // 16b precision
+#define LORA_WV_B_SIZE (16 * 128 * 2)     // 16b precision
+#define LORA_WV_A_SIZE (512 * 16 * 2)     // 16b precision
 #define CLASSIFIER_W_SIZE (512 * 16 * 2)  // 16b precision
