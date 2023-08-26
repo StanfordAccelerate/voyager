@@ -109,7 +109,7 @@ std::vector<Workload> MobileBERT::getWorkloads(
     // If codegen, use generated models
     if (codegen) {
       // inputs, weights, bias, residual, outputs
-      workload.memoryMap = {SRAM, (workload.params.WEIGHT ? RRAM : SRAM),
+      workload.memoryMap = {SRAM, workload.params.WEIGHT ? RRAM : SRAM,
                             workload.params.ATTENTION_MASK ? SRAM : RRAM, SRAM,
                             SRAM};
 
