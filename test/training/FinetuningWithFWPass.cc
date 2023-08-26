@@ -284,7 +284,6 @@ int main(int argc, char **argv) {
     // std::cout << std::endl;
 
     full_forward_pass();
-    std::abort();
     full_backward_pass();
   }
 }

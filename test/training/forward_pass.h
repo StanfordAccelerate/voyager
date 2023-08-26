@@ -137,25 +137,6 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            activationBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE, 0,
            weightBase + 2 * INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_BIAS_SIZE);
 
-    // double *combined_query_weight =
-    //     readFileAsDouble("combined_query_weight", 128 * 128, true);
-    // int count = 0;
-    // for (int i = 0; i < 128 * 128; i++) {
-    //   if (fabs(combined_query_weight[i] -
-    //            memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                         2 * INTRA_BOTTLENECK_SIZE + i]) > 0.001) {
-    //     // std::cout << "Mismatch at " << i << std::endl;
-    //     count++;
-    //     std::cout << combined_query_weight[i] << "/"
-    //               << memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                               2 * INTRA_BOTTLENECK_SIZE + i]
-    //               << " ";
-    //     // std::abort();
-    //   }
-    // }
-    // std::cout << std::endl << count << " mismatches" << std::endl;
-    // std::abort();
-
     // query projection
     run_op(OPERATION(attention_self_query_layer, inference),
            activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
@@ -401,6 +382,18 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                          std::to_string(encoderLayer) +
                          "_attention_output_LayerNorm");
   }
+
+  // if (encoderLayer == 20) {
+  //   std::cerr << "attention output LayerNorm" << std::endl;
+  //   for (int i = 0; i < 128; i++) {
+  //     for (int j = 0; j < 128; j++) {
+  //       int offset = i * 128 + j;
+  //       std::cerr << memory->sram[activationBase + INTERMEDIATE_SIZE + offset] << '\t';
+  //     }
+  //     std::cerr << std::endl;
+  //   }
+  //   std::cerr << std::endl << std::endl;
+  // }
 
   for (int ffn = 0; ffn < NUM_FFN; ffn++) {
     // ffn_intermediate_dense

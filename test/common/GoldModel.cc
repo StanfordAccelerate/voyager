@@ -540,16 +540,10 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       saveOutput(matrixC, i, outputMatrix[i], false);
     }
   } else if (params.QUANTIZE_TO_P8) {
-    ACC_T outputMatrix[X * C];
-    // Read double precision inputs
+    // Read double precision inputs and save in single precision format
     for (int i = 0; i < X * C; i++) {
-      outputMatrix[i] = readInput(matrixA, i, true);
-      ;
-    }
-
-    // Save quantized single precision outputs
-    for (int i = 0; i < X * C; i++) {
-      saveOutput(matrixC, i, outputMatrix[i], false);
+      ACC_T val = readInput(matrixA, i, true);
+      saveOutput(matrixC, i, val, false);
     }
   } else if (params.WEIGHT_UPDATE) {
     ACC_T *weights = new ACC_T[X * C];
