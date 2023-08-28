@@ -39,6 +39,10 @@ void MapOperation(const SimplifiedParams &params, const MemoryMap &memoryMap,
     MapCrossEntropyGrad(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.WEIGHT_UPDATE) {
     MapWeightUpdate(params, memoryMap, mappedParams, opMemoryMaps);
+  } else if (params.MERGE_LORA_WEIGHT) {
+    MapLoRACombination(params, memoryMap, mappedParams, opMemoryMaps);
+  } else if (params.QUANTIZE_TO_P8) {
+    MapLoRAQuantize(params, memoryMap, mappedParams, opMemoryMaps);
   } else {
     MapMatrixOp(params, memoryMap, mappedParams, opMemoryMaps);
   }
