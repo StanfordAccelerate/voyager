@@ -1,6 +1,34 @@
 #pragma once
 #include "memory_plan.h"
 
+// #define CHECK_OUTPUT
+
+#ifndef SOC
+void checkBWDLayerOutput(int memoryOffset, int size, std::string file,
+                         bool weightGradient = false) {
+  std::string fullFileName =
+      "models/mobilebert/binary_data/tiny_pretrained/step_0/" +
+      std::string(weightGradient ? "weight_gradients/"
+                                 : "activation_gradients/") +
+      file;
+  double *expected = readFileAsDouble(fullFileName, size, true);
+  int mismatchCount = 0;
+  for (int i = 0; i < size; i++) {
+    if (fabs(expected[i] - memory->sram[memoryOffset + i]) > 0.001) {
+      std::cout << "Mismatch at " << i << std::endl;
+      std::cout << expected[i] << " vs " << memory->sram[memoryOffset + i]
+                << std::endl;
+      mismatchCount++;
+    }
+  }
+  if (mismatchCount > 0) {
+    std::cout << mismatchCount << " mismatches" << std::endl;
+    std::cout << "file: " << file << std::endl;
+    std::abort();
+  }
+}
+#endif
+
 void encoder_backward_pass(int encoderLayer) {
   int activationBase = ENCODER_SCRATCH;
   int activationGradientBase = BACKPROP_SCRATCH;
@@ -15,10 +43,24 @@ void encoder_backward_pass(int encoderLayer) {
              3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
          activationGradientBase, 0, 0);
 
+#ifdef CHECK_OUTPUT
+  checkBWDLayerOutput(activationGradientBase, INTERMEDIATE_SIZE,
+                      "mobilebert_encoder_layer_" +
+                          std::to_string(encoderLayer) +
+                          "_output_bottleneck_dense");
+#endif
+
   run_op(OPERATION(output_LayerNorm, backward), activationGradientBase,
          weightBase + 7 * INTERMEDIATE_SIZE + 2 * INTERMEDIATE_BIAS_SIZE +
              3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
          activationGradientBase + INTERMEDIATE_SIZE, 0, 0);
+
+#ifdef CHECK_OUTPUT
+  checkBWDLayerOutput(activationGradientBase + INTERMEDIATE_SIZE,
+                      INTRA_BOTTLENECK_SIZE,
+                      "mobilebert_encoder_layer_" +
+                          std::to_string(encoderLayer) + "_output_LayerNorm");
+#endif
 
   for (int ffn = NUM_FFN - 1; ffn >= 0; ffn--) {
     run_op(OPERATION(output_dense, backward),
@@ -62,6 +104,14 @@ void encoder_backward_pass(int encoderLayer) {
          activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE, 0,
          0);
 
+#ifdef CHECK_OUTPUT
+  checkBWDLayerOutput(
+      activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
+      INTRA_BOTTLENECK_SIZE,
+      "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
+          "_attention_output_dense");
+#endif
+
   run_op(OPERATION(attention_self_context_layer, backward),
          activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
          weightBase + 3 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
@@ -69,10 +119,26 @@ void encoder_backward_pass(int encoderLayer) {
          activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
          0, 0);
 
+#ifdef CHECK_OUTPUT
+  checkBWDLayerOutput(
+      activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+      INTRA_BOTTLENECK_SIZE,
+      "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
+          "_attention_self_context_layer");
+#endif
+
   run_op(OPERATION(bottleneck_input_dense, backward),
          activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
          weightBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_BIAS_SIZE,
          activationGradientBase + INTERMEDIATE_SIZE, 0, 0);
+
+  if (encoderLayer > 0)
+#ifdef CHECK_OUTPUT
+    checkBWDLayerOutput(
+        activationGradientBase + INTERMEDIATE_SIZE, INTRA_BOTTLENECK_SIZE,
+        "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
+            "_bottleneck_input_dense");
+#endif
 
   for (int head = 0; head < NUM_HEADS; head++) {
     forward_pass_from_checkpoint(encoderLayer, head == 0   ? FORWARD_PASS_MHA_0
@@ -125,32 +191,7 @@ void encoder_backward_pass(int encoderLayer) {
   /* ========================== query lora ========================== */
 
   // recompute bottleneck attention LayerNorm
-  forward_pass_from_checkpoint(encoderLayer,
-                               FORWARD_PASS_BOTTLENECK_ATTENTION);
-
-  int output_loc;
-
-  // std::cerr << "attention output LayerNorm" << std::endl;
-  // output_loc = activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE;
-  // for (int i = 0; i < 128; i++) {
-  //   for (int j = 0; j < 128; j++) {
-  //     int offset = i * 128 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
-
-  // std::cerr << "query error" << std::endl;
-  // output_loc = activationGradientBase + INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_SIZE;
-  // for (int i = 0; i < 128; i++) {
-  //   for (int j = 0; j < 128; j++) {
-  //     int offset = i * 128 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
+  forward_pass_from_checkpoint(encoderLayer, FORWARD_PASS_BOTTLENECK_ATTENTION);
 
   // query weight gradient
   run_op(OPERATION(attention_self_query_weight, gradient),
@@ -159,32 +200,11 @@ void encoder_backward_pass(int encoderLayer) {
          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
          0, 0);
 
-  // std::cerr << "query weight gradient" << std::endl;
-  // output_loc = activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE;
-  // for (int i = 0; i < 128; i++) {
-  //   for (int j = 0; j < 128; j++) {
-  //     int offset = i * 128 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
-
   // quantize lora_A weight
   run_op(OPERATION(attention_self_query_lora_A_quant, gradient),
          LORA_W + loraWeightOffset, 0,
-         activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE, 0, 0);
-
-  // std::cerr << "query lora_A quantized to p8" << std::endl;
-  // output_loc = activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE;
-  // for (int i = 0; i < 128; i++) {
-  //   for (int j = 0; j < 16; j++) {
-  //     int offset = i * 16 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
+         activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         0, 0);
 
   // query lora_B gradient
   run_op(OPERATION(attention_self_query_lora_B_weight, gradient),
@@ -207,8 +227,9 @@ void encoder_backward_pass(int encoderLayer) {
 
   // quantize lora_B weight
   run_op(OPERATION(attention_self_query_lora_B_quant, gradient),
-          LORA_W + loraWeightOffset + LORA_WQ_A_SIZE, 0,
-          activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE, 0, 0);
+         LORA_W + loraWeightOffset + LORA_WQ_A_SIZE, 0,
+         activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         0, 0);
 
   // query lora_A gradient
   run_op(OPERATION(attention_self_query_lora_A_weight, gradient),
@@ -283,6 +304,14 @@ void encoder_backward_pass(int encoderLayer) {
          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
          0, 0);
 
+#ifdef CHECK_OUTPUT
+  checkBWDLayerOutput(
+      activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
+      INTRA_BOTTLENECK_SIZE,
+      "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
+          "_bottleneck_attention_dense");
+#endif
+
   run_op(OPERATION(bottlenecked_hidden_states, backward),
          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
          weightBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
@@ -296,7 +325,14 @@ void encoder_backward_pass(int encoderLayer) {
              8 * INTRA_BOTTLENECK_BIAS_SIZE,
          activationGradientBase, 0, activationGradientBase);
 
-  /* ========================== value lora gradient ========================== */
+#ifdef CHECK_OUTPUT
+  checkBWDLayerOutput(activationGradientBase, INTERMEDIATE_SIZE,
+                      "mobilebert_encoder_layer_" +
+                          std::to_string(encoderLayer) + "_hidden_states");
+#endif
+
+  /* ========================== value lora gradient ==========================
+   */
 
   int encoderLayerInput;
   if (encoderLayer == 0) {
@@ -307,50 +343,17 @@ void encoder_backward_pass(int encoderLayer) {
     encoderLayerInput = activationBase;
   }
 
-  // std::cerr << "hidden states" << std::endl;
-  // output_loc = encoderLayerInput;
-  // for (int i = 0; i < 128; i++) {
-  //   for (int j = 0; j < 512; j++) {
-  //     int offset = i * 512 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
-
-  // std::cerr << "value error" << std::endl;
-  // output_loc = activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE;
-  // for (int i = 0; i < 4 * 128; i++) {
-  //   for (int j = 0; j < 32; j++) {
-  //     int offset = i * 32 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
-
   // value weight gradient
-  run_op(OPERATION(attention_self_value_weight, gradient),
-         encoderLayerInput,
+  run_op(OPERATION(attention_self_value_weight, gradient), encoderLayerInput,
          activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
          0, 0);
 
-  // std::cerr << "value weight gradient" << std::endl;
-  // output_loc = activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE;
-  // for (int i = 0; i < 512; i++) {
-  //   for (int j = 0; j < 128; j++) {
-  //     int offset = i * 128 + j;
-  //     std::cerr << memory->sram[output_loc + offset] << '\t';
-  //   }
-  //   std::cerr << std::endl;
-  // }
-  // std::cerr << std::endl << std::endl;
-
   // quantize value lora_A weight
   run_op(OPERATION(attention_self_value_lora_A_quant, gradient),
          LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0,
-         activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE, 0, 0);
+         activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+         0, 0);
 
   // value lora_B gradient
   run_op(OPERATION(attention_self_value_lora_B_weight, gradient),
@@ -373,8 +376,11 @@ void encoder_backward_pass(int encoderLayer) {
 
   // quantize lora_B weight
   run_op(OPERATION(attention_self_value_lora_B_quant, gradient),
-          LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE, 0,
-          activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE, 0, 0);
+         LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+             LORA_WV_A_SIZE,
+         0,
+         activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+         0, 0);
 
   // value lora_A gradient
   run_op(OPERATION(attention_self_value_lora_A_weight, gradient),

@@ -211,7 +211,8 @@ void Simulation::run() {
           (memoryMap.weights ? positMemory->rram : positMemory->sram) +
               params.WEIGHT_OFFSET,
           positMemory->sram + params.OUTPUT_OFFSET,
-          positMemory->rram + params.BIAS_OFFSET,
+          (params.ATTENTION_MASK ? positMemory->sram : positMemory->rram) +
+              params.BIAS_OFFSET,
           positMemory->sram + params.RESIDUAL_OFFSET,
           positMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
@@ -222,7 +223,9 @@ void Simulation::run() {
                              : universalPositMemory->sram) +
               params.WEIGHT_OFFSET,
           universalPositMemory->sram + params.OUTPUT_OFFSET,
-          universalPositMemory->rram + params.BIAS_OFFSET,
+          (params.ATTENTION_MASK ? universalPositMemory->sram
+                                 : universalPositMemory->rram) +
+              params.BIAS_OFFSET,
           universalPositMemory->sram + params.RESIDUAL_OFFSET,
           universalPositMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }
@@ -232,7 +235,8 @@ void Simulation::run() {
           (memoryMap.weights ? floatMemory->rram : floatMemory->sram) +
               params.WEIGHT_OFFSET,
           floatMemory->sram + params.OUTPUT_OFFSET,
-          floatMemory->rram + params.BIAS_OFFSET,
+          (params.ATTENTION_MASK ? floatMemory->sram : floatMemory->rram) +
+              params.BIAS_OFFSET,
           floatMemory->sram + params.RESIDUAL_OFFSET,
           floatMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
     }

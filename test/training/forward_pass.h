@@ -2,7 +2,9 @@
 
 #include "memory_plan.h"
 
-// #define LORA
+#define LORA
+
+// #define CHECK_OUTPUT
 
 #ifdef SOC
 typedef enum
@@ -25,7 +27,8 @@ enum ForwardPassVariant
 };
 #endif
 
-void checkLayerOutput(int memoryOffset, int size, std::string file) {
+#ifndef SOC
+void checkFWDLayerOutput(int memoryOffset, int size, std::string file) {
   std::string fullFileName =
       "models/mobilebert/binary_data/tiny_pretrained/step_0/activations/" +
       file;
@@ -45,6 +48,7 @@ void checkLayerOutput(int memoryOffset, int size, std::string file) {
     std::abort();
   }
 }
+#endif
 
 void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
   int activationBase = ENCODER_SCRATCH;
@@ -68,23 +72,6 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
     encoderLayerInput = activationBase;
   }
 
-  // if (encoderLayer == 20) {
-  //   std::cout << "Input:" << std::endl;
-  //   for (int i = 0; i < 10; i++) {
-  //     std::cout << memory->sram[encoderLayerInput + i] << std::endl;
-  //   }
-  //   std::cout << std::endl;
-  //   for (int i = 63 * 512; i < 63 * 512 + 10; i++) {
-  //     std::cout << memory->sram[encoderLayerInput + i] << std::endl;
-  //   }
-
-  //   std::cout << std::endl;
-  //   for (int i = 64 * 512; i < 64 * 512 + 10; i++) {
-  //     std::cout << memory->sram[encoderLayerInput + i] << std::endl;
-  //   }
-  //   std::abort();
-  // }
-
   if (variant == COMPLETE_FORWARD_PASS ||
       variant == FORWARD_PASS_FFN_1_INTERMEDIATE ||
       variant == FORWARD_PASS_MHA_0 ||
@@ -96,10 +83,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            weightBase + 2 * INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    checkLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
-                     "mobilebert_encoder_layer_" +
-                         std::to_string(encoderLayer) +
-                         "_bottleneck_attention_dense");
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
+                        "mobilebert_encoder_layer_" +
+                            std::to_string(encoderLayer) +
+                            "_bottleneck_attention_dense");
+#endif
 
     // bottleneck_input_LayerNorm
     run_op(OPERATION(bottleneck_attention_LayerNorm, inference),
@@ -109,20 +98,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            weightBase + 2 * INTERMEDIATE_SIZE + 5 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    checkLayerOutput(
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(
         activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE, 128 * 128,
         "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
             "_bottleneck_attention_LayerNorm");
-
-    // std::cerr << "bottleneck attention LayerNorm" << std::endl;
-    // int offsets = activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE;
-    // for (int i = 0; i < 128; i++) {
-    //   for (int j = 0; j < 128; j++) {
-    //     std::cerr << memory->sram[offsets + i * 128 + j] << "\t";
-    //   }
-    //   std::cerr << std::endl;
-    // }
-    // std::cerr << std::endl << std::endl;
+#endif
 
     if (variant == FORWARD_PASS_BOTTLENECK_ATTENTION) {
       return;
@@ -130,7 +111,6 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
 
 #ifdef LORA
 
-    // std::cout << "query weight combination" << std::endl;
     // LoRA query weight (A * B) + W
     run_op(OPERATION(attention_self_query_weight, inference), loraWeightBase,
            loraWeightBase + LORA_WQ_A_SIZE,
@@ -145,6 +125,13 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            weightBase + 2 * INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE +
                6 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
+
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
+                        "mobilebert_encoder_layer_" +
+                            std::to_string(encoderLayer) +
+                            "_attention_self_query_layer");
+#endif
 #else
     // query projection
     run_op(OPERATION(attention_self_query_layer, inference),
@@ -155,10 +142,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                6 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    checkLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
-                     "mobilebert_encoder_layer_" +
-                         std::to_string(encoderLayer) +
-                         "_attention_self_query_layer");
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
+                        "mobilebert_encoder_layer_" +
+                            std::to_string(encoderLayer) +
+                            "_attention_self_query_layer");
+#endif
 #endif
     // key projection
     run_op(OPERATION(attention_self_key_layer, inference),
@@ -170,30 +159,15 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                7 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    checkLayerOutput(
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(
         activationBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
         128 * 128,
         "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
             "_attention_self_key_layer");
+#endif
 
 #ifdef LORA
-
-    // double *value_lora_A_weight =
-    //     readFileAsDouble("value_lora_A_weight", 128 * 128, true);
-    // for (int i = 0; i < 128 * 128; i++) {
-    //   if (fabs(value_lora_A_weight[i] -
-    //            memory->sram[loraWeightBase + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE
-    //            +
-    //                         i * 2]) > 0.001) {
-    //     std::cout << "Mismatch at " << i << std::endl;
-    //     std::cout << value_lora_A_weight[i] << " vs "
-    //               << memory->sram[loraWeightBase + LORA_WQ_A_SIZE +
-    //                               LORA_WQ_B_SIZE + i * 2]
-    //               << std::endl;
-    //     std::abort();
-    //   }
-    // }
-    // std::abort();
 
     // LoRA value weight (A * B) + W
     run_op(OPERATION(attention_self_value_weight, inference),
@@ -203,44 +177,6 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            weightBase + 2 * INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE +
                8 * INTRA_BOTTLENECK_BIAS_SIZE);
 
-    // double *combined_value_weight =
-    //     readFileAsDouble("combined_value_weight", 512 * 128, true);
-    // for (int i = 0; i < 512 * 128; i++) {
-    //   if (fabs(combined_value_weight[i] -
-    //            memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                         3 * INTRA_BOTTLENECK_SIZE + i]) > 0.001) {
-    //     std::cout << "Mismatch at " << i << std::endl;
-    //     std::cout << combined_value_weight[i] << " vs "
-    //               << memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                               3 * INTRA_BOTTLENECK_SIZE + i]
-    //               << std::endl;
-    //     std::abort();
-    //   }
-    // }
-    // std::abort();
-    // std::cout << "Value weights:" << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                             3 * INTRA_BOTTLENECK_SIZE + i]
-    //             << std::endl;
-    // }
-    // std::abort();
-
-    // std::cout << "Value inputs:" << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->sram[encoderLayerInput + i] << std::endl;
-    // }
-
-    // std::cout << "Value bias:" << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->rram[weightBase + 3 * INTERMEDIATE_SIZE +
-    //                             2 * INTRA_BOTTLENECK_SIZE +
-    //                             8 * INTRA_BOTTLENECK_BIAS_SIZE + i]
-    //             << std::endl;
-    // }
-
-    // std::cout << "*******************" << std::endl;
-
     // value projection
     run_op(OPERATION(attention_self_value_layer, inference), encoderLayerInput,
            activationBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
@@ -249,20 +185,13 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                8 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    // std::cout << "Value weights:" << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                             3 * INTRA_BOTTLENECK_SIZE + i]
-    //             << std::endl;
-    // }
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(
+        activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE, 128 * 128,
+        "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
+            "_attention_self_value_layer");
+#endif
 
-    // std::cout << "Value output:" << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->sram[activationBase + INTERMEDIATE_SIZE +
-    //                             INTRA_BOTTLENECK_SIZE + i]
-    //             << std::endl;
-    // }
-    // std::abort();
 #else
     // value projection
     run_op(OPERATION(attention_self_value_layer, inference), encoderLayerInput,
@@ -273,10 +202,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                8 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    checkLayerOutput(
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(
         activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE, 128 * 128,
         "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
             "_attention_self_value_layer");
+#endif
 #endif
   }
 
@@ -321,12 +252,14 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                  head * ATTENTION_HEAD_SIZE,
              0, 0);
 
-      checkLayerOutput(
+#ifdef CHECK_OUTPUT
+      checkFWDLayerOutput(
           activationBase + INTERMEDIATE_SIZE + 6 * INTRA_BOTTLENECK_SIZE +
               head * ATTENTION_HEAD_SIZE,
           128 * 32,
           "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
               "_attention_self_context_layer_" + std::to_string(head));
+#endif
     }
 
     // bottleneck_attention_dense
@@ -335,10 +268,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
            weightBase + INTERMEDIATE_SIZE, 0);
 
-    checkLayerOutput(
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(
         activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE, 128 * 128,
         "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
             "_bottleneck_input_dense");
+#endif
 
     // bottleneck_attention_LayerNorm
     run_op(OPERATION(bottleneck_input_LayerNorm, inference),
@@ -347,10 +282,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
            activationBase + INTERMEDIATE_SIZE,
            weightBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_BIAS_SIZE, 0);
 
-    checkLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
-                     "mobilebert_encoder_layer_" +
-                         std::to_string(encoderLayer) +
-                         "_bottleneck_input_LayerNorm");
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
+                        "mobilebert_encoder_layer_" +
+                            std::to_string(encoderLayer) +
+                            "_bottleneck_input_LayerNorm");
+#endif
 
     // attention_output_dense
     run_op(OPERATION(attention_output_dense, inference),
@@ -362,10 +299,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                9 * INTRA_BOTTLENECK_BIAS_SIZE,
            activationBase + INTERMEDIATE_SIZE);
 
-    checkLayerOutput(
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(
         activationBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE, 128 * 128,
         "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
             "_attention_output_dense");
+#endif
 
     // attention_output_LayerNorm
     run_op(OPERATION(attention_output_LayerNorm, inference),
@@ -377,23 +316,13 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
                11 * INTRA_BOTTLENECK_BIAS_SIZE,
            0);
 
-    checkLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
-                     "mobilebert_encoder_layer_" +
-                         std::to_string(encoderLayer) +
-                         "_attention_output_LayerNorm");
+#ifdef CHECK_OUTPUT
+    checkFWDLayerOutput(activationBase + INTERMEDIATE_SIZE, 128 * 128,
+                        "mobilebert_encoder_layer_" +
+                            std::to_string(encoderLayer) +
+                            "_attention_output_LayerNorm");
+#endif
   }
-
-  // if (encoderLayer == 20) {
-  //   std::cerr << "attention output LayerNorm" << std::endl;
-  //   for (int i = 0; i < 128; i++) {
-  //     for (int j = 0; j < 128; j++) {
-  //       int offset = i * 128 + j;
-  //       std::cerr << memory->sram[activationBase + INTERMEDIATE_SIZE + offset] << '\t';
-  //     }
-  //     std::cerr << std::endl;
-  //   }
-  //   std::cerr << std::endl << std::endl;
-  // }
 
   for (int ffn = 0; ffn < NUM_FFN; ffn++) {
     // ffn_intermediate_dense
@@ -456,10 +385,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
              3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
          encoderLayerInput);
 
-  checkLayerOutput(
+#ifdef CHECK_OUTPUT
+  checkFWDLayerOutput(
       activationBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE, 128 * 512,
       "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
           "_output_bottleneck_dense");
+#endif
 
   // output_bottleneck_LayerNorm
   run_op(OPERATION(output_bottleneck_LayerNorm, inference),
@@ -471,9 +402,12 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
              3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE,
          0);
 
-  checkLayerOutput(encoderLayerOutput, 128 * 512,
-                   "mobilebert_encoder_layer_" + std::to_string(encoderLayer) +
-                       "_output_bottleneck_LayerNorm");
+#ifdef CHECK_OUTPUT
+  checkFWDLayerOutput(encoderLayerOutput, 128 * 512,
+                      "mobilebert_encoder_layer_" +
+                          std::to_string(encoderLayer) +
+                          "_output_bottleneck_LayerNorm");
+#endif
 }
 
 void forward_pass(int startingEncoder, int endingEncoder) {

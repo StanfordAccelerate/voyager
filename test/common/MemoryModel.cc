@@ -271,9 +271,6 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
       !files.weights_file.empty()) {
     loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
   }
-  if (params.BIAS && !files.bias_file.empty() && params.ATTENTION_MASK) {
-    loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
-  }
   if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
     loadResiduals(params, memoryMap.residual, files.residual_file, useDataFile);
   }
@@ -288,17 +285,17 @@ void MemoryModel::loadModelParams(const SimplifiedParams& params,
                                   const Files& files,
                                   const MemoryMap& memoryMap,
                                   bool useDataFile) {
-  // If weights is false, we don't load weights, but we load the second input as
-  // weights from SRAM, see above
+  // If weights is false, we don't load weights, but we load the second input
+  // as weights from SRAM, see above
   if (params.WEIGHT) {
     loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
   }
-  // if ATTENTION_MASK is true, we don't load bias as a model parameter, but as
-  // an input, see above
-  if (params.BIAS) {
-    if (!params.ATTENTION_MASK) {
-      loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
-    }
+  // if ATTENTION_MASK is true, we don't load bias as a model parameter, but
+  // as an input, see above
+  if (params.BIAS && !params.ATTENTION_MASK) {
+    loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
+  } else if (params.ATTENTION_MASK) {
+    loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
   }
   if (params.CROSS_ENTROPY_GRAD) {
     loadWeights(params, SRAM, files.weights_file, useDataFile);

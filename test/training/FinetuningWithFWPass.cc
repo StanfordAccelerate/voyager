@@ -114,8 +114,12 @@ void load_sample(DatasetIterator &dataset, bool useStepFolder, int step) {
                                dummyAttentionMaskWorkload.memoryMap, true);
 
   // open file
-  std::ifstream labelFile(sampleFolder + "/activations/mobilebert_labels",
-                          std::ios::binary);
+  std::ifstream labelFile(
+      useStepFolder
+          ? "models/mobilebert/binary_data/tiny_pretrained/step_" +
+                std::to_string(step) + "/activations/mobilebert_labels"
+          : sampleFolder + "/activations/mobilebert_labels",
+      std::ios::binary);
   double *tmpValuesArray = new double[1024];
   labelFile.read((char *)tmpValuesArray, 1024 * sizeof(double));
   for (int i = 0; i < 2; i++) {
@@ -178,15 +182,14 @@ void initialize_model(const std::string &modelPath) {
     double *w_qb_lora_weights =
         readFileAsDouble(w_qb_lora_file, LORA_WQ_B_SIZE / 2, true);
 
+    // B is stored as a transposed matrix
     for (int row = 0; row < 16; row++) {
       for (int col = 0; col < 128; col++) {
-        for (int precision = 0; precision < 2; precision++) {
-          memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-                       LORA_WQ_A_SIZE + row * 128 * 2 + col * 2] =
-              w_qb_lora_weights[col * 128 + row];
-          memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-                       LORA_WQ_A_SIZE + row * 128 * 2 + col * 2 + 1] = 0;
-        }
+        memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
+                     LORA_WQ_A_SIZE + row * 128 * 2 + col * 2] =
+            w_qb_lora_weights[col * 16 + row];
+        memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
+                     LORA_WQ_A_SIZE + row * 128 * 2 + col * 2 + 1] = 0;
       }
     }
 
@@ -219,14 +222,6 @@ void initialize_model(const std::string &modelPath) {
                    LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + i * 2 + 1] = 0;
     }
 
-    // std::cout << "encoderLayer: " << encoderLayer << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-    //                             LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + i * 2]
-    //             << std::endl;
-    // }
-    // std::cout << "------" << std::endl;
-
     std::string w_vb_lora_file =
         "models/mobilebert/binary_data/tiny_pretrained/step_" +
         std::to_string(stepNum) + "/weights/mobilebert_encoder_layer_" +
@@ -234,40 +229,19 @@ void initialize_model(const std::string &modelPath) {
         "_attention_self_value_lora_B_default_weight";
     double *w_vb_lora_weights =
         readFileAsDouble(w_vb_lora_file, LORA_WV_B_SIZE / 2, true);
-    // for (int i = 0; i < LORA_WV_B_SIZE / 2; i++) {
-    //   memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-    //                LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE + i * 2]
-    //                =
-    //       w_vb_lora_weights[i];
-    //   memory
-    //       ->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE + LORA_WQ_A_SIZE
-    //       +
-    //              LORA_WQ_B_SIZE + LORA_WV_A_SIZE + i * 2 + 1] = 0;
-    // }
 
+    // B is stored as a transposed matrix
     for (int row = 0; row < 16; row++) {
       for (int col = 0; col < 128; col++) {
-        for (int precision = 0; precision < 2; precision++) {
-          memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-                       LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE +
-                       row * 128 * 2 + col * 2] =
-              w_vb_lora_weights[col * 128 + row];
-          memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-                       LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE +
-                       +row * 128 * 2 + col * 2 + 1] = 0;
-        }
+        memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
+                     LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE +
+                     row * 128 * 2 + col * 2] =
+            w_vb_lora_weights[col * 16 + row];
+        memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
+                     LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE +
+                     +row * 128 * 2 + col * 2 + 1] = 0;
       }
     }
-
-    // std::cout << "encoderLayer: " << encoderLayer << std::endl;
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout
-    //       << memory->sram[LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE +
-    //                       LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE +
-    //                       i]
-    //       << std::endl;
-    // }
-    // std::cout << "------" << std::endl;
   }
 
   // Initialize LoRA weight gradient
@@ -299,11 +273,6 @@ int main(int argc, char **argv) {
   DatasetIterator dataset("models/mobilebert/binary_data/tiny_pretrained/");
   for (int i = 0; i < 100; i++) {
     load_sample(dataset, true, i);
-
-    // for (int i = 0; i < 10; i++) {
-    //   std::cout << memory->sram[INPUT + i] << " ";
-    // }
-    // std::cout << std::endl;
 
     full_forward_pass();
     full_backward_pass();
