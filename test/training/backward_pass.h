@@ -443,7 +443,7 @@ void encoder_backward_pass(int encoderLayer, int step) {
 void full_backward_pass(int step = 0) {
   // cross-entropy gradient
   run_op(OPERATION(classifier, backward), ENCODER_SCRATCH + INTERMEDIATE_SIZE,
-         0, BACKPROP_SCRATCH, 0, 0);
+         LABEL, BACKPROP_SCRATCH, 0, 0);
 
   // for (int j = 0; j < 16; j++) {
   //   std::cerr << memory->sram[BACKPROP_SCRATCH + j] << '\t';
