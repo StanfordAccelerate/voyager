@@ -271,6 +271,9 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
       !files.weights_file.empty()) {
     loadWeights(params, memoryMap.weights, files.weights_file, useDataFile);
   }
+  if (params.ATTENTION_MASK) {
+    loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
+  }
   if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
     loadResiduals(params, memoryMap.residual, files.residual_file, useDataFile);
   }
@@ -295,7 +298,9 @@ void MemoryModel::loadModelParams(const SimplifiedParams& params,
   if (params.BIAS && !params.ATTENTION_MASK) {
     loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
   } else if (params.ATTENTION_MASK) {
-    loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
+    if (files.bias_file != "") {
+      loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
+    }
   }
   if (params.CROSS_ENTROPY_GRAD) {
     loadWeights(params, SRAM, files.weights_file, useDataFile);

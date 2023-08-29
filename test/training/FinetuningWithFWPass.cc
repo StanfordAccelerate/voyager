@@ -146,6 +146,9 @@ void initialize_model(const std::string &modelPath) {
           0, modelPath + "step_" + std::to_string(stepNum) + "/weights/");
       workload.files.bias_file.insert(
           0, modelPath + "step_" + std::to_string(stepNum) + "/weights/");
+      if (workload.params.ATTENTION_MASK) {
+        workload.files.bias_file = "";
+      }
       memory->loadModelParams(workload.params, workload.files,
                               workload.memoryMap, true);
     }
@@ -253,7 +256,8 @@ void initialize_model(const std::string &modelPath) {
   for (int i = 0; i < 16 * 512; i++) {
     int rramOffset = (NUM_ENCODER_LAYERS - 1) * ENCODER_WEIGHT_SIZE +
                      8 * INTERMEDIATE_SIZE + 5 * INTERMEDIATE_BIAS_SIZE +
-                     3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE;
+                     3 * INTRA_BOTTLENECK_SIZE +
+                     18 * INTRA_BOTTLENECK_BIAS_SIZE;
     memory->sram[CLASSIFIER_W + 2 * i] = memory->rram[rramOffset + i];
     memory->sram[CLASSIFIER_W + 2 * i + 1] = 0;
   }
@@ -261,8 +265,10 @@ void initialize_model(const std::string &modelPath) {
   for (int i = 0; i < 16; i++) {
     int rramOffset = (NUM_ENCODER_LAYERS - 1) * ENCODER_WEIGHT_SIZE +
                      8 * INTERMEDIATE_SIZE + 21 * INTERMEDIATE_BIAS_SIZE +
-                     3 * INTRA_BOTTLENECK_SIZE + 18 * INTRA_BOTTLENECK_BIAS_SIZE;
-    memory->sram[CLASSIFIER_W + CLASSIFIER_W_SIZE + 2 * i] = memory->rram[rramOffset + 2 * i];
+                     3 * INTRA_BOTTLENECK_SIZE +
+                     18 * INTRA_BOTTLENECK_BIAS_SIZE;
+    memory->sram[CLASSIFIER_W + CLASSIFIER_W_SIZE + 2 * i] =
+        memory->rram[rramOffset + 2 * i];
     memory->sram[CLASSIFIER_W + CLASSIFIER_W_SIZE + 2 * i + 1] = 0;
   }
 }
