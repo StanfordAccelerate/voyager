@@ -99,7 +99,7 @@ const SimplifiedParams cross_entropy_gradient = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
-    // .outputExpBias = 9,
+    .outputExpBias = 8,
 };
 
 // (128 x 16) x (16 x 512)

@@ -5,8 +5,8 @@
 #define NUM_FFN 2
 
 #define START_LR 2e-2
-#define GRADIENT_ACCUMULATION_STEPS 8
-#define MAX_TRAININING_STEPS (7000 * GRADIENT_ACCUMULATION_STEPS)
+#define GRADIENT_ACCUMULATION_STEPS 16
+#define MAX_TRAININING_STEPS (6900 * GRADIENT_ACCUMULATION_STEPS)
 
 #define ATTENTION_HEAD_SIZE (128 * 32)
 #define INTRA_BOTTLENECK_SIZE (128 * 128)
@@ -21,3 +21,4 @@
 #define LORA_WV_B_SIZE (128 * 16 * 2)     // 16b precision
 #define LORA_WV_A_SIZE (512 * 16 * 2)     // 16b precision
 #define CLASSIFIER_W_SIZE (512 * 16 * 2)  // 16b precision
+#define CLASSIFIER_B_SIZE (16 * 2)        // 16b precision

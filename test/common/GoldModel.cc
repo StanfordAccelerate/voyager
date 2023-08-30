@@ -551,21 +551,21 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int i = 0; i < X * C; i++) {
       gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
       weights[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
-
       weights[i] -= static_cast<ACC_T>(learningRate * gradients[i]);
-
-      // save 8-bit quantized weight to RRAM
       saveOutput(matrixB, i, weights[i], params.ACC_T_OUTPUT);
-
-      // if (!params.ACC_T_OUTPUT && params.ERROR_FEEDBACK) {
-      //   INT_T lr = learningRate;
-      //   gradients[i] =
-      //       static_cast<ACC_T>(static_cast<ACC_T>(matrixA[i]) - weights[i]);
-      //   gradients[i] *= static_cast<ACC_T>(1 / lr);
-      //   // float feedback = ((float)matrixA[i] - val) / learningRate;
-      //   // Save 8-bit weight residual to SRAM
-      //   saveOutput(matrixA, i, gradients[i], params.ACC_T_OUTPUT);
-      // }
+    }
+  } else if (params.MAX_REDUCE) {
+    // TODO:
+    ACC_T *gradients = new ACC_T[X * C];
+    for (int i = 0; i < X * C; i++) {
+      gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+    }
+  } else if (params.ELWISE_ADD) {
+    for (int i = 0; i < X * C; i++) {
+      ACC_T x = readInput(matrixA, i, params.ACC_T_INPUT);
+      ACC_T y = readInput(matrixB, i, params.ACC_T_WEIGHT);
+      ACC_T sum = static_cast<ACC_T>(x + y);
+      saveOutput(matrixC, i, sum, params.ACC_T_OUTPUT);
     }
   } else {
     // Large arrays need to go on the heap
