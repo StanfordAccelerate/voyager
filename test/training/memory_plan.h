@@ -3,7 +3,9 @@
 #include "model_arch.h"
 
 // memory map
-#define LABEL (0)
+#define STACK 0
+#define STACK_SIZE (0x40000)
+#define LABEL (STACK + STACK_SIZE)
 #define LABEL_SIZE 16
 #define INPUT (LABEL + LABEL_SIZE)
 #define INPUT_SIZE (128 * 512)
