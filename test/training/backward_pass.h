@@ -541,20 +541,18 @@ void full_backward_pass(int step) {
   // }
 
   // classifier bias
-  run_op(OPERATION(classifier_bias, gradient), BACKPROP_SCRATCH,
-         CLASSIFIER_G + CLASSIFIER_W_SIZE, CLASSIFIER_G + CLASSIFIER_W_SIZE, 0,
-         0);
+  run_op(OPERATION(classifier_bias, gradient), BACKPROP_SCRATCH, CLASSIFIER_B_G,
+         CLASSIFIER_B_G, 0, 0);
 
   // classifier weight update
   if (step != 0 && step % GRADIENT_ACCUMULATION_STEPS == 0) {
     // unscale + gradient clipping
-    run_op(OPERATION(classifier_bias_grad_clip, gradient),
-           CLASSIFIER_G + CLASSIFIER_W_SIZE, 0,
-           CLASSIFIER_G + CLASSIFIER_W_SIZE, 0, 0);
+    run_op(OPERATION(classifier_bias_grad_clip, gradient), CLASSIFIER_B_G, 0,
+           CLASSIFIER_B_G, 0, 0);
 
     // classifier weight update
-    run_op(OPERATION(classifier_bias, weight), CLASSIFIER_G + CLASSIFIER_W_SIZE,
-           CLASSIFIER_W + CLASSIFIER_W_SIZE, 0, 0, 0
+    run_op(OPERATION(classifier_bias, weight), CLASSIFIER_B_G, CLASSIFIER_B, 0,
+           0, 0
 #ifndef SOC
            ,
            step
