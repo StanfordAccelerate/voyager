@@ -579,6 +579,7 @@ void full_backward_pass(int step) {
     encoder_backward_pass(encoderLayer, step);
   }
 
+#ifndef SOC
   // After each weight update, clear all gradients
   if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
     for (int i = 0; i < LORA_G_SIZE + CLASSIFIER_W_SIZE + CLASSIFIER_B_SIZE;
@@ -586,4 +587,5 @@ void full_backward_pass(int step) {
       memory->sram[LORA_G + i] = 0;
     }
   }
+#endif
 }
