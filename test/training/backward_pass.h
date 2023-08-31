@@ -35,6 +35,16 @@ void encoder_backward_pass(int encoderLayer, int step) {
   int weightBase = encoderLayer * ENCODER_WEIGHT_SIZE;
   int loraWeightOffset = encoderLayer * LORA_W_PER_ENC_SIZE;
 
+  int encoderLayerInput;
+  if (encoderLayer == 0) {
+    encoderLayerInput = INPUT;
+  } else if (encoderLayer % CHECKPOINT_INTERVAL == 0) {
+    encoderLayerInput =
+        CHECKPOINT + (encoderLayer / CHECKPOINT_INTERVAL - 1) * INPUT_SIZE;
+  } else {
+    encoderLayerInput = activationBase;
+  }
+
   // These namings are weird, they actually refer to the layer before
 
   run_op(OPERATION(output_bottleneck_dense, backward),
@@ -349,15 +359,6 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
   /* ========================== value lora gradient ==========================
    */
-
-  int encoderLayerInput;
-  if (encoderLayer == 0) {
-    encoderLayerInput = INPUT;
-  } else if (encoderLayer % 5 == 0) {  // layers 5, 10, 15, 20
-    encoderLayerInput = CHECKPOINT + (encoderLayer / 5 - 1) * INPUT_SIZE;
-  } else {
-    encoderLayerInput = activationBase;
-  }
 
   // value weight gradient
   run_op(OPERATION(attention_self_value_weight, gradient), encoderLayerInput,
