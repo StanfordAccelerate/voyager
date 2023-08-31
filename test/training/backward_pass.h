@@ -258,12 +258,22 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
     // query lora_A weight update
     run_op(OPERATION(attention_self_query_lora_A_weight, weight),
-           LORA_G + loraWeightOffset, LORA_W + loraWeightOffset, 0, 0, 0, step);
+           LORA_G + loraWeightOffset, LORA_W + loraWeightOffset, 0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // query lora_B weight update
     run_op(OPERATION(attention_self_query_lora_B_weight, weight),
            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE,
-           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE, 0, 0, 0, step);
+           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE, 0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // std::cerr << "query lora_A weight" << std::endl;
     // output_loc = LORA_W + loraWeightOffset;
@@ -425,8 +435,13 @@ void encoder_backward_pass(int encoderLayer, int step) {
     // value lora_A weight update
     run_op(OPERATION(attention_self_value_lora_A_weight, weight),
            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE,
-           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0, 0, 0,
-           step);
+           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0, 0, 0
+
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // value lora_B weight update
     run_op(OPERATION(attention_self_value_lora_B_weight, weight),
@@ -434,7 +449,12 @@ void encoder_backward_pass(int encoderLayer, int step) {
                LORA_WV_A_SIZE,
            LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
                LORA_WV_A_SIZE,
-           0, 0, 0, step);
+           0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // std::cerr << "value lora_A weight" << std::endl;
     // output_loc = LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE;
@@ -463,7 +483,7 @@ void encoder_backward_pass(int encoderLayer, int step) {
    */
 }
 
-void full_backward_pass(int step = 0) {
+void full_backward_pass(int step) {
   // cross-entropy gradient
   run_op(OPERATION(classifier, backward), ENCODER_SCRATCH + INTERMEDIATE_SIZE,
          LABEL, BACKPROP_SCRATCH, 0, 0);
@@ -503,7 +523,12 @@ void full_backward_pass(int step = 0) {
 
     // classifier weight update
     run_op(OPERATION(classifier_weight, weight), CLASSIFIER_G, CLASSIFIER_W, 0,
-           0, 0, step);
+           0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
   }
 
   // std::cerr << "classifier weight update" << std::endl;
@@ -529,7 +554,12 @@ void full_backward_pass(int step = 0) {
 
     // classifier weight update
     run_op(OPERATION(classifier_bias, weight), CLASSIFIER_G + CLASSIFIER_W_SIZE,
-           CLASSIFIER_W + CLASSIFIER_W_SIZE, 0, 0, 0, step);
+           CLASSIFIER_W + CLASSIFIER_W_SIZE, 0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
   }
 
   // std::cerr << "classifier bias update" << std::endl;
