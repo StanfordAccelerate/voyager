@@ -247,7 +247,7 @@ void encoder_backward_pass(int encoderLayer, int step) {
   // }
   // std::cerr << std::endl << std::endl;
 
-  if (step != 0 && step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
     run_op(OPERATION(attention_self_query_lora_A_grad_clip, gradient),
            LORA_G + loraWeightOffset, 0, LORA_G + loraWeightOffset, 0, 0);
@@ -418,7 +418,7 @@ void encoder_backward_pass(int encoderLayer, int step) {
   // }
   // std::cerr << std::endl << std::endl;
 
-  if (step != 0 && step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
     run_op(OPERATION(attention_self_value_lora_A_grad_clip, gradient),
            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0,
@@ -516,7 +516,7 @@ void full_backward_pass(int step) {
   // }
 
   // classifier weight update
-  if (step != 0 && step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
     run_op(OPERATION(classifier_weight_grad_clip, gradient), CLASSIFIER_G, 0,
            CLASSIFIER_G, 0, 0);
@@ -545,7 +545,7 @@ void full_backward_pass(int step) {
          CLASSIFIER_B_G, 0, 0);
 
   // classifier weight update
-  if (step != 0 && step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
     run_op(OPERATION(classifier_bias_grad_clip, gradient), CLASSIFIER_B_G, 0,
            CLASSIFIER_B_G, 0, 0);
@@ -581,7 +581,7 @@ void full_backward_pass(int step) {
 
 #ifndef SOC
   // After each weight update, clear all gradients
-  if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     for (int i = 0; i < LORA_G_SIZE + CLASSIFIER_W_SIZE + CLASSIFIER_B_SIZE;
          i++) {
       memory->sram[LORA_G + i] = 0;
