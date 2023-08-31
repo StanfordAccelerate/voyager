@@ -48,7 +48,7 @@ const SimplifiedParams classifier_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -56,6 +56,61 @@ const SimplifiedParams classifier_weight_gradient = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = true,
+};
+
+// (16 x 512)
+const SimplifiedParams classifier_weight_grad_clip = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
+    .loops = {{1, 1, 1, 1, 1, 1}, {32, 1, 1, 1, 1, 16}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = false,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = true,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
+    .outputExpBias = -11,
 };
 
 // (16 x 1)
@@ -101,13 +156,69 @@ const SimplifiedParams classifier_bias_gradient = {
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
     .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
+    .ACC_T_WEIGHT = true,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
+    .ELWISE_ADD = true,
+};
+
+// (16 x 1)
+const SimplifiedParams classifier_bias_grad_clip = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
+    .loops = {{1, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 1}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = true,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = true,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
     .learningRate = 0.0,
-    .ACC_T_INPUT = false,
+    .ACC_T_INPUT = true,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
+    .outputExpBias = -11,
 };
 
 // (128 x 512) * (128 x 512)
@@ -152,7 +263,7 @@ const SimplifiedParams output_bottleneck_LayerNorm_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (128 x 128) x (128 x 512)
@@ -197,7 +308,7 @@ const SimplifiedParams intermediate_dense_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (512 x 128) x (128 x 128)
@@ -242,7 +353,7 @@ const SimplifiedParams output_dense_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (128 x 128) x (128 x 128)
@@ -287,7 +398,7 @@ const SimplifiedParams attention_output_dense_weight_gradient = {
     .CONCAT_INPUT = true,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (512 x 128) x (128 x 128)
@@ -332,7 +443,7 @@ const SimplifiedParams value_projection_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = true,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (512 x 16)
@@ -443,59 +554,6 @@ const SimplifiedParams value_lora_B_quant = {
     .QUANTIZE_TO_P8 = true,
 };
 
-// (128 x 512) x (512 x 16)
-const SimplifiedParams value_lora_B_weight_gradient = {
-    .INPUT_OFFSET = 0,
-    .WEIGHT_OFFSET = 0,
-    .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false,
-    .loops = {{2, 1, 1, 1, 1, 1}, {32, 1, 1, 1, 1, 64}},
-    .inputXLoopIndex = {0, 5},
-    .inputYLoopIndex = {1, 4},
-    .reductionLoopIndex = {3, 0},
-    .weightLoopIndex = {2, 1},
-    .fxIndex = 3,
-    .fyIndex = 2,
-    .weightReuseIndex = {4, 5},
-    .STRIDE = 1,
-    .REPLICATION = false,
-    .RELU = false,
-    .BIAS = false,
-    .BIAS_OFFSET = 0,
-    .RESIDUAL = true,
-    .RESIDUAL_OFFSET = 0,
-    .MAXPOOL = false,
-    .AVGPOOL = false,
-    .WEIGHT = false,
-    .STORE_IN_ACC = false,
-    .ACC_FROM_ACC = false,
-    .SOFTMAX = false,
-    .ATTENTION_SCALING = false,
-    .FC = false,
-    .NO_NORM = false,
-    .SOFTMAX_GRAD = false,
-    .FC_GRAD = false,
-    .NO_NORM_GRAD = false,
-    .RELU_GRAD = false,
-    .BIAS_GRAD = false,
-    .CROSS_ENTROPY_GRAD = false,
-    .MSE_GRAD = false,
-    .BCE_WITH_LOGITS_GRAD = false,
-    .INPUT_TRANSPOSE = true,
-    .CONCAT_INPUT = false,
-    .CONCAT_WEIGHT = false,
-    .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
-    .GRAD_CLIPPING_UNIT_TEST = false,
-    .WEIGHT_SPLITTING = false,
-    .WEIGHT_RESIDUAL_OFFSET = 0,
-    .learningRate = 0.0,
-    .ACC_T_INPUT = false,
-    .ACC_T_WEIGHT = false,
-    .ACC_T_OUTPUT = true,
-    .ACC_T_RESIDUAL = false,
-};
-
 // (16 x 128) x (128 x 128)
 const SimplifiedParams value_lora_A_weight_gradient = {
     .INPUT_OFFSET = 0,
@@ -538,7 +596,7 @@ const SimplifiedParams value_lora_A_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -546,7 +604,60 @@ const SimplifiedParams value_lora_A_weight_gradient = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
-    .ACC_T_RESIDUAL = false,
+    .ACC_T_RESIDUAL = true,
+};
+
+// (128 x 512) x (512 x 16)
+const SimplifiedParams value_lora_B_weight_gradient = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false,
+    .loops = {{2, 1, 1, 1, 1, 1}, {32, 1, 1, 1, 1, 64}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = true,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = true,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = false,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 128) x (128 x 128)
@@ -591,7 +702,7 @@ const SimplifiedParams query_key_projection_weight = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = true,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (128 x 16)
@@ -744,7 +855,7 @@ const SimplifiedParams query_lora_A_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -752,7 +863,7 @@ const SimplifiedParams query_lora_A_weight_gradient = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
-    .ACC_T_RESIDUAL = false,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 128) x (128 x 16)
@@ -797,7 +908,7 @@ const SimplifiedParams query_lora_B_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -805,7 +916,7 @@ const SimplifiedParams query_lora_B_weight_gradient = {
     .ACC_T_INPUT = false,
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = true,
-    .ACC_T_RESIDUAL = false,
+    .ACC_T_RESIDUAL = true,
 };
 
 // (128 x 128) * (128 x 128)
@@ -850,7 +961,7 @@ const SimplifiedParams input_bottleneck_LayerNorm_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -903,7 +1014,7 @@ const SimplifiedParams input_bottleneck_weight_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
 };
 
 // (128 x 128)
@@ -948,7 +1059,7 @@ const SimplifiedParams intra_bottleneck_bias_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -1001,7 +1112,7 @@ const SimplifiedParams intra_bottleneck_bias_with_head_concat = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = true,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -1054,7 +1165,7 @@ const SimplifiedParams inter_bottleneck_bias_gradient = {
     .CONCAT_INPUT = false,
     .CONCAT_WEIGHT = false,
     .SPLIT_OUTPUT = false,
-    .GRAD_CLIPPING = true,
+    .GRAD_CLIPPING = false,
     .GRAD_CLIPPING_UNIT_TEST = false,
     .WEIGHT_SPLITTING = false,
     .WEIGHT_RESIDUAL_OFFSET = 0,
@@ -1065,10 +1176,230 @@ const SimplifiedParams inter_bottleneck_bias_gradient = {
     .ACC_T_RESIDUAL = true,
 };
 
+// (512 x 16)
+const SimplifiedParams value_lora_A_grad_clip = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .loops = {{8, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = false,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = true,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
+    .outputExpBias = -11,
+};
+
+// (128 x 16)
+const SimplifiedParams query_and_value_lora_grad_clip = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = false,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = true,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = true,
+    .ACC_T_RESIDUAL = false,
+    .outputExpBias = -11,
+};
+
+// (512 x 16)
+const SimplifiedParams value_lora_A_max_grad = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .loops = {{8, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = false,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = false,
+    .ACC_T_RESIDUAL = false,
+    .QUANTIZE_TO_P8 = false,
+    .MAX_REDUCE = true,
+};
+
+// (128 x 16)
+const SimplifiedParams query_and_value_lora_max_grad = {
+    .INPUT_OFFSET = 0,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 0,
+    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = false,
+    .RESIDUAL_OFFSET = 0,
+    .MAXPOOL = false,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+    .ATTENTION_SCALING = false,
+    .FC = false,
+    .NO_NORM = false,
+    .SOFTMAX_GRAD = false,
+    .FC_GRAD = false,
+    .NO_NORM_GRAD = false,
+    .RELU_GRAD = false,
+    .BIAS_GRAD = false,
+    .CROSS_ENTROPY_GRAD = false,
+    .MSE_GRAD = false,
+    .BCE_WITH_LOGITS_GRAD = false,
+    .INPUT_TRANSPOSE = false,
+    .CONCAT_INPUT = false,
+    .CONCAT_WEIGHT = false,
+    .SPLIT_OUTPUT = false,
+    .GRAD_CLIPPING = false,
+    .GRAD_CLIPPING_UNIT_TEST = false,
+    .WEIGHT_SPLITTING = false,
+    .WEIGHT_RESIDUAL_OFFSET = 0,
+    .learningRate = 0.0,
+    .ACC_T_INPUT = true,
+    .ACC_T_WEIGHT = false,
+    .ACC_T_OUTPUT = false,
+    .ACC_T_RESIDUAL = false,
+    .QUANTIZE_TO_P8 = false,
+    .MAX_REDUCE = true,
+};
+
 std::map<std::string, SimplifiedParams> gradientParams;
 
 gradientParams["classifier_weight"] = classifier_weight_gradient;
+gradientParams["classifier_weight_grad_clip"] = classifier_weight_grad_clip;
 gradientParams["classifier_bias"] = classifier_bias_gradient;
+gradientParams["classifier_bias_grad_clip"] = classifier_bias_grad_clip;
 gradientParams["output_bottleneck_LayerNorm_weight"] =
     output_bottleneck_LayerNorm_gradient;
 gradientParams["output_bottleneck_LayerNorm_bias"] =
@@ -1109,6 +1440,11 @@ gradientParams["attention_self_value_lora_B_quant"] = value_lora_B_quant;
 gradientParams["attention_self_value_lora_A_weight"] = value_lora_A_weight_gradient;
 gradientParams["attention_self_value_lora_B_weight"] = value_lora_B_weight_gradient;
 
+gradientParams["attention_self_value_lora_A_max_grad"] = value_lora_A_max_grad;
+gradientParams["attention_self_value_lora_B_max_grad"] = query_and_value_lora_max_grad;
+gradientParams["attention_self_value_lora_A_grad_clip"] = value_lora_A_grad_clip;
+gradientParams["attention_self_value_lora_B_grad_clip"] = query_and_value_lora_grad_clip;
+
 gradientParams["attention_self_query_weight"] = query_key_projection_weight;
 gradientParams["attention_self_query_bias"] =
     intra_bottleneck_bias_with_head_concat;
@@ -1116,6 +1452,11 @@ gradientParams["attention_self_query_lora_A_quant"] = query_lora_A_quant;
 gradientParams["attention_self_query_lora_B_quant"] = query_lora_B_quant;
 gradientParams["attention_self_query_lora_A_weight"] = query_lora_A_weight_gradient;
 gradientParams["attention_self_query_lora_B_weight"] = query_lora_B_weight_gradient;
+
+gradientParams["attention_self_query_lora_A_max_grad"] = query_and_value_lora_max_grad;
+gradientParams["attention_self_query_lora_B_max_grad"] = query_and_value_lora_max_grad;
+gradientParams["attention_self_query_lora_A_grad_clip"] = query_and_value_lora_grad_clip;
+gradientParams["attention_self_query_lora_B_grad_clip"] = query_and_value_lora_grad_clip;
 
 gradientParams["attention_self_key_weight"] = query_key_projection_weight;
 gradientParams["attention_self_key_bias"] =
