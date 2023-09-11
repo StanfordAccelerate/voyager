@@ -226,13 +226,16 @@ build/DatasetIterator.o: test/training/DatasetIterator.cc
 .PHONY: networks
 networks: build/networks.a
 
-build/networks.a: build/ResNet.o build/MobileBERT.o
+build/networks.a: build/ResNet.o build/MobileBERT.o build/Generic.o
 	$(AR) rcs $@ $^
 
 build/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h test/common/VerificationTypes.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+build/Generic.o: test/generic/Generic.cc 
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
