@@ -46,14 +46,17 @@ def write_model_params(model, data_dir):
         print(outfile, end="\r", flush=True)
     print("=" * 120)
 
-def write_dataset(model, model_dir, data_dir):
+def write_dataset(model, glue_dataset, model_dir, data_dir, finetuning=False):
     'NOTE: only supports SST-2 for now'
 
-    raw_datasets = load_dataset("glue", "sst2")
+    raw_datasets = load_dataset("glue", glue_dataset)
     tokenizer = AutoTokenizer.from_pretrained(model_dir)
 
     def preprocess_function(examples):
-        result = tokenizer(examples["sentence"], padding="max_length", max_length=128, truncation=True)
+        if glue_dataset == "sst2":
+            result = tokenizer(examples["sentence"], padding="max_length", max_length=128, truncation=True)
+        else:
+            result = tokenizer(examples["sentence1"], examples["sentence2"], padding="max_length", max_length=128, truncation=True)
         result["labels"] = examples["label"]
         return result
 
@@ -64,28 +67,38 @@ def write_dataset(model, model_dir, data_dir):
         desc="Running tokenizer on dataset",
     )
 
-    eval_dataset = tokenized_datasets["validation"]
-    eval_dataloader = DataLoader(eval_dataset, collate_fn=default_data_collator, batch_size=1)
+    if finetuning:
+        sets = ["train", "validation"]
+    else:
+        sets = ["validation"]
 
-    model.eval()
-    device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-    model.to(device)
+    for set_name in sets:
+        dataset = tokenized_datasets[set_name]
+        dataloader = DataLoader(dataset, collate_fn=default_data_collator, batch_size=1)
 
-    for idx, batch in enumerate(tqdm(eval_dataloader, desc="Running through eval dataset")):
-        inputs = {k: v.to(device) for k, v in batch.items()}
+        model.eval()
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        model.to(device)
 
-        embedding_output = model.mobilebert.embeddings(input_ids=inputs["input_ids"], token_type_ids=inputs["token_type_ids"])
-        embedding_output = embedding_output.detach().numpy().astype(np.float64)
-        attention_mask = (1.0 - inputs["attention_mask"]).cpu().numpy() * np.finfo(np.float32).min
-        labels = inputs["labels"].detach().numpy().astype(np.float64)
+        for idx, batch in enumerate(tqdm(dataloader, desc=f"Running through {set_name} dataset")):
+            inputs = {k: v.to(device) for k, v in batch.items()}
+            print(model(**inputs))
+            quit()
+            embedding_output = model.mobilebert.embeddings(input_ids=inputs["input_ids"], token_type_ids=inputs["token_type_ids"])
+            embedding_output = embedding_output.detach().numpy().astype(np.float64)
+            attention_mask = (1.0 - inputs["attention_mask"]).cpu().numpy() * np.finfo(np.float32).min
+            labels = inputs["labels"].detach().numpy().astype(np.float64)
 
-        folder = os.path.join(data_dir, f"{idx}_{int(labels[0])}")
-        if not os.path.exists(folder):
-            os.makedirs(folder)
-        
-        # write embedding output and attention mask
-        write_fp64(os.path.join(folder, "embedding_output"), embedding_output)
-        write_fp64(os.path.join(folder, "attention_mask"), attention_mask)
+            if finetuning:
+                folder = os.path.join(data_dir, set_name, f"{idx}_{int(labels[0])}")
+            else:
+                folder = os.path.join(data_dir, f"{idx}_{int(labels[0])}")
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+            
+            # write embedding output and attention mask
+            # write_fp64(os.path.join(folder, "embedding_output"), embedding_output)
+            # write_fp64(os.path.join(folder, "attention_mask"), attention_mask)
 
 
 def export_to_onnx(model, model_dir, output_onnx_path):
@@ -138,6 +151,8 @@ def main():
     )
     parser.add_argument("--dump_model", action="store_true", help="Dump model parameters.")
     parser.add_argument("--dump_dataset", action="store_true", help="Dump dataset.")
+    parser.add_argument("--dataset", type=str, help="Dataset to dump.", default="sst2")
+    parser.add_argument("--finetuning", action="store_true", help="Dump dataset for finetuning.")
     args = parser.parse_args()
 
     model = AutoModelForSequenceClassification.from_pretrained(args.model_dir, ignore_mismatched_sizes=True)
@@ -145,7 +160,7 @@ def main():
     if args.dump_model:
         write_model_params(model, args.output_dir)
     if args.dump_dataset:
-        write_dataset(model, args.model_dir, args.output_dir)
+        write_dataset(model, args.dataset, args.model_dir, args.output_dir, args.finetuning)
     
     # export_to_onnx(model, args.model_dir, "model.onnx")
     
