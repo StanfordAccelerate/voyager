@@ -594,6 +594,7 @@ const SimplifiedParams fc_params = {
     .SOFTMAX = false,
     .ATTENTION_SCALING = false,
     .FC = true,
+    .ACC_T_OUTPUT = true,
 };
 
 const std::map<std::string, SimplifiedParams> params{
