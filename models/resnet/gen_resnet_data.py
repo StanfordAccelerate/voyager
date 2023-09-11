@@ -159,10 +159,6 @@ def dump_model_data(args: argparse.Namespace, image_paths: str, image_labels: st
             pickle.dump(activations, f)
         pkl_file_paths.append(pkl_file_path)
 
-    print(activations["conv1.input"][:50])
-    print(activations["conv1.input"][-50:])
-    print(activations["fc.comp"])
-
     model_ref_acc = model_ref_corr / args.samples
 
     print(f"\nRan through {args.samples} samples from {len(set(image_labels[:args.samples]))} categories. \nAccuracy: ref {model_ref_acc}.")
@@ -181,15 +177,14 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
     #     "https://download.pytorch.org/models/resnet18-5c106cde.pth")
     # model_ref.load_state_dict(ref_state_dict)
 
-    model_ref = vision_models.ResNet(
-        block=vision_models.BasicBlock, layers=[2, 2, 2, 2])
-    model_path = os.path.join(args.model_dir, 'resnet18_mp2.pth')
-    bnfold_state_dict = torch.load(model_path).state_dict()
-    model_ref.load_state_dict(bnfold_state_dict)
-    model_ref.eval()
-
     # Create bn folded + maxpool 2x2 model (bn folded into conv)
-    model_bnfold = bn_folding.bn_folding_model(model_ref)
+    model_bnfold = vision_models.ResNet(
+        block=vision_models.BasicBlock, layers=[2, 2, 2, 2])
+    model_path = os.path.join(args.model_dir, 'resnet18_mp2_p8_qat.pth')
+    bnfold_state_dict = torch.load(model_path, map_location=torch.device('cpu'))['state_dict']
+    model_bnfold.load_state_dict(bnfold_state_dict)
+    model_bnfold.eval()
+    model_bnfold = bn_folding.bn_folding_model(model_bnfold)
 
     preprocess = transforms.Compose([
         transforms.Resize(256),
@@ -199,12 +194,28 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
                              std=[0.229, 0.224, 0.225]),
     ])
 
+    if args.write_model:
+        output_folder = os.path.join(args.output_dataset_dir, "params")
+        os.makedirs(output_folder, exist_ok=True)
+
+        for name, param in model_bnfold.named_parameters():
+            data = arrange_data(name, param.data)
+            file_name = re.sub('downsample.0', 'downsample', name)
+            file_name = re.sub('\.', '_', file_name)
+
+            with open(os.path.join(output_folder, file_name), 'wb') as output:
+                output.write(struct.pack('%sd' % len(data), *data))
+
     model_ref_corr = 0
     model_bnfold_corr = 0
     pkl_file_paths = []
 
     vision_models._no_intermediates = args.no_intermediates
     vision_models._no_weights = args.no_weights
+
+    with open(os.path.join(args.data_dir, 'labels.txt'), 'r') as f:
+        class_labels = f.readlines()
+        class_labels = [s.split(',')[0] for s in class_labels]
 
     # Loop over all images and verify results
     for i in tqdm(range(args.samples)):
@@ -259,6 +270,20 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
             with open(pkl_file_path, "wb") as f:
                 pickle.dump(vision_models._buffer, f)
             pkl_file_paths.append(pkl_file_path)
+
+            # Write images to disk
+            if args.write_dataset:
+                imagenet_label = ref_labels[top_catid_ref[0]][0]
+                class_id = class_labels.index(imagenet_label)
+                sample_name = f"{class_id}_{model_id}"
+                output_folder_name = os.path.join(args.output_dataset_dir,sample_name)
+                os.makedirs(output_folder_name, exist_ok=True)
+                
+                input_data = vision_models._buffer['conv1.input']
+                # Open output file, then pack and write data
+
+                with open(os.path.join(output_folder_name, "input"), 'wb') as output:
+                    output.write(struct.pack('%sd' % len(input_data), *input_data))
 
             if args.export_onnx:
                 # Write model to disk
@@ -366,6 +391,9 @@ def main():
                         type=str,
                         default='models/resnet/binary_data',
                         help='Path the binary data output will be written to (binary files for simulation).')
+    parser.add_argument('--write_dataset', default=False, action='store_true', help='Write dataset to disk.')
+    parser.add_argument('--write_model', default=False, action='store_true', help='Write model weights to disk.')
+    parser.add_argument('--output_dataset_dir', type=str, default='data/imagenet', help='Path to output folder for dataset.')
     parser.add_argument('--samples',
                         type=int,
                         default=1,

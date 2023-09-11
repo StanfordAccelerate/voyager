@@ -36,7 +36,7 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
   acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 2;  // 2d tensor
-  vectorParams->DP_VEC1 = false;
+  vectorParams->DP_VEC1 = params.ACC_T_WEIGHT;
 
   vectorParams->addressGen1Loops[0][0] = 1;
   vectorParams->addressGen1Loops[0][1] = K / DIMENSION;

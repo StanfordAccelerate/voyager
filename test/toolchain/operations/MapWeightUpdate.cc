@@ -28,8 +28,15 @@ void MapWeightUpdate(const SimplifiedParams &params, const MemoryMap &memoryMap,
     factor1 = totalSize / 512;
 
   } else {
-    factor0 = totalSize;
-    factor1 = 1;
+    if (totalSize == 128) {
+      factor0 = 1;
+      factor1 = 128;
+    } else {
+      factor0 = totalSize;
+      factor1 = 1;
+    }
+    // factor0 = totalSize/16;
+    // factor1 = 16;
   }
 
   VectorParams *vectorParams = new VectorParams;
@@ -103,13 +110,16 @@ void MapWeightUpdate(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vInst0.vOp4 = VectorInstructions::nop;
   vInst0.vDest = VectorInstructions::vWriteOut;
   vectorInstructionConfig->inst[0] = vInst0;
-
-  // C/DIMENSION to do the complete reduction
-  // DIMENSION to fill up the entire vector
   vectorInstructionConfig->instCount[0] = totalSize;
+  if (totalSize == 128) {
+    // vectorInstructionConfig->instCount[0] = 1;
+  }
 
   vectorInstructionConfig->instLen = 1;
   vectorInstructionConfig->instLoopCount = 1;
+  if (totalSize == 128) {
+    // vectorInstructionConfig->instLoopCount = 16;
+  }
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);

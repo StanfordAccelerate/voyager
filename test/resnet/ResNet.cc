@@ -41,6 +41,7 @@ ResNet::ResNet(const std::string modelName, const std::string dataDir)
 std::vector<Workload> ResNet::getWorkloads(
     const std::vector<std::string>& layers) const {
   std::vector<Workload> workloads;
+  workloads.reserve(layers.size());
 
   for (const std::string& layer : layers) {
     Workload workload;

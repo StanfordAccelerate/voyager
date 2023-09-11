@@ -112,6 +112,7 @@ void MapBiasGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
   opMemoryMaps.push_back(acceleratorMemoryMap);
 
   if (params.GRAD_CLIPPING) {
-    MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps, K);
+    //     MapGradNormClipping(params, memoryMap, mappedParams, opMemoryMaps,
+    //     K);
   }
 }

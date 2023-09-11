@@ -23,6 +23,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   // so to make them match up, we create a copy of the params with the
   // softmax convention for mapping the softmax part.
   SimplifiedParams modifiedSoftmaxParams = params;
+  modifiedSoftmaxParams.ACC_T_INPUT = false;
   modifiedSoftmaxParams.loops[1][modifiedSoftmaxParams.inputYLoopIndex[1]] = X;
   modifiedSoftmaxParams.loops[1][modifiedSoftmaxParams.inputXLoopIndex[1]] = 1;
   MapSoftmax(modifiedSoftmaxParams, memoryMap, mappedParams, opMemoryMaps);
@@ -33,7 +34,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
       dynamic_cast<VectorInstructionConfig *>(mappedParams.at(1));
 
   // make softmax output in DP
-  softmaxVectorParams->DP_OUTPUT = true;
+  // softmaxVectorParams->DP_OUTPUT = true;
 
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
@@ -50,7 +51,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   vectorParams->addressGen0Loop[1][0] = 1;
   vectorParams->addressGen0Loop[1][1] = 1;
   vectorParams->addressGen0Loop[1][2] = X / DIMENSION;
-  vectorParams->DP_VEC0 = true;
+  // vectorParams->DP_VEC0 = true;
 
   // address gen 1 (weights)
   acceleratorMemoryMap["vector1"] = memoryMap.weights;
@@ -106,10 +107,7 @@ void MapCrossEntropyGrad(const SimplifiedParams &params,
   vInst0.vAccumulatePush = 0;
   vInst0.vDest = VectorInstructions::vWriteOut;
   vectorInstructionConfig->inst[0] = vInst0;
-
-  // C/DIMENSION to do the complete reduction
-  // DIMENSION to fill up the entire vector
-  vectorInstructionConfig->instCount[0] = X;
+  vectorInstructionConfig->instCount[0] = X / DIMENSION;
 
   vectorInstructionConfig->instLen = 1;
   vectorInstructionConfig->instLoopCount = 1;

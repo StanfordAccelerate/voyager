@@ -163,6 +163,10 @@ build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/G
 MobileBERTAccuracy: build/AccuracyTester 
 	./build/AccuracyTester mobilebert models/mobilebert/binary_data/tiny_truncated_sst2/
 
+.PHONY: ResNetAccuracy
+ResNetAccuracy: build/AccuracyTester
+	./build/AccuracyTester resnet18 models/resnet/binary_data/imagenet_1000/
+
 build/AccuracyTester: build/AccuracyTester.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
 	$(CC) -o $@ $^ -lstdc++fs
 

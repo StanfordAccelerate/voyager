@@ -35,6 +35,16 @@ void encoder_backward_pass(int encoderLayer, int step) {
   int weightBase = encoderLayer * ENCODER_WEIGHT_SIZE;
   int loraWeightOffset = encoderLayer * LORA_W_PER_ENC_SIZE;
 
+  int encoderLayerInput;
+  if (encoderLayer == 0) {
+    encoderLayerInput = INPUT;
+  } else if (encoderLayer % CHECKPOINT_INTERVAL == 0) {
+    encoderLayerInput =
+        CHECKPOINT + (encoderLayer / CHECKPOINT_INTERVAL - 1) * INPUT_SIZE;
+  } else {
+    encoderLayerInput = activationBase;
+  }
+
   // These namings are weird, they actually refer to the layer before
 
   run_op(OPERATION(output_bottleneck_dense, backward),
@@ -208,11 +218,10 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
   // query lora_B gradient
   run_op(OPERATION(attention_self_query_lora_B_weight, gradient),
-          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
-          activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
-          LORA_G + loraWeightOffset + LORA_WQ_A_SIZE,
-          0,
-          LORA_G + loraWeightOffset + LORA_WQ_A_SIZE);
+         activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
+         activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         LORA_G + loraWeightOffset + LORA_WQ_A_SIZE, 0,
+         LORA_G + loraWeightOffset + LORA_WQ_A_SIZE);
 
   // std::cerr << "query lora_B gradient" << std::endl;
   // output_loc = LORA_G + loraWeightOffset + LORA_WQ_A_SIZE;
@@ -233,11 +242,9 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
   // query lora_A gradient
   run_op(OPERATION(attention_self_query_lora_A_weight, gradient),
-          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
-          activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
-          LORA_G + loraWeightOffset,
-          0,
-          LORA_G + loraWeightOffset);
+         activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
+         activationGradientBase + INTERMEDIATE_SIZE + 4 * INTRA_BOTTLENECK_SIZE,
+         LORA_G + loraWeightOffset, 0, LORA_G + loraWeightOffset);
 
   // std::cerr << "query lora_A gradient" << std::endl;
   // output_loc = LORA_G + loraWeightOffset;
@@ -250,11 +257,10 @@ void encoder_backward_pass(int encoderLayer, int step) {
   // }
   // std::cerr << std::endl << std::endl;
 
-  if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
     run_op(OPERATION(attention_self_query_lora_A_grad_clip, gradient),
-           LORA_G + loraWeightOffset, 0,
-           LORA_G + loraWeightOffset, 0, 0);
+           LORA_G + loraWeightOffset, 0, LORA_G + loraWeightOffset, 0, 0);
 
     run_op(OPERATION(attention_self_query_lora_B_grad_clip, gradient),
            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE, 0,
@@ -262,13 +268,22 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
     // query lora_A weight update
     run_op(OPERATION(attention_self_query_lora_A_weight, weight),
-            LORA_G + loraWeightOffset,
-            LORA_W + loraWeightOffset, 0, 0, 0, step);
+           LORA_G + loraWeightOffset, LORA_W + loraWeightOffset, 0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // query lora_B weight update
     run_op(OPERATION(attention_self_query_lora_B_weight, weight),
-            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE,
-            LORA_W + loraWeightOffset + LORA_WQ_A_SIZE, 0, 0, 0, step);
+           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE,
+           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE, 0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // std::cerr << "query lora_A weight" << std::endl;
     // output_loc = LORA_W + loraWeightOffset;
@@ -345,15 +360,6 @@ void encoder_backward_pass(int encoderLayer, int step) {
   /* ========================== value lora gradient ==========================
    */
 
-  int encoderLayerInput;
-  if (encoderLayer == 0) {
-    encoderLayerInput = INPUT;
-  } else if (encoderLayer % 5 == 0) {  // layers 5, 10, 15, 20
-    encoderLayerInput = CHECKPOINT + (encoderLayer / 5 - 1) * INPUT_SIZE;
-  } else {
-    encoderLayerInput = activationBase;
-  }
-
   // value weight gradient
   run_op(OPERATION(attention_self_value_weight, gradient), encoderLayerInput,
          activationGradientBase + INTERMEDIATE_SIZE + INTRA_BOTTLENECK_SIZE,
@@ -368,15 +374,17 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
   // value lora_B gradient
   run_op(OPERATION(attention_self_value_lora_B_weight, gradient),
-          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
-          activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
-          LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE,
-          0,
-          LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE);
+         activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
+         activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+         LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+             LORA_WV_A_SIZE,
+         0,
+         LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+             LORA_WV_A_SIZE);
 
   // std::cerr << "value lora_B gradient" << std::endl;
-  // output_loc = LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE;
-  // for (int i = 0; i < 128; i++) {
+  // output_loc = LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+  // LORA_WV_A_SIZE; for (int i = 0; i < 128; i++) {
   //   for (int j = 0; j < 16; j++) {
   //     int offset = i * 16 + j;
   //     std::cerr << memory->sram[output_loc + 2 * offset] << '\t';
@@ -395,11 +403,10 @@ void encoder_backward_pass(int encoderLayer, int step) {
 
   // value lora_A gradient
   run_op(OPERATION(attention_self_value_lora_A_weight, gradient),
-          activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
-          activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
-          LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE,
-          0,
-          LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE);
+         activationGradientBase + INTERMEDIATE_SIZE + 3 * INTRA_BOTTLENECK_SIZE,
+         activationGradientBase + INTERMEDIATE_SIZE + 2 * INTRA_BOTTLENECK_SIZE,
+         LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0,
+         LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE);
 
   // std::cerr << "value lora_A gradient" << std::endl;
   // output_loc = LORA_G + loraWeightOffset;
@@ -412,25 +419,43 @@ void encoder_backward_pass(int encoderLayer, int step) {
   // }
   // std::cerr << std::endl << std::endl;
 
-  if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
     run_op(OPERATION(attention_self_value_lora_A_grad_clip, gradient),
            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0,
            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0, 0);
 
     run_op(OPERATION(attention_self_value_lora_B_grad_clip, gradient),
-           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE, 0,
-           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE, 0, 0);
+           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+               LORA_WV_A_SIZE,
+           0,
+           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+               LORA_WV_A_SIZE,
+           0, 0);
 
     // value lora_A weight update
     run_op(OPERATION(attention_self_value_lora_A_weight, weight),
-            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE,
-            LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0, 0, 0, step);
+           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE,
+           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE, 0, 0, 0
+
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // value lora_B weight update
     run_op(OPERATION(attention_self_value_lora_B_weight, weight),
-            LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE,
-            LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE, 0, 0, 0, step);
+           LORA_G + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+               LORA_WV_A_SIZE,
+           LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE +
+               LORA_WV_A_SIZE,
+           0, 0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
 
     // std::cerr << "value lora_A weight" << std::endl;
     // output_loc = LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE;
@@ -444,8 +469,8 @@ void encoder_backward_pass(int encoderLayer, int step) {
     // std::cerr << std::endl << std::endl;
 
     // std::cerr << "value lora_B weight" << std::endl;
-    // output_loc = LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE + LORA_WV_A_SIZE;
-    // for (int i = 0; i < 128; i++) {
+    // output_loc = LORA_W + loraWeightOffset + LORA_WQ_A_SIZE + LORA_WQ_B_SIZE
+    // + LORA_WV_A_SIZE; for (int i = 0; i < 128; i++) {
     //   for (int j = 0; j < 16; j++) {
     //     int offset = i * 16 + j;
     //     std::cerr << memory->sram[output_loc + 2 * offset] << '\t';
@@ -455,13 +480,14 @@ void encoder_backward_pass(int encoderLayer, int step) {
     // std::cerr << std::endl << std::endl;
   }
 
-  /* ========================== value lora gradient ========================== */
+  /* ========================== value lora gradient ==========================
+   */
 }
 
-void full_backward_pass(int step = 0) {
+void full_backward_pass(int step) {
   // cross-entropy gradient
   run_op(OPERATION(classifier, backward), ENCODER_SCRATCH + INTERMEDIATE_SIZE,
-         0, BACKPROP_SCRATCH, 0, 0);
+         LABEL, BACKPROP_SCRATCH, 0, 0);
 
   // for (int j = 0; j < 16; j++) {
   //   std::cerr << memory->sram[BACKPROP_SCRATCH + j] << '\t';
@@ -481,14 +507,29 @@ void full_backward_pass(int step = 0) {
   //   std::cerr << std::endl;
   // }
 
-  if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  // std::cerr << "classifier orig weight" << std::endl;
+  // for (int i = 0; i < 16; i++) {
+  //   for (int j = 0; j < 512; j++) {
+  //     int offset = i * 512 + j;
+  //     std::cerr << memory->sram[CLASSIFIER_W + 2 * offset] << '\t';
+  //   }
+  //   std::cerr << std::endl;
+  // }
+
+  // classifier weight update
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
-    run_op(OPERATION(classifier_weight_grad_clip, gradient),
-          CLASSIFIER_G, 0, CLASSIFIER_G, 0, 0);
+    run_op(OPERATION(classifier_weight_grad_clip, gradient), CLASSIFIER_G, 0,
+           CLASSIFIER_G, 0, 0);
 
     // classifier weight update
-    run_op(OPERATION(classifier_weight, weight),
-          CLASSIFIER_G, CLASSIFIER_W, 0, 0, 0, step);
+    run_op(OPERATION(classifier_weight, weight), CLASSIFIER_G, CLASSIFIER_W, 0,
+           0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
   }
 
   // std::cerr << "classifier weight update" << std::endl;
@@ -501,26 +542,29 @@ void full_backward_pass(int step = 0) {
   // }
 
   // classifier bias
-  run_op(OPERATION(classifier_bias, gradient),
-         BACKPROP_SCRATCH,
-         CLASSIFIER_G + CLASSIFIER_W_SIZE,
-         CLASSIFIER_G + CLASSIFIER_W_SIZE, 0, 0);
+  run_op(OPERATION(classifier_bias, gradient), BACKPROP_SCRATCH, CLASSIFIER_B_G,
+         CLASSIFIER_B_G, 0, 0);
 
-  if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
+  // classifier weight update
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
     // unscale + gradient clipping
-    run_op(OPERATION(classifier_bias_grad_clip, gradient),
-          CLASSIFIER_G + CLASSIFIER_W_SIZE, 0,
-          CLASSIFIER_G + CLASSIFIER_W_SIZE, 0, 0);
+    run_op(OPERATION(classifier_bias_grad_clip, gradient), CLASSIFIER_B_G, 0,
+           CLASSIFIER_B_G, 0, 0);
 
     // classifier weight update
-    run_op(OPERATION(classifier_bias, weight),
-          CLASSIFIER_G + CLASSIFIER_W_SIZE,
-          CLASSIFIER_W + CLASSIFIER_W_SIZE, 0, 0, 0, step);
+    run_op(OPERATION(classifier_bias, weight), CLASSIFIER_B_G, CLASSIFIER_B, 0,
+           0, 0
+#ifndef SOC
+           ,
+           step
+#endif
+    );
   }
 
   // std::cerr << "classifier bias update" << std::endl;
   // for (int i = 0; i < 16; i++) {
-  //   std::cerr << memory->sram[CLASSIFIER_W + CLASSIFIER_W_SIZE + 2 * i] << '\t';
+  //   std::cerr << memory->sram[CLASSIFIER_W + CLASSIFIER_W_SIZE + 2 * i] <<
+  //   '\t';
   // }
   // std::cerr << std::endl;
 
@@ -536,10 +580,13 @@ void full_backward_pass(int step = 0) {
     encoder_backward_pass(encoderLayer, step);
   }
 
+#ifndef SOC
   // After each weight update, clear all gradients
-  if (step % GRADIENT_ACCUMULATION_STEPS == 0) {
-    for (int i = 0; i < LORA_G_SIZE + CLASSIFIER_W_SIZE + CLASSIFIER_B_SIZE; i++) {
+  if (step % (GRADIENT_ACCUMULATION_STEPS - 1) == 0) {
+    for (int i = 0; i < LORA_G_SIZE + CLASSIFIER_W_SIZE + CLASSIFIER_B_SIZE;
+         i++) {
       memory->sram[LORA_G + i] = 0;
     }
   }
+#endif
 }

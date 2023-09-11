@@ -66,6 +66,10 @@ void MapMatrixOp(const SimplifiedParams &params, const MemoryMap &memoryMap,
 void MapWeightUpdate(const SimplifiedParams &params, const MemoryMap &memoryMap,
                      std::deque<BaseParams *> &mappedParams,
                      std::deque<AcceleratorMemoryMap> &opMemoryMaps);
+
+void MapNop(const SimplifiedParams &params, const MemoryMap &memoryMap,
+            std::deque<BaseParams *> &mappedParams,
+            std::deque<AcceleratorMemoryMap> &opMemoryMaps);
 void MapLoRACombination(const SimplifiedParams &params,
                         const MemoryMap &memoryMap,
                         std::deque<BaseParams *> &mappedParams,

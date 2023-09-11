@@ -166,6 +166,7 @@ struct SimplifiedParams {
   bool QUANTIZE_TO_P8;
   bool MAX_REDUCE;
   bool ELWISE_ADD;
+  bool NOP;
 };
 
 struct MemoryOffsets {

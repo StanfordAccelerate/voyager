@@ -56,18 +56,19 @@ void encoder_forward_pass(int encoderLayer, ForwardPassVariant variant) {
   int loraWeightBase = LORA_W + encoderLayer * LORA_W_PER_ENC_SIZE;
 
   // Handle checkpointing
-  // outputs of encoder layers 4, 9, 14, 19 are checkpointed
   int encoderLayerOutput;
-  if (encoderLayer % 5 == 4) {  // layers 4, 9, 14, 19
-    encoderLayerOutput = CHECKPOINT + (encoderLayer / 5) * INPUT_SIZE;
+  if (encoderLayer % CHECKPOINT_INTERVAL == CHECKPOINT_INTERVAL - 1) {
+    encoderLayerOutput =
+        CHECKPOINT + (encoderLayer / CHECKPOINT_INTERVAL) * INPUT_SIZE;
   } else {
     encoderLayerOutput = activationBase;
   }
   int encoderLayerInput;
   if (encoderLayer == 0) {
     encoderLayerInput = INPUT;
-  } else if (encoderLayer % 5 == 0) {  // layers 5, 10, 15, 20
-    encoderLayerInput = CHECKPOINT + (encoderLayer / 5 - 1) * INPUT_SIZE;
+  } else if (encoderLayer % CHECKPOINT_INTERVAL == 0) {
+    encoderLayerInput =
+        CHECKPOINT + (encoderLayer / CHECKPOINT_INTERVAL - 1) * INPUT_SIZE;
   } else {
     encoderLayerInput = activationBase;
   }
@@ -447,8 +448,8 @@ void forward_pass_from_checkpoint(int endEncoderLayer,
   if (variant == FORWARD_PASS_FFN_1_INTERMEDIATE ||
       variant == FORWARD_PASS_MHA_0) {
     // start from checkpoint and go to endEncoderLayer
-    // checkpointed layer is 5, 10, 15, 20
-    int closestCheckpoint = endEncoderLayer / 5 * 5;
+    int closestCheckpoint =
+        endEncoderLayer / CHECKPOINT_INTERVAL * CHECKPOINT_INTERVAL;
     for (int encoderLayer = closestCheckpoint; encoderLayer < endEncoderLayer;
          encoderLayer++) {
       encoder_forward_pass(encoderLayer, COMPLETE_FORWARD_PASS);

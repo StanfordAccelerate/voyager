@@ -1,9 +1,8 @@
 #include "test/toolchain/operations/Operations.h"
 
-// Performs a P16->P8 quantization on an input
-void MapLoRAQuantize(const SimplifiedParams &params, const MemoryMap &memoryMap,
-                     std::deque<BaseParams *> &mappedParams,
-                     std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+void MapNop(const SimplifiedParams &params, const MemoryMap &memoryMap,
+            std::deque<BaseParams *> &mappedParams,
+            std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   int X = params.loops[0][params.inputXLoopIndex[0]] *
           params.loops[1][params.inputXLoopIndex[1]];
   int Y = params.loops[0][params.inputYLoopIndex[0]] *
@@ -14,64 +13,50 @@ void MapLoRAQuantize(const SimplifiedParams &params, const MemoryMap &memoryMap,
   int FX = params.loops[1][params.fxIndex];
   int FY = params.loops[1][params.fyIndex];
   int STRIDE = params.STRIDE;
-  int size = X * Y * C * K * FX * FY / DIMENSION / DIMENSION;
-  std::cout << "size: " << size << std::endl;
+  int size = X * Y * C * K * FX * FY;
 
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
   AcceleratorMemoryMap acceleratorMemoryMap;
 
-  // input is a vector of size C
   acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
   vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Broadcast = false;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;
   }
-  vectorParams->addressGen0Loop[0][1] = 1;
-  vectorParams->addressGen0Loop[1][0] = 1;
-  if (size > 512) {
-    vectorParams->addressGen0Loop[1][1] = size / 512;
-    vectorParams->addressGen0Loop[1][2] = 512;
-  } else {
-    vectorParams->addressGen0Loop[1][1] = 16;
-    vectorParams->addressGen0Loop[1][2] = size / 16;
-  }
+  vectorParams->addressGen0Loop[1][0] = FX;
+  vectorParams->addressGen0Loop[1][1] = Y;
+  vectorParams->addressGen0Loop[1][2] = X;
+  vectorParams->DP_VEC0 = false;
 
-  vectorParams->addressGen0Broadcast = false;
-  vectorParams->DP_VEC0 = true;
-
-  // weights is a matrix of K x C
+  // address gen 1 (weights)
   acceleratorMemoryMap["vector1"] = memoryMap.weights;
   vectorParams->ADDRESS_GEN1_OFFSET = params.WEIGHT_OFFSET;
   vectorParams->addressGen1Mode = 0;  // 2d tensor
-  vectorParams->DP_VEC1 = false;
-
-  vectorParams->addressGen1Loops[0][0] = 1;
-  vectorParams->addressGen1Loops[0][1] = 1;
-  vectorParams->addressGen1Loops[0][2] = 1;
-  vectorParams->addressGen1Loops[1][0] = 1;
-  vectorParams->addressGen1Loops[1][1] = 1;
-  vectorParams->addressGen1Loops[1][2] = 1;
-
-  // bias
-  acceleratorMemoryMap["vector2"] = memoryMap.residual;
-  vectorParams->ADDRESS_GEN2_OFFSET = params.RESIDUAL_OFFSET;
-  vectorParams->addressGen2Mode = 0;  // 2d tensor
   for (int i = 0; i < 3; i++) {
-    vectorParams->addressGen2Loops[0][i] = 1;
+    vectorParams->addressGen1Loops[0][i] = 1;
   }
-  vectorParams->addressGen2InputXLoopIndex[0] = 0;
-  vectorParams->addressGen2InputYLoopIndex[0] = 1;
-  vectorParams->addressGen2WeightLoopIndex[0] = 2;
+  vectorParams->addressGen1Loops[1][0] = X;
+  vectorParams->addressGen1Loops[1][1] = 1;
+  vectorParams->addressGen1Loops[1][2] = K / DIMENSION;
+  vectorParams->DP_VEC1 = true;
 
-  vectorParams->addressGen2Loops[1][0] = 1;
+  acceleratorMemoryMap["vector2"] = memoryMap.bias;
+  vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
+  vectorParams->addressGen2Mode = 0;  // use bias mode
+  vectorParams->addressGen2Loops[0][0] = X;
+  vectorParams->addressGen2Loops[0][1] = 1;
+  vectorParams->addressGen2Loops[0][2] = 1;
+  vectorParams->addressGen2Loops[1][0] = C / DIMENSION;
   vectorParams->addressGen2Loops[1][1] = 1;
   vectorParams->addressGen2Loops[1][2] = 1;
-  vectorParams->addressGen2WeightLoopIndex[1] = 0;
-  vectorParams->addressGen2InputYLoopIndex[1] = 1;
   vectorParams->addressGen2InputXLoopIndex[1] = 2;
+  vectorParams->addressGen2InputYLoopIndex[1] = 1;
+  vectorParams->addressGen2WeightLoopIndex[1] = 0;
+  vectorParams->addressGen2WeightLoopIndex[0] = 2;
 
   vectorParams->VECTOR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
   vectorParams->SCALAR_OUTPUT_OFFSET = params.OUTPUT_OFFSET;
@@ -79,28 +64,23 @@ void MapLoRAQuantize(const SimplifiedParams &params, const MemoryMap &memoryMap,
   // vectorParams->scalarOutputCount = 0;
   vectorParams->MAXPOOL = params.MAXPOOL;
   vectorParams->AVGPOOL = params.AVGPOOL;
+  vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;
 
   // output
   acceleratorMemoryMap["outputs"] = memoryMap.outputs;
   for (int i = 0; i < 3; i++) {
     vectorParams->outputLoops[0][i] = 1;
   }
-  vectorParams->outputXLoopIndex[0] = 0;
-  vectorParams->outputYLoopIndex[0] = 1;
-  vectorParams->outputWeightLoopIndex[0] = 2;
+  vectorParams->outputXLoopIndex[0] = params.inputXLoopIndex[0];
+  vectorParams->outputYLoopIndex[0] = params.inputYLoopIndex[0];
+  vectorParams->outputWeightLoopIndex[0] = params.weightLoopIndex[0];
 
   vectorParams->outputLoops[1][0] = 1;
-  if (size > 512) {
-    vectorParams->outputLoops[1][1] = size / 512;
-    vectorParams->outputLoops[1][2] = 512;
-  } else {
-    vectorParams->outputLoops[1][1] = 16;
-    vectorParams->outputLoops[1][2] = size / 16;
-  }
-  vectorParams->outputXLoopIndex[1] = 0;
-  vectorParams->outputYLoopIndex[1] = 1;
+  vectorParams->outputLoops[1][1] = 1;
+  vectorParams->outputLoops[1][2] = 1;
   vectorParams->outputWeightLoopIndex[1] = 2;
-  vectorParams->SPLIT_OUTPUT = false;
+  vectorParams->outputYLoopIndex[1] = 0;
+  vectorParams->outputXLoopIndex[1] = 1;
   vectorParams->DP_OUTPUT = false;
 
   // sendSerializedParams<VectorParams, 32>(vectorParams,
@@ -109,7 +89,7 @@ void MapLoRAQuantize(const SimplifiedParams &params, const MemoryMap &memoryMap,
   // create instruction stream
   //    VectorInstructionConfig vectorInstructionConfig;
 
-  // inst0- read input as DP, write out as SP
+  // inst 1- (inputs x weights) + bias
   VectorInstructions vInst0;
   vInst0.instType = VectorInstructions::vector;
   vInst0.vInput = VectorInstructions::readFromVectorFetch;
@@ -121,12 +101,26 @@ void MapLoRAQuantize(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vInst0.vOp3Src1 = VectorInstructions::nop;
   vInst0.vOp3 = VectorInstructions::nop;
   vInst0.vOp4 = VectorInstructions::nop;
-  vInst0.vDest = VectorInstructions::vWriteOut;
+  vInst0.vDest = VectorInstructions::nop;
   vectorInstructionConfig->inst[0] = vInst0;
-  vectorInstructionConfig->instCount[0] = size / 16;
+
+  // C/DIMENSION to do the complete reduction
+  // DIMENSION to fill up the entire vector
+  vectorInstructionConfig->instCount[0] = X * Y;
 
   vectorInstructionConfig->instLen = 1;
-  vectorInstructionConfig->instLoopCount = 16;
+  vectorInstructionConfig->instLoopCount = FX;
+
+  // sendSerializedParams<VectorInstructionConfig,
+  // 32>(vectorInstructionConfig,
+  //   &serialVectorParamsIn);
+
+  //     vectorUnitStartSignal.SyncPop();
+  //     CCS_LOG("Accelerator
+  //     Layer Started.");
+  //     vectorUnitDoneSignal.SyncPop();
+  //     CCS_LOG("Accelerator
+  //     Layer Finished.");
 
   mappedParams.push_back(vectorParams);
   mappedParams.push_back(vectorInstructionConfig);
