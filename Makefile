@@ -174,14 +174,7 @@ build/AccuracyTester: build/AccuracyTester.o build/GoldModel.o build/Utils.o bui
 MobileBERTFinetuning: build/Finetuning
 	./build/Finetuning
 
-build/Finetuning: build/Finetuning.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
-	$(CC) -o $@ $^ -lstdc++fs
-
-.PHONY: MobileBERTFinetuningWithFWPass
-MobileBERTFinetuningWithFWPass: build/FinetuningWithFWPass
-	./build/FinetuningWithFWPass
-
-build/FinetuningWithFWPass: build/FinetuningWithFWPass.o build/MobileBERTParams.o build/DatasetIterator.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
+build/Finetuning: build/Finetuning.o build/MobileBERTParams.o build/DatasetIterator.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
 	$(CC) -o $@ $^ -lstdc++fs
 
 # Unit tests for custom Posit implementation
@@ -218,10 +211,7 @@ build/TestRunner.o: test/common/TestRunner.cc
 build/AccuracyTester.o: test/common/AccuracyTester.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Finetuning.o: test/training/Finetuning.cc
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
-
-build/FinetuningWithFWPass.o: test/training/FinetuningWithFWPass.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h test/training/DTYPE.h
+build/Finetuning.o: test/training/Finetuning.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h test/training/DTYPE.h
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 build/MobileBERTParams.o: test/training/MobileBERTParams.cc test/mobilebert/mobilebert_tiny2/*.h
