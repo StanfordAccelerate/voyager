@@ -274,7 +274,8 @@ void MemoryModel::loadModelActivations(const SimplifiedParams& params,
   if (params.ATTENTION_MASK) {
     loadBias(params, memoryMap.bias, files.bias_file, useDataFile);
   }
-  if (params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) {
+  if ((params.RESIDUAL || params.RELU_GRAD || params.SOFTMAX_GRAD) &&
+      !files.residual_file.empty()) {
     loadResiduals(params, memoryMap.residual, files.residual_file, useDataFile);
   }
   if (params.WEIGHT_SPLITTING) {
