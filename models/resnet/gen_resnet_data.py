@@ -273,8 +273,7 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
 
             # Write images to disk
             if args.write_dataset:
-                imagenet_label = ref_labels[top_catid_ref[0]][0]
-                class_id = class_labels.index(imagenet_label)
+                class_id = class_labels.index(image_labels[i])
                 sample_name = f"{class_id}_{model_id}"
                 output_folder_name = os.path.join(args.output_dataset_dir,sample_name)
                 os.makedirs(output_folder_name, exist_ok=True)
