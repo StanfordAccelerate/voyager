@@ -255,14 +255,26 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
         if image_labels[i] == ref_labels[top_catid_bnfold[0]][0]:
             model_bnfold_corr += 1
 
-        if vision_models._export:
-
-            # Get unique name from image path
+        # Get unique name from image path
             path_components = os.path.normpath(image_path).split(os.path.sep)
             model_id = path_components[-2] + '_' + \
                 re.findall('000[0-9]+', path_components[-1])[-1]
             dataset_name = path_components[-3]
 
+        # Write inputs to NN to disk
+        if args.write_dataset:
+            class_id = class_labels.index(image_labels[i])
+            sample_name = f"{class_id}_{model_id}"
+            output_folder_name = os.path.join(args.output_dataset_dir,sample_name)
+            os.makedirs(output_folder_name, exist_ok=True)
+            
+            input_data = vision_models._buffer['conv1.input']
+            # Open output file, then pack and write data
+
+            with open(os.path.join(output_folder_name, "input"), 'wb') as output:
+                output.write(struct.pack('%sd' % len(input_data), *input_data))
+
+        if args.dump_pickle:
             os.makedirs(os.path.join(args.model_dir,
                         dataset_name), exist_ok=True)
             pkl_file_path = os.path.join(
@@ -270,19 +282,6 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
             with open(pkl_file_path, "wb") as f:
                 pickle.dump(vision_models._buffer, f)
             pkl_file_paths.append(pkl_file_path)
-
-            # Write images to disk
-            if args.write_dataset:
-                class_id = class_labels.index(image_labels[i])
-                sample_name = f"{class_id}_{model_id}"
-                output_folder_name = os.path.join(args.output_dataset_dir,sample_name)
-                os.makedirs(output_folder_name, exist_ok=True)
-                
-                input_data = vision_models._buffer['conv1.input']
-                # Open output file, then pack and write data
-
-                with open(os.path.join(output_folder_name, "input"), 'wb') as output:
-                    output.write(struct.pack('%sd' % len(input_data), *input_data))
 
             if args.export_onnx:
                 # Write model to disk
@@ -393,6 +392,7 @@ def main():
     parser.add_argument('--write_dataset', default=False, action='store_true', help='Write dataset to disk.')
     parser.add_argument('--write_model', default=False, action='store_true', help='Write model weights to disk.')
     parser.add_argument('--output_dataset_dir', type=str, default='data/imagenet', help='Path to output folder for dataset.')
+    parser.add_argument('--dump_pickle', default=False, action='store_true', help='Dump pickle files.')
     parser.add_argument('--samples',
                         type=int,
                         default=1,
