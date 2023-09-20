@@ -416,10 +416,10 @@ def main():
 
     image_paths, image_labels, ref_labels = prepare_data(args)
     assert len(image_paths) >= args.samples, f'Can not generate {args.samples}, only {len(image_paths)} samples available.'
-    # pkl_file_paths = run_model(args, image_paths, image_labels, ref_labels)
-    pkl_file_paths = dump_model_data(args, image_paths, image_labels, ref_labels)
+    pkl_file_paths = run_model(args, image_paths, image_labels, ref_labels)
+    #pkl_file_paths = dump_model_data(args, image_paths, image_labels, ref_labels)
     # pkl_file_paths = dump_model_weights(args)
-    write_binary(args, pkl_file_paths)
+    #write_binary(args, pkl_file_paths)
 
     print("ResNet data generator done!")
 
