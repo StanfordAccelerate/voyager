@@ -164,6 +164,19 @@ const SimplifiedParams classifier_bias_gradient = {
     .ACC_T_WEIGHT = true,
     .ACC_T_OUTPUT = true,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
+    .QUANTIZE_TO_P8 = false,
+    .MAX_REDUCE = false,
     .ELWISE_ADD = true,
 };
 
@@ -451,7 +464,7 @@ const SimplifiedParams value_lora_A_quant = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{8, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -497,6 +510,17 @@ const SimplifiedParams value_lora_A_quant = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = true,
 };
 
@@ -505,7 +529,7 @@ const SimplifiedParams value_lora_B_quant = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -551,6 +575,17 @@ const SimplifiedParams value_lora_B_quant = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = true,
 };
 
@@ -710,7 +745,7 @@ const SimplifiedParams query_lora_A_quant = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -756,6 +791,17 @@ const SimplifiedParams query_lora_A_quant = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = true,
 };
 
@@ -764,7 +810,7 @@ const SimplifiedParams query_lora_B_quant = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -810,6 +856,17 @@ const SimplifiedParams query_lora_B_quant = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = true,
 };
 
@@ -818,7 +875,7 @@ const SimplifiedParams query_lora_A_weight_gradient = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is already transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is already transposed
     .loops = {{2, 1, 1, 1, 1, 1}, {8, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -1181,7 +1238,7 @@ const SimplifiedParams value_lora_A_grad_clip = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{8, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -1235,7 +1292,7 @@ const SimplifiedParams query_and_value_lora_grad_clip = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -1289,7 +1346,7 @@ const SimplifiedParams value_lora_A_max_grad = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{8, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -1335,6 +1392,17 @@ const SimplifiedParams value_lora_A_max_grad = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = false,
     .MAX_REDUCE = true,
 };
@@ -1344,7 +1412,7 @@ const SimplifiedParams query_and_value_lora_max_grad = {
     .INPUT_OFFSET = 0,
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 0,
-    .WEIGHT_TRANSPOSE = false, // lora_B is stored transposed
+    .WEIGHT_TRANSPOSE = false,  // lora_B is stored transposed
     .loops = {{2, 1, 1, 1, 1, 1}, {1, 1, 1, 1, 1, 64}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
@@ -1390,6 +1458,17 @@ const SimplifiedParams query_and_value_lora_max_grad = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = false,
     .MAX_REDUCE = true,
 };
@@ -1437,26 +1516,37 @@ gradientParams["attention_self_value_bias"] =
     intra_bottleneck_bias_with_head_concat;
 gradientParams["attention_self_value_lora_A_quant"] = value_lora_A_quant;
 gradientParams["attention_self_value_lora_B_quant"] = value_lora_B_quant;
-gradientParams["attention_self_value_lora_A_weight"] = value_lora_A_weight_gradient;
-gradientParams["attention_self_value_lora_B_weight"] = value_lora_B_weight_gradient;
+gradientParams["attention_self_value_lora_A_weight"] =
+    value_lora_A_weight_gradient;
+gradientParams["attention_self_value_lora_B_weight"] =
+    value_lora_B_weight_gradient;
 
 gradientParams["attention_self_value_lora_A_max_grad"] = value_lora_A_max_grad;
-gradientParams["attention_self_value_lora_B_max_grad"] = query_and_value_lora_max_grad;
-gradientParams["attention_self_value_lora_A_grad_clip"] = value_lora_A_grad_clip;
-gradientParams["attention_self_value_lora_B_grad_clip"] = query_and_value_lora_grad_clip;
+gradientParams["attention_self_value_lora_B_max_grad"] =
+    query_and_value_lora_max_grad;
+gradientParams["attention_self_value_lora_A_grad_clip"] =
+    value_lora_A_grad_clip;
+gradientParams["attention_self_value_lora_B_grad_clip"] =
+    query_and_value_lora_grad_clip;
 
 gradientParams["attention_self_query_weight"] = query_key_projection_weight;
 gradientParams["attention_self_query_bias"] =
     intra_bottleneck_bias_with_head_concat;
 gradientParams["attention_self_query_lora_A_quant"] = query_lora_A_quant;
 gradientParams["attention_self_query_lora_B_quant"] = query_lora_B_quant;
-gradientParams["attention_self_query_lora_A_weight"] = query_lora_A_weight_gradient;
-gradientParams["attention_self_query_lora_B_weight"] = query_lora_B_weight_gradient;
+gradientParams["attention_self_query_lora_A_weight"] =
+    query_lora_A_weight_gradient;
+gradientParams["attention_self_query_lora_B_weight"] =
+    query_lora_B_weight_gradient;
 
-gradientParams["attention_self_query_lora_A_max_grad"] = query_and_value_lora_max_grad;
-gradientParams["attention_self_query_lora_B_max_grad"] = query_and_value_lora_max_grad;
-gradientParams["attention_self_query_lora_A_grad_clip"] = query_and_value_lora_grad_clip;
-gradientParams["attention_self_query_lora_B_grad_clip"] = query_and_value_lora_grad_clip;
+gradientParams["attention_self_query_lora_A_max_grad"] =
+    query_and_value_lora_max_grad;
+gradientParams["attention_self_query_lora_B_max_grad"] =
+    query_and_value_lora_max_grad;
+gradientParams["attention_self_query_lora_A_grad_clip"] =
+    query_and_value_lora_grad_clip;
+gradientParams["attention_self_query_lora_B_grad_clip"] =
+    query_and_value_lora_grad_clip;
 
 gradientParams["attention_self_key_weight"] = query_key_projection_weight;
 gradientParams["attention_self_key_bias"] =
