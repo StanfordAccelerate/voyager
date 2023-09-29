@@ -78,10 +78,18 @@ void print_memory(int address, bool SRAM) {
     }
   }
   std::cout << std::endl;
-  // wait for user to press enter
-  std::string line;
-  std::getline(std::cin, line);
+#endif
+}
 
+void dump_memory(int address, int size, char *file) {
+#ifdef SOC
+  gdb_dump_memory(address, size, file);
+#else
+  std::ofstream myfile(std::string(file));
+  for (int i = 0; i < size; i++) {
+    myfile << memory->sram[address + i].bits << std::endl;
+  }
+  myfile.close();
 #endif
 }
 
