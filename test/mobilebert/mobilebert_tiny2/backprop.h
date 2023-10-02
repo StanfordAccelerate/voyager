@@ -152,6 +152,17 @@ const SimplifiedParams classifier_weight_quant = {
     .ACC_T_WEIGHT = false,
     .ACC_T_OUTPUT = false,
     .ACC_T_RESIDUAL = false,
+    .outputExpBias = 0,
+    .WEIGHT_UPDATE = false,
+    .ERROR_FEEDBACK = false,
+    .depthwise = false,
+    .sram_banks = {ON},
+    .rram_banks = {ON},
+    .bandwidth_mode = QUAD,
+    .bank_offsets = {0},
+    .name = "",
+    .ATTENTION_MASK = false,
+    .MERGE_LORA_WEIGHT = false,
     .QUANTIZE_TO_P8 = true,
 };
 
