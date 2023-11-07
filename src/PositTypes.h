@@ -46,8 +46,7 @@ template <int nbits, int es, int fbits>
 void convert_(const bool sign, const int scale,
               const ac_int<fbits, false> fraction_in,
               ac_int<nbits, false> &bits) {
-  if ((es > 0 && scale < -(nbits - 1) * (1 << es) + (1 << max(es - 1, 0))) ||
-      (es == 0 && scale < -(nbits - 1))) {
+  if (nbits == 8 && es == 1 && scale < -13) {
     bits = 0;
     return;
   }
@@ -61,30 +60,18 @@ void convert_(const bool sign, const int scale,
       bits[0] = 1;
     }
   } else {
-    ac_int<nbits + 3 + es, false> pt_bits, regime, exponent, fraction,
-        sticky_bit;
+    ac_int<nbits + 1 + es + fbits, false> pt_bits, regime, exponent;
 
     bool r = (scale >= 0);
     int run = r ? (1 + (scale >> es)) : -(scale >> es);
-    regime = r ? (1l << (run + 1)) - 1 : 0;
-    regime[0] = ~r;
-
+    regime = r ? (1l << (run + 1)) - 2 : 0x1;
     exponent = scale % (uint32_t(1) << es);
+    pt_bits = (regime << fbits + es) | (exponent << fbits) | fraction_in;
 
-    int nf = max(0, nbits + 1 - (2 + run + es));
-    fraction = fraction_in >> max(fbits - nf, 0);
-    fraction <<= max(nf - fbits, 0);
-
-    regime <<= es + nf + 1;
-    exponent <<= nf + 1;
-    fraction <<= 1;
-    sticky_bit = fraction_in << nf ? 1 : 0;
-    pt_bits = regime | exponent | fraction | sticky_bit;
-
-    int len = 1 + max(nbits + 1, 2 + run + es);
+    int len = 2 + run + es + fbits;
     bool blast = pt_bits[len - nbits];
     bool bafter = pt_bits[len - nbits - 1];
-    bool bsticky = pt_bits & ((1 << (len - nbits - 1)) - 1);
+    bool bsticky = pt_bits  << (2 * nbits - run);
     bool rb = (blast & bafter) | (bafter & bsticky);
 
     bits = pt_bits >> (len - nbits);
@@ -92,6 +79,57 @@ void convert_(const bool sign, const int scale,
   }
   if (sign) twos_complement(bits);
 }
+
+// template <int nbits, int es, int fbits>
+// void convert_(const bool sign, const int scale,
+//               const ac_int<fbits, false> fraction_in,
+//               ac_int<nbits, false> &bits) {
+//   if ((es > 0 && scale < -(nbits - 1) * (1 << es) + (1 << max(es - 1, 0))) ||
+//       (es == 0 && scale < -(nbits - 1))) {
+//     bits = 0;
+//     return;
+//   }
+
+//   if ((scale >> es) > nbits - 2 || (scale >> es) < -(nbits - 2)) {
+//     bits = 0;
+//     if (scale > 0) {
+//       bits = bits.bit_complement();
+//       bits[nbits - 1] = 0;
+//     } else {
+//       bits[0] = 1;
+//     }
+//   } else {
+//     ac_int<nbits + 3 + es, false> pt_bits, regime, exponent, fraction,
+//         sticky_bit;
+
+//     bool r = (scale >= 0);
+//     int run = r ? (1 + (scale >> es)) : -(scale >> es);
+//     regime = r ? (1l << (run + 1)) - 1 : 0;
+//     regime[0] = ~r;
+
+//     exponent = scale % (uint32_t(1) << es);
+
+//     int nf = max(0, nbits + 1 - (2 + run + es));
+//     fraction = fraction_in >> max(fbits - nf, 0);
+//     fraction <<= max(nf - fbits, 0);
+
+//     regime <<= es + nf + 1;
+//     exponent <<= nf + 1;
+//     fraction <<= 1;
+//     sticky_bit = fraction_in << nf ? 1 : 0;
+//     pt_bits = regime | exponent | fraction | sticky_bit;
+
+//     int len = 1 + max(nbits + 1, 2 + run + es);
+//     bool blast = pt_bits[len - nbits];
+//     bool bafter = pt_bits[len - nbits - 1];
+//     bool bsticky = pt_bits & ((1 << (len - nbits - 1)) - 1);
+//     bool rb = (blast & bafter) | (bafter & bsticky);
+
+//     bits = pt_bits >> (len - nbits);
+//     if (rb) bits++;
+//   }
+//   if (sign) twos_complement(bits);
+// }
 
 template <int nbits, int es, int fbits>
 void decode(ac_int<nbits, false> bits, bool &sign, int &scale,
