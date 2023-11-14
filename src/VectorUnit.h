@@ -384,7 +384,6 @@ SC_MODULE(VectorOpUnit) {
 #pragma hls_pipeline_stall_mode flush
       for (int index = 0; index < iterationCount; index++) {
         typename ACC_DTYPE::DecomposedPosit prevResult;
-        prevResult.setZero();
 
         if (inst.rOp == VectorInstructions::radd) {
           for (int i = 0; i < inst.rCount; i++) {
@@ -409,8 +408,9 @@ SC_MODULE(VectorOpUnit) {
             typename ACC_DTYPE::DecomposedPosit result = treemax16(op);
             // TreeOps<typename ACC_DTYPE::DecomposedPosit, WIDTH>().treemax(
             //     op);
-
-            result = result < prevResult ? prevResult : result;
+            if (i != 0) {
+              result = result < prevResult ? prevResult : result;
+            }
 
             prevResult = result;
           }
