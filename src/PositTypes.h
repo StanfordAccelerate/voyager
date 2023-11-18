@@ -46,7 +46,13 @@ template <int nbits, int es, int fbits>
 void convert_(const bool sign, const int scale,
               const ac_int<fbits, false> fraction_in,
               ac_int<nbits, false> &bits) {
-  if (nbits == 8 && es == 1 && scale < -13) {
+  // if (nbits == 8 && es == 1 && scale < -13) {
+  //   bits = 0;
+  //   return;
+  // }
+
+  if ((es > 0 && scale < -(nbits - 1) * (1 << es) + (1 << max(es - 1, 0))) ||
+      (es == 0 && scale < -(nbits - 1))) {
     bits = 0;
     return;
   }
@@ -64,15 +70,18 @@ void convert_(const bool sign, const int scale,
 
     bool r = (scale >= 0);
     int run = r ? (1 + (scale >> es)) : -(scale >> es);
-    regime = r ? (1l << (run + 1)) - 2 : 0x1;
+    regime = r ? (1 << (run + 1)) - 2 : 1;
     exponent = scale % (uint32_t(1) << es);
     pt_bits = (regime << fbits + es) | (exponent << fbits) | fraction_in;
 
+    bool rb = false;
     int len = 2 + run + es + fbits;
-    bool blast = pt_bits[len - nbits];
-    bool bafter = pt_bits[len - nbits - 1];
-    bool bsticky = pt_bits  << (2 * nbits - run);
-    bool rb = (blast & bafter) | (bafter & bsticky);
+    if (len > nbits) {
+      bool blast = pt_bits[len - nbits];
+      bool bafter = pt_bits[len - nbits - 1];
+      bool bsticky = pt_bits << (2 * nbits - run);
+      rb = (blast & bafter) | (bafter & bsticky);
+    }
 
     bits = pt_bits >> (len - nbits);
     if (rb) bits++;
@@ -443,6 +452,18 @@ class PositFP {
 
   void masked_relu(const PositFP &mask) {
     if (mask.isZero()) setZero();
+  }
+
+  void posit_exp() {
+    this->negate();
+
+    Posit<16, 0> posit16_0(*this);
+    posit16_0.sigmoid();
+    posit16_0.reciprocal();
+    *this = posit16_0;
+
+    *this -= 1.10925;
+    this->relu();
   }
 
   PositFP<sbits, abits + 1> operator+(const PositFP &rhs) const;
