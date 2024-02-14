@@ -14,8 +14,10 @@
 #define hidden_bits 1
 
 template <int mantissa, int exp>
-class Float {
+//  : public ac_float<mantissa+hidden_bits, hidden_bits, exp, AC_RND>
+class Float{
     public:
+
     // ac_float<W,I,E,Q>- mantissa: ac_fixed<W,I,true> exp: ac_int<E,true> quant : default trunc 
     typedef ac_float<mantissa+hidden_bits, hidden_bits, exp, AC_RND> ac_float_rep; 
 
@@ -27,6 +29,12 @@ class Float {
 
     Float();
     Float(ac_float_rep input_float_rep);
+    template<int i_mantissa, int i_exp>
+    Float(Float<i_mantissa, i_exp> rhs);
+
+    // ac_int<mantissa+exp+hidden_bits,true> bits(){
+    //     return float_val.data_ac_int();
+    // }
 
     void negate(){
         float_val = -float_val;
@@ -41,6 +49,9 @@ class Float {
     }
 
     void setbits(int i) { float_val = i; }
+
+
+    // void setbits(Float<mantissa, exp> i) { float_val = i; }
 
     void setZero(){
         float_val = 0;
@@ -79,6 +90,19 @@ class Float {
         float_val = sigmoid_in_fixed.to_ac_float();
     }
 
+  Float operator+(const Float &rhs);
+  Float operator*(const Float &rhs);
+  Float operator/(const Float &rhs);
+
+  Float &operator+=(const Float &rhs);
+  Float &operator-=(const Float &rhs);
+  Float &operator*=(const Float &rhs);
+  Float &operator/=(const Float &rhs);
+
+  bool operator<(const Float &rhs) const;
+
+  operator float() const;
+
 // SystemC is not compatible with C++17
 #ifndef NO_SYSC
     template <unsigned int Size>
@@ -87,7 +111,8 @@ class Float {
     }
 #endif
 
-    static const unsigned int width = ac_float_rep::width;
+    // static const unsigned int width = ac_float_rep::width;
+    static constexpr int width = mantissa + exp + hidden_bits;
     private:
     ac_float_rep float_val;
 
@@ -97,7 +122,7 @@ class Float {
 template <int mantissa, int exp>
 inline std::ostream &operator<<(std::ostream &os, const Float<mantissa, exp> &val) {
 #ifndef __SYNTHESIS__
-  os << static_cast<float>(val) << " ";
+  os << static_cast<float>(val.float_val) << " ";
 #else
   os << val.bits << " ";
 #endif
@@ -112,4 +137,58 @@ Float<mantissa, exp>::Float(ac_float_rep input_float_rep){
 template <int mantissa, int exp>
 Float<mantissa, exp>::Float(){
     float_val = 0;
+}
+
+
+template<int mantissa, int exp>
+template<int i_mantissa, int i_exp>
+Float<mantissa, exp>::Float(Float<i_mantissa, i_exp> rhs){
+    float_val = rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> Float<mantissa, exp>::operator+(
+    const Float<mantissa, exp> &rhs) {
+  return *this + rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> Float<mantissa, exp>::operator*(
+    const Float<mantissa, exp> &rhs) {
+  return *this * rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> Float<mantissa, exp>::operator/(
+    const Float<mantissa, exp> &rhs) {
+  return *this / rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> &Float<mantissa, exp>::operator+=(
+    const Float<mantissa, exp> &rhs) {
+  return *this + rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> &Float<mantissa, exp>::operator-=(
+    const Float<mantissa, exp> &rhs) {
+  return *this - rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> &Float<mantissa, exp>::operator*=(
+    const Float<mantissa, exp> &rhs) {
+  return *this * rhs;
+}
+
+template<int mantissa, int exp>
+inline Float<mantissa, exp> &Float<mantissa, exp>::operator/=(
+    const Float<mantissa, exp> &rhs) {
+  return *this / rhs;
+}
+
+template <int mantissa, int exp>
+inline bool Float<mantissa, exp>::operator<(const Float<mantissa, exp> &rhs) const {
+  return (*this < rhs);
 }

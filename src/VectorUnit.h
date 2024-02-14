@@ -350,6 +350,7 @@ SC_MODULE(VectorOpUnit) {
 
 #pragma hls_unroll yes
         for (int i = 0; i < WIDTH; i++) {
+          // accum[i] = accum[i] + op[i];
           accum[i] += op[i];
         }
       }
