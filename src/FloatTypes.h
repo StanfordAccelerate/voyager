@@ -149,43 +149,53 @@ Float<mantissa, exp>::Float(Float<i_mantissa, i_exp> rhs){
 template<int mantissa, int exp>
 inline Float<mantissa, exp> Float<mantissa, exp>::operator+(
     const Float<mantissa, exp> &rhs) {
-  return *this + rhs;
+  AccumulationDatatype op1 = *this;
+  AccumulationDatatype op2 = rhs;
+  return op1 + op2;
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> Float<mantissa, exp>::operator*(
     const Float<mantissa, exp> &rhs) {
-  return *this * rhs;
+  AccumulationDatatype op1 = *this;
+  AccumulationDatatype op2 = rhs;
+  return op1 * op2;
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> Float<mantissa, exp>::operator/(
     const Float<mantissa, exp> &rhs) {
-  return *this / rhs;
+  AccumulationDatatype op1 = *this;
+  AccumulationDatatype op2 = rhs;
+  return op1 / op2;
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> &Float<mantissa, exp>::operator+=(
     const Float<mantissa, exp> &rhs) {
-  return *this + rhs;
+  *this = *this + rhs;
+  return *this;
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> &Float<mantissa, exp>::operator-=(
     const Float<mantissa, exp> &rhs) {
-  return *this - rhs;
+  *this = *this - rhs;
+  return *this;
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> &Float<mantissa, exp>::operator*=(
     const Float<mantissa, exp> &rhs) {
-  return *this * rhs;
+  *this = *this * rhs;
+  return *this;
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> &Float<mantissa, exp>::operator/=(
     const Float<mantissa, exp> &rhs) {
-  return *this / rhs;
+  *this = *this / rhs;
+  return *this;
 }
 
 template <int mantissa, int exp>
