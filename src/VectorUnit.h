@@ -169,9 +169,9 @@ SC_MODULE(VectorOpUnit) {
                  inst.vOp0Src1 == VectorInstructions::op0immediate1) {
         IDTYPE immediate;
         if (inst.vOp0Src1 == VectorInstructions::op0immediate0) {
-          immediate.bits = inst.immediate0;
+          immediate = static_cast<IDTYPE>(inst.immediate0);
         } else {
-          immediate.bits = inst.immediate1;
+          immediate = static_cast<IDTYPE>(inst.immediate1);
         }
 
 #pragma hls_unroll yes
@@ -256,10 +256,11 @@ SC_MODULE(VectorOpUnit) {
                  inst.vOp3Src1 == VectorInstructions::op3immediate1) {
         IDTYPE immediate;
         if (inst.vOp3Src1 == VectorInstructions::op3immediate0) {
-          immediate.bits = inst.immediate0;
+          immediate = static_cast<IDTYPE>(inst.immediate0);
         } else {
-          immediate.bits = inst.immediate1;
+          immediate = static_cast<IDTYPE>(inst.immediate1);
         }
+
 
 #pragma hls_unroll yes
         for (int i = 0; i < WIDTH; i++) {
@@ -431,15 +432,7 @@ SC_MODULE(VectorOpUnit) {
       }
 
       if (inst.rMax1) {
-        typename ACC_DTYPE::AccumulationDatatype one;
-        one._zero = false;
-        one.fraction = 0;
-        one.scale = 0;
-        one.sign = false;
-
-        if (scalarResult > one) {
-          scalarResult = one;
-        }
+        scalarResult = scalarResult.max1();
       }
 
       if (inst.rDuplicate) {

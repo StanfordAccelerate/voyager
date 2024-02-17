@@ -293,7 +293,7 @@ Posit<nbits, es>::Posit(const float f) {
 
 // Implements an optimized exp that is only valid for inputs smaller than zero
 template <int nbits, int es>
-Posit<nbits, es> posit_exp(Posit<nbits, es> val) {
+Posit<nbits, es> exponent(Posit<nbits, es> val) {
   assert(nbits == 16 && es == 1);
 
   Posit<nbits, es> min_exp;
@@ -468,7 +468,7 @@ class PositFP {
     *this = posit_rep;  
   }
 
-  void posit_exp() {
+  void exponent() {
     this->negate();
 
     Posit<16, 0> posit16_0(*this);
@@ -483,6 +483,10 @@ class PositFP {
     *this -= static_cast<PositFP>(diff);
 
     this->relu();
+  }
+
+  void expScale(ac_int<8, false> offset){
+    this->scale = this->scale + offset;
   }
 
   PositFP<sbits, abits + 1> operator+(const PositFP &rhs) const;
@@ -513,6 +517,22 @@ class PositFP {
     ac_math::ac_inverse_sqrt_pwl(ac_f, ac_f_inv_sqrt);
 
     return PositFP(ac_f_inv_sqrt);
+  }
+
+  PositFP max1() {
+    ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
+    ac_float_rep one;
+
+    one._zero = false;
+    one.fraction = 0;
+    one.scale = 0;
+    one.sign = false;
+
+    if (ac_f > one) {
+      ac_f = one;
+    }
+
+    return ac_f;
   }
 
   // SystemC is not compatible with C++17
@@ -878,7 +898,7 @@ typename Posit<nbits2, es2>::AccumulationDatatype decomposed_fma(
   if (a.isZero() || b.isZero()) {
     return c;
   }
-
+  // TODO : Suresh Templatize Max bitwidth of the input operands
   PositFP<8, mbits> product = a * b;
   if (c.isZero()) {
     return typename Posit<nbits2, es2>::AccumulationDatatype(product);

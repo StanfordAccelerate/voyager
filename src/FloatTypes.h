@@ -22,7 +22,10 @@ class Float{
     typedef ac_float<mantissa+hidden_bits, hidden_bits, exp, AC_RND> ac_float_rep; 
 
     // TODO Set Float to Fixed type
-    typedef ac_fixed<2*mantissa, mantissa, true> ac_float_to_fixed_rep;
+    typedef ac_fixed<2*mantissa, mantissa, true> ac_float_to_fixed_rep;   
+
+    // TODO Set Float to Fixed type
+    typedef ac_fixed<2*mantissa, mantissa, false> ac_float_to_fixed_rep_out;
 
     // Set Accumulation datatype size for Floats to floating point type
     typedef Float<mantissa, exp> AccumulationDatatype;
@@ -68,12 +71,12 @@ class Float{
     void exponent(){
         // convert to fixed point
         ac_float_to_fixed_rep converted_to_fixed = float_val.to_ac_fixed();
-        ac_float_to_fixed_rep exponent_in_fixed;
+        ac_float_to_fixed_rep_out exponent_in_fixed;
         // take fixed point exponent
         ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
         // convert back to float
-        float_val = exponent_in_fixed.to_ac_float();
-    }   
+        float_val = static_cast<ac_float_rep>(exponent_in_fixed);
+    }    
 
     // log_mult not implemented for float type
 
@@ -83,12 +86,25 @@ class Float{
         return float_val_inv_sqrt;
     }
 
+    Float max1(){
+        ac_float_rep one;
+        one = 1.0;
+        if(float_val > one){
+          float_val = one;
+        } 
+        return float_val;
+    }
+
     void sigmoid(){
         ac_float_to_fixed_rep converted_to_fixed = float_val.to_ac_fixed();
-        ac_float_to_fixed_rep sigmoid_in_fixed;        
+        ac_float_to_fixed_rep_out sigmoid_in_fixed;        
         ac_math::ac_sigmoid_pwl(converted_to_fixed, sigmoid_in_fixed);
-        float_val = sigmoid_in_fixed.to_ac_float();
+        float_val = static_cast<ac_float_rep>(sigmoid_in_fixed);
     }
+
+    void expScale(ac_int<8, false> offset){
+      float_val.set_exp(float_val.exp() + offset);
+    }    
 
   Float operator+(const Float &rhs);
   Float operator*(const Float &rhs);
@@ -107,7 +123,11 @@ class Float{
 #ifndef NO_SYSC
     template <unsigned int Size>
     void Marshall(Marshaller<Size> &m) {
-        m &float_val;
+        // m &float_val;
+        // float_val.Marshall(m);
+        Wrapped<ac_float_rep> wrapped_float_val(float_val);
+        m &wrapped_float_val;
+        
     }
 #endif
 
@@ -122,12 +142,27 @@ class Float{
 template <int mantissa, int exp>
 inline std::ostream &operator<<(std::ostream &os, const Float<mantissa, exp> &val) {
 #ifndef __SYNTHESIS__
-  os << static_cast<float>(val.float_val) << " ";
+  os << static_cast<float>(val) << " ";
 #else
   os << val.bits << " ";
 #endif
   return os;
 }
+
+template <int mantissa, int exp>
+Float<mantissa, exp> exponent(Float<mantissa, exp> element){
+  typedef ac_float<mantissa+hidden_bits, hidden_bits, exp, AC_RND> ac_float_rep;
+  typedef ac_fixed<2*mantissa, mantissa, true> ac_float_to_fixed_rep;
+  typedef ac_fixed<2*mantissa, mantissa, false> ac_float_to_fixed_out_rep;
+  // convert to fixed point
+  ac_float_to_fixed_rep converted_to_fixed =
+     static_cast<ac_float_rep>(element).to_ac_fixed();
+  ac_float_to_fixed_out_rep exponent_in_fixed;
+  // take fixed point exponent
+  ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
+  // convert back to float
+  return static_cast<ac_float_rep>(exponent_in_fixed);
+} 
 
 template <int mantissa, int exp>
 Float<mantissa, exp>::Float(ac_float_rep input_float_rep){
@@ -143,7 +178,7 @@ Float<mantissa, exp>::Float(){
 template<int mantissa, int exp>
 template<int i_mantissa, int i_exp>
 Float<mantissa, exp>::Float(Float<i_mantissa, i_exp> rhs){
-    float_val = rhs;
+    float_val = static_cast<ac_float_rep>(rhs);
 }
 
 template<int mantissa, int exp>
@@ -201,4 +236,18 @@ inline Float<mantissa, exp> &Float<mantissa, exp>::operator/=(
 template <int mantissa, int exp>
 inline bool Float<mantissa, exp>::operator<(const Float<mantissa, exp> &rhs) const {
   return (*this < rhs);
+}
+
+template <int mantissa_i, int exp_i, int mantissa_o, int exp_o>
+typename Float<mantissa_o, exp_o>::AccumulationDatatype decomposed_fma(
+    const typename Float<mantissa_i, exp_i>::AccumulationDatatype &a,
+    const typename Float<mantissa_i, exp_i>::AccumulationDatatype &b,
+    const typename Float<mantissa_o, exp_o>::AccumulationDatatype &c) {
+
+  return  static_cast<typename Float<mantissa_o, exp_o>::AccumulationDatatype >(a * b) + c;
+  // if (c.isZero()) {
+  //   return typename Posit<nbits2, es2>::AccumulationDatatype(product);
+  // } else {
+  //   PositFP<8, abits + 1> sum = PositFP<8, fbits2>(product) + c;
+  //   return typename Posit<nbits2, es2>::AccumulationDatatype(sum);
 }

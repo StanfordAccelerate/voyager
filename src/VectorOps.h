@@ -52,8 +52,8 @@ void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH> mask,
 #pragma hls_design ccore
 template <typename ACC_DTYPE, int WIDTH>
 void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
-  // convert to Posit16
-  Pack1D<Posit<16, 1>, WIDTH> tmp;
+  // convert to ACCUM_DATATYPE
+  Pack1D<ACCUM_DATATYPE, WIDTH> tmp;
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
     tmp[i] = op0[i];
@@ -61,7 +61,7 @@ void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
 
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
-    tmp[i] = posit_exp(tmp[i]);
+    tmp[i] = exponent(tmp[i]);
   }
 
 // convert back to decoded format
@@ -82,7 +82,8 @@ void vscaleexp(Pack1D<ACC_DTYPE, WIDTH>& op0, ac_int<8, false> expScale,
 
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
-    res[i].scale += expScale;
+    res[i].expScale(expScale);
+    // res[i].scale += expScale;
   }
 }
 
