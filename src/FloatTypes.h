@@ -139,12 +139,11 @@ class Float{
 #ifndef NO_SYSC
     template <unsigned int Size>
     void Marshall(Marshaller<Size> &m) {
-      std::cout << "called marshall" << std::endl;
-        // m &float_val;
-        // float_val.Marshall(m);
-        Wrapped<ac_float_rep> wrapped_float_val(float_val);
-        m &wrapped_float_val;
-        
+      // std::cout << "called marshall" << std::endl;
+      // m &float_val;
+      // float_val.Marshall(m);
+      Wrapped<ac_float_rep> wrapped_float_val(float_val);
+      m &wrapped_float_val;     
     }
 #endif
 

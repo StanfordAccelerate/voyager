@@ -188,17 +188,17 @@ SC_MODULE(VectorFetchUnit) {
                       Pack1D<ACC_DTYPE, WIDTH> fullPrecisionVec;
 
                       for (int precision = 0; precision < 2; precision++) {
-                        sc_lv<ODTYPE::width * WIDTH> bias =
-                            TypeToBits<Pack1D<ODTYPE, WIDTH> >(vectorFetch0DataResponse.Pop());
+                        Pack1D<ODTYPE, WIDTH> bias =
+                            vectorFetch0DataResponse.Pop();
 #pragma hls_unroll yes
                         for (int i = 0; i < WIDTH / 2; i++) {
-                          sc_lv<ODTYPE::width * 2> temp;
+                          ac_int<ODTYPE::width * 2, false> temp;
 #pragma hls_unroll yes
                           for (int byte = 0; byte < 2; byte++) {
-                            temp(byte * ODTYPE::width, (byte+1) * ODTYPE::width) = bias;
+                            temp.set_slc(byte * ODTYPE::width, bias[i * 2 + byte].bits_rep());
                           }
-                          fullPrecisionVec[precision * (WIDTH / 2) + i] =
-                              BitsToType<ACC_DTYPE> (temp);
+                          fullPrecisionVec[precision * (WIDTH / 2) + i].setbits(
+                              temp);
                         }
                       }
 
@@ -441,18 +441,18 @@ SC_MODULE(VectorFetchUnit) {
 
                     if (params.DP_VEC1) {
                       for (int precision = 0; precision < 2; precision++) {
-                        sc_lv<ODTYPE::width * WIDTH> response =
-                            TypeToBits<Pack1D<ODTYPE, WIDTH> >(vectorFetch1DataResponse.Pop());
+                        Pack1D<ODTYPE, WIDTH> response =
+                            vectorFetch1DataResponse.Pop();
 
 #pragma hls_unroll yes
                         for (int i = 0; i < WIDTH / 2; i++) {
-                          sc_lv<ODTYPE::width * 2> temp;
+                          ac_int<ODTYPE::width * 2, false> temp;
 #pragma hls_unroll yes
                           for (int byte = 0; byte < 2; byte++) {
-                            temp(byte * ODTYPE::width, (byte+1) * ODTYPE::width) = response;
+                            temp.set_slc(byte * ODTYPE::width, response[i * 2 + byte].bits_rep());
                           }
-                          fullPrecisionDataResponse[precision * (WIDTH / 2) + i] = 
-                              BitsToType<ACC_DTYPE> (temp);
+                        fullPrecisionDataResponse[precision * (WIDTH / 2) + i]
+                            .setbits(temp);                          
                         }
                       }
                     } else {
@@ -607,18 +607,16 @@ SC_MODULE(VectorFetchUnit) {
                 Pack1D<ACC_DTYPE, WIDTH> fullPrecisionBias;
 
                 for (int pack = 0; pack < 2; pack++) {
-                  sc_lv<ODTYPE::width * WIDTH> bias = 
-                        TypeToBits<Pack1D<ODTYPE, WIDTH> >(vectorFetch2DataResponse.Pop());
+                  Pack1D<ODTYPE, WIDTH> bias = vectorFetch2DataResponse.Pop();
 
 #pragma hls_unroll yes
                   for (int i = 0; i < WIDTH / 2; i++) {
-                    sc_lv<ODTYPE::width * 2> temp;
+                    ac_int<ODTYPE::width * 2, false> temp;
 #pragma hls_unroll yes
                     for (int byte = 0; byte < 2; byte++) {
-                      temp(byte * ODTYPE::width, (byte+1) * ODTYPE::width) = bias;
+                      temp.set_slc(byte * ODTYPE::width, bias[i * 2 + byte].bits_rep());
                     }
-                    fullPrecisionBias[pack * (WIDTH / 2) + i] =
-                          BitsToType<ACC_DTYPE> (temp);
+                    fullPrecisionBias[pack * (WIDTH / 2) + i].setbits(temp);
                   }
                 }
 
@@ -638,18 +636,18 @@ SC_MODULE(VectorFetchUnit) {
               Pack1D<ACC_DTYPE, WIDTH> castedVec;
               if (params.DP_VEC2) {
                 for (int precision = 0; precision < 2; precision++) {
-                  sc_lv<ODTYPE::width * WIDTH> originalVec =
-                      TypeToBits<Pack1D<ODTYPE, WIDTH> >(vectorFetch2DataResponse.Pop());
+                  Pack1D<ODTYPE, WIDTH> originalVec =
+                      vectorFetch2DataResponse.Pop();
 
 #pragma hls_unroll yes
                   for (int vecIndex = 0; vecIndex < WIDTH / 2; vecIndex++) {
-                    sc_lv<ODTYPE::width * 2> temp;
+                    ac_int<ODTYPE::width * 2, false> temp;
 #pragma hls_unroll yes
                     for (int byte = 0; byte < 2; byte++) {
-                      temp(byte * ODTYPE::width, (byte+1) * ODTYPE::width) = originalVec;
+                      temp.set_slc(byte * ODTYPE::width, 
+                          originalVec[i * 2 + byte].bits_rep());
                     }
-                    castedVec[precision * (WIDTH / 2) + vecIndex] = 
-                          BitsToType<ACC_DTYPE> (temp);
+                    castedVec[precision * (WIDTH / 2) + vecIndex].setbits(temp);
                   }
                 }
               } else {
