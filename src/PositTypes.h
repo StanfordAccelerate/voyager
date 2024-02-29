@@ -207,7 +207,9 @@ class Posit {
   template <int fp_sbits, int fp_fbits>
   Posit(const PositFP<fp_sbits, fp_fbits> &input);
 
-  // ac_int<nbits, false> bits(){ return bits;} 
+  ac_int<nbits, false> bits_rep(){ 
+    return bits;
+  } 
 
   bool isZero() const { return bits == 0; }
 
@@ -522,9 +524,9 @@ class PositFP {
   }
 
   PositFP max1() {
-    ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
-    ac_float_rep one;
-
+    // ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
+    PositFP<sbits, fbits> one;
+    PositFP<sbits, fbits> ac_f = *this; 
     one._zero = false;
     one.fraction = 0;
     one.scale = 0;

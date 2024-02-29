@@ -30,8 +30,8 @@ inline float readValue(INPUT_DATATYPE *matrix, int index,
     return static_cast<float>(matrix[index]);
   }
 
-  int lower = matrix[2 * index].bits();
-  int upper = matrix[2 * index + 1].bits();
+  int lower = matrix[2 * index].bits_rep();
+  int upper = matrix[2 * index + 1].bits_rep();
   ACCUM_DATATYPE p16;
   p16.setbits((upper << 8) + lower);
   return static_cast<float>(p16);

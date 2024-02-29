@@ -36,11 +36,11 @@ class Float{
     template<int i_mantissa, int i_exp>
     Float(Float<i_mantissa, i_exp> rhs);
 
-    // ac_int<mantissa+exp+hidden_bits,true> bits(){
+    // ac_int<mantissa+exp+hidden_bits,true> bits_rep(){
     //     return float_val.data_ac_int();
     // }
 
-    ac_int<mantissa + exp + hidden_bits, false> bits() const { 
+    ac_int<mantissa + exp + hidden_bits, false> bits_rep() const { 
       ac_int<mantissa + exp + hidden_bits, false> bit_expression;
       // bit_expression = BitsToType<ac_int<mantissa + exp + hidden_bits, false> >
       //                   (TypeToBits<ac_float_rep>(float_val));
@@ -158,7 +158,7 @@ class Float{
 
 template <int mantissa, int exp>
 inline std::ostream &operator<<(std::ostream &os, const Float<mantissa, exp> &val) {
-  os << val.bits() << " ";
+  os << val.bits_rep() << " ";
   return os;
 }
 

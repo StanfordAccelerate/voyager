@@ -79,8 +79,8 @@ inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
     return static_cast<ACCUM_DATATYPE>(matrix[index]);
   }
 
-  int encoding1 = matrix[2 * index].bits();
-  int encoding2 = matrix[2 * index + 1].bits();
+  int encoding1 = matrix[2 * index].bits_rep();
+  int encoding2 = matrix[2 * index + 1].bits_rep();
   ACCUM_DATATYPE p16;
   p16.setbits((encoding2 << 8) + encoding1);
   return p16;
@@ -110,7 +110,7 @@ inline void saveOutput(INPUT_DATATYPE *matrix, int index,
     matrix[index] = static_cast<INPUT_DATATYPE>(value);
   } else {
     ACCUM_DATATYPE p16 = value;
-    int bits = p16.bits();
+    int bits = p16.bits_rep();
     matrix[2 * index].setbits(bits & 0xFF);
     matrix[2 * index + 1].setbits((bits >> 8) & 0xFF);
   }
