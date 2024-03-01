@@ -1,7 +1,6 @@
 #define CUSTOM_FLOAT
 
 #ifdef CUSTOM_POSIT
-#include "src/PositTypes.h"
 
 using P8 = Posit<8, 1>;
 using P16 = Posit<16, 1>;
@@ -13,12 +12,6 @@ using P16D = Posit<16, 1>::AccumulationDatatype;
 #define OUTPUT_DATATYPE P8
 
 #elif defined(CUSTOM_FLOAT)
-// #include "src/FloatTypes.h"
-
-// using F8 = Float<3, 4>;
-// using F16 = Float<7, 8>;
-
-#include "src/StdFloatTypes.h"
 
 using F8 = StdFloat<3, 4>;
 using F16 = StdFloat<7, 8>;

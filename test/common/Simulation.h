@@ -7,7 +7,7 @@
 
 #define NO_SYSC
 // clang-format off
-#include "src/PositTypes.h"
+#include "src/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
 #include "test/common/SimpleMemoryModel.h"

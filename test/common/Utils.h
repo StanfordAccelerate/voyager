@@ -5,7 +5,7 @@
 #include <vector>
 
 // clang-format off
-#include "src/PositTypes.h"
+#include "src/DataTypes.h"
 // clang-format on
 #include "VerificationTypes.h"
 #include "src/ArchitectureParams.h"
