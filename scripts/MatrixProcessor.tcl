@@ -16,9 +16,9 @@ directive set -CLOCKS $clocks
 
 go assembly
 
-directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.bits -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $DIMENSION]
+directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $DIMENSION]
 if {[info exists env(DEBUG)] == 0} {
-  directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.bits:rsc -MAP_TO_MODULE mem_1024x402.custom1024x402
+  directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE mem_1024x402.custom1024x402
 }
 
 go architect

@@ -2,6 +2,7 @@ source scripts/architecture.tcl
 
 set block "MaxpoolUnit"
 set full_block_name "MaxpoolUnit<$ACCUM_DATATYPE, $IO_DATATYPE, $DIMENSION>"
+set full_block_name_stripped [string map {" " ""} $full_block_name]
 
 source scripts/common.tcl
 
@@ -11,6 +12,6 @@ directive set -CLOCKS $clocks
 
 go assembly
 
-directive set /MaxpoolUnit<P16,P8,16>/run/while:maxpool_comparator.value.bits:rsc -MAP_TO_MODULE {[Register]}
+directive set /$full_block_name_stripped/run/while:maxpool_comparator.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE {[Register]}
 
 go extract
