@@ -122,6 +122,8 @@ void Simulation::loadMemory() {
     acceleratorMemory = new SimpleMemoryModel<INPUT_DATATYPE>(true);
     memories.push_back(acceleratorMemory);
   }
+  // TODO: don't use customposit/customfloat anymore. It should instead be
+  // called "hlstype"
   if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
     positMemory = new SimpleMemoryModel<INPUT_DATATYPE>(false);
     memories.push_back(positMemory);
@@ -434,8 +436,8 @@ int Simulation::checkOutput() {
 
     rel_err +=
         compare_arrays(acceleratorOutput + params.OUTPUT_OFFSET, "accelerator",
-                       positOutput + params.OUTPUT_OFFSET, "customfloat", size,
-                       diffFile, params.ACC_T_OUTPUT);
+                       customFloatOutput + params.OUTPUT_OFFSET, "customfloat",
+                       size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
