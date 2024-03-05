@@ -8,11 +8,17 @@ set DIMENSION 16
 # set IO_DATATYPE_DEC "P8D"
 # set ACCUM_DATATYPE "P16"
 # set INTERMEDIATE_DATATYPE "P16D"
-set C_DATA_REP_NAME "bits"
+# set PE_INPUT_DATATYPE "P8D"
+# set PE_WEIGHT_DATATYPE "P8D"
+# set PE_PSUM_DATATYPE "P16D"
+# set C_DATA_REP_NAME "bits"
 
 set IO_DATATYPE "F8"
 set ACCUM_DATATYPE "F16"
 set INTERMEDIATE_DATATYPE "F16"
+set PE_INPUT_DATATYPE "StdFloat<3, 4>::AccumulationDatatype"
+set PE_WEIGHT_DATATYPE "StdFloat<3, 4>::AccumulationDatatype"
+set PE_PSUM_DATATYPE "StdFloat<7, 8>::AccumulationDatatype"
 set C_DATA_REP_NAME "float_val.d"
 
 set ACCUM_DATATYPE_WIDTH 16

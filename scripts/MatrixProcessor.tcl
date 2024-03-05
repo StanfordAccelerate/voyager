@@ -3,6 +3,8 @@ source scripts/architecture.tcl
 set block "MatrixProcessor"
 set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION, 1024>"
 set full_block_name_stripped [string map {" " ""} $full_block_name]
+set pe_name "ProcessingElement<$PE_INPUT_DATATYPE,$PE_WEIGHT_DATATYPE,$PE_PSUM_DATATYPE>"
+set pe_name_stripped [string map {" " ""} $pe_name]
 
 source scripts/common.tcl
 
@@ -10,7 +12,7 @@ solution library add {[Block] ProcessingElement.v1}
 
 go libraries
 
-directive set /MatrixProcessor<P8,P16,16,16,1024>/ProcessingElement<P8D,P8D,P16D> -MAP_TO_MODULE {[Block] ProcessingElement.v1}
+directive set /$full_block_name_stripped/$pe_name_stripped -MAP_TO_MODULE {[Block] ProcessingElement.v1}
 
 directive set -CLOCKS $clocks
 
