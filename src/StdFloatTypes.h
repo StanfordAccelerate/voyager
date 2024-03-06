@@ -30,6 +30,9 @@ class StdFloat {
 #endif
 
   template <int mantissa2, int exp2>
+  StdFloat(const StdFloat<mantissa2, exp2> input[2]);
+
+  template <int mantissa2, int exp2>
   StdFloat(const StdFloat<mantissa2, exp2> &input);
 
   template <int W, bool S>
@@ -117,6 +120,18 @@ StdFloat<mantissa, exp>::StdFloat(const float val) {
   float_val = StdFloat<mantissa, exp>::ac_float_rep(val);
 }
 #endif
+
+template <int mantissa, int exp>
+template <int mantissa2, int exp2>
+StdFloat<mantissa, exp>::StdFloat(const StdFloat<mantissa2, exp2> input[2]) {
+  static_assert(
+      (mantissa + exp + 1) == 2 * (mantissa2 + exp2 + 1),
+      "Lower precision type must be half the width of higher precision.");
+#pragma hls_unroll yes
+  for (int i = 0; i < 2; i++) {
+    float_val.d.set_slc(0 + i * (mantissa2 + exp2 + 1), input[i].float_val.d);
+  }
+}
 
 template <int mantissa, int exp>
 StdFloat<mantissa, exp>::StdFloat(const ac_float_rep &input_float_rep) {

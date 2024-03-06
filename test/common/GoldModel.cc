@@ -77,13 +77,10 @@ inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
                                 bool doublePrecision) {
   if (!doublePrecision) {
     return static_cast<ACCUM_DATATYPE>(matrix[index]);
+  } else {
+    ACCUM_DATATYPE dpValue(&matrix[2 * index]);
+    return dpValue;
   }
-
-  int encoding1 = matrix[2 * index].bits_rep();
-  int encoding2 = matrix[2 * index + 1].bits_rep();
-  ACCUM_DATATYPE p16;
-  p16.setbits((encoding2 << 8) + encoding1);
-  return p16;
 }
 
 inline float readInput(float *matrix, int index, bool doublePrecision) {
@@ -131,7 +128,8 @@ inline void adjustExp(UniversalPositAccum &value, int expBias) {
   value *= pow(2, expBias);
 }
 #endif
-inline void adjustExp(ACCUM_DATATYPE::AccumulationDatatype &value, int expBias) {
+inline void adjustExp(ACCUM_DATATYPE::AccumulationDatatype &value,
+                      int expBias) {
   value.expScale(expBias);
 }
 inline void adjustExp(float &value, int expBias) { value *= pow(2, expBias); }
@@ -853,33 +851,27 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
   }
 }
 
-void run_gold_model(const SimplifiedParams params,
-                                 INPUT_DATATYPE *matrixA,
-                                 INPUT_DATATYPE *matrixB,
-                                 INPUT_DATATYPE *matrixC,
-                                 INPUT_DATATYPE *biasMatrix,
-                                 INPUT_DATATYPE *residualMatrix,
-                                 INPUT_DATATYPE *weightResidualMatrix) {
-  run_gold_op<INPUT_DATATYPE, ACCUM_DATATYPE::AccumulationDatatype, ACCUM_DATATYPE>(
-      params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix,
-      weightResidualMatrix);
+void run_gold_model(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
+                    INPUT_DATATYPE *matrixB, INPUT_DATATYPE *matrixC,
+                    INPUT_DATATYPE *biasMatrix, INPUT_DATATYPE *residualMatrix,
+                    INPUT_DATATYPE *weightResidualMatrix) {
+  run_gold_op<INPUT_DATATYPE, ACCUM_DATATYPE::AccumulationDatatype,
+              ACCUM_DATATYPE>(params, matrixA, matrixB, matrixC, biasMatrix,
+                              residualMatrix, weightResidualMatrix);
 }
 
-void run_gold_model(const SimplifiedParams params,
-                                    UniversalPosit *matrixA,
-                                    UniversalPosit *matrixB,
-                                    UniversalPosit *matrixC,
-                                    UniversalPosit *biasMatrix,
-                                    UniversalPosit *residualMatrix,
-                                    UniversalPosit *weightResidualMatrix) {
+void run_gold_model(const SimplifiedParams params, UniversalPosit *matrixA,
+                    UniversalPosit *matrixB, UniversalPosit *matrixC,
+                    UniversalPosit *biasMatrix, UniversalPosit *residualMatrix,
+                    UniversalPosit *weightResidualMatrix) {
   run_gold_op<UniversalPosit, UniversalPositAccum, UniversalPositAccum>(
       params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix,
       weightResidualMatrix);
 }
 
 void run_gold_model(const SimplifiedParams params, float *matrixA,
-                       float *matrixB, float *matrixC, float *biasMatrix,
-                       float *residualMatrix, float *weightResidualMatrix) {
+                    float *matrixB, float *matrixC, float *biasMatrix,
+                    float *residualMatrix, float *weightResidualMatrix) {
   run_gold_op<float, float, float>(params, matrixA, matrixB, matrixC,
                                    biasMatrix, residualMatrix,
                                    weightResidualMatrix);
