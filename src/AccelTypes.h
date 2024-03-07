@@ -25,8 +25,8 @@ struct MemoryRequest {
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
-    m &address;
-    m &burstSize;
+    m & address;
+    m & burstSize;
   }
 
   inline friend void sc_trace(sc_trace_file *tf,
@@ -54,8 +54,8 @@ struct PEInput {
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
-    m &data;
-    m &swapWeights;
+    m & data;
+    m & swapWeights;
   }
 
   inline friend void sc_trace(sc_trace_file *tf, const PEInput &peInput,
@@ -81,8 +81,8 @@ struct PEWeight {
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
-    m &data;
-    m &tag;
+    m & data;
+    m & tag;
   }
 
   inline friend void sc_trace(sc_trace_file *tf, const PEWeight &peWeight,
@@ -124,6 +124,8 @@ class Pack1D {
   }
 };
 
+// TODO: is there a way to make this more generic?
+
 template <size_t SIZE, int nbits, int es>
 class Pack1D<PEInput<Posit<nbits, es> >, SIZE> {
  public:
@@ -160,12 +162,15 @@ class Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE> {
  public:
   PEWeight<PositFP<sbits, fbits> > value[SIZE];
 
-  static const unsigned int width = PEWeight<PositFP<sbits, fbits> >::width * SIZE;
+  static const unsigned int width =
+      PEWeight<PositFP<sbits, fbits> >::width * SIZE;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
-  operator int() const { return Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE>(); }
+  operator int() const {
+    return Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE>();
+  }
 
   PEWeight<PositFP<sbits, fbits> > &operator[](unsigned int i) {
     return this->value[i];
@@ -236,6 +241,97 @@ class Pack1D<PositFP<sbits, fbits>, SIZE> {
   }
 };
 
+template <size_t SIZE, int mantissa, int exp>
+class Pack1D<StdFloat<mantissa, exp>, SIZE> {
+ public:
+  StdFloat<mantissa, exp> value[SIZE];
+  static const unsigned int width = StdFloat<mantissa, exp>::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const { return Pack1D<StdFloat<mantissa, exp>, SIZE>(); }
+
+  StdFloat<mantissa, exp> &operator[](size_t i) { return value[i]; }
+  const StdFloat<mantissa, exp> &operator[](size_t i) const { return value[i]; }
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].float_val.d;
+    }
+  }
+};
+
+template <size_t SIZE, int mantissa, int exp>
+class Pack1D<PEInput<StdFloat<mantissa, exp> >, SIZE> {
+ public:
+  PEInput<StdFloat<mantissa, exp> > value[SIZE];
+
+  static const unsigned int width =
+      PEInput<StdFloat<mantissa, exp> >::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const {
+    return Pack1D<PEInput<StdFloat<mantissa, exp> >, SIZE>();
+  }
+
+  PEInput<StdFloat<mantissa, exp> > &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEInput<StdFloat<mantissa, exp> > &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.float_val.d;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].swapWeights;
+    }
+  }
+};
+
+template <size_t SIZE, int mantissa, int exp>
+class Pack1D<PEWeight<StdFloat<mantissa, exp> >, SIZE> {
+ public:
+  PEWeight<StdFloat<mantissa, exp> > value[SIZE];
+
+  static const unsigned int width =
+      PEWeight<StdFloat<mantissa, exp> >::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const {
+    return Pack1D<PEWeight<StdFloat<mantissa, exp> >, SIZE>();
+  }
+
+  PEWeight<StdFloat<mantissa, exp> > &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEWeight<StdFloat<mantissa, exp> > &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.float_val.d;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].tag;
+    }
+  }
+};
+
 template <typename TYPE, size_t SIZE>
 struct BufferWriteRequest {
   int address;
@@ -245,8 +341,8 @@ struct BufferWriteRequest {
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
-    m &address;
-    m &data;
+    m & address;
+    m & data;
   }
 
   inline friend void sc_trace(sc_trace_file *tf,
