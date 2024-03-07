@@ -216,44 +216,45 @@ SC_MODULE(MaxpoolUnit) {
                     }
 
                     if (params.MAXPOOL) {
-                      if (x0 % 2 == 0 && y0 % 2 == 0) {
-#pragma hls_unroll yes
-                        for (int i = 0; i < WIDTH; i++) {
-                          // update maxpool comparator
-                          maxpool_comparator[(x0 / 2)].value[i] =
-                              outputPixel.value[i];
-                        }
-                      } else if (x0 % 2 == 1 && y0 % 2 == 0) {
-#pragma hls_unroll yes
-                        for (int i = 0; i < WIDTH; i++) {
-                          // update maxpool comparator
-                          if (maxpool_comparator[(x0 - 1) / 2].value[i] <
-                              outputPixel.value[i]) {
-                            maxpool_comparator[(x0 - 1) / 2].value[i] =
-                                outputPixel.value[i];
-                          }
-                        }
-                      } else if (x0 % 2 == 0 && y0 % 2 == 1) {
-#pragma hls_unroll yes
-                        for (int i = 0; i < WIDTH; i++) {
-                          // update maxpool comparator
-                          if (maxpool_comparator[(x0) / 2].value[i] <
-                              outputPixel.value[i]) {
-                            maxpool_comparator[(x0) / 2].value[i] =
-                                outputPixel.value[i];
-                          }
-                        }
-                      } else {
-#pragma hls_unroll yes
-                        for (int i = 0; i < WIDTH; i++) {
-                          if (maxpool_comparator[(x0 - 1) / 2].value[i] <
-                              outputPixel.value[i]) {
-                            maxpool_comparator[(x0 - 1) / 2].value[i] =
-                                outputPixel.value[i];
-                          }
-                        }
-                        tensorOut.Push(maxpool_comparator[(x0 - 1) / 2]);
-                      }
+                      // Don't support maxpool for now
+//                       if (x0 % 2 == 0 && y0 % 2 == 0) {
+// #pragma hls_unroll yes
+//                         for (int i = 0; i < WIDTH; i++) {
+//                           // update maxpool comparator
+//                           maxpool_comparator[(x0 / 2)].value[i] =
+//                               outputPixel.value[i];
+//                         }
+//                       } else if (x0 % 2 == 1 && y0 % 2 == 0) {
+// #pragma hls_unroll yes
+//                         for (int i = 0; i < WIDTH; i++) {
+//                           // update maxpool comparator
+//                           if (maxpool_comparator[(x0 - 1) / 2].value[i] <
+//                               outputPixel.value[i]) {
+//                             maxpool_comparator[(x0 - 1) / 2].value[i] =
+//                                 outputPixel.value[i];
+//                           }
+//                         }
+//                       } else if (x0 % 2 == 0 && y0 % 2 == 1) {
+// #pragma hls_unroll yes
+//                         for (int i = 0; i < WIDTH; i++) {
+//                           // update maxpool comparator
+//                           if (maxpool_comparator[(x0) / 2].value[i] <
+//                               outputPixel.value[i]) {
+//                             maxpool_comparator[(x0) / 2].value[i] =
+//                                 outputPixel.value[i];
+//                           }
+//                         }
+//                       } else {
+// #pragma hls_unroll yes
+//                         for (int i = 0; i < WIDTH; i++) {
+//                           if (maxpool_comparator[(x0 - 1) / 2].value[i] <
+//                               outputPixel.value[i]) {
+//                             maxpool_comparator[(x0 - 1) / 2].value[i] =
+//                                 outputPixel.value[i];
+//                           }
+//                         }
+//                         tensorOut.Push(maxpool_comparator[(x0 - 1) / 2]);
+//                       }
                     } else {
                       tensorOut.Push(outputPixel);
                     }
