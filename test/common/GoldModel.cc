@@ -18,7 +18,7 @@ inline void gold_fma(INPUT_DATATYPE a, INPUT_DATATYPE b,
                      ACCUM_DATATYPE::AccumulationDatatype &c) {
   INPUT_DATATYPE::AccumulationDatatype v1 = a;
   INPUT_DATATYPE::AccumulationDatatype v2 = b;
-  c = decomposed_fma<8, 1, 16, 1>(v1, v2, c);
+  c = v1.fma(v2, c);
 }
 
 inline void gold_fma(float a, float b, float &c) { c += a * b; }

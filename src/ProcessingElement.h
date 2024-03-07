@@ -99,7 +99,7 @@ SC_MODULE(ProcessingElement) {
 
       nextWeight0 = nextWeight1;
       nextWeight1 = nextWeight2;
-      
+
       PEInput<IDTYPE> inputStruct = inputIn.Pop();
 
       ODTYPE psum = psumIn.Pop();
@@ -123,6 +123,6 @@ SC_MODULE(ProcessingElement) {
 
   ODTYPE pe_fma(IDTYPE input, WDTYPE weight, ODTYPE psum) {
     // CCS_LOG(input << " * " << weight << " + " << psum);
-    return decomposed_fma<8, 1, 16, 1>(input, weight, psum);
+    return input.fma(weight, psum);
   }
 };

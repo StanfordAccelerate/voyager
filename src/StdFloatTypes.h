@@ -1,9 +1,12 @@
 #pragma once
 
+// clang-format off
+#include <ac_std_float.h>
+// clang-format on
 #include <ac_math/ac_inverse_sqrt_pwl.h>
 #include <ac_math/ac_pow_pwl.h>
+#include <ac_math/ac_reciprocal_pwl.h>
 #include <ac_math/ac_sigmoid_pwl.h>
-#include <ac_std_float.h>
 
 template <int mantissa, int exp>
 class StdFloat {
@@ -56,7 +59,10 @@ class StdFloat {
 
   void custom_converted_reciprocal() { this->reciprocal(); }
 
-  void reciprocal() { float_val = float_val.one() / float_val; }
+  void reciprocal() {
+    float_val = ac_math::ac_reciprocal_pwl<ac_float_rep, AC_TRN, ac_float_rep>(
+        float_val);
+  }
 
   void exponent() {
     // convert to fixed point
@@ -73,6 +79,8 @@ class StdFloat {
     result.reciprocal();
     return result;
   }
+
+  StdFloat sqrt() { return float_val.template sqrt<AC_RND_CONV, false>(); }
 
   StdFloat max1() {
     ac_float_rep one;
@@ -94,6 +102,9 @@ class StdFloat {
     // TODO: fix this to be scale the exponent
     float_val.d += offset;
   }
+
+  template <int mantissa2, int exp2>
+  StdFloat<mantissa2, exp2> fma(StdFloat &b, StdFloat<mantissa2, exp2> &c);
 
   StdFloat operator+(const StdFloat &rhs);
   StdFloat operator*(const StdFloat &rhs);
@@ -222,6 +233,17 @@ inline StdFloat<mantissa, exp> &StdFloat<mantissa, exp>::operator/=(
 template <int mantissa, int exp>
 inline bool StdFloat<mantissa, exp>::operator<(const StdFloat &rhs) const {
   return float_val < rhs.float_val;
+}
+
+template <int mantissa, int exp>
+template <int mantissa2, int exp2>
+StdFloat<mantissa2, exp2> StdFloat<mantissa, exp>::fma(
+    StdFloat<mantissa, exp> &b, StdFloat<mantissa2, exp2> &c) {
+  StdFloat<mantissa2, exp2> a_higherprecision(*this);
+  StdFloat<mantissa2, exp2> b_higherprecision(b);
+
+  return a_higherprecision.float_val.template fma<AC_TRN_ZERO, true>(
+      b_higherprecision.float_val, c.float_val);
 }
 
 template <int mantissa_i, int exp_i, int mantissa_o, int exp_o>
