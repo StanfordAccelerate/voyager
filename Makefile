@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := TestRunner
 
-# Detect OS 
+# Detect OS
 OS := $(shell lsb_release -si)
 VER := $(shell lsb_release -sr)
 
@@ -41,15 +41,16 @@ override BASE_FLAGS += \
 	-Wno-bool-operation \
 	-Wno-maybe-uninitialized \
 	-Wno-class-memaccess \
-	-Wall
+	-Wall \
+	-Wno-bool-compare
 
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG_LOG -g -ggdb
-else 
+else
 	override BASE_FLAGS += -O3 # TODO(fpedd): SystemC is not happy about this flag -DCONNECTIONS_FAST_SIM
 endif
 
-# We need to work with multiple C++ standards, as the SystemC lib is only 
+# We need to work with multiple C++ standards, as the SystemC lib is only
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C11FLAGS += $(BASE_FLAGS) -std=c++11 -Wno-deprecated-declarations
 C17FLAGS += $(BASE_FLAGS) -std=c++17
@@ -63,7 +64,7 @@ LDLIBS += -L/cad/mentor/2021.1/Mgc_home/shared/lib/
 # Main target to run HLS and build RTL (Verilog)
 rtl: build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v
 
-# For debugging it might be beneficial to only build sub-components in RTL and 
+# For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
 InputController: build/Catapult_InputController/InputController.v1/concat_rtl.v
 WeightController: build/Catapult_WeightController/WeightController.v1/concat_rtl.v
@@ -148,7 +149,7 @@ gui:
 # Standard Event-based SystemC Simulations
 ###########################################################
 
-# Main target for accelerator simulations 
+# Main target for accelerator simulations
 .PHONY: sim
 sim: build/TestRunner
 	./build/TestRunner
@@ -160,7 +161,7 @@ build/TestRunner: build/Accelerator.o build/Harness.o build/TestRunner.o build/G
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 .PHONY: MobileBERTAccuracy
-MobileBERTAccuracy: build/AccuracyTester 
+MobileBERTAccuracy: build/AccuracyTester
 	./build/AccuracyTester mobilebert models/mobilebert/binary_data/tiny_truncated_sst2/
 
 .PHONY: ResNetAccuracy
@@ -185,9 +186,9 @@ build/PositTest: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -fopenmp -DNO_SYSC $< -o $@
 
 build/Accelerator.o: src/Accelerator.cc $(wildcard src/*.h)
-	$(CC) $(C11FLAGS) -c -o $@ $< 
+	$(CC) $(C11FLAGS) -c -o $@ $<
 
-build/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h) 
+build/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
 	$(CC) $(C11FLAGS) -c -o $@ $<
 
 build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h
@@ -235,7 +236,7 @@ build/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
 build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Generic.o: test/generic/Generic.cc 
+build/Generic.o: test/generic/Generic.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
