@@ -106,8 +106,8 @@ struct MatrixParams : BaseParams {
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    m& INPUT_OFFSET;
-    m& WEIGHT_OFFSET;
+    m & INPUT_OFFSET;
+    m & WEIGHT_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
         m& loops[i][j];
@@ -125,8 +125,8 @@ struct MatrixParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& weightLoopIndex[i];
     }
-    m& fxIndex;
-    m& fyIndex;
+    m & fxIndex;
+    m & fyIndex;
     for (int i = 0; i < 2; i++) {
       m& weightReuseIndex[i];
     }
@@ -141,19 +141,19 @@ struct MatrixParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& weightAddressGenWeightLoopIndex[i];
     }
-    m& weightAddressGenFxIndex;
-    m& weightAddressGenFyIndex;
-    m& STRIDE;
-    m& WEIGHT_TRANSPOSE;
-    m& REPLICATION;
-    m& STORE_IN_ACC;
-    m& ACC_FROM_ACC;
-    m& CONCAT_INPUT;
-    m& CONCAT_HEAD_WEIGHTS;
-    m& TRANPOSE_INPUTS;
-    m& GRAD_OFFSET;
-    m& COMBINE_GRADS;
-    m& learningRate;
+    m & weightAddressGenFxIndex;
+    m & weightAddressGenFyIndex;
+    m & STRIDE;
+    m & WEIGHT_TRANSPOSE;
+    m & REPLICATION;
+    m & STORE_IN_ACC;
+    m & ACC_FROM_ACC;
+    m & CONCAT_INPUT;
+    m & CONCAT_HEAD_WEIGHTS;
+    m & TRANPOSE_INPUTS;
+    m & GRAD_OFFSET;
+    m & COMBINE_GRADS;
+    m & learningRate;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,
@@ -227,7 +227,8 @@ struct VectorInstructions {
     vDest = 0;
     rCount = 0;
     rOp = 0;
-    rInvSqrt = 0;
+    rSqrt = 0;
+    rReciprocal = 0;
     rMax1 = 0;
     rDuplicate = 0;
     rDest = 0;
@@ -283,11 +284,10 @@ struct VectorInstructions {
   static const unsigned int readNormalInterface = 2;
   static const unsigned int op3immediate0 = 3;
   static const unsigned int op3immediate1 = 4;
-  ac_int<3, false> vOp3;  // add, div
+  ac_int<3, false> vOp3;  // add, mult
   // static const unsigned int vadd = 1;
   // static const unsigned int vmult = 2;
-  static const unsigned int vdiv = 3;
-  static const unsigned int vsquare = 4;
+  static const unsigned int vsquare = 3;
 
   // Stage 4: relu
   ac_int<2, false> vOp4;
@@ -305,7 +305,8 @@ struct VectorInstructions {
   static const unsigned int radd = 1;
   static const unsigned int rmax = 2;
 
-  ac_int<1, false> rInvSqrt;
+  ac_int<1, false> rSqrt;
+  ac_int<1, false> rReciprocal;
   ac_int<1, false> rMax1;
   ac_int<1, false> rDuplicate;
 
@@ -321,32 +322,33 @@ struct VectorInstructions {
   ac_int<8, false> immediate0;
   ac_int<8, false> immediate1;
 
-  static const unsigned int width = 59;
+  static const unsigned int width = 60;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    m& instType;
-    m& vInput;
-    m& vOp0Src1;
-    m& vOp0;
-    m& vOp1;
-    m& vOp1Src1;
-    m& vOp2;
-    m& vOp3Src1;
-    m& vOp3;
-    m& vOp4;
-    m& vAccumulatePush;
-    m& vDest;
-    m& rCount;
-    m& rOp;
-    m& rInvSqrt;
-    m& rMax1;
-    m& rDuplicate;
-    m& rDest;
-    m& rBroadcast;
-    m& immediate0;
-    m& immediate1;
+    m & instType;
+    m & vInput;
+    m & vOp0Src1;
+    m & vOp0;
+    m & vOp1;
+    m & vOp1Src1;
+    m & vOp2;
+    m & vOp3Src1;
+    m & vOp3;
+    m & vOp4;
+    m & vAccumulatePush;
+    m & vDest;
+    m & rCount;
+    m & rOp;
+    m & rSqrt;
+    m & rReciprocal;
+    m & rMax1;
+    m & rDuplicate;
+    m & rDest;
+    m & rBroadcast;
+    m & immediate0;
+    m & immediate1;
   }
 
   inline friend void sc_trace(sc_trace_file* tf,
@@ -491,14 +493,14 @@ struct VectorParams : BaseParams {
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    m& VECTOR_OFFSET;
+    m & VECTOR_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         m& addressGen0Loop[i][j];
       }
     }
-    m& DP_VEC0;
-    m& ADDRESS_GEN1_OFFSET;
+    m & DP_VEC0;
+    m & ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         m& addressGen1Loops[i][j];
@@ -513,8 +515,8 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& addressGen1WeightLoopIndex[i];
     }
-    m& DP_VEC1;
-    m& ADDRESS_GEN2_OFFSET;
+    m & DP_VEC1;
+    m & ADDRESS_GEN2_OFFSET;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -530,9 +532,9 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& addressGen2WeightLoopIndex[i];
     }
-    m& DP_VEC2;
-    m& VECTOR_OUTPUT_OFFSET;
-    m& SCALAR_OUTPUT_OFFSET;
+    m & DP_VEC2;
+    m & VECTOR_OUTPUT_OFFSET;
+    m & SCALAR_OUTPUT_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         m& outputLoops[i][j];
@@ -547,15 +549,15 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& outputWeightLoopIndex[i];
     }
-    m& SPLIT_OUTPUT;
-    m& DP_OUTPUT;
-    m& addressGen0Enable;
-    m& addressGen0Broadcast;
-    m& addressGen0BroadcastCount;
-    m& addressGen1Mode;
-    m& addressGen2Mode;
-    m& MAXPOOL;
-    m& AVGPOOL;
+    m & SPLIT_OUTPUT;
+    m & DP_OUTPUT;
+    m & addressGen0Enable;
+    m & addressGen0Broadcast;
+    m & addressGen0BroadcastCount;
+    m & addressGen1Mode;
+    m & addressGen2Mode;
+    m & MAXPOOL;
+    m & AVGPOOL;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const VectorParams& params,
@@ -636,7 +638,10 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].rOp;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rInvSqrt;
+      m& inst[j].rSqrt;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].rReciprocal;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rMax1;
@@ -660,8 +665,8 @@ struct VectorInstructionConfig : BaseParams {
     for (int i = 0; i < 8; i++) {
       m& instCount[i];
     }
-    m& instLen;
-    m& instLoopCount;
+    m & instLen;
+    m & instLoopCount;
   }
 
   inline friend void sc_trace(sc_trace_file* tf,

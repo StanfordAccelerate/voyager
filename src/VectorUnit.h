@@ -49,22 +49,22 @@ SC_MODULE(VectorOpUnit) {
       Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(reductionOpOutputOp3Src1);
 
-  Broadcaster<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> > CCS_INIT_S1(
-      broadcastReduction0);
+  Broadcaster<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
+      CCS_INIT_S1(broadcastReduction0);
   Connections::Combinational<ac_int<16, false> > broadcastReduction0Count;
   Connections::Combinational<
       Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(broadcastReductionOpOutputOp0Src0);
 
-  Broadcaster<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> > CCS_INIT_S1(
-      broadcastReduction1);
+  Broadcaster<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
+      CCS_INIT_S1(broadcastReduction1);
   Connections::Combinational<ac_int<16, false> > broadcastReduction1Count;
   Connections::Combinational<
       Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(broadcastReductionOpOutputOp0Src1);
 
-  Broadcaster<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> > CCS_INIT_S1(
-      broadcastReduction2);
+  Broadcaster<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
+      CCS_INIT_S1(broadcastReduction2);
   Connections::Combinational<ac_int<16, false> > broadcastReduction2Count;
   Connections::Combinational<
       Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
@@ -193,10 +193,10 @@ SC_MODULE(VectorOpUnit) {
           }
         }
         vadd<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(op0Src0, op0Src1,
-                                                         res0);
+                                                              res0);
       } else if (inst.vOp0 == VectorInstructions::vmult) {
         vmult<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(op0Src0, op0Src1,
-                                                          res0);
+                                                               res0);
         DLOG(op0Src0 << std::endl
                      << " * " << std::endl
                      << op0Src1 << std::endl
@@ -220,8 +220,8 @@ SC_MODULE(VectorOpUnit) {
         } else {
           scaleVal = inst.immediate1;
         }
-        vscaleexp<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(res0, scaleVal,
-                                                              res1);
+        vscaleexp<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(
+            res0, scaleVal, res1);
       } else {
         res1 = res0;
       }
@@ -261,7 +261,6 @@ SC_MODULE(VectorOpUnit) {
           immediate = static_cast<IDTYPE>(inst.immediate1);
         }
 
-
 #pragma hls_unroll yes
         for (int i = 0; i < WIDTH; i++) {
           op3Src1[i] = immediate;
@@ -270,19 +269,20 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vOp3 == VectorInstructions::vadd) {
         vadd<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(op3Src0, op3Src1,
-                                                         res3);
+                                                              res3);
 
         // DLOG(op3Src0 << std::endl
-        //              << " + " << std::endl
-        //              << op3Src1 << std::endl
-        //              << " = " << std::endl
-        //              << res3);
+        //                 << " + " << std::endl
+        //                 << op3Src1 << std::endl
+        //                 << " = " << std::endl
+        //                 << res3);
       } else if (inst.vOp3 == VectorInstructions::vmult ||
-                 inst.vOp3 == VectorInstructions::vdiv ||
                  inst.vOp3 == VectorInstructions::vsquare) {
-        vmultdiv<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(
-            op3Src0, op3Src1, res3, inst.vOp3 == VectorInstructions::vdiv,
-            inst.vOp3 == VectorInstructions::vsquare);
+        if (inst.vOp3 == VectorInstructions::vsquare) {
+          op3Src1 = op3Src0;
+        }
+        vmult<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(op3Src0, op3Src1,
+                                                               res3);
       } else if (inst.vOp3 == VectorInstructions::vscaleexp) {
         ac_int<8, true> scaleVal;
         if (inst.vOp3Src1 == VectorInstructions::op3immediate0) {
@@ -290,8 +290,8 @@ SC_MODULE(VectorOpUnit) {
         } else {
           scaleVal = inst.immediate1;
         }
-        vscaleexp<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(op3Src0, scaleVal,
-                                                              res3);
+        vscaleexp<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(
+            op3Src0, scaleVal, res3);
       } else {
         res3 = op3Src0;
       }
@@ -305,7 +305,7 @@ SC_MODULE(VectorOpUnit) {
           inst.vOp4 == VectorInstructions::vrelumask) {
         bool useMask = inst.vOp4 == VectorInstructions::vrelumask;
         vrelu<typename ACC_DTYPE::AccumulationDatatype, WIDTH>(res3, op0Src1,
-                                                          useMask, res4);
+                                                               useMask, res4);
       } else {
         res4 = res3;
       }
@@ -392,7 +392,8 @@ SC_MODULE(VectorOpUnit) {
             Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> op =
                 reductionOpInput.Pop();
             typename ACC_DTYPE::AccumulationDatatype result = treeadd16(op);
-            // TreeOps<typename ACC_DTYPE::AccumulationDatatype, WIDTH>().treeadd(
+            // TreeOps<typename ACC_DTYPE::AccumulationDatatype,
+            // WIDTH>().treeadd(
             //     op);
             DLOG("reduction: " << op << " = " << result);
             if (i != 0) {
@@ -408,7 +409,8 @@ SC_MODULE(VectorOpUnit) {
             Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> op =
                 reductionOpInput.Pop();
             typename ACC_DTYPE::AccumulationDatatype result = treemax16(op);
-            // TreeOps<typename ACC_DTYPE::AccumulationDatatype, WIDTH>().treemax(
+            // TreeOps<typename ACC_DTYPE::AccumulationDatatype,
+            // WIDTH>().treemax(
             //     op);
             if (i != 0) {
               result = result < prevResult ? prevResult : result;
@@ -427,8 +429,12 @@ SC_MODULE(VectorOpUnit) {
                           << res);
       }
 
-      if (inst.rInvSqrt) {
-        scalarResult = scalarResult.inv_sqrt();
+      if (inst.rSqrt) {
+        scalarResult = scalarResult.sqrt();
+      }
+
+      if (inst.rReciprocal) {
+        scalarResult.reciprocal();
       }
 
       if (inst.rMax1) {
