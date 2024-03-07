@@ -62,7 +62,8 @@ void MapGradNormClipping(const SimplifiedParams &params,
   vInst0.rCount = size / DIMENSION;
   vInst0.rOp = VectorInstructions::radd;
   vInst0.rDuplicate = 1;
-  vInst0.rInvSqrt = 1;
+  vInst0.rSqrt = 1;
+  vInst0.rReciprocal = 1;
   vInst0.rMax1 = 1;
   vInst0.rDest = VectorInstructions::toVectorOp3Src1;
   vInst0.rBroadcast = 1;

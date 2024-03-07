@@ -258,7 +258,8 @@ void MapFCGradWithNormClipping(const SimplifiedParams &params,
   vectorInstructionConfig_clip->inst[0].rCount = X * K / DIMENSION;
   vectorInstructionConfig_clip->inst[0].rOp = VectorInstructions::radd;
   vectorInstructionConfig_clip->inst[0].rDuplicate = 1;
-  vectorInstructionConfig_clip->inst[0].rInvSqrt = 1;
+  vectorInstructionConfig_clip->inst[0].rSqrt = 1;
+  vectorInstructionConfig_clip->inst[0].rReciprocal = 1;
   vectorInstructionConfig_clip->inst[0].rDest =
       VectorInstructions::toVectorOp0Src1;
   vectorInstructionConfig_clip->inst[0].rBroadcast = 1;

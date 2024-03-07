@@ -81,7 +81,8 @@ void MapSoftmax(const SimplifiedParams &params, const MemoryMap &memoryMap,
   ac_int<16, false> vInst0_broadcastCount = 2 * Y / DIMENSION;
   vInst0.immediate0 = vInst0_broadcastCount.slc<8>(0);
   vInst0.immediate1 = vInst0_broadcastCount.slc<8>(8);
-  vInst0.rInvSqrt = false;
+  vInst0.rSqrt = false;
+  vInst0.rReciprocal = false;
 
   vectorInstructionConfig->inst[0] = vInst0;
   vectorInstructionConfig->instCount[0] = 1;
@@ -114,7 +115,8 @@ void MapSoftmax(const SimplifiedParams &params, const MemoryMap &memoryMap,
   ac_int<16, false> vInst2_broadcastCount = Y / DIMENSION;
   vInst2.immediate0 = vInst2_broadcastCount.slc<8>(0);
   vInst2.immediate1 = vInst2_broadcastCount.slc<8>(8);
-  vInst2.rInvSqrt = false;
+  vInst2.rSqrt = false;
+  vInst2.rReciprocal = true;
 
   vectorInstructionConfig->inst[2] = vInst2;
   vectorInstructionConfig->instCount[2] = 1;
@@ -145,7 +147,7 @@ void MapSoftmax(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vInst4.vOp1 = VectorInstructions::vexp;
   vInst4.vOp2 = VectorInstructions::nop;
   vInst4.vOp3Src1 = VectorInstructions::readReduceInterface;
-  vInst4.vOp3 = VectorInstructions::vdiv;
+  vInst4.vOp3 = VectorInstructions::vmult;
   vInst4.vOp4 = VectorInstructions::nop;
   vInst4.vDest = VectorInstructions::vWriteOut;
   vectorInstructionConfig->inst[4] = vInst4;
