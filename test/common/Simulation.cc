@@ -65,18 +65,18 @@ Simulation::Simulation() {
                  [](unsigned char c) { return std::tolower(c); });
 
   // Match the model family and construct required network
-  std::unique_ptr<Network> network;
+  Network* network;
   if (modelNameLower.find("resnet") != std::string::npos) {
     if (data_dir.empty()) {
-      network = std::make_unique<ResNet>(modelName);
+      network = new ResNet(modelName);
     } else {
-      network = std::make_unique<ResNet>(modelName, data_dir);
+      network = new ResNet(modelName, data_dir);
     }
   } else if (modelNameLower.find("mobilebert") != std::string::npos) {
     if (data_dir.empty()) {
-      network = std::make_unique<MobileBERT>(modelName, task);
+      network = new MobileBERT(modelName, task);
     } else {
-      network = std::make_unique<MobileBERT>(modelName, task, data_dir);
+      network = new MobileBERT(modelName, task, data_dir);
     }
   } else {
     throw std::runtime_error("Unknown model: " + modelName);
