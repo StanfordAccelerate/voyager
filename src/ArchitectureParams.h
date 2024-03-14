@@ -31,6 +31,16 @@ using F16 = StdFloat<7, 8>;
 #define ACCUM_DATATYPE F16
 #define OUTPUT_DATATYPE F8
 
+#elif defined(HYBRID_FP8)
+
+using F8 = StdFloat<3, 4>;
+using F16 = StdFloat<7, 8>;
+
+#define INPUT_DATATYPE F8
+#define WEIGHT_DATATYPE F8
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F8
+
 #elif defined(BF16)
 
 using F16 = StdFloat<7, 8>;

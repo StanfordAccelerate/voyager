@@ -104,7 +104,22 @@ SC_MODULE(ProcessingElement) {
 
       ODTYPE psum = psumIn.Pop();
       inputOut.Push(inputStruct);
+#ifdef HYBRID_FP8
+      ODTYPE output;
+      if (inputStruct.castToE5M2) {
+        StdFloat<2, 5> castedInput;
+        castedInput.float_val.d = inputStruct.data.float_val.d;
+        StdFloat<2, 5> castedWeight;
+        castedWeight.float_val.d = weight_reg.float_val.d;
+
+        output = castedInput.fma(castedWeight, psum);
+
+      } else {
+        output = inputStruct.data.fma(weight_reg, psum);
+      }
+#else
       ODTYPE output = pe_fma(inputStruct.data, weight_reg, psum);
+#endif
 
       psumOut.Push(output);
 
