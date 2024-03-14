@@ -84,4 +84,5 @@ if {[info exists env(DEBUG)]} {
 } else {
   solution library add TS1N40LPB1024X128M4FWBA_wrapped
   solution library add mem_1024x402
+  solution library add mem_1024x512
 }
