@@ -22,6 +22,11 @@ else # CentOS or RHEL
 	endif
 endif
 
+# Check if the environment variable is set
+ifndef DATATYPE
+$(error DATATYPE is not set)
+endif
+
 INC := \
 	-I/cad/mentor/2021.1/Mgc_home/shared/include/ \
 	-Ilib/ \
@@ -42,7 +47,8 @@ override BASE_FLAGS += \
 	-Wno-maybe-uninitialized \
 	-Wno-class-memaccess \
 	-Wall \
-	-Wno-bool-compare
+	-Wno-bool-compare \
+	-D$(DATATYPE)
 
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG_LOG -g -ggdb
