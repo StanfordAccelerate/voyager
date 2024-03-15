@@ -48,7 +48,8 @@ override BASE_FLAGS += \
 	-Wno-class-memaccess \
 	-Wall \
 	-Wno-bool-compare \
-	-D$(DATATYPE)
+	-D$(DATATYPE) \
+	-DDIMENSION=$(DIMENSION)
 
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG_LOG -g -ggdb

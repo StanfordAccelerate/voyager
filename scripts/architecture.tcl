@@ -1,8 +1,7 @@
-set DIMENSION 16
-
 # read environment variable "DATATYPE"
 global env
 set datatype $env(DATATYPE)
+set DIMENSION $env(DIMENSION)
 
 if { $datatype == "P8" } {
   set IO_DATATYPE "P8"

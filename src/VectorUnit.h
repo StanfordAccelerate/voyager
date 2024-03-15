@@ -391,7 +391,7 @@ SC_MODULE(VectorOpUnit) {
           for (int i = 0; i < inst.rCount; i++) {
             Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> op =
                 reductionOpInput.Pop();
-            typename ACC_DTYPE::AccumulationDatatype result = treeadd16(op);
+            typename ACC_DTYPE::AccumulationDatatype result = treeadd(op);
             // TreeOps<typename ACC_DTYPE::AccumulationDatatype,
             // WIDTH>().treeadd(
             //     op);
@@ -408,7 +408,7 @@ SC_MODULE(VectorOpUnit) {
           for (int i = 0; i < inst.rCount; i++) {
             Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> op =
                 reductionOpInput.Pop();
-            typename ACC_DTYPE::AccumulationDatatype result = treemax16(op);
+            typename ACC_DTYPE::AccumulationDatatype result = treemax(op);
             // TreeOps<typename ACC_DTYPE::AccumulationDatatype,
             // WIDTH>().treemax(
             //     op);

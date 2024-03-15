@@ -57,7 +57,12 @@ using F32 = StdFloat<23, 8>;
 
 #endif
 
-#define DIMENSION 16
+#if !defined(DIMENSION)
+
+#error "No dimension specified!"
+
+#endif
+
 #define INPUT_BUFFER_SIZE 1024
 #define WEIGHT_BUFFER_SIZE 1024
 #define ACCUMULATION_BUFFER_SIZE 1024

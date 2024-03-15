@@ -2,8 +2,6 @@
 
 #include "test/common/VerificationTypes.h"
 
-#define DIMENSION 16
-
 double* readFileAsDouble(const std::string& filename, int size,
                          bool useDataFile);
 

@@ -148,9 +148,78 @@ void vmultdiv(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
   }
 }
 
+// Need to overload treeadd and treemax for the number of dimensions that need
+// to be supported
+
+/*
+ * Dimension = 32
+ */
 #pragma hls_design ccore
 template <typename ACC_DTYPE>
-ACC_DTYPE treeadd16(Pack1D<ACC_DTYPE, 16>& op) {
+ACC_DTYPE treeadd(Pack1D<ACC_DTYPE, 32>& op) {
+  Pack1D<ACC_DTYPE, 16> lvl0;
+#pragma hls_unroll yes
+  for (int i = 0; i < 16; i++) {
+    lvl0[i] = static_cast<ACC_DTYPE>(op[i * 2] + op[i * 2 + 1]);
+  }
+
+  Pack1D<ACC_DTYPE, 8> lvl1;
+#pragma hls_unroll yes
+  for (int i = 0; i < 8; i++) {
+    lvl1[i] = static_cast<ACC_DTYPE>(op[i * 2] + op[i * 2 + 1]);
+  }
+
+  Pack1D<ACC_DTYPE, 4> lvl2;
+#pragma hls_unroll yes
+  for (int i = 0; i < 4; i++) {
+    lvl2[i] = static_cast<ACC_DTYPE>(lvl1[i * 2] + lvl1[i * 2 + 1]);
+  }
+
+  Pack1D<ACC_DTYPE, 2> lvl3;
+#pragma hls_unroll yes
+  for (int i = 0; i < 2; i++) {
+    lvl3[i] = static_cast<ACC_DTYPE>(lvl2[i * 2] + lvl2[i * 2 + 1]);
+  }
+
+  return static_cast<ACC_DTYPE>(lvl3[0] + lvl3[1]);
+}
+
+#pragma hls_design ccore
+template <typename ACC_DTYPE>
+ACC_DTYPE treemax(Pack1D<ACC_DTYPE, 32>& op) {
+  Pack1D<ACC_DTYPE, 16> lvl0;
+#pragma hls_unroll yes
+  for (int i = 0; i < 16; i++) {
+    lvl0[i] = op[i * 2] < op[i * 2 + 1] ? op[i * 2 + 1] : op[i * 2];
+  }
+
+  Pack1D<ACC_DTYPE, 8> lvl1;
+#pragma hls_unroll yes
+  for (int i = 0; i < 8; i++) {
+    lvl1[i] = op[i * 2] < op[i * 2 + 1] ? op[i * 2 + 1] : op[i * 2];
+  }
+
+  Pack1D<ACC_DTYPE, 4> lvl2;
+#pragma hls_unroll yes
+  for (int i = 0; i < 4; i++) {
+    lvl2[i] = lvl1[i * 2] < lvl1[i * 2 + 1] ? lvl1[i * 2 + 1] : lvl1[i * 2];
+  }
+
+  Pack1D<ACC_DTYPE, 2> lvl3;
+#pragma hls_unroll yes
+  for (int i = 0; i < 2; i++) {
+    lvl3[i] = lvl2[i * 2] < lvl2[i * 2 + 1] ? lvl2[i * 2 + 1] : lvl2[i * 2];
+  }
+
+  return lvl3[0] < lvl3[1] ? lvl3[1] : lvl3[0];
+}
+
+/*
+ * Dimension = 16
+ */
+#pragma hls_design ccore
+template <typename ACC_DTYPE>
+ACC_DTYPE treeadd(Pack1D<ACC_DTYPE, 16>& op) {
   Pack1D<ACC_DTYPE, 8> lvl0;
 #pragma hls_unroll yes
   for (int i = 0; i < 8; i++) {
@@ -174,7 +243,7 @@ ACC_DTYPE treeadd16(Pack1D<ACC_DTYPE, 16>& op) {
 
 #pragma hls_design ccore
 template <typename ACC_DTYPE>
-ACC_DTYPE treemax16(Pack1D<ACC_DTYPE, 16>& op) {
+ACC_DTYPE treemax(Pack1D<ACC_DTYPE, 16>& op) {
   Pack1D<ACC_DTYPE, 8> lvl0;
 #pragma hls_unroll yes
   for (int i = 0; i < 8; i++) {
@@ -194,6 +263,45 @@ ACC_DTYPE treemax16(Pack1D<ACC_DTYPE, 16>& op) {
   }
 
   return lvl2[0] < lvl2[1] ? lvl2[1] : lvl2[0];
+}
+
+/*
+ * Dimension = 8
+ */
+#pragma hls_design ccore
+template <typename ACC_DTYPE>
+ACC_DTYPE treeadd(Pack1D<ACC_DTYPE, 8>& op) {
+  Pack1D<ACC_DTYPE, 4> lvl0;
+#pragma hls_unroll yes
+  for (int i = 0; i < 4; i++) {
+    lvl0[i] = static_cast<ACC_DTYPE>(op[i * 2] + op[i * 2 + 1]);
+  }
+
+  Pack1D<ACC_DTYPE, 2> lvl1;
+#pragma hls_unroll yes
+  for (int i = 0; i < 2; i++) {
+    lvl1[i] = static_cast<ACC_DTYPE>(lvl0[i * 2] + lvl0[i * 2 + 1]);
+  }
+
+  return static_cast<ACC_DTYPE>(lvl1[0] + lvl1[1]);
+}
+
+#pragma hls_design ccore
+template <typename ACC_DTYPE>
+ACC_DTYPE treemax(Pack1D<ACC_DTYPE, 8>& op) {
+  Pack1D<ACC_DTYPE, 4> lvl0;
+#pragma hls_unroll yes
+  for (int i = 0; i < 4; i++) {
+    lvl0[i] = op[i * 2] < op[i * 2 + 1] ? op[i * 2 + 1] : op[i * 2];
+  }
+
+  Pack1D<ACC_DTYPE, 2> lvl1;
+#pragma hls_unroll yes
+  for (int i = 0; i < 2; i++) {
+    lvl1[i] = lvl0[i * 2] < lvl0[i * 2 + 1] ? lvl0[i * 2 + 1] : lvl0[i * 2];
+  }
+
+  return lvl1[0] < lvl1[1] ? lvl1[1] : lvl1[0];
 }
 
 // // Compile-time template recursion

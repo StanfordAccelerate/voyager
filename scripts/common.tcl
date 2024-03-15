@@ -19,7 +19,7 @@ logfile move ./build/${block}.log
 options set Message/ErrorOverride ASSERT-1 -remove
 options set Input/TargetPlatform x86_64
 options set /Input/CppStandard c++11
-options set Input/CompilerFlags -D$datatype
+options set Input/CompilerFlags "-D$datatype -DDIMENSION=$DIMENSION"
 solution options set /Input/CppStandard c++11
 options set Input/SearchPath ./lib
 options set Output/OutputVHDL false
@@ -30,7 +30,7 @@ options set Flows/VCS/SYSC_VERSION 2.3.2
 options set Flows/VCS/VLOGAN_OPTS {+v2k -timescale=1ns/10ps +notimingcheck +define+UNIT_DELAY}
 options set Flows/VCS/VCSSIM_OPTS {+fsdbfile+dump.fsdb +fsdb+all=on +fsdb+dumpon+0}
 options set Flows/VCS/VCS_DOFILE dump.do
-options set Flows/VCS/COMP_FLAGS "-O3 -Wall -Wno-unknown-pragmas -I../../../lib/ -I../../../src/ -I../../../ -DNO_UNIVERSAL -DSIM_$block -D$datatype"
+options set Flows/VCS/COMP_FLAGS "-O3 -Wall -Wno-unknown-pragmas -I../../../lib/ -I../../../src/ -I../../../ -DNO_UNIVERSAL -DSIM_$block -D$datatype -DDIMENSION=$DIMENSION"
 options set Flows/VCS/VCSELAB_OPTS "-timescale=1ns/1ps -sysc=blocksync -lstdc++fs"
 flow package require /SCVerify
 flow package option set /SCVerify/USE_VCS true
