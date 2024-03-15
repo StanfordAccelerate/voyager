@@ -69,6 +69,12 @@ if {$block == "Accelerator"} {
   foreach mapped_block [list "InputController<$IO_DATATYPE, $DIMENSION>" "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION, 1024>" "VectorUnit<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION>" "WeightController<$IO_DATATYPE, $DIMENSION, $DIMENSION>"] {
     solution design set $mapped_block -mapped
   }
+} elseif {$block == "SystolicArrayChunk"} {
+   solution design set "SystolicArrayRow<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $PE_PSUM_DATATYPE, $DIMENSION>" -mapped
+} elseif {$block == "SystolicArray"} {
+  solution design set "SystolicArrayChunk<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $PE_PSUM_DATATYPE, 4, $DIMENSION>" -mapped
+} elseif {$block == "MatrixProcessor"} {
+  solution design set "SystolicArray<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $PE_PSUM_DATATYPE, $DIMENSION, $DIMENSION>" -mapped
 }
 
 go compile
