@@ -75,6 +75,9 @@ rtl: build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v
 # have them integrate into the SystemC code
 InputController: build/Catapult_InputController/InputController.v1/concat_rtl.v
 WeightController: build/Catapult_WeightController/WeightController.v1/concat_rtl.v
+SystolicArrayRow: build/Catapult_SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v
+SystolicArrayChunk: build/Catapult_SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v
+SystolicArray: build/Catapult_SystolicArray/SystolicArray.v1/concat_rtl.v
 MatrixProcessor: build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v
 ProcessingElement: build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v
 VectorUnit: build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
@@ -89,7 +92,13 @@ build/Catapult_WeightController/WeightController.v1/concat_rtl.v: src/WeightCont
 	catapult -shell -file scripts/WeightController.tcl
 build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v: src/ProcessingElement.h
 	catapult -shell -file scripts/ProcessingElement.tcl
-build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v
+build/Catapult_SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v: src/SystolicArray.h build/Catapult_ProcessingElement/ProcessingElement.v1/concat_rtl.v
+	catapult -shell -file scripts/SystolicArrayRow.tcl
+build/Catapult_SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v: src/SystolicArray.h build/Catapult_SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v
+	catapult -shell -file scripts/SystolicArrayChunk.tcl
+build/Catapult_SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicArray.h build/Catapult_SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v
+	catapult -shell -file scripts/SystolicArray.tcl
+build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h build/Catapult_SystolicArray/SystolicArray.v1/concat_rtl.v
 	catapult -shell -file scripts/MatrixProcessor.tcl
 build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v: build/Catapult_MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v build/Catapult_OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v build/Catapult_VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v build/Catapult_VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
 	catapult -shell -file scripts/VectorUnit.tcl
