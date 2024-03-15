@@ -260,6 +260,7 @@ typename StdFloat<mantissa_o, exp_o>::AccumulationDatatype decomposed_fma(
       b_higherprecision.float_val, c.float_val);
 }
 
+template <>
 class StdFloat<7, 8> {
  public:
   typedef ac::bfloat16 ac_float_rep;
@@ -281,7 +282,7 @@ class StdFloat<7, 8> {
   ac_float_rep float_val;
 
   StdFloat() {}
-  StdFloat(const ac_float_rep &input_float_rep);
+  StdFloat(const ac_float_rep &input_float_rep) { float_val = input_float_rep; }
 
 #ifndef __SYNTHESIS__
   StdFloat(const float val);
@@ -396,7 +397,7 @@ class StdFloat<7, 8> {
 };
 
 template <int mantissa2, int exp2>
-StdFloat<7, 8>::StdFloat(const StdFloat<mantissa2, exp2> &input){
+StdFloat<7, 8>::StdFloat(const StdFloat<mantissa2, exp2> &input) {
   float_val = ac::bfloat16(input.float_val);
 }
 
@@ -416,17 +417,18 @@ StdFloat<7, 8>::StdFloat(const ac_int<W, S> &rhs) {
 //       b_higherprecision.float_val, c.float_val);
 // }
 
-template <int mantissa_o, int exp_o>
-typename StdFloat<mantissa_o, exp_o>::AccumulationDatatype decomposed_fma(
-    const typename StdFloat<23, 8>::AccumulationDatatype &a,
-    const typename StdFloat<23, 8>::AccumulationDatatype &b,
-    const typename StdFloat<mantissa_o, exp_o>::AccumulationDatatype &c) {
-  StdFloat<mantissa_o, exp_o> a_higherprecision(a.float_val.to_ac_std_float());
-  StdFloat<mantissa_o, exp_o> b_higherprecision(b.float_val.to_ac_std_float());
+// template <int mantissa_o, int exp_o>
+// typename StdFloat<mantissa_o, exp_o>::AccumulationDatatype decomposed_fma(
+//     const typename StdFloat<23, 8>::AccumulationDatatype &a,
+//     const typename StdFloat<23, 8>::AccumulationDatatype &b,
+//     const typename StdFloat<mantissa_o, exp_o>::AccumulationDatatype &c) {
+//   StdFloat<mantissa_o, exp_o>
+//   a_higherprecision(a.float_val.to_ac_std_float()); StdFloat<mantissa_o,
+//   exp_o> b_higherprecision(b.float_val.to_ac_std_float());
 
-  return a_higherprecision.float_val.template fma<AC_TRN_ZERO, true>(
-      b_higherprecision.float_val, c.float_val);
-}
+//   return a_higherprecision.float_val.template fma<AC_TRN_ZERO, true>(
+//       b_higherprecision.float_val, c.float_val);
+// }
 
 template <int mantissa2, int exp2>
 StdFloat<7, 8>::StdFloat(const StdFloat<mantissa2, exp2> input[2]) {
