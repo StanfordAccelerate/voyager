@@ -182,9 +182,9 @@ void Simulation::run() {
         params.loops[1][params.inputXLoopIndex[1]];
     Y = params.loops[0][params.inputYLoopIndex[0]] *
         params.loops[1][params.inputYLoopIndex[1]];
-    C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+    C = params.loops[1][params.reductionLoopIndex[1]] * (16);
     K = params.loops[0][params.weightLoopIndex[0]] *
-        params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+        params.loops[1][params.weightLoopIndex[1]] * (16);
     FX = params.loops[1][params.fxIndex];
     FY = params.loops[1][params.fyIndex];
     STRIDE = params.STRIDE;
@@ -284,9 +284,9 @@ int Simulation::checkOutput() {
       params.loops[1][params.inputXLoopIndex[1]];
   Y = params.loops[0][params.inputYLoopIndex[0]] *
       params.loops[1][params.inputYLoopIndex[1]];
-  C = params.loops[1][params.reductionLoopIndex[1]] * DIMENSION;
+  C = params.loops[1][params.reductionLoopIndex[1]] * (16);
   K = params.loops[0][params.weightLoopIndex[0]] *
-      params.loops[1][params.weightLoopIndex[1]] * DIMENSION;
+      params.loops[1][params.weightLoopIndex[1]] * (16);
   FX = params.loops[1][params.fxIndex];
   FY = params.loops[1][params.fyIndex];
   STRIDE = params.STRIDE;
