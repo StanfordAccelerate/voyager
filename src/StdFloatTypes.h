@@ -288,6 +288,8 @@ class StdFloat<7, 8> {
   StdFloat(const float val);
 #endif
 
+  StdFloat(const StdFloat input[2]);
+
   template <int mantissa2, int exp2>
   StdFloat(const StdFloat<mantissa2, exp2> input[2]);
 
@@ -429,6 +431,8 @@ StdFloat<7, 8>::StdFloat(const ac_int<W, S> &rhs) {
 //   return a_higherprecision.float_val.template fma<AC_TRN_ZERO, true>(
 //       b_higherprecision.float_val, c.float_val);
 // }
+
+StdFloat<7, 8>::StdFloat(const StdFloat<7, 8> input[2]) { *this = input[0]; }
 
 template <int mantissa2, int exp2>
 StdFloat<7, 8>::StdFloat(const StdFloat<mantissa2, exp2> input[2]) {
