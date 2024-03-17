@@ -17,6 +17,7 @@
 #include <ac_float.h>
 #include <ac_int.h>
 #include <ac_math/ac_inverse_sqrt_pwl.h>
+#include <ac_math/ac_sqrt_pwl.h>
 inline int max(int a, int b) { return a > b ? a : b; }
 
 template <class T>
@@ -199,17 +200,24 @@ class Posit {
   ac_int<nbits, false> bits;
 
   Posit() {}
+
+#ifndef __SYNTHESIS__
   Posit(const float f);
+#endif
+
+  template <int W, bool S>
+  Posit(const ac_int<W, S> &rhs);
 
   template <int nbits2, int es2>
   Posit(const Posit<nbits2, es2> &input);
 
+  template <int nbits2, int es2>
+  Posit(const Posit<nbits2, es2> input[2]);
+
   template <int fp_sbits, int fp_fbits>
   Posit(const PositFP<fp_sbits, fp_fbits> &input);
 
-  ac_int<nbits, false> bits_rep(){ 
-    return bits;
-  } 
+  ac_int<nbits, false> bits_rep() { return bits; }
 
   bool isZero() const { return bits == 0; }
 
@@ -252,7 +260,7 @@ class Posit {
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
-    m &bits;
+    m & bits;
   }
 
   inline friend void sc_trace(sc_trace_file *tf, const Posit &posit,
@@ -267,6 +275,21 @@ template <int nbits2, int es2>
 Posit<nbits, es>::Posit(const Posit<nbits2, es2> &input) {
   typename Posit<nbits2, es2>::AccumulationDatatype tmp(input);
   *this = tmp;
+}
+
+template <int nbits, int es>
+template <int nbits2, int es2>
+Posit<nbits, es>::Posit(const Posit<nbits2, es2> input[2]) {
+#pragma hls_unroll yes
+  for (int i = 0; i < 2; i++) {
+    bits.set_slc(i * nbits2, input[i].bits);
+  }
+}
+
+template <int nbits, int es>
+template <int W, bool S>
+Posit<nbits, es>::Posit(const ac_int<W, S> &rhs) {
+  bits = rhs;
 }
 
 template <int nbits, int es>
@@ -462,14 +485,13 @@ class PositFP {
     if (mask.isZero()) setZero();
   }
 
-
-  void custom_converted_reciprocal(){
+  void custom_converted_reciprocal() {
     // convert to Posit Larger bitwidth
     // TODO ACC_DTYPE width likely doesnot evaluate to 16
-    Posit<width, 1> posit_rep;    
+    Posit<width, 1> posit_rep;
     posit_rep = *this;
     posit_rep.reciprocal();
-    *this = posit_rep;  
+    *this = posit_rep;
   }
 
   void exponent() {
@@ -489,9 +511,7 @@ class PositFP {
     this->relu();
   }
 
-  void expScale(ac_int<8, false> offset){
-    this->scale = this->scale + offset;
-  }
+  void expScale(ac_int<8, false> offset) { this->scale = this->scale + offset; }
 
   PositFP<sbits, abits + 1> operator+(const PositFP &rhs) const;
   PositFP<sbits, abits + 1> operator-(const PositFP &rhs) const;
@@ -514,6 +534,17 @@ class PositFP {
   explicit operator ac_float_rep() const;
   explicit operator float() const;
 
+  PositFP sqrt() {
+    ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
+    ac_float_rep ac_f_sqrt;
+
+    ac_math::ac_sqrt_pwl(ac_f, ac_f_sqrt);
+
+    return PositFP(ac_f_sqrt);
+  }
+
+  void reciprocal() { custom_converted_reciprocal(); }
+
   PositFP inv_sqrt() {
     ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
     ac_float_rep ac_f_inv_sqrt;
@@ -526,7 +557,7 @@ class PositFP {
   PositFP max1() {
     // ac_float_rep ac_f = static_cast<ac_float_rep>(*this);
     PositFP<sbits, fbits> one;
-    PositFP<sbits, fbits> ac_f = *this; 
+    PositFP<sbits, fbits> ac_f = *this;
     one._zero = false;
     one.fraction = 0;
     one.scale = 0;
@@ -539,14 +570,17 @@ class PositFP {
     return ac_f;
   }
 
+  template <int fbits2>
+  PositFP<sbits, fbits2> fma(PositFP &b, PositFP<sbits, fbits2> &c);
+
   // SystemC is not compatible with C++17
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
-    m &sign;
-    m &scale;
-    m &fraction;
-    m &_zero;
+    m & sign;
+    m & scale;
+    m & fraction;
+    m & _zero;
   }
 
   inline friend void sc_trace(sc_trace_file *tf, const PositFP &posit,
@@ -925,6 +959,27 @@ PositFP<sbits, fbits2> fma(const PositFP<sbits, fbits1> &a,
   }
 
   PositFP<sbits, mbits> product = a * b;
+  if (c.isZero()) {
+    return PositFP<sbits, fbits2>(product);
+  } else {
+    PositFP<8, abits + 1> sum = PositFP<sbits, fbits2>(product) + c;
+    return PositFP<sbits, fbits2>(sum);
+  }
+}
+
+template <int sbits, int fbits>
+template <int fbits2>
+PositFP<sbits, fbits2> PositFP<sbits, fbits>::fma(PositFP<sbits, fbits> &b,
+                                                  PositFP<sbits, fbits2> &c) {
+  constexpr size_t fhbits = fbits + 1;  // size of fraction + hidden bit
+  constexpr size_t mbits = 2 * fhbits;  // size of the multiplier output
+  constexpr size_t abits = fbits2 + 4;  // size of the addend
+
+  if (this->isZero() || b.isZero()) {
+    return c;
+  }
+
+  PositFP<sbits, mbits> product = *this * b;
   if (c.isZero()) {
     return PositFP<sbits, fbits2>(product);
   } else {
