@@ -398,6 +398,51 @@ class StdFloat<7, 8> {
 #endif
 };
 
+inline StdFloat<7, 8> StdFloat<7, 8>::operator+(
+    const StdFloat &rhs) {
+  return float_val + rhs.float_val;
+}
+
+inline StdFloat<7, 8> StdFloat<7, 8>::operator*(
+    const StdFloat &rhs) {
+  return float_val * rhs.float_val;
+}
+
+inline StdFloat<7, 8> StdFloat<7, 8>::operator/(
+    const StdFloat &rhs) {
+  return float_val / rhs.float_val;
+}
+
+inline StdFloat<7, 8> &StdFloat<7, 8>::operator+=(
+    const StdFloat &rhs) {
+  float_val += rhs.float_val;
+  return *this;
+}
+
+inline StdFloat<7, 8> &StdFloat<7, 8>::operator-=(
+    const StdFloat &rhs) {
+  float_val -= rhs.float_val;
+  return *this;
+}
+
+inline StdFloat<7, 8> &StdFloat<7, 8>::operator*=(
+    const StdFloat &rhs) {
+  float_val *= rhs.float_val;
+  return *this;
+}
+
+inline StdFloat<7, 8> &StdFloat<7, 8>::operator/=(
+    const StdFloat &rhs) {
+  float_val /= rhs.float_val;
+  return *this;
+}
+
+#ifndef __SYNTHESIS__
+inline StdFloat<7, 8>::StdFloat(const float val) {
+  float_val = StdFloat<7, 8>::ac_float_rep(val);
+}
+#endif
+
 template <int mantissa2, int exp2>
 StdFloat<7, 8>::StdFloat(const StdFloat<mantissa2, exp2> &input) {
   float_val = ac::bfloat16(input.float_val);

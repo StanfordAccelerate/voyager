@@ -169,9 +169,9 @@ SC_MODULE(VectorOpUnit) {
                  inst.vOp0Src1 == VectorInstructions::op0immediate1) {
         IDTYPE immediate;
         if (inst.vOp0Src1 == VectorInstructions::op0immediate0) {
-          immediate = static_cast<IDTYPE>(inst.immediate0);
+          immediate.setbits(inst.immediate0);
         } else {
-          immediate = static_cast<IDTYPE>(inst.immediate1);
+          immediate.setbits(inst.immediate1);
         }
 
 #pragma hls_unroll yes
@@ -256,9 +256,9 @@ SC_MODULE(VectorOpUnit) {
                  inst.vOp3Src1 == VectorInstructions::op3immediate1) {
         IDTYPE immediate;
         if (inst.vOp3Src1 == VectorInstructions::op3immediate0) {
-          immediate = static_cast<IDTYPE>(inst.immediate0);
+          immediate.setbits(inst.immediate0);
         } else {
-          immediate = static_cast<IDTYPE>(inst.immediate1);
+          immediate.setbits(inst.immediate1);
         }
 
 #pragma hls_unroll yes

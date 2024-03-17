@@ -113,20 +113,36 @@ SC_MODULE(MaxpoolUnit) {
                           static_cast<ACC_DTYPE>(uncastedOutputPixel[i]);
                     }
 
-                    sc_lv<ACC_DTYPE::width * WIDTH> dpOutputPixelBits =
-                      TypeToBits<Pack1D<ACC_DTYPE, WIDTH> > (dpOutputPixel);
-
                     for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
                       Pack1D<DTYPE, WIDTH> dpHalfVec;
-
-                      dpHalfVec = 
-                          BitsToType<Pack1D<DTYPE, WIDTH> >(
-                          static_cast<sc_lv<DTYPE::width * WIDTH> > 
-                          (dpOutputPixelBits[(vecSlice * (WIDTH / 2) * ACC_DTYPE::width), 
-                          ((vecSlice + 1) * (WIDTH / 2) * ACC_DTYPE::width)]));
-
+#pragma hls_unroll yes
+                      for (int i = 0; i < WIDTH / 2; i++) {
+#pragma hls_unroll yes
+                        for (int byte = 0; byte < 2; byte++) {
+                          dpHalfVec[i * 2 + byte].setbits(
+                              dpOutputPixel[vecSlice * (WIDTH / 2) + i]
+                                  .bits_rep().template slc<8>(byte * 8));
+                        }
+                      }
                       tensorOut.Push(dpHalfVec);
                     }
+
+                    
+
+                    // sc_lv<ACC_DTYPE::width * WIDTH> dpOutputPixelBits =
+                    //   TypeToBits<Pack1D<ACC_DTYPE, WIDTH> > (dpOutputPixel);
+
+                    // for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
+                    //   Pack1D<DTYPE, WIDTH> dpHalfVec;
+
+                    //   dpHalfVec = 
+                    //       BitsToType<Pack1D<DTYPE, WIDTH> >(
+                    //       static_cast<sc_lv<DTYPE::width * WIDTH> > 
+                    //       (dpOutputPixelBits[(vecSlice * (WIDTH / 2) * ACC_DTYPE::width), 
+                    //       ((vecSlice + 1) * (WIDTH / 2) * ACC_DTYPE::width)]));
+
+                    //   tensorOut.Push(dpHalfVec);
+                    // }
 
                     if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;

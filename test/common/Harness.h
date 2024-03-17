@@ -65,23 +65,29 @@ SC_MODULE(Harness) {
   CombinationalInterface<int> CCS_INIT_S1(serialVectorParamsIn);
 
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > inputDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       inputDataResponse);
 
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > weightDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(gradAddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > gradDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       gradDataResponse);
 
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > vectorFetch0DataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       vectorFetch0DataResponse);
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > vectorFetch1DataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       vectorFetch1DataResponse);
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > vectorFetch2DataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       vectorFetch2DataResponse);
 
@@ -111,6 +117,15 @@ SC_MODULE(Harness) {
   Accelerator CCS_INIT_S1(accelerator);
 #endif
 
+  void readMemoryRequest(
+      CombinationalInterface<MemoryRequest> * addressRequest,
+      sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse_fifo,
+      std::string memSourceType);
+  void sendMemoryResponse(
+      sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse_fifo,
+      CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
+          dataResponse);
+
   void memAccessBurst(
       CombinationalInterface<MemoryRequest> * addressRequest,
       CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse,
@@ -126,6 +141,24 @@ SC_MODULE(Harness) {
   // void memAccess(CombinationalInterface<int> * addressRequest,
   //                CombinationalInterface<INPUT_DATATYPE> * dataResponse,
   //                MemorySource memSource);
+
+  void readRequestInputs();
+  void sendResponseInputs();
+
+  void readRequestWeights();
+  void sendResponseWeights();
+
+  void readRequestVector0();
+  void sendResponseVector0();
+
+  void readRequestVector1();
+  void sendResponseVector1();
+
+  void readRequestVector2();
+  void sendResponseVector2();
+
+  void readRequestGrad();
+  void sendResponseGrad();
 
   void memAccessInputs();
   void memAccessWeights();

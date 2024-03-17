@@ -46,7 +46,13 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
       params_list(params_list),
       sramMemory(sram),
       rramMemory(rram),
-      memoryMap(memoryMap) {
+      memoryMap(memoryMap),
+      inputDataResponse_fifo("inputDataResponse_fifo", 1024),
+      weightDataResponse_fifo("weightDataResponse_fifo", 1024),
+      gradDataResponse_fifo("gradDataResponse_fifo", 1024),
+      vectorFetch0DataResponse_fifo("vectorFetch0DataResponse_fifo", 1024),
+      vectorFetch1DataResponse_fifo("vectorFetch1DataResponse_fifo", 1024),
+      vectorFetch2DataResponse_fifo("vectorFetch2DataResponse_fifo", 1024) {
   accelerator.clk(clk);
   accelerator.rstn(rstn);
   accelerator.serialMatrixParamsIn(serialMatrixParamsIn);
@@ -88,27 +94,51 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
 
   SC_CTHREAD(reset, clk);
 
-  SC_THREAD(memAccessInputs);
+  SC_THREAD(readRequestInputs);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessWeights);
+  SC_THREAD(sendResponseInputs);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessVector0);
+  SC_THREAD(readRequestWeights);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessVector1);
+  SC_THREAD(sendResponseWeights);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessVector2);
+  SC_THREAD(readRequestVector0);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(memAccessGrad);
+  SC_THREAD(sendResponseVector0);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(readRequestVector1);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseVector1);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(readRequestVector2);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseVector2);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(readRequestGrad);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseGrad);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -126,6 +156,60 @@ void Harness::reset() {
   wait(5);
   rstn.write(1);
   wait();
+}
+
+void Harness::readMemoryRequest(
+    CombinationalInterface<MemoryRequest> *addressRequest,
+    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse_fifo,
+    std::string memSourceType) {
+  addressRequest->ResetRead();
+
+  wait();
+
+  while (true) {
+    MemoryRequest memRequest = addressRequest->Pop();
+    MemorySource memSource;
+
+    auto it = currentMemoryMap.find(memSourceType);
+    if (it != currentMemoryMap.end()) {
+      memSource = it->second;
+    } else {
+      std::cerr << "Memory interface " << memSourceType
+                << " has not been specified for layer " << currentParams.name
+                << " but received memory requests. Fix the operation mapping."
+                << std::endl;
+      std::abort();
+    }
+
+    INPUT_DATATYPE *memory;
+    if (memSource == RRAM) {
+      memory = rramMemory;
+    } else {
+      memory = sramMemory;
+    }
+
+    for (int b = 0; b < memRequest.burstSize / DIMENSION; b++) {
+      Pack1D<INPUT_DATATYPE, DIMENSION> data;
+      for (int i = 0; i < DIMENSION; i++) {
+        data[i] = memory[memRequest.address + b * DIMENSION + i];
+      }
+      DLOG(memSource << " access at addr: " << memRequest.address
+                     << " data: " << data << std::endl);
+      dataResponse_fifo->write(data);
+    }
+  }
+}
+
+void Harness::sendMemoryResponse(
+    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse_fifo,
+    CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse) {
+  dataResponse->ResetWrite();
+
+  wait();
+
+  while (true) {
+    dataResponse->Push(dataResponse_fifo->read());
+  }
 }
 
 void Harness::memAccessBurst(
@@ -238,6 +322,51 @@ void Harness::memAccessBurstVariable(
 //     dataResponse->Push(memory[address]);
 //   }
 // }
+
+void Harness::readRequestInputs() {
+  readMemoryRequest(&inputAddressRequest, &inputDataResponse_fifo, "inputs");
+}
+void Harness::sendResponseInputs() {
+  sendMemoryResponse(&inputDataResponse_fifo, &inputDataResponse);
+}
+
+void Harness::readRequestWeights() {
+  readMemoryRequest(&weightAddressRequest, &weightDataResponse_fifo, "weights");
+}
+void Harness::sendResponseWeights() {
+  sendMemoryResponse(&weightDataResponse_fifo, &weightDataResponse);
+}
+
+void Harness::readRequestVector0() {
+  readMemoryRequest(&vectorFetch0AddressRequest, &vectorFetch0DataResponse_fifo,
+                    "vector0");
+}
+void Harness::sendResponseVector0() {
+  sendMemoryResponse(&vectorFetch0DataResponse_fifo, &vectorFetch0DataResponse);
+}
+
+void Harness::readRequestVector1() {
+  readMemoryRequest(&vectorFetch1AddressRequest, &vectorFetch1DataResponse_fifo,
+                    "vector1");
+}
+void Harness::sendResponseVector1() {
+  sendMemoryResponse(&vectorFetch1DataResponse_fifo, &vectorFetch1DataResponse);
+}
+
+void Harness::readRequestVector2() {
+  readMemoryRequest(&vectorFetch2AddressRequest, &vectorFetch2DataResponse_fifo,
+                    "vector2");
+}
+void Harness::sendResponseVector2() {
+  sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vectorFetch2DataResponse);
+}
+
+void Harness::readRequestGrad() {
+  readMemoryRequest(&gradAddressRequest, &gradDataResponse_fifo, "grad");
+}
+void Harness::sendResponseGrad() {
+  sendMemoryResponse(&gradDataResponse_fifo, &gradDataResponse);
+}
 
 void Harness::memAccessInputs() {
   memAccessBurst(&inputAddressRequest, &inputDataResponse, "inputs");

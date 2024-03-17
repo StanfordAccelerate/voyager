@@ -57,7 +57,6 @@ template <typename IDTYPE, typename WDTYPE, typename ODTYPE, int NROWS,
           int NCOLS>
 SC_MODULE(SystolicArrayChunk) {
  private:
-  Connections::Combinational<PEInput<IDTYPE> > inputConnection[NROWS];
   Connections::Combinational<ODTYPE> psumConnection[NROWS - 1][NCOLS];
   Connections::Combinational<PEWeight<WDTYPE> > weightConnection[NROWS - 1]
                                                                 [NCOLS];
@@ -118,7 +117,6 @@ SC_MODULE(SystolicArray) {
   static constexpr int CHUNK_SIZE = 4;
   static constexpr int NCHUNKS = NROWS / 4;
 
-  Connections::Combinational<PEInput<IDTYPE> > inputConnection[NROWS];
   Connections::Combinational<ODTYPE> psumConnection[NCHUNKS - 1][NCOLS];
   Connections::Combinational<PEWeight<WDTYPE> > weightConnection[NCHUNKS]
                                                                 [NCOLS];
