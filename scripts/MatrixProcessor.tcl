@@ -21,10 +21,16 @@ go assembly
 
 directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $DIMENSION]
 if {[info exists env(DEBUG)] == 0} {
-  if {[expr $ACCUM_DATATYPE_WIDTH * $DIMENSION] == 512} {
+  if {[expr $ACCUM_DATATYPE_WIDTH * $DIMENSION] == 128} {
+    directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE mem_1024x128.custom1024x128
+  } elseif {[expr $ACCUM_DATATYPE_WIDTH * $DIMENSION] == 256} {
+    directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE mem_1024x256.custom1024x256
+  } elseif {[expr $ACCUM_DATATYPE_WIDTH * $DIMENSION] == 512} {
     directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE mem_1024x512.custom1024x512
+  } elseif {[expr $ACCUM_DATATYPE_WIDTH * $DIMENSION] == 1024} {
+    directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE mem_1024x1024.custom1024x1024
   } else {
-    directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE mem_1024x402.custom1024x402
+    error "No memory for width [expr $ACCUM_DATATYPE_WIDTH * $DIMENSION]"
   }
 }
 

@@ -91,7 +91,12 @@ solution options set ComponentLibs/SearchPath /sim/kprabhu7/minotaur-accelerator
 if {[info exists env(DEBUG)]} {
   solution library add ccs_sample_mem
 } else {
+  solution library add TS1N40LPB1024X64M4FW_wrapped
   solution library add TS1N40LPB1024X128M4FWBA_wrapped
-  solution library add mem_1024x402
+  solution library add TS1N40LPB1024X256M4FWBA_wrapped
+  solution library add TS1N40LPB1024X512M4FWBA_wrapped
+  solution library add mem_1024x128
+  solution library add mem_1024x256
   solution library add mem_1024x512
+  solution library add mem_1024x1024
 }
