@@ -112,7 +112,7 @@ build/Catapult_VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.h
 	catapult -shell -file scripts/VectorOpUnit.tcl
 build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v: build/Catapult_InputController/InputController.v1/concat_rtl.v build/Catapult_WeightController/WeightController.v1/concat_rtl.v build/Catapult_MatrixProcessor/MatrixProcessor.v1/concat_rtl.v build/Catapult_VectorUnit/VectorUnit.v1/concat_rtl.v
 	catapult -shell -file scripts/Accelerator.tcl
-	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
+	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/module TS1N40LPB1024X64M4FW /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' build/Catapult_Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
 
 .PHONY: rtl InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
 
