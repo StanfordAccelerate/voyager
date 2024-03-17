@@ -51,6 +51,15 @@ using F32 = StdFloat<23, 8>;
 #define ACCUM_DATATYPE F32
 #define OUTPUT_DATATYPE F16
 
+#elif defined(BF16_ONLY)
+
+using F16 = StdFloat<7, 8>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F16
+
 #else
 
 #error "No datatype specified!"
