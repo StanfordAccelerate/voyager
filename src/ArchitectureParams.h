@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(P8)
+#if defined(P8_1)
 
 using P8 = Posit<8, 1>;
 using P16 = Posit<16, 1>;
