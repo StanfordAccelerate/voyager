@@ -617,6 +617,7 @@ SC_MODULE(VectorFetchUnit) {
           }
         }
       } else {  // pasthrough for a standard 2d tensor
+#pragma hls_pipeline_init_interval 1
         for (ac_int<10, false> i = 0; i < params.addressGen2Loops[0][0]; i++) {
           for (ac_int<10, false> j = 0; j < params.addressGen2Loops[0][1];
                j++) {
