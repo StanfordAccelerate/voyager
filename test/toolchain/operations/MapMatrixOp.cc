@@ -278,8 +278,8 @@ void MapMatrixOp(const SimplifiedParams &originalParams, const MemoryMap &memory
   } else if (params.ATTENTION_SCALING) {
     vInst0.vOp0Src1 = VectorInstructions::op0immediate0;
     float fpscale = (1.0 / sqrt(32));
-    Posit<8, 1> scale = static_cast<Posit<8, 1> >(fpscale);
-    vInst0.immediate0 = scale.bits;
+    INPUT_DATATYPE scale(fpscale);
+    vInst0.immediate0 = scale.bits_rep();
     vInst0.vOp0 = VectorInstructions::vmult;
   } else {
     vInst0.vOp0Src1 = VectorInstructions::nop;
