@@ -16,9 +16,15 @@ inline void gold_fma(UniversalPosit a, UniversalPosit b,
 
 inline void gold_fma(INPUT_DATATYPE a, INPUT_DATATYPE b,
                      ACCUM_DATATYPE::AccumulationDatatype &c) {
+#ifdef HYBRID_FP8
+  HYBRID_TYPE hybrid_a(a);
+  HYBRID_TYPE hybrid_b(b);
+  c = hybrid_a.fma(hybrid_b, c);
+#else
   INPUT_DATATYPE::AccumulationDatatype v1 = a;
   INPUT_DATATYPE::AccumulationDatatype v2 = b;
   c = v1.fma(v2, c);
+#endif
 }
 
 inline void gold_fma(float a, float b, float &c) { c += a * b; }
@@ -644,14 +650,13 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     }
 
     // adjust loop counters for dimension != 16
-    if(DIMENSION < 16){
-      params.loops[0][params.weightLoopIndex[0]] *= (16/DIMENSION);
-      params.loops[1][params.reductionLoopIndex[1]] *= (16/DIMENSION);
-    } else if(DIMENSION > 16){
-      params.loops[1][params.weightLoopIndex[1]] /= (DIMENSION/16);
-      params.loops[1][params.reductionLoopIndex[1]] /= (DIMENSION/16);
+    if (DIMENSION < 16) {
+      params.loops[0][params.weightLoopIndex[0]] *= (16 / DIMENSION);
+      params.loops[1][params.reductionLoopIndex[1]] *= (16 / DIMENSION);
+    } else if (DIMENSION > 16) {
+      params.loops[1][params.weightLoopIndex[1]] /= (DIMENSION / 16);
+      params.loops[1][params.reductionLoopIndex[1]] /= (DIMENSION / 16);
     }
-
 
     int loop_counters[2][6] = {0};
 
