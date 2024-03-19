@@ -474,6 +474,8 @@ void Harness::sendParams() {
       CCS_LOG("----- Accelerator Layer '" << currentParams.name
                                           << "' Started. -----");
 
+      sc_time start = sc_time_stamp();
+
       if (matrixParamsValid) {
         matrixUnitDoneSignal.SyncPop();
       }
@@ -482,6 +484,8 @@ void Harness::sendParams() {
       }
       CCS_LOG("----- Accelerator Layer '" << currentParams.name
                                           << "' Finished. -----");
+      sc_time end = sc_time_stamp();
+      std::cout << "Runtime: " << end - start << std::endl;
 
       opMemoryMaps.pop_front();
     }
