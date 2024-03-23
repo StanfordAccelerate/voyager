@@ -884,7 +884,7 @@ void run_gold_model(const SimplifiedParams params, UniversalPosit *matrixA,
       params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix,
       weightResidualMatrix);
 }
-#endif NO_UNIVERSAL
+#endif
 
 void run_gold_model(const SimplifiedParams params, float *matrixA,
                     float *matrixB, float *matrixC, float *biasMatrix,

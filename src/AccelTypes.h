@@ -203,21 +203,25 @@ class Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE> {
   }
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].data.sign;
+//     }
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].data.scale;
+//     }
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].data.fraction;
+//     }
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].data._zero;
+//     }
 #pragma hls_unroll yes
     for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].data.sign;
-    }
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].data.scale;
-    }
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].data.fraction;
-    }
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].data._zero;
+      m &value[i].data.float_val.d;
     }
 #pragma hls_unroll yes
     for (unsigned int i = 0; i < SIZE; i++) {
@@ -245,21 +249,25 @@ class Pack1D<PositFP<sbits, fbits>, SIZE> {
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].sign;
+//     }
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].scale;
+//     }
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i].fraction;
+//     }
+// #pragma hls_unroll yes
+//     for (unsigned int i = 0; i < SIZE; i++) {
+//       m &value[i]._zero;
+//     }
 #pragma hls_unroll yes
     for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].sign;
-    }
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].scale;
-    }
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i].fraction;
-    }
-#pragma hls_unroll yes
-    for (unsigned int i = 0; i < SIZE; i++) {
-      m &value[i]._zero;
+      m &value[i].float_val.d;
     }
   }
 };

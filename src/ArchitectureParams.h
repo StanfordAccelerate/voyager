@@ -8,7 +8,8 @@ using P8D = Posit<8, 1>::AccumulationDatatype;
 using P16D = Posit<16, 1>::AccumulationDatatype;
 #define INPUT_DATATYPE P8
 #define WEIGHT_DATATYPE P8
-#define ACCUM_DATATYPE P16
+// #define ACCUM_DATATYPE P16
+#define ACCUM_DATATYPE PositFP<8, 7>
 #define OUTPUT_DATATYPE P8
 
 #elif defined(E4M3)
