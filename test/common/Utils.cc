@@ -104,12 +104,12 @@ float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
     }
     if (abs_diff < 1) {
       abs_diff_buckets[3]++;
-    } else {
+    } else if (!std::isinf(abs_diff) && !std::isnan(abs_diff)) {
       abs_diff_buckets[4]++;
     }
 
     // Does not fully protect against overflow, but lets not over engineer
-    if (a == 0 && b == 0) {
+    if ((a == 0 && b == 0) || std::isinf(a) || std::isinf(b)) {
       rel_diff_buckets[0]++;
       rel_diff_buckets[1]++;
       rel_diff_buckets[2]++;
