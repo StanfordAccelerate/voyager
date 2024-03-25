@@ -415,8 +415,8 @@ class PositFP {
   PositFP(const float &fval) : float_val(fval) {}
 #endif
 
-  template <int W2, int E2>
-  PositFP(const ac_std_float<W2, E2> &f) : float_val(f) {}
+  template <int W, int E>
+  PositFP(const ac_std_float<W, E> &f) : float_val(f) {}
 
   template <int sbits2, int fbits2>
   PositFP(const PositFP<sbits2, fbits2> &f) : float_val(f.float_val) {}
@@ -463,7 +463,7 @@ class PositFP {
 
   bool isZero() const { return float_val.d == 0; }
 
-  void setZero() { float_val.d == 0; }
+  void setZero() { float_val.d = 0; }
 
   void reciprocal() {
     Posit<16, 0> posit = *this;
