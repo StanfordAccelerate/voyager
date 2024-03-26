@@ -255,15 +255,19 @@ Posit<nbits, es>::Posit(const PositFP<fp_sbits, fp_fbits> &input) {
   if (input.isZero()) {
     bits = 0;
   } else {
-    const int e_width = PositFP<fp_sbits, fp_fbits>::ac_float_t::e_width;
-    const int mant_bits = PositFP<fp_sbits, fp_fbits>::ac_float_t::mant_bits;
-    const int exp_bias = PositFP<fp_sbits, fp_fbits>::ac_float_t::exp_bias;
+    const int e_width = PositFP<fp_sbits, fp_fbits>::e_width;
+    const int mant_bits = PositFP<fp_sbits, fp_fbits>::mant_bits;
+    const int exp_bias = PositFP<fp_sbits, fp_fbits>::exp_bias;
 
-    bool f_sign = input.float_val.signbit();
-    ac_int<mant_bits, false> f_mu = input.float_val.d;
-    ac_int<e_width, true> f_e =
-        input.float_val.d.template slc<e_width>(mant_bits) - exp_bias;
-    convert_<nbits, es, mant_bits>(f_sign, f_e, f_mu, bits);
+    // bool sign = input.float_val.signbit();
+    // int scale = input.float_val.d.template slc<e_width>(mant_bits) - exp_bias;
+    // ac_int<mant_bits, false> fraction = input.float_val.d;
+    // FIXME: ac::bfloat16 version
+    short d = input.float_val.d;
+    bool sign = d < 0;
+    int scale = ((d >> mant_bits) & 0xff) - exp_bias;
+    ac_int<mant_bits, false> fraction = d & 0x7f;
+    convert_<nbits, es, mant_bits>(sign, scale, fraction, bits);
   }
 }
 
@@ -403,8 +407,11 @@ inline std::ostream &operator<<(std::ostream &os, const Posit<nbits, es> &val) {
 template <int sbits, int fbits>
 class PositFP {
  public:
-  static constexpr int width = sbits + fbits + 1;
-  typedef ac_std_float<width, sbits> ac_float_t;
+  static const int width = 16;
+  static const int e_width = 8;
+  static const int mant_bits = 7;
+  static const int exp_bias = (1 << (e_width - 1)) - 1;
+  typedef ac::bfloat16 ac_float_t;
   typedef PositFP<sbits, fbits> AccumulationDatatype;
 
   ac_float_t float_val;
@@ -414,6 +421,8 @@ class PositFP {
 #ifndef __SYNTHESIS__
   PositFP(const float &fval) : float_val(fval) {}
 #endif
+
+  PositFP(const ac::bfloat16 &f) : float_val(f) {}
 
   template <int W, int E>
   PositFP(const ac_std_float<W, E> &f) : float_val(f) {}
@@ -426,25 +435,23 @@ class PositFP {
     static_assert(
         (sbits + fbits + 1) == 2 * nbits,
         "Lower precision type must be half the width of higher precision.");
+    ac_std_float<width, sbits> tmp;
 #pragma hls_unroll yes
     for (int i = 0; i < 2; i++) {
-      float_val.d.set_slc(i * nbits, input[i].bits);
+      tmp.d.set_slc(i * nbits, input[i].bits);
     }
+    *this = tmp;
   }
 
   template <int nbits, int es>
   PositFP(const Posit<nbits, es> &posit) {
     bool sign;
     int scale;
-    ac_int<ac_float_t::mant_bits, false> mantissa;
-    decode<nbits, es, ac_float_t::mant_bits>(posit.bits, sign, scale, mantissa);
+    ac_int<mant_bits, false> mantissa;
+    decode<nbits, es, mant_bits>(posit.bits, sign, scale, mantissa);
 
-    ac_int<1, false> sign_bit = sign;
-    ac_int<ac_float_t::e_width, true> exp = scale + ac_float_t::exp_bias;
-
-    float_val.d.set_slc(0, mantissa);
-    float_val.d.set_slc(ac_float_t::mant_bits, exp);
-    float_val.d.set_slc(ac_float_t::width - 1, sign_bit);
+    float_val.d = ((scale + exp_bias) << 7) | mantissa;
+    if (sign) float_val = -float_val;
   }
 
   ac_int<sbits + fbits + 1, false> bits_rep() { return float_val.d; }
@@ -497,10 +504,8 @@ class PositFP {
   }
 
   void expScale(ac_int<8, true> offset) {
-    ac_int<ac_float_t::e_width, true> exponent =
-        float_val.d.template slc<ac_float_t::e_width>(ac_float_t::mant_bits) +
-        offset;
-    float_val.d.set_slc(ac_float_t::mant_bits, exponent);
+    short exponent = ((float_val.d >> 7) & 0xff) + offset;
+    float_val.d = (float_val.d & 0x807F) | exponent << 7;
   }
 
   template <int sbits2, int fbits2>
@@ -547,9 +552,7 @@ class PositFP {
     return *this;
   }
 
-  bool operator<(const PositFP &rhs) const {
-    return float_val < rhs.float_val;
-  }
+  bool operator<(const PositFP &rhs) const { return float_val < rhs.float_val; }
 
 // SystemC is not compatible with C++17
 #ifndef NO_SYSC
@@ -585,3 +588,189 @@ inline std::ostream &operator<<(std::ostream &os,
 #endif
   return os;
 }
+
+// template <int sbits, int fbits>
+// class PositFP {
+//  public:
+//   static const int width = sbits + fbits + 1;
+//   static const int e_width = sbits;
+//   static const int mant_bits = fbits;
+//   typedef ac_std_float<width, sbits> ac_float_t;
+//   typedef PositFP<sbits, fbits> AccumulationDatatype;
+
+//   ac_float_t float_val;
+
+//   PositFP(){};
+
+// #ifndef __SYNTHESIS__
+//   PositFP(const float &fval) : float_val(fval) {}
+// #endif
+
+//   template <int W, int E>
+//   PositFP(const ac_std_float<W, E> &f) : float_val(f) {}
+
+//   template <int sbits2, int fbits2>
+//   PositFP(const PositFP<sbits2, fbits2> &f) : float_val(f.float_val) {}
+
+//   template <int nbits, int es>
+//   PositFP(const Posit<nbits, es> input[2]) {
+//     static_assert(
+//         (sbits + fbits + 1) == 2 * nbits,
+//         "Lower precision type must be half the width of higher precision.");
+// #pragma hls_unroll yes
+//     for (int i = 0; i < 2; i++) {
+//       float_val.d.set_slc(i * nbits, input[i].bits);
+//     }
+//   }
+
+//   template <int nbits, int es>
+//   PositFP(const Posit<nbits, es> &posit) {
+//     bool sign;
+//     int scale;
+//     ac_int<mant_bits, false> mantissa;
+//     decode<nbits, es, mant_bits>(posit.bits, sign, scale, mantissa);
+
+//     ac_int<1, false> sign_bit = sign;
+//     ac_int<e_width, true> exp = scale + ac_float_t::exp_bias;
+
+//     float_val.d.set_slc(0, mantissa);
+//     float_val.d.set_slc(mant_bits, exp);
+//     float_val.d.set_slc(width - 1, sign_bit);
+//   }
+
+//   ac_int<sbits + fbits + 1, false> bits_rep() { return float_val.d; }
+
+//   void setbits(const int &i) { float_val.d = i; }
+
+//   void negate() { float_val.set_signbit(!float_val.signbit()); }
+
+//   void relu() {
+//     if (float_val.signbit()) setZero();
+//   }
+
+//   void masked_relu(const PositFP &mask) {
+//     if (mask.float_val.d == 0) setZero();
+//   }
+
+//   bool isZero() const { return float_val.d == 0; }
+
+//   void setZero() { float_val.d = 0; }
+
+//   void reciprocal() {
+//     Posit<16, 0> posit = *this;
+//     posit.reciprocal();
+//     *this = posit;
+//   }
+
+//   void exponent() {
+//     Posit<16, 0> posit16_0 = static_cast<ac_float_t>(-float_val);
+//     posit16_0.sigmoid();
+//     posit16_0.reciprocal();
+
+//     *this = posit16_0;
+//     float_val -= ac_float_t(1.10925f);
+//     if (float_val.signbit()) {
+//       float_val.d = 0;
+//     }
+//   }
+
+//   PositFP inv_sqrt() {
+//     PositFP result = float_val.template sqrt<AC_RND_CONV, true>();
+//     result.reciprocal();
+//     return result;
+//   }
+
+//   PositFP sqrt() { return float_val.template sqrt<AC_RND_CONV, true>(); }
+
+//   PositFP max1() {
+//     ac_float_t one = float_val.one();
+//     return float_val > one ? float_val : one;
+//   }
+
+//   void expScale(ac_int<8, true> offset) {
+//     ac_int<e_width, true> exponent =
+//         float_val.d.template slc<e_width>(mant_bits) + offset;
+//     float_val.d.set_slc(mant_bits, exponent);
+//   }
+
+//   template <int sbits2, int fbits2>
+//   PositFP<sbits2, fbits2> fma(const PositFP &b,
+//                               const PositFP<sbits2, fbits2> &c) {
+//     typename PositFP<sbits2, fbits2>::ac_float_t op1(float_val);
+//     typename PositFP<sbits2, fbits2>::ac_float_t op2(b.float_val);
+//     return op1.template fma<AC_RND_CONV, true>(op2, c.float_val);
+//   }
+
+//   template <int sbits2, int fbits2>
+//   explicit operator PositFP<sbits2, fbits2>() const {
+//     return PositFP<sbits2, fbits2>(float_val);
+//   }
+
+// #ifndef __SYNTHESIS__
+//   operator float() const { return float_val.to_float(); }
+// #endif
+
+//   PositFP operator+(const PositFP &op2) const {
+//     return float_val + op2.float_val;
+//   }
+
+//   PositFP operator-(const PositFP &op2) const {
+//     return float_val - op2.float_val;
+//   }
+
+//   PositFP operator*(const PositFP &op2) const {
+//     return float_val * op2.float_val;
+//   }
+
+//   PositFP &operator+=(const PositFP &op2) {
+//     float_val += op2.float_val;
+//     return *this;
+//   }
+
+//   PositFP &operator-=(const PositFP &op2) {
+//     float_val -= op2.float_val;
+//     return *this;
+//   }
+
+//   PositFP &operator*=(const PositFP &op2) {
+//     float_val *= op2.float_val;
+//     return *this;
+//   }
+
+//   bool operator<(const PositFP &rhs) const { return float_val <
+//   rhs.float_val; }
+
+// // SystemC is not compatible with C++17
+// #ifndef NO_SYSC
+//   template <unsigned int Size>
+//   void Marshall(Marshaller<Size> &m) {
+//     m & float_val.d;
+//   }
+
+//   inline friend void sc_trace(sc_trace_file *tf, const PositFP &posit,
+//                               const std::string &name) {}
+// #endif
+// };
+
+// template <int sbits, int fbits>
+// PositFP<sbits, fbits> exponent(const PositFP<sbits, fbits> &val) {
+//   Posit<16, 0> posit = static_cast<PositFP<sbits, fbits>>(-val.float_val);
+//   posit.sigmoid();
+//   posit.reciprocal();
+
+//   PositFP<sbits, fbits> result(posit);
+//   result.float_val -= typename PositFP<sbits, fbits>::ac_float_t(1.10925f);
+//   if (result.float_val.signbit()) {
+//     result.float_val.d = 0;
+//   }
+//   return result;
+// }
+
+// template <int sbits, int fbits>
+// inline std::ostream &operator<<(std::ostream &os,
+//                                 const PositFP<sbits, fbits> &val) {
+// #ifndef __SYNTHESIS__
+//   os << static_cast<float>(val) << " ";
+// #endif
+//   return os;
+// }
