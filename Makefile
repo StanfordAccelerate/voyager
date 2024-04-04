@@ -8,9 +8,14 @@ VER := $(shell lsb_release -sr)
 MSG := Compiling on $(OS) $(VER)
 $(info $(MSG))
 
+# Build folder format is build/DATATYPE_DIMENSIONxDIMENSION
+BUILD_DIR = build/$(DATATYPE)_$(DIMENSION)x$(DIMENSION)
+CC_BUILD_DIR = $(BUILD_DIR)/cc
+TOOLCHAIN_BUILD_DIR = $(BUILD_DIR)/cc/test/toolchain
+TOOLCHAIN_BUILD_DIRS = $(TOOLCHAIN_BUILD_DIR) $(TOOLCHAIN_BUILD_DIR)/operations
+ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 # Create build dirs automatically
-BUILD_DIRS = build build/test build/test/toolchain build/test/toolchain/operations
-$(info $(shell mkdir -p $(BUILD_DIRS)))
+$(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
 ifeq ($(OS), Ubuntu)
@@ -168,89 +173,89 @@ gui:
 
 # Main target for accelerator simulations
 .PHONY: sim
-sim: build/TestRunner
-	./build/TestRunner
+sim: $(CC_BUILD_DIR)/TestRunner
+	./$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: TestRunner
-TestRunner: build/TestRunner
+TestRunner: $(CC_BUILD_DIR)/TestRunner
 
-build/TestRunner: build/Harness.o build/TestRunner.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/Simulation.o build/networks.a build/toolchain.a
+$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a $(CC_BUILD_DIR)/toolchain.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 .PHONY: MobileBERTAccuracy
-MobileBERTAccuracy: build/AccuracyTester
-	./build/AccuracyTester mobilebert models/mobilebert/binary_data/tiny_truncated_sst2/
+MobileBERTAccuracy: $(CC_BUILD_DIR)/AccuracyTester
+	./$(CC_BUILD_DIR)/AccuracyTester mobilebert models/mobilebert/binary_data/tiny_truncated_sst2/
 
 .PHONY: ResNetAccuracy
-ResNetAccuracy: build/AccuracyTester
-	./build/AccuracyTester resnet18 models/resnet/binary_data/imagenet_1000/
+ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
+	./$(CC_BUILD_DIR)/AccuracyTester resnet18 models/resnet/binary_data/imagenet_1000/
 
-build/AccuracyTester: build/AccuracyTester.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
+$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/networks.a
 	$(CC) -o $@ $^ -lstdc++fs
 
 .PHONY: MobileBERTFinetuning
-MobileBERTFinetuning: build/Finetuning
-	./build/Finetuning
+MobileBERTFinetuning: $(CC_BUILD_DIR)/Finetuning
+	./$(CC_BUILD_DIR)/Finetuning
 
-build/Finetuning: build/Finetuning.o build/MobileBERTParams.o build/DatasetIterator.o build/GoldModel.o build/Utils.o build/MemoryModel.o build/SimpleMemoryModel.o build/networks.a
+$(CC_BUILD_DIR)/Finetuning: $(CC_BUILD_DIR)/Finetuning.o $(CC_BUILD_DIR)/MobileBERTParams.o $(CC_BUILD_DIR)/DatasetIterator.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/networks.a
 	$(CC) -o $@ $^ -lstdc++fs
 
 # Unit tests for custom Posit implementation
 .PHONY: PositTest
-PositTest: build/PositTest
+PositTest: $(CC_BUILD_DIR)/PositTest
 
-build/PositTest: test/common/PositTest.cc src/PositTypes.h
+$(CC_BUILD_DIR)/PositTest: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -fopenmp -DNO_SYSC $< -o $@
 
-build/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
+$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
 	$(CC) $(C11FLAGS) -c -o $@ $<
 
-build/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h
+$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-build/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
+$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryModel.h src/ArchitectureParams.h
+$(CC_BUILD_DIR)/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryModel.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h
+$(CC_BUILD_DIR)/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/TestRunner.o: test/common/TestRunner.cc
+$(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/AccuracyTester.o: test/common/AccuracyTester.cc
+$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Finetuning.o: test/training/Finetuning.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h test/training/DTYPE.h
+$(CC_BUILD_DIR)/Finetuning.o: test/training/Finetuning.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h test/training/DTYPE.h
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-build/MobileBERTParams.o: test/training/MobileBERTParams.cc test/mobilebert/mobilebert_tiny2/*.h
+$(CC_BUILD_DIR)/MobileBERTParams.o: test/training/MobileBERTParams.cc test/mobilebert/mobilebert_tiny2/*.h
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-build/DatasetIterator.o: test/training/DatasetIterator.cc
+$(CC_BUILD_DIR)/DatasetIterator.o: test/training/DatasetIterator.cc
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 ###########################################################
 # Networks
 ###########################################################
 .PHONY: networks
-networks: build/networks.a
+networks: $(CC_BUILD_DIR)/networks.a
 
-build/networks.a: build/ResNet.o build/MobileBERT.o build/Generic.o
+$(CC_BUILD_DIR)/networks.a: $(CC_BUILD_DIR)/ResNet.o $(CC_BUILD_DIR)/MobileBERT.o $(CC_BUILD_DIR)/Generic.o
 	$(AR) rcs $@ $^
 
-build/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
+$(CC_BUILD_DIR)/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h test/common/VerificationTypes.h
+$(CC_BUILD_DIR)/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-build/Generic.o: test/generic/Generic.cc
+$(CC_BUILD_DIR)/Generic.o: test/generic/Generic.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
@@ -258,23 +263,26 @@ build/Generic.o: test/generic/Generic.cc
 ###########################################################
 
 TOOLCHAIN_SRC = test/toolchain/MapOperation.cc $(wildcard test/toolchain/operations/*.cc)
-TOOLCHAIN_OBJ = $(addprefix build/,  $(TOOLCHAIN_SRC:.cc=.o) )
+TOOLCHAIN_OBJ = $(addprefix $(CC_BUILD_DIR)/,  $(TOOLCHAIN_SRC:.cc=.o) )
 
-build/test/toolchain/%.o: test/toolchain/%.cc
+$(CC_BUILD_DIR)/test/toolchain/%.o: test/toolchain/%.cc
 	$(CC) $(C11FLAGS) -c -o $@ $<
 
 .PHONY: toolchain
-toolchain: build/toolchain.a
+toolchain: $(CC_BUILD_DIR)/toolchain.a
 
-build/toolchain.a: $(TOOLCHAIN_OBJ)
+$(CC_BUILD_DIR)/toolchain.a: $(TOOLCHAIN_OBJ)
 	$(AR) rcs $@ $^
 
 ###########################################################
 # Cleanup Targets
 ###########################################################
 
-clean:
+clean-all:
 	rm -rf build/*
+
+clean:
+	rm -rf $(CC_BUILD_DIR)
 
 clean-test:
 	rm -rf test_outputs/*
