@@ -88,9 +88,7 @@ solution options set ComponentLibs/SearchPath {/home/shared/catapult/memories /h
 solution library add tcbn40ulpbwp40_c170815tt0p9v25c_dc -- -rtlsyntool DesignCompiler -vendor TSMC -technology 40nm
 
 # Add build folder
-solution options set ComponentLibs/SearchPath {./build/} -append
-
-solution options set ComponentLibs/SearchPath /sim/kprabhu7/minotaur-accelerator/build -append
+solution options set ComponentLibs/SearchPath [file dirname $project_folder] -append
 
 if {[info exists env(DEBUG)]} {
   solution library add ccs_sample_mem
