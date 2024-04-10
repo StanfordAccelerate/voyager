@@ -22,6 +22,16 @@ using F16 = StdFloat<7, 8>;
 #define ACCUM_DATATYPE F16
 #define OUTPUT_DATATYPE F8
 
+#elif defined(E4M3_DW)
+
+using F8 = StdFloat<3, 4, true>;
+using F16 = StdFloat<7, 8, true>;
+
+#define INPUT_DATATYPE F8
+#define WEIGHT_DATATYPE F8
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F8
+
 #elif defined(E5M2)
 
 using F8 = StdFloat<2, 5>;
