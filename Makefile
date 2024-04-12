@@ -18,14 +18,7 @@ ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
-ifeq ($(OS), Ubuntu)
-	CC := g++
-else # CentOS or RHEL
-	CC := /opt/rh/devtoolset-10/root/bin/g++
-	ifeq (,$(wildcard $(CC))) # If devtoolset-10 does not exist, fall back to devtoolset-7
-		CC := /opt/rh/devtoolset-7/root/bin/g++
-	endif
-endif
+CC := $(CATAPULT_ROOT)/bin/g++
 
 # Check if the environment variable is set
 ifndef DATATYPE
@@ -33,7 +26,7 @@ $(error DATATYPE is not set)
 endif
 
 INC := \
-	-I/cad/mentor/2021.1/Mgc_home/shared/include/ \
+	-I/cad/mentor/2024.1/Mgc_home/shared/include/ \
 	-Ilib/ \
 	-Ilib/universal/include/ \
 	-Isrc/ \
@@ -43,7 +36,6 @@ INC := \
 override BASE_FLAGS += \
 	$(INC) \
 	-DSC_INCLUDE_DYNAMIC_PROCESSES \
-	-D_GLIBCXX_USE_CXX11_ABI=0 \
 	-Wno-unknown-pragmas \
 	-Wno-unused-but-set-variable \
 	-Wno-unused-variable \
@@ -67,7 +59,7 @@ endif
 C11FLAGS += $(BASE_FLAGS) -std=c++11 -Wno-deprecated-declarations
 C17FLAGS += $(BASE_FLAGS) -std=c++17
 LDFLAGS += -lsystemc -lstdc++fs
-LDLIBS += -L/cad/mentor/2021.1/Mgc_home/shared/lib/
+LDLIBS += -L/cad/mentor/2024.1/Mgc_home/shared/lib/
 
 ###########################################################
 # Catapult Synthesis
