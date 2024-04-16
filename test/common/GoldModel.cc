@@ -39,8 +39,9 @@ inline void gold_relu(float &a) { a = a < 0 ? 0 : a; }
 inline void gold_exp(UniversalPositAccum &a) { a = sw::universal::exp(a); }
 #endif
 inline void gold_exp(ACCUM_DATATYPE::AccumulationDatatype &a) {
-  a = static_cast<ACCUM_DATATYPE::AccumulationDatatype>(
-      exponent(static_cast<ACCUM_DATATYPE>(a)));
+  ACCUM_DATATYPE tmp = static_cast<ACCUM_DATATYPE>(a);
+  tmp.exponential();
+  a = static_cast<ACCUM_DATATYPE::AccumulationDatatype>(tmp);
 }
 inline void gold_exp(float &a) { a = exp(a); }
 

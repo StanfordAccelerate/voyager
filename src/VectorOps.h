@@ -61,7 +61,7 @@ void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
 
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
-    tmp[i] = exponent(tmp[i]);
+    tmp[i] = exponential(tmp[i]);
   }
 
 // convert back to decoded format

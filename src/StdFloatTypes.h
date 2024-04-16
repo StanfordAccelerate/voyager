@@ -80,9 +80,12 @@ class StdFloat {
         float_val);
   }
 
-  void exponent() {
+  void exponential() {
     // convert to fixed point
-    ac_float_to_fixed_rep converted_to_fixed = float_val.convert_to_ac_fixed();
+    ac_float_to_fixed_rep converted_to_fixed =
+        float_val.template convert_to_ac_fixed<2 * mantissa, mantissa, true,
+                                               AC_TRN, AC_WRAP>(true);
+
     ac_float_to_fixed_rep_out exponent_in_fixed;
     // take fixed point exponent
     ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
