@@ -263,7 +263,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator+(
     const StdFloat &rhs) {
-  return float_val + rhs.float_val;
+  return float_val.template add<Q, !ieee_compliance>(rhs.float_val);
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
@@ -271,7 +271,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator*(
     const StdFloat &rhs) {
-  return float_val * rhs.float_val;
+  return float_val.template mult<Q, !ieee_compliance>(rhs.float_val);
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
@@ -279,7 +279,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator/(
     const StdFloat &rhs) {
-  return float_val / rhs.float_val;
+  return float_val.template div<Q, !ieee_compliance>(rhs.float_val);
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
@@ -287,7 +287,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator+=(
     const StdFloat &rhs) {
-  float_val += rhs.float_val;
+  *this = float_val.template add<Q, !ieee_compliance>(rhs.float_val);
   return *this;
 }
 
@@ -296,7 +296,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator-=(
     const StdFloat &rhs) {
-  float_val -= rhs.float_val;
+  *this = float_val.template sub<Q, !ieee_compliance>(rhs.float_val);
   return *this;
 }
 
@@ -305,7 +305,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator*=(
     const StdFloat &rhs) {
-  float_val *= rhs.float_val;
+  *this = float_val.template mult<Q, !ieee_compliance>(rhs.float_val);
   return *this;
 }
 
@@ -314,7 +314,7 @@ template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
 inline StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator/=(
     const StdFloat &rhs) {
-  float_val /= rhs.float_val;
+  *this = float_val.template div<Q, !ieee_compliance>(rhs.float_val);
   return *this;
 }
 
