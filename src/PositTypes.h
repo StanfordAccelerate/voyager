@@ -526,6 +526,17 @@ class PositFP {
   operator float() const { return float_val.to_float(); }
 #endif
 
+  template <int nbits, int es>
+  void storeAsLowerPrecision(Posit<nbits, es> output[2]) {
+    short d = float_val.d;
+
+#pragma hls_unroll yes
+    for (int i = 0; i < 2; i++) {
+      output[i].bits = d & 0xFF;
+      d >>= 8;
+    }
+  }
+
   PositFP operator+(const PositFP &op2) const {
     return float_val + op2.float_val;
   }
