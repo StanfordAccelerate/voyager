@@ -288,7 +288,7 @@ Posit<nbits, es>::Posit(const float f) {
 
 // Implements an optimized exp that is only valid for inputs smaller than zero
 template <int nbits, int es>
-Posit<nbits, es> exponent(Posit<nbits, es> val) {
+Posit<nbits, es> exponential(Posit<nbits, es> val) {
   assert(nbits == 16 && es == 1);
 
   Posit<nbits, es> min_exp;
@@ -478,8 +478,9 @@ class PositFP {
     *this = posit;
   }
 
-  void exponent() {
-    Posit<16, 0> posit16_0 = static_cast<ac_float_t>(-float_val);
+  void exponential() {
+    Posit<16, 0> posit16_0(*this);
+    posit16_0.negate();
     posit16_0.sigmoid();
     posit16_0.reciprocal();
 
@@ -567,7 +568,7 @@ class PositFP {
 };
 
 template <int sbits, int fbits>
-PositFP<sbits, fbits> exponent(const PositFP<sbits, fbits> &val) {
+PositFP<sbits, fbits> exponential(const PositFP<sbits, fbits> &val) {
   Posit<16, 0> posit = static_cast<PositFP<sbits, fbits>>(-val.float_val);
   posit.sigmoid();
   posit.reciprocal();
