@@ -14,8 +14,18 @@ using P16D = Posit<16, 1>::AccumulationDatatype;
 
 #elif defined(E4M3)
 
-using F8 = StdFloat<3, 4>;
-using F16 = StdFloat<7, 8>;
+using F8 = StdFloat<3, 4, false, true, AC_RND_CONV>;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F8
+#define WEIGHT_DATATYPE F8
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F8
+
+#elif defined(E4M3_NS)
+
+using F8 = StdFloat<3, 4, false, false, AC_RND_CONV>;
+using F16 = StdFloat<7, 8, false, false, AC_RND_CONV>;
 
 #define INPUT_DATATYPE F8
 #define WEIGHT_DATATYPE F8
@@ -24,8 +34,18 @@ using F16 = StdFloat<7, 8>;
 
 #elif defined(E4M3_DW)
 
-using F8 = StdFloat<3, 4, true>;
-using F16 = StdFloat<7, 8, true>;
+using F8 = StdFloat<3, 4, true, true, AC_RND_CONV>;
+using F16 = StdFloat<7, 8, true, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F8
+#define WEIGHT_DATATYPE F8
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F8
+
+#elif defined(E4M3_DW_NS)
+
+using F8 = StdFloat<3, 4, true, false, AC_RND_CONV>;
+using F16 = StdFloat<7, 8, true, false, AC_RND_CONV>;
 
 #define INPUT_DATATYPE F8
 #define WEIGHT_DATATYPE F8
@@ -56,8 +76,38 @@ using F9 = StdFloat<3, 5>;
 
 #elif defined(BF16)
 
-using F16 = StdFloat<7, 8>;
-using F32 = StdFloat<23, 8>;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+using F32 = StdFloat<23, 8, false, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F32
+#define OUTPUT_DATATYPE F16
+
+#elif defined(BF16_NS)
+
+using F16 = StdFloat<7, 8, false, false, AC_RND_CONV>;
+using F32 = StdFloat<23, 8, false, false, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F32
+#define OUTPUT_DATATYPE F16
+
+#elif defined(BF16_TRN)
+
+using F16 = StdFloat<7, 8, false, true, AC_TRN_ZERO>;
+using F32 = StdFloat<23, 8, false, true, AC_TRN_ZERO>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F32
+#define OUTPUT_DATATYPE F16
+
+#elif defined(BF16_NS_TRN)
+
+using F16 = StdFloat<7, 8, false, false, AC_TRN_ZERO>;
+using F32 = StdFloat<23, 8, false, false, AC_TRN_ZERO>;
 
 #define INPUT_DATATYPE F16
 #define WEIGHT_DATATYPE F16
@@ -66,7 +116,34 @@ using F32 = StdFloat<23, 8>;
 
 #elif defined(BF16_ONLY)
 
-using F16 = StdFloat<7, 8>;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F16
+
+#elif defined(BF16_ONLY_NS)
+
+using F16 = StdFloat<7, 8, false, false, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F16
+
+#elif defined(BF16_ONLY_TRN)
+
+using F16 = StdFloat<7, 8, false, true, AC_TRN_ZERO>;
+
+#define INPUT_DATATYPE F16
+#define WEIGHT_DATATYPE F16
+#define ACCUM_DATATYPE F16
+#define OUTPUT_DATATYPE F16
+
+#elif defined(BF16_ONLY_NS_TRN)
+
+using F16 = StdFloat<7, 8, false, false, AC_TRN_ZERO>;
 
 #define INPUT_DATATYPE F16
 #define WEIGHT_DATATYPE F16
