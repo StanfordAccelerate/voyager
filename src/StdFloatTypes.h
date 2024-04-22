@@ -349,7 +349,7 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::fma(
       b);
 
   if (useDWImpl) {
-    return fp_mac<Q, !ieee_compliance, mantissa2 + exp2 + 1, exp2>(
+    return fp_mac<Q, ieee_compliance, mantissa2 + exp2 + 1, exp2>(
         a_higherprecision.float_val, b_higherprecision.float_val, c.float_val);
   } else {
     return a_higherprecision.float_val.template fma<Q, !ieee_compliance>(
