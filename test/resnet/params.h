@@ -11,7 +11,13 @@ const SimplifiedParams conv1_params = {
     .WEIGHT_OFFSET = 0,
     .OUTPUT_OFFSET = 431072,
     .WEIGHT_TRANSPOSE = false,
-    .loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, 2, 16, 16}},
+    // .loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, 2, 16, 16}},
+    .loops = {{7, 7, 2, 1, 1, 1},
+              {1, 2, 7,
+               (DIMENSION == 16   ? 2
+                : DIMENSION == 32 ? 1
+                                  : 7),
+               16, 16}},
     .inputXLoopIndex = {0, 5},
     .inputYLoopIndex = {1, 4},
     .reductionLoopIndex = {3, 0},
@@ -26,7 +32,7 @@ const SimplifiedParams conv1_params = {
     .BIAS_OFFSET = 9408,
     .RESIDUAL = false,
     .RESIDUAL_OFFSET = -1,
-    .MAXPOOL = true,
+    .MAXPOOL = false,
     .AVGPOOL = false,
     .WEIGHT = true,
     .STORE_IN_ACC = false,

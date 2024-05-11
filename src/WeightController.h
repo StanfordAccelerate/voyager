@@ -438,12 +438,17 @@ SC_MODULE(WeightController) {
                         if (params.REPLICATION) {
                           startingC = 3 - 1;
                           endingC = 3;
-                          if (loop_counters[1][params.fxIndex] == 0) {
-                            numPadding = NROWS - 12;
-                            replicationBound = 4;
-                          } else {
-                            numPadding = NROWS - 9;
-                            replicationBound = 3;
+                          if (DIMENSION == 16) {
+                            if (loop_counters[1][params.fxIndex] == 0) {
+                              numPadding = NROWS - 12;
+                              replicationBound = 4;
+                            } else {
+                              numPadding = NROWS - 9;
+                              replicationBound = 3;
+                            }
+                          } else if (DIMENSION == 32) {
+                            replicationBound = 7;
+                            numPadding = NROWS - replicationBound * 3;
                           }
                         }
 
@@ -475,8 +480,12 @@ SC_MODULE(WeightController) {
                             ac_int<8, false> C = DIMENSION;
                             if (params.REPLICATION) {
                               C = 3;
-                              fx = loop_counters[1][params.fxIndex] * 4 +
-                                   fx_repl;
+                              if (DIMENSION == 16) {
+                                fx = loop_counters[1][params.fxIndex] * 4 +
+                                     fx_repl;
+                              } else if (DIMENSION == 32) {
+                                fx = fx_repl;
+                              }
                               FX = 7;
                             }
 
@@ -1024,27 +1033,32 @@ SC_MODULE(WeightController) {
           Pack1D<typename ACC_DTYPE::AccumulationDatatype, NROWS>
               gradientsDecomposed;
 
-// #pragma hls_unroll yes
-//           for (int i = 0; i < NROWS; i++) {
-//             gradientsDecomposed[i] =
-//                 static_cast<typename ACC_DTYPE::AccumulationDatatype>(
-//                     static_cast<typename ACC_DTYPE::AccumulationDatatype>(
-//                         learningRate) *
-//                     static_cast<typename ACC_DTYPE::AccumulationDatatype>(
-//                         gradients[i]));
-//           }
+          // #pragma hls_unroll yes
+          //           for (int i = 0; i < NROWS; i++) {
+          //             gradientsDecomposed[i] =
+          //                 static_cast<typename
+          //                 ACC_DTYPE::AccumulationDatatype>(
+          //                     static_cast<typename
+          //                     ACC_DTYPE::AccumulationDatatype>(
+          //                         learningRate) *
+          //                     static_cast<typename
+          //                     ACC_DTYPE::AccumulationDatatype>(
+          //                         gradients[i]));
+          //           }
 
           // CCS_LOG("gradients:\t" << gradients << std::endl
           //  << "--->\t" << gradientsDecomposed);
 
           // CCS_LOG("weights\t " << weightsDecomposed);
-// #pragma hls_unroll yes
-//           for (int i = 0; i < NROWS; i++) {
-//             weightsDecomposed[i] = static_cast<typename DTYPE::AccumulationDatatype>(
-//                 static_cast<typename ACC_DTYPE::AccumulationDatatype>(
-//                     weightsDecomposed[i]) -
-//                 gradientsDecomposed[i]);
-//           }
+          // #pragma hls_unroll yes
+          //           for (int i = 0; i < NROWS; i++) {
+          //             weightsDecomposed[i] = static_cast<typename
+          //             DTYPE::AccumulationDatatype>(
+          //                 static_cast<typename
+          //                 ACC_DTYPE::AccumulationDatatype>(
+          //                     weightsDecomposed[i]) -
+          //                 gradientsDecomposed[i]);
+          //           }
           // CCS_LOG("--->\t" << weightsDecomposed);
         }
 

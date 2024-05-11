@@ -672,6 +672,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     if (params.REPLICATION) {
       params.loops[1][params.fxIndex] = 7;
       IC_unroll = 3;
+      params.loops[1][params.reductionLoopIndex[1]] = 1;
     }
 
     for (loop_counters[0][0] = 0; loop_counters[0][0] < params.loops[0][0];
@@ -734,10 +735,17 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                           }
                         }
                         if (params.REPLICATION) {
-                          if (loop_counters[1][params.fxIndex] == 3 ||
-                              loop_counters[1][params.fxIndex] == 6) {
-                            outputMatrix[outputAddress] =
-                                static_cast<INT_T>(outputMatrix[outputAddress]);
+                          if (DIMENSION == 16) {
+                            if (loop_counters[1][params.fxIndex] == 3 ||
+                                loop_counters[1][params.fxIndex] == 6) {
+                              outputMatrix[outputAddress] = static_cast<INT_T>(
+                                  outputMatrix[outputAddress]);
+                            }
+                          } else if (DIMENSION == 32) {
+                            if (loop_counters[1][params.fxIndex] == 6) {
+                              outputMatrix[outputAddress] = static_cast<INT_T>(
+                                  outputMatrix[outputAddress]);
+                            }
                           }
                         } else {
                           outputMatrix[outputAddress] =
