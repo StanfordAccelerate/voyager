@@ -150,6 +150,15 @@ using F16 = StdFloat<7, 8, false, false, AC_TRN_ZERO>;
 #define ACCUM_DATATYPE F16
 #define OUTPUT_DATATYPE F16
 
+#elif defined(FP32)
+
+using F32 = StdFloat<23, 8, false, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F32
+#define WEIGHT_DATATYPE F32
+#define ACCUM_DATATYPE F32
+#define OUTPUT_DATATYPE F32
+
 #else
 
 #error "No datatype specified!"
