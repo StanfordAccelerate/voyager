@@ -1,5 +1,5 @@
 # Create project folder
-set project_folder "$root/build/${DATATYPE}_${DIMENSION}x${DIMENSION}/Catapult/clock_${CLOCK_PERIOD}/$BLOCK"
+set project_folder "$root/build/${DATATYPE}_${DIMENSION}x${DIMENSION}/Catapult/${TECHNOLOGY}/clock_${CLOCK_PERIOD}/$BLOCK"
 if { [file exists $project_folder] } {
   file delete -force -- $project_folder
 }
@@ -8,7 +8,7 @@ project new -dir $project_folder
 project save
 
 # Set log file
-logfile move "$root/build/${DATATYPE}_${DIMENSION}x${DIMENSION}/Catapult/clock_${CLOCK_PERIOD}/$BLOCK.log"
+logfile move "$root/build/${DATATYPE}_${DIMENSION}x${DIMENSION}/Catapult/${TECHNOLOGY}/clock_${CLOCK_PERIOD}/$BLOCK.log"
 
 # Configure options
 solution options set Project/SolutionName $BLOCK
