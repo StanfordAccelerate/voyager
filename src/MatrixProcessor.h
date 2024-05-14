@@ -13,23 +13,33 @@ SC_MODULE(MatrixProcessor) {
   Connections::SyncChannel CCS_INIT_S1(weightLoadDone);
   Connections::SyncChannel CCS_INIT_S1(weightSwapDone);
 
-  MultiInputSerializedSkewer<IDTYPE, typename IDTYPE::AccumulationDatatype, NROWS> CCS_INIT_S1(inputSkewer);
+  MultiInputSerializedSkewer<IDTYPE, typename IDTYPE::AccumulationDatatype,
+                             NROWS>
+      CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<PEInput<IDTYPE>, NROWS> > CCS_INIT_S1(
       inputSkewerDin);
 
-  WeightSerializedSkewer<typename IDTYPE::AccumulationDatatype, typename IDTYPE::AccumulationDatatype, NROWS> CCS_INIT_S1(weightSkewer);
-  Connections::Combinational<Pack1D<PEWeight<typename IDTYPE::AccumulationDatatype>, NROWS> > CCS_INIT_S1(
-      weightSkewerDin);
+  WeightSerializedSkewer<typename IDTYPE::AccumulationDatatype,
+                         typename IDTYPE::AccumulationDatatype, NROWS>
+      CCS_INIT_S1(weightSkewer);
+  Connections::Combinational<
+      Pack1D<PEWeight<typename IDTYPE::AccumulationDatatype>, NROWS> >
+      CCS_INIT_S1(weightSkewerDin);
 
-  SerializedSkewer<ODTYPE, typename ODTYPE::AccumulationDatatype, NROWS> CCS_INIT_S1(psumInSkewer);
+  SerializedSkewer<ODTYPE, typename ODTYPE::AccumulationDatatype, NROWS>
+      CCS_INIT_S1(psumInSkewer);
   Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumInSkewerDin);
 
-  DeserializedSkewer<typename ODTYPE::AccumulationDatatype, ODTYPE, NROWS> CCS_INIT_S1(psumOutSkewer);
+  DeserializedSkewer<typename ODTYPE::AccumulationDatatype, ODTYPE, NROWS>
+      CCS_INIT_S1(psumOutSkewer);
   Connections::Combinational<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(
       psumOutSkewerDout);
 
-  SystolicArray<typename IDTYPE::AccumulationDatatype, typename IDTYPE::AccumulationDatatype, typename ODTYPE::AccumulationDatatype, NROWS, NCOLS> CCS_INIT_S1(systolicArray);
+  SystolicArray<typename IDTYPE::AccumulationDatatype,
+                typename IDTYPE::AccumulationDatatype,
+                typename ODTYPE::AccumulationDatatype, NROWS, NCOLS>
+      CCS_INIT_S1(systolicArray);
 
   MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
 
@@ -38,18 +48,23 @@ SC_MODULE(MatrixProcessor) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputsChannel);
-  Connections::In<Pack1D<typename IDTYPE::AccumulationDatatype, NROWS> > CCS_INIT_S1(weightsChannel);
+  Connections::In<Pack1D<typename IDTYPE::AccumulationDatatype, NROWS> >
+      CCS_INIT_S1(weightsChannel);
   Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(outputsChannel);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<PEInput<typename IDTYPE::AccumulationDatatype> > inputsToSystolicArray[NROWS];
+  Connections::Combinational<PEInput<typename IDTYPE::AccumulationDatatype> >
+      inputsToSystolicArray[NROWS];
   // Connections::Combinational<ac_int<1, false> >
   //     weightSwapToSystolicArray[NROWS];
-  Connections::Combinational<typename ODTYPE::AccumulationDatatype> psumsToSystolicArray[NCOLS];
-  Connections::Combinational<typename ODTYPE::AccumulationDatatype> outputsFromSystolicArray[NCOLS];
-  Connections::Combinational<PEWeight<typename IDTYPE::AccumulationDatatype> > weightsToSystolicArray[NCOLS];
+  Connections::Combinational<typename ODTYPE::AccumulationDatatype>
+      psumsToSystolicArray[NCOLS];
+  Connections::Combinational<typename ODTYPE::AccumulationDatatype>
+      outputsFromSystolicArray[NCOLS];
+  Connections::Combinational<PEWeight<typename IDTYPE::AccumulationDatatype> >
+      weightsToSystolicArray[NCOLS];
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
   Connections::SyncOut CCS_INIT_S1(doneSignal);
@@ -121,7 +136,8 @@ SC_MODULE(MatrixProcessor) {
     while (true) {
 #pragma hls_pipeline_init_interval 1
       for (int weight_count = 0; weight_count < NROWS; weight_count++) {
-        Pack1D<typename IDTYPE::AccumulationDatatype, NCOLS> arrayWeights = weightsChannel.Pop();
+        Pack1D<typename IDTYPE::AccumulationDatatype, NCOLS> arrayWeights =
+            weightsChannel.Pop();
         // std::cout << "Weights: " << arrayWeights << std::endl;
         Pack1D<PEWeight<typename IDTYPE::AccumulationDatatype>, NCOLS> weights;
 #pragma hls_unroll yes
@@ -131,6 +147,22 @@ SC_MODULE(MatrixProcessor) {
         }
 
         weightSkewerDin.Push(weights);
+      }
+    }
+  }
+
+  int max3(int a, int b, int c) {
+    if (a > b) {
+      if (a > c) {
+        return a;
+      } else {
+        return c;
+      }
+    } else {
+      if (b > c) {
+        return b;
+      } else {
+        return c;
       }
     }
   }
@@ -183,23 +215,23 @@ SC_MODULE(MatrixProcessor) {
       ac_int<32, false> outputStep = 0;
 
       // first couple of outputs are garbage (bc of the swap)
-      int NUM_GARBAGE = 3;
-      int garbageCount = 0;
+      //       int NUM_GARBAGE = 0;
+      //       int garbageCount = 0;
 
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      for (int count = 0; count < NUM_GARBAGE; count++) {
-        Pack1D<PEInput<IDTYPE>, NROWS> inputs;
-#pragma hls_unroll yes
-        for (int i = 0; i < NROWS; i++) {
-          inputs[i].swapWeights = count == 0;
-        }
+      // #pragma hls_pipeline_init_interval 1
+      // #pragma hls_pipeline_stall_mode flush
+      //       for (int count = 0; count < NUM_GARBAGE; count++) {
+      //         Pack1D<PEInput<IDTYPE>, NROWS> inputs;
+      // #pragma hls_unroll yes
+      //         for (int i = 0; i < NROWS; i++) {
+      //           inputs[i].swapWeights = count == 0;
+      //         }
 
-        Pack1D<ODTYPE, NCOLS> psum;
+      //         Pack1D<ODTYPE, NCOLS> psum;
 
-        inputSkewerDin.Push(inputs);
-        psumInSkewerDin.Push(psum);
-      }
+      //         inputSkewerDin.Push(inputs);
+      //         psumInSkewerDin.Push(psum);
+      //       }
 
       // Push inputs and psums into the array
       // Pipelined across tiles
@@ -219,18 +251,14 @@ SC_MODULE(MatrixProcessor) {
 
         bool sendWeights;
         if (params.weightReuseIndex[0] != params.weightReuseIndex[1]) {
-          sendWeights =
-              (loop_counters[1][params.weightReuseIndex[1]] ==
-               loop_bounds[1][params.weightReuseIndex[1]] - NUM_GARBAGE) &&
-              (loop_counters[1][params.weightReuseIndex[0]] ==
-               loop_bounds[1][params.weightReuseIndex[0]] - 1);
+          sendWeights = (loop_counters[1][params.weightReuseIndex[1]] == 0) &&
+                        (loop_counters[1][params.weightReuseIndex[0]] == 0);
         } else {
-          sendWeights =
-              (loop_counters[1][params.weightReuseIndex[1]] ==
-               loop_bounds[1][params.weightReuseIndex[1]] - NUM_GARBAGE);
+          sendWeights = (loop_counters[1][params.weightReuseIndex[1]] == 0);
         }
+        sendWeights = sendWeights || step == 0;
 
-        if (sendWeights && step < totalOps - NUM_GARBAGE) {
+        if (sendWeights && step < totalOps - 1) {
           // CCS_LOG("sendWeights: " << sendWeights);
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
@@ -248,6 +276,7 @@ SC_MODULE(MatrixProcessor) {
         // Pack1D<IDTYPE, NROWS> inputs;
         if (step < totalOps) {
           Pack1D<IDTYPE, NROWS> inputsData = inputsChannel.Pop();
+          CCS_LOG("inputs: " << inputsData);
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
             inputs[i].data = inputsData[i];
@@ -281,7 +310,7 @@ SC_MODULE(MatrixProcessor) {
         READ_ACC_BUFFER:
 #endif
           psum = accumulation_buffer[readAddress];
-          // DLOG("readAddress: " << readAddress << " psum " << psum);
+          CCS_LOG("readAddress: " << readAddress << " psum " << psum);
         }
 
         // if (!stallInputs) {
@@ -292,60 +321,59 @@ SC_MODULE(MatrixProcessor) {
 
         Pack1D<ODTYPE, NCOLS> outputs;
         if (psumOutSkewerDout.PopNB(outputs)) {
-          if (garbageCount < NUM_GARBAGE) {
-            garbageCount++;
-          } else {
-            outputStep++;
-            DLOG("systolic array output: " << outputs);
-            bool accumulationFinished =
-                (loop_counters_out[1][params.reductionLoopIndex[1]] ==
-                 params.loops[1][params.reductionLoopIndex[1]] - 1) &&
-                (loop_counters_out[1][params.fxIndex] ==
-                 params.loops[1][params.fxIndex] - 1) &&
-                (loop_counters_out[1][params.fyIndex] ==
-                 params.loops[1][params.fyIndex] - 1);
+          // if (garbageCount < NUM_GARBAGE) {
+          //   garbageCount++;
+          // } else {
+          outputStep++;
+          // DLOG("systolic array output: " << outputs);
+          bool accumulationFinished =
+              (loop_counters_out[1][params.reductionLoopIndex[1]] ==
+               params.loops[1][params.reductionLoopIndex[1]] - 1) &&
+              (loop_counters_out[1][params.fxIndex] ==
+               params.loops[1][params.fxIndex] - 1) &&
+              (loop_counters_out[1][params.fyIndex] ==
+               params.loops[1][params.fyIndex] - 1);
 
-            if (accumulationFinished && !params.STORE_IN_ACC) {
-              outputsChannel.Push(outputs);
-              DLOG("matrix processor output: " << outputs);
-              // std::cout << "Output: " << outputs << std::endl;
-            } else {
-              int writeAddress =
-                  static_cast<ac_int<10, false> >(
-                      loop_counters_out[1][params.weightLoopIndex[1]] *
-                      params.loops[1][params.inputXLoopIndex[1]] *
-                      params.loops[1][params.inputYLoopIndex[1]]) +
-                  static_cast<ac_int<10, false> >(
-                      loop_counters_out[1][params.inputYLoopIndex[1]] *
-                      params.loops[1][params.inputXLoopIndex[1]]) +
-                  loop_counters_out[1][params.inputXLoopIndex[1]];
+          if (accumulationFinished && !params.STORE_IN_ACC) {
+            outputsChannel.Push(outputs);
+            // DLOG("matrix processor output: " << outputs);
+            // std::cout << "Output: " << outputs << std::endl;
+          } else {
+            int writeAddress =
+                static_cast<ac_int<10, false> >(
+                    loop_counters_out[1][params.weightLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]] *
+                    params.loops[1][params.inputYLoopIndex[1]]) +
+                static_cast<ac_int<10, false> >(
+                    loop_counters_out[1][params.inputYLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]]) +
+                loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__
-            WRITE_ACC_BUFFER:
+          WRITE_ACC_BUFFER:
 #endif
-              accumulation_buffer[writeAddress] = outputs;
-              // DLOG("writeAddress: " << writeAddress << " val "
-              //                          << outputs);
-            }
+            accumulation_buffer[writeAddress] = outputs;
+            CCS_LOG("writeAddress: " << writeAddress << " val " << outputs);
+          }
 
-            loop_counters_out[1][5]++;
+          loop_counters_out[1][5]++;
 #pragma hls_unroll yes
-            for (int i = 1; i >= 0; i--) {
+          for (int i = 1; i >= 0; i--) {
 #pragma hls_unroll yes
-              for (int j = 5; j >= 0; j--) {
-                if (loop_counters_out[i][j] == params.loops[i][j]) {
-                  loop_counters_out[i][j] = 0;
-                  if (j > 0) {
-                    loop_counters_out[i][j - 1]++;
-                  } else {
-                    if (i > 0) {
-                      loop_counters_out[i - 1][5]++;
-                    }
+            for (int j = 5; j >= 0; j--) {
+              if (loop_counters_out[i][j] == params.loops[i][j]) {
+                loop_counters_out[i][j] = 0;
+                if (j > 0) {
+                  loop_counters_out[i][j - 1]++;
+                } else {
+                  if (i > 0) {
+                    loop_counters_out[i - 1][5]++;
                   }
                 }
               }
             }
           }
+          // }
         }
 
         // if (!stallInputs) {
@@ -378,6 +406,8 @@ SC_MODULE(MatrixProcessor) {
         Pack1D<ODTYPE, NCOLS> outputs;
         if (psumOutSkewerDout.PopNB(outputs)) {
           outputStep++;
+          CCS_LOG("outputStep: " << outputStep << " / " << totalOps);
+
           DLOG("systolic array output: " << outputs);
           bool accumulationFinished =
               (loop_counters_out[1][params.reductionLoopIndex[1]] ==
@@ -430,7 +460,7 @@ SC_MODULE(MatrixProcessor) {
           wait();
         }
       }
-
+      CCS_LOG("done...");
       doneSignal.SyncPush();
     }
   }

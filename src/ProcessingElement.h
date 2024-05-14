@@ -47,6 +47,8 @@ SC_MODULE(ProcessingElement) {
 
     wait();
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode bubble
     while (true) {
       PEWeight<WDTYPE> weightStruct = weightIn.Pop();
 
@@ -65,6 +67,8 @@ SC_MODULE(ProcessingElement) {
 
     wait();
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode bubble
     while (true) {
       storedWeight.Push(newWeightFifo.Pop());
     }
@@ -85,48 +89,63 @@ SC_MODULE(ProcessingElement) {
     bool swapWeight1 = false;
     bool swapWeight2 = false;
 
+    // name is a string separated by '.'
+    // get the last part of the string
+    bool debug = std::string(name()) ==
+                 "harness.accelerator.matrixUnit.matrixProcessor.systolicArray."
+                 "systolic_chunk_inst_0.systolic_row_inst_0.pe_inst_0";
+
     wait();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode bubble
     while (true) {
-      if (swapWeight0) {
-        weight_reg = nextWeight0;
-      }
+      // if (swapWeight0) {
+      //   weight_reg = nextWeight0;
+      // }
 
-      swapWeight0 = swapWeight1;
-      swapWeight1 = swapWeight2;
+      // swapWeight0 = swapWeight1;
+      // swapWeight1 = swapWeight2;
 
-      nextWeight0 = nextWeight1;
-      nextWeight1 = nextWeight2;
+      // nextWeight0 = nextWeight1;
+      // nextWeight1 = nextWeight2;
 
       PEInput<IDTYPE> inputStruct = inputIn.Pop();
+      CCS_LOG("PE: " << inputStruct.data << " " << inputStruct.swapWeights);
+
+      if (inputStruct.swapWeights) {
+        weight_reg = storedWeight.Pop();
+      }
 
       ODTYPE psum = psumIn.Pop();
       inputOut.Push(inputStruct);
-// #ifdef HYBRID_FP8
-//       ODTYPE output;
-//       if (inputStruct.castToE5M2) {
-//         StdFloat<2, 5> castedInput;
-//         castedInput.float_val.d = inputStruct.data.float_val.d;
-//         StdFloat<2, 5> castedWeight;
-//         castedWeight.float_val.d = weight_reg.float_val.d;
+      // #ifdef HYBRID_FP8
+      //       ODTYPE output;
+      //       if (inputStruct.castToE5M2) {
+      //         StdFloat<2, 5> castedInput;
+      //         castedInput.float_val.d = inputStruct.data.float_val.d;
+      //         StdFloat<2, 5> castedWeight;
+      //         castedWeight.float_val.d = weight_reg.float_val.d;
 
-//         output = castedInput.fma(castedWeight, psum);
+      //         output = castedInput.fma(castedWeight, psum);
 
-//       } else {
-//         output = inputStruct.data.fma(weight_reg, psum);
-//       }
-// #else
+      //       } else {
+      //         output = inputStruct.data.fma(weight_reg, psum);
+      //       }
+      // #else
       ODTYPE output = pe_fma(inputStruct.data, weight_reg, psum);
-// #endif
+      // #endif
+
+      // if (debug) {
+      // CCS_LOG(inputStruct.data << " * " << weight_reg << " + " << psum);
+      // }
 
       psumOut.Push(output);
 
-      swapWeight2 = inputStruct.swapWeights;
-      if (inputStruct.swapWeights) {  // for next iteration
-        nextWeight2 = storedWeight.Pop();
-      }
+      // swapWeight2 = inputStruct.swapWeights;
+      // if (inputStruct.swapWeights) {  // for next iteration
+      //   nextWeight2 = storedWeight.Pop();
+      // }
     }
   }
 
@@ -137,7 +156,8 @@ SC_MODULE(ProcessingElement) {
   }
 
   ODTYPE pe_fma(IDTYPE input, WDTYPE weight, ODTYPE psum) {
-    // CCS_LOG(input << " * " << weight << " + " << psum);
+    // CCS_LOG(input << " * " << weight << " + " << psum << " = "
+    //               << input.fma(weight, psum));
     return input.fma(weight, psum);
   }
 };
