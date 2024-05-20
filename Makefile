@@ -18,7 +18,8 @@ ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
-CC := $(CATAPULT_ROOT)/bin/g++
+# CC := $(CATAPULT_ROOT)/bin/g++
+CC := /cad/mentor/2024.1/Mgc_home/bin/g++
 
 # Check if the environment variable is set
 ifndef DATATYPE
