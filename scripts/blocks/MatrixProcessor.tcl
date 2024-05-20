@@ -50,5 +50,5 @@ proc pre_extract {} {
   ignore_memory_precedences -from WRITE_ACC_BUFFER* -to READ_ACC_BUFFER*
 
   # to prevent stuttering issues, schedule inputDin and psumIn to happen in the same cycle
-  cycle set inputSkewerDin.Push()#1 -from psumInSkewerDin.Push()#1 -equal 0
+  cycle set inputSkewerDin.Push() -from psumInSkewerDin.Push() -equal 0
 }
