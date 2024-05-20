@@ -20,7 +20,24 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
     params.loops[0][params.weightLoopIndex[0]] *= (16 / DIMENSION);
     params.loops[1][params.reductionLoopIndex[1]] *= (16 / DIMENSION);
   } else if (DIMENSION > 16) {
-    params.loops[1][params.weightLoopIndex[1]] /= (DIMENSION / 16);
+    // if the inner weight loop is >=4, we should reduce the inner loop
+    // (otherwise, we violate the weight buffer constraint) otherwise, we reduce
+    // the outer loop
+    if (params.loops[1][params.weightLoopIndex[1]] >= 4 &&
+        params.loops[1][params.fxIndex] > 1 &&
+        params.loops[1][params.fyIndex] > 1) {
+      params.loops[1][params.weightLoopIndex[1]] /= (DIMENSION / 16);
+    } else {
+      params.loops[0][params.weightLoopIndex[0]] /= (DIMENSION / 16);
+    }
+
+    // // try to reduce the outer weight loop, but if it's 1, reduce the inner
+    // loop if (params.loops[0][params.weightLoopIndex[0]] > 1) {
+    //   params.loops[0][params.weightLoopIndex[0]] /= (DIMENSION / 16);
+    // } else {
+    //   params.loops[1][params.weightLoopIndex[1]] /= (DIMENSION / 16);
+    // }
+
     if (!params.REPLICATION) {
       params.loops[1][params.reductionLoopIndex[1]] /= (DIMENSION / 16);
     }
