@@ -4,3 +4,6 @@
 [submodule "lib/matplotlib-cpp"]
 	path = lib/matplotlib-cpp
 	url = https://github.com/lava/matplotlib-cpp.git
+[submodule "quantized-training"]
+	path = quantized-training
+	url = https://github.com/jeffreyyu0602/quantized-training.git
