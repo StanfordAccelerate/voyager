@@ -268,9 +268,6 @@ SC_MODULE(MatrixProcessor) {
           // if accumulating, make sure that the output loop counter has
           // received the accumulated value
           stallInputs = !(oldOutputStep2 > step - nonAccumulatingTileSize);
-          CCS_LOG("stalling!!, step: "
-                  << step << " outputStep: " << oldOutputStep2
-                  << " nonAccumulatingTileSize: " << nonAccumulatingTileSize);
         }
 
         bool sendWeights;
@@ -300,7 +297,6 @@ SC_MODULE(MatrixProcessor) {
         // Pack1D<IDTYPE, NROWS> inputs;
         if (step < totalOps && !stallInputs) {
           Pack1D<IDTYPE, NROWS> inputsData = inputsChannel.Pop();
-          CCS_LOG("inputs: " << inputsData);
 #pragma hls_unroll yes
           for (int i = 0; i < NROWS; i++) {
             inputs[i].data = inputsData[i];
@@ -335,7 +331,6 @@ SC_MODULE(MatrixProcessor) {
         READ_ACC_BUFFER:
 #endif
           psum = accumulation_buffer[readAddress];
-          CCS_LOG("readAddress: " << readAddress << " psum " << psum);
         }
 
         if (!stallInputs) {
@@ -378,7 +373,6 @@ SC_MODULE(MatrixProcessor) {
           WRITE_ACC_BUFFER:
 #endif
             accumulation_buffer[writeAddress] = outputs;
-            CCS_LOG("writeAddress: " << writeAddress << " val " << outputs);
           }
 
           loop_counters_out[1][5]++;
@@ -434,11 +428,9 @@ SC_MODULE(MatrixProcessor) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       while (outputStep < totalOps) {
-        CCS_LOG("draining");
         Pack1D<ODTYPE, NCOLS> outputs;
         if (psumOutSkewerDout.PopNB(outputs)) {
           outputStep++;
-          CCS_LOG("outputStep: " << outputStep << " / " << totalOps);
 
           DLOG("systolic array output: " << outputs);
           bool accumulationFinished =
@@ -492,7 +484,7 @@ SC_MODULE(MatrixProcessor) {
           wait();
         }
       }
-      CCS_LOG("done...");
+
       doneSignal.SyncPush();
     }
   }

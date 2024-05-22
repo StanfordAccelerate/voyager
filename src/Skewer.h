@@ -63,7 +63,7 @@ SC_MODULE(SerializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                          \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(readFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),    \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),     \
                                             SC_CURRENT_USER_MODULE,         \
                                             BOOST_PP_CAT(readFifos, i));    \
   sensitive << clk.pos();                                                   \
@@ -142,7 +142,7 @@ SC_MODULE(MultiInputSerializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                          \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(readFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),    \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),     \
                                             SC_CURRENT_USER_MODULE,         \
                                             BOOST_PP_CAT(readFifos, i));    \
   sensitive << clk.pos();                                                   \
@@ -219,7 +219,7 @@ SC_MODULE(WeightSerializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                          \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(readFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),    \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),     \
                                             SC_CURRENT_USER_MODULE,         \
                                             BOOST_PP_CAT(readFifos, i));    \
   sensitive << clk.pos();                                                   \
@@ -294,7 +294,7 @@ SC_MODULE(DeserializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                           \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(writeFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(writeFifos, i)),    \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(writeFifos, i)),     \
                                             SC_CURRENT_USER_MODULE,          \
                                             BOOST_PP_CAT(writeFifos, i));    \
   sensitive << clk.pos();                                                    \
@@ -317,7 +317,6 @@ SC_MODULE(DeserializedSkewer) {
 #define FIFO_READ(z, i, unused) output[i] = BOOST_PP_CAT(fifo, i).read();
       REPEAT(FIFO_READ)
 #undef FIFO_READ
-      // CCS_LOG("psum output");
       // for (int i = 0; i < SIZE; i++) {
       //   std::cout << output[i].bits.to_string(AC_HEX) << " ";
       // }
