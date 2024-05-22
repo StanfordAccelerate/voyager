@@ -353,8 +353,8 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
     vInst2.vOp4 = VectorInstructions::nop;
     vInst2.vDest = VectorInstructions::vWriteOut;
     float fpscale = (1.0 / (X * Y));
-    Posit<8, 1> scale = static_cast<Posit<8, 1> >(fpscale);
-    vInst2.immediate0 = scale.bits;
+    INPUT_DATATYPE scale(fpscale);
+    vInst2.immediate0 = scale.bits_rep();
     vectorInstructionConfig->inst[2] = vInst2;
     vectorInstructionConfig->instCount[2] = 1;
 
