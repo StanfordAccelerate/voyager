@@ -4,6 +4,3 @@
 [submodule "lib/matplotlib-cpp"]
 	path = lib/matplotlib-cpp
 	url = https://github.com/lava/matplotlib-cpp.git
-[submodule "zagzig"]
-	path = zagzig
-	url = git@code.stanford.edu:fpedd/zagzig.git
