@@ -50,6 +50,10 @@ SC_MODULE(SystolicArrayRow) {
     }
 
     inputConnectionTieoff.in(inputConnection[NCOLS - 1]);
+#ifdef CONNECTIONS_FAST_SIM
+    inputConnectionTieoff.clk(clk);
+    inputConnectionTieoff.rstn(rstn);
+#endif
   };
 };
 
@@ -173,6 +177,10 @@ SC_MODULE(SystolicArray) {
       weightConnectionTieoff[i] =
           new Tieoff<PEWeight<IDTYPE> >(sc_gen_unique_name("tieoff"));
       weightConnectionTieoff[i]->in(weightConnection[NCHUNKS - 1][i]);
+#ifdef CONNECTIONS_FAST_SIM
+      weightConnectionTieoff[i]->clk(clk);
+      weightConnectionTieoff[i]->rstn(rstn);
+#endif
     }
 
     /*

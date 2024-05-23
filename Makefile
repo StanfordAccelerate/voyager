@@ -52,7 +52,7 @@ override BASE_FLAGS += \
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG_LOG -g -ggdb
 else
-	override BASE_FLAGS += -O3 # TODO(fpedd): SystemC is not happy about this flag -DCONNECTIONS_FAST_SIM
+	override BASE_FLAGS += -O3
 endif
 
 # We need to work with multiple C++ standards, as the SystemC lib is only
@@ -171,6 +171,10 @@ gui:
 sim: $(CC_BUILD_DIR)/TestRunner
 	./$(CC_BUILD_DIR)/TestRunner
 
+.PHONY: fast-sim
+fast-sim: $(CC_BUILD_DIR)/TestRunner-fast
+	./$(CC_BUILD_DIR)/TestRunner-fast
+
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner
 	gdb ./$(CC_BUILD_DIR)/TestRunner
@@ -179,6 +183,9 @@ sim-debug: $(CC_BUILD_DIR)/TestRunner
 TestRunner: $(CC_BUILD_DIR)/TestRunner
 
 $(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a $(CC_BUILD_DIR)/toolchain.a
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a $(CC_BUILD_DIR)/toolchain.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
 .PHONY: MobileBERTAccuracy
@@ -208,6 +215,9 @@ $(CC_BUILD_DIR)/PositTest: test/common/PositTest.cc src/PositTypes.h
 
 $(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
 	$(CC) $(C11FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
+	$(CC) $(C11FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
 $(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
