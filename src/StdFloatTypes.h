@@ -57,7 +57,7 @@ class StdFloat {
 
   void storeAsLowerPrecision(StdFloat output[2]);
 
-  ac_int<mantissa + exp, false> bits_rep() { return float_val.d; }
+  ac_int<mantissa + exp + 1, false> bits_rep() { return float_val.d; }
 
   void negate() { float_val = -float_val; }
 
