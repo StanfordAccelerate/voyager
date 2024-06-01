@@ -166,7 +166,7 @@ ACC_DTYPE treeadd(Pack1D<ACC_DTYPE, 32>& op) {
   Pack1D<ACC_DTYPE, 8> lvl1;
 #pragma hls_unroll yes
   for (int i = 0; i < 8; i++) {
-    lvl1[i] = static_cast<ACC_DTYPE>(op[i * 2] + op[i * 2 + 1]);
+    lvl1[i] = static_cast<ACC_DTYPE>(lvl0[i * 2] + lvl0[i * 2 + 1]);
   }
 
   Pack1D<ACC_DTYPE, 4> lvl2;
@@ -196,7 +196,7 @@ ACC_DTYPE treemax(Pack1D<ACC_DTYPE, 32>& op) {
   Pack1D<ACC_DTYPE, 8> lvl1;
 #pragma hls_unroll yes
   for (int i = 0; i < 8; i++) {
-    lvl1[i] = op[i * 2] < op[i * 2 + 1] ? op[i * 2 + 1] : op[i * 2];
+    lvl1[i] = lvl0[i * 2] < lvl0[i * 2 + 1] ? lvl0[i * 2 + 1] : lvl0[i * 2];
   }
 
   Pack1D<ACC_DTYPE, 4> lvl2;
