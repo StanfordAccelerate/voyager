@@ -448,12 +448,12 @@ struct VectorParams : BaseParams {
 
   // Address Gen 0 (vector input)
   int VECTOR_OFFSET;
-  ac_int<10, false> addressGen0Loop[2][3];  // tiled 2d tensor
+  ac_int<11, false> addressGen0Loop[2][3];  // tiled 2d tensor
   bool DP_VEC0;
 
   // Address Gen 1 (residual/op0src1)
   int ADDRESS_GEN1_OFFSET;
-  ac_int<10, false> addressGen1Loops[2][3];
+  ac_int<11, false> addressGen1Loops[2][3];
   ac_int<3, false> addressGen1InputXLoopIndex[2];
   ac_int<3, false> addressGen1InputYLoopIndex[2];
   ac_int<3, false> addressGen1WeightLoopIndex[2];
@@ -461,7 +461,7 @@ struct VectorParams : BaseParams {
 
   // Address Gen 2 (bias/op3src1)
   int ADDRESS_GEN2_OFFSET;
-  ac_int<10, false> addressGen2Loops[2][3];
+  ac_int<11, false> addressGen2Loops[2][3];
   ac_int<3, false> addressGen2InputXLoopIndex[2];
   ac_int<3, false> addressGen2InputYLoopIndex[2];
   ac_int<3, false> addressGen2WeightLoopIndex[2];
@@ -470,7 +470,7 @@ struct VectorParams : BaseParams {
   int VECTOR_OUTPUT_OFFSET;
   int SCALAR_OUTPUT_OFFSET;
 
-  ac_int<10, false> outputLoops[2][3];
+  ac_int<11, false> outputLoops[2][3];
   ac_int<3, false> outputXLoopIndex[2];
   ac_int<3, false> outputYLoopIndex[2];
   ac_int<3, false> outputWeightLoopIndex[2];
@@ -487,7 +487,7 @@ struct VectorParams : BaseParams {
   bool AVGPOOL;
 
   static const unsigned int width =
-      5 * 32 /* OFFSETS */ + 4 * 6 * 10 /* Loops */ +
+      5 * 32 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
       3 * 6 * 3 /* Loop indices */ + 9 * 1 /* Bools */ + 10 + 2 * 2;
 
 #ifndef NO_SYSC

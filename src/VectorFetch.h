@@ -69,16 +69,16 @@ SC_MODULE(VectorFetchUnit) {
       VectorParams params = addressGen0Params.Pop();
 
 #pragma hls_pipeline_init_interval 1
-      for (ac_int<10, false> i0 = 0; i0 < params.addressGen0Loop[0][0]; i0++) {
-        for (ac_int<10, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
+      for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0]; i0++) {
+        for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
              j0++) {
-          for (ac_int<10, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
+          for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
                k0++) {
-            for (ac_int<10, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
+            for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
                  i1++) {
-              for (ac_int<10, false> j1 = 0; j1 < params.addressGen0Loop[1][1];
+              for (ac_int<11, false> j1 = 0; j1 < params.addressGen0Loop[1][1];
                    j1++) {
-                for (ac_int<10, false> k1 = 0;
+                for (ac_int<11, false> k1 = 0;
                      k1 < params.addressGen0Loop[1][2]; k1++) {
                   ac_int<16, false> j = j0 * params.addressGen0Loop[1][1] + j1;
                   ac_int<16, false> k =
@@ -131,17 +131,17 @@ SC_MODULE(VectorFetchUnit) {
         ac_int<16, false> broadcastCount = params.addressGen0BroadcastCount;
 
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<10, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
+        for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
              i0++) {
-          for (ac_int<10, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
+          for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
                j0++) {
-            for (ac_int<10, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
+            for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
                  k0++) {
-              for (ac_int<10, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
+              for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
                    i1++) {
-                for (ac_int<10, false> j1 = 0;
+                for (ac_int<11, false> j1 = 0;
                      j1 < params.addressGen0Loop[1][1]; j1++) {
-                  for (ac_int<10, false> k1 = 0;
+                  for (ac_int<11, false> k1 = 0;
                        k1 < params.addressGen0Loop[1][2]; k1++) {
                     ac_int<16, false> K = params.addressGen0Loop[0][2] *
                                           params.addressGen0Loop[1][2] * WIDTH;
@@ -171,17 +171,17 @@ SC_MODULE(VectorFetchUnit) {
         }
       } else {  // passthrough
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<10, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
+        for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
              i0++) {
-          for (ac_int<10, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
+          for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
                j0++) {
-            for (ac_int<10, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
+            for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
                  k0++) {
-              for (ac_int<10, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
+              for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
                    i1++) {
-                for (ac_int<10, false> j1 = 0;
+                for (ac_int<11, false> j1 = 0;
                      j1 < params.addressGen0Loop[1][1]; j1++) {
-                  for (ac_int<10, false> k1 = 0;
+                  for (ac_int<11, false> k1 = 0;
                        k1 < params.addressGen0Loop[1][2]; k1++) {
                     if (params.DP_VEC0) {
                       // convert 2 8b bias into 1 16b bias
@@ -234,8 +234,8 @@ SC_MODULE(VectorFetchUnit) {
 
       // TODO: i think these address generators could be merged
       if (params.addressGen1Mode == 1) {
-        ac_int<10, false> loop_counters[2][3];
-        ac_int<10, false> loop_bounds[2][3];
+        ac_int<11, false> loop_counters[2][3];
+        ac_int<11, false> loop_bounds[2][3];
 
         for (int i = 0; i < 2; i++) {
           for (int j = 0; j < 3; j++) {
@@ -260,34 +260,34 @@ SC_MODULE(VectorFetchUnit) {
                   for (loop_counters[1][2] = 0;
                        loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
-                    ac_int<10, false> x0 =
+                    ac_int<11, false> x0 =
                         loop_counters[1][params.addressGen1InputXLoopIndex[1]];
-                    ac_int<10, false> x1 =
+                    ac_int<11, false> x1 =
                         loop_counters[0][params.addressGen1InputXLoopIndex[0]];
-                    ac_int<10, false> X0 =
+                    ac_int<11, false> X0 =
                         params.addressGen1Loops
                             [1][params.addressGen1InputXLoopIndex[1]];
-                    ac_int<10, false> X1 =
+                    ac_int<11, false> X1 =
                         params.addressGen1Loops
                             [0][params.addressGen1InputXLoopIndex[0]];
-                    ac_int<10, false> y0 =
+                    ac_int<11, false> y0 =
                         loop_counters[1][params.addressGen1InputYLoopIndex[1]];
-                    ac_int<10, false> y1 =
+                    ac_int<11, false> y1 =
                         loop_counters[0][params.addressGen1InputYLoopIndex[0]];
-                    ac_int<10, false> Y0 =
+                    ac_int<11, false> Y0 =
                         params.addressGen1Loops
                             [1][params.addressGen1InputYLoopIndex[1]];
-                    ac_int<10, false> Y1 =
+                    ac_int<11, false> Y1 =
                         params.addressGen1Loops
                             [0][params.addressGen1InputYLoopIndex[0]];
-                    ac_int<10, false> k2 =
+                    ac_int<11, false> k2 =
                         loop_counters[0][params.addressGen1WeightLoopIndex[0]];
-                    ac_int<10, false> K2 =
+                    ac_int<11, false> K2 =
                         params.addressGen1Loops
                             [0][params.addressGen1WeightLoopIndex[0]];
-                    ac_int<10, false> k1 =
+                    ac_int<11, false> k1 =
                         loop_counters[1][params.addressGen1WeightLoopIndex[1]];
-                    ac_int<10, false> K1 =
+                    ac_int<11, false> K1 =
                         params.addressGen1Loops
                             [1][params.addressGen1WeightLoopIndex[1]];
                     ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
@@ -311,17 +311,17 @@ SC_MODULE(VectorFetchUnit) {
         }
       } else {  // 2d tensor
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<10, false> i0 = 0; i0 < params.addressGen1Loops[0][0];
+        for (ac_int<11, false> i0 = 0; i0 < params.addressGen1Loops[0][0];
              i0++) {
-          for (ac_int<10, false> j0 = 0; j0 < params.addressGen1Loops[0][1];
+          for (ac_int<11, false> j0 = 0; j0 < params.addressGen1Loops[0][1];
                j0++) {
-            for (ac_int<10, false> k0 = 0; k0 < params.addressGen1Loops[0][2];
+            for (ac_int<11, false> k0 = 0; k0 < params.addressGen1Loops[0][2];
                  k0++) {
-              for (ac_int<10, false> i1 = 0; i1 < params.addressGen1Loops[1][0];
+              for (ac_int<11, false> i1 = 0; i1 < params.addressGen1Loops[1][0];
                    i1++) {
-                for (ac_int<10, false> j1 = 0;
+                for (ac_int<11, false> j1 = 0;
                      j1 < params.addressGen1Loops[1][1]; j1++) {
-                  for (ac_int<10, false> k1 = 0;
+                  for (ac_int<11, false> k1 = 0;
                        k1 < params.addressGen1Loops[1][2]; k1++) {
                     ac_int<16, false> j =
                         j0 * params.addressGen1Loops[1][1] + j1;
@@ -370,8 +370,8 @@ SC_MODULE(VectorFetchUnit) {
       VectorParams params = dataResponse1Params.Pop();
 
       if (params.addressGen1Mode == 1) {
-        ac_int<10, false> loop_counters[2][3];
-        ac_int<10, false> loop_bounds[2][3];
+        ac_int<11, false> loop_counters[2][3];
+        ac_int<11, false> loop_bounds[2][3];
 
         for (int i = 0; i < 2; i++) {
           for (int j = 0; j < 3; j++) {
@@ -415,17 +415,17 @@ SC_MODULE(VectorFetchUnit) {
         }
       } else {  // 2d tensor
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<10, false> i0 = 0; i0 < params.addressGen1Loops[0][0];
+        for (ac_int<11, false> i0 = 0; i0 < params.addressGen1Loops[0][0];
              i0++) {
-          for (ac_int<10, false> j0 = 0; j0 < params.addressGen1Loops[0][1];
+          for (ac_int<11, false> j0 = 0; j0 < params.addressGen1Loops[0][1];
                j0++) {
-            for (ac_int<10, false> k0 = 0; k0 < params.addressGen1Loops[0][2];
+            for (ac_int<11, false> k0 = 0; k0 < params.addressGen1Loops[0][2];
                  k0++) {
-              for (ac_int<10, false> i1 = 0; i1 < params.addressGen1Loops[1][0];
+              for (ac_int<11, false> i1 = 0; i1 < params.addressGen1Loops[1][0];
                    i1++) {
-                for (ac_int<10, false> j1 = 0;
+                for (ac_int<11, false> j1 = 0;
                      j1 < params.addressGen1Loops[1][1]; j1++) {
-                  for (ac_int<10, false> k1 = 0;
+                  for (ac_int<11, false> k1 = 0;
                        k1 < params.addressGen1Loops[1][2]; k1++) {
                     ac_int<16, false> j =
                         j0 * params.addressGen1Loops[1][1] + j1;
@@ -480,8 +480,8 @@ SC_MODULE(VectorFetchUnit) {
       VectorParams params = addressGen2Params.Pop();
 
       if (params.addressGen2Mode == 1) {
-        ac_int<10, false> loop_counters[2][3];
-        ac_int<10, false> loop_bounds[2][3];
+        ac_int<11, false> loop_counters[2][3];
+        ac_int<11, false> loop_bounds[2][3];
 
         for (int i = 0; i < 2; i++) {
           for (int j = 0; j < 3; j++) {
@@ -497,20 +497,20 @@ SC_MODULE(VectorFetchUnit) {
             for (loop_counters[0][2] = 0;
                  loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
-              for (ac_int<10, false> k1 = 0;
+              for (ac_int<11, false> k1 = 0;
                    k1 <
                    params
                        .addressGen2Loops[1]
                                         [params.addressGen2WeightLoopIndex[1]];
                    k1++) {
-                ac_int<10, false> k2 =
+                ac_int<11, false> k2 =
                     loop_counters[0][params.addressGen2WeightLoopIndex[0]];
-                ac_int<10, false> K2 =
+                ac_int<11, false> K2 =
                     params
                         .addressGen2Loops[0]
                                          [params.addressGen2WeightLoopIndex[0]];
 
-                ac_int<10, false> K1 =
+                ac_int<11, false> K1 =
                     params
                         .addressGen2Loops[1]
                                          [params.addressGen2WeightLoopIndex[1]];
@@ -527,10 +527,10 @@ SC_MODULE(VectorFetchUnit) {
       } else {  // 2d tensor
         DLOG("2d tensor for bias");
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<10, false> i = 0; i < params.addressGen2Loops[0][0]; i++) {
-          for (ac_int<10, false> j = 0; j < params.addressGen2Loops[0][1];
+        for (ac_int<11, false> i = 0; i < params.addressGen2Loops[0][0]; i++) {
+          for (ac_int<11, false> j = 0; j < params.addressGen2Loops[0][1];
                j++) {
-            for (ac_int<10, false> k = 0; k < params.addressGen2Loops[0][2];
+            for (ac_int<11, false> k = 0; k < params.addressGen2Loops[0][2];
                  k++) {
               int address = static_cast<ac_int<32, false> >(
                                 j * params.addressGen2Loops[0][2] * WIDTH) +
@@ -568,8 +568,8 @@ SC_MODULE(VectorFetchUnit) {
       VectorParams params = replicateBiasParams.Pop();
 
       if (params.addressGen2Mode == 1) {
-        ac_int<10, false> loop_counters[2][3];
-        ac_int<10, false> loop_bounds[2][3];
+        ac_int<11, false> loop_counters[2][3];
+        ac_int<11, false> loop_bounds[2][3];
 
         for (int i = 0; i < 2; i++) {
           for (int j = 0; j < 3; j++) {
@@ -590,7 +590,7 @@ SC_MODULE(VectorFetchUnit) {
             for (loop_counters[0][2] = 0;
                  loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
-              for (ac_int<10, false> k1 = 0;
+              for (ac_int<11, false> k1 = 0;
                    k1 <
                    params
                        .addressGen2Loops[1]
@@ -618,10 +618,10 @@ SC_MODULE(VectorFetchUnit) {
         }
       } else {  // pasthrough for a standard 2d tensor
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<10, false> i = 0; i < params.addressGen2Loops[0][0]; i++) {
-          for (ac_int<10, false> j = 0; j < params.addressGen2Loops[0][1];
+        for (ac_int<11, false> i = 0; i < params.addressGen2Loops[0][0]; i++) {
+          for (ac_int<11, false> j = 0; j < params.addressGen2Loops[0][1];
                j++) {
-            for (ac_int<10, false> k = 0; k < params.addressGen2Loops[0][2];
+            for (ac_int<11, false> k = 0; k < params.addressGen2Loops[0][2];
                  k++) {
               Pack1D<ACC_DTYPE, WIDTH> castedVec;
               if (params.DP_VEC2) {
