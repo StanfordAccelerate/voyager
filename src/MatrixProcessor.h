@@ -267,7 +267,7 @@ SC_MODULE(MatrixProcessor) {
         if (isAccumulation) {
           // if accumulating, make sure that the output loop counter has
           // received the accumulated value
-          stallInputs = !(oldOutputStep2 > step - nonAccumulatingTileSize);
+          stallInputs = !(oldOutputStep2 > step - nonAccumulatingTileSize + 1);
         }
 
         bool sendWeights;
