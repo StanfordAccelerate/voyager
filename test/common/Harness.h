@@ -126,22 +126,6 @@ SC_MODULE(Harness) {
       CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
           dataResponse);
 
-  void memAccessBurst(
-      CombinationalInterface<MemoryRequest> * addressRequest,
-      CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse,
-      std::string memSourceType);
-  void memAccessBurstVariable(
-      CombinationalInterface<MemoryRequest> * addressRequest,
-      CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse);
-  // void memAccessPack(
-  //     CombinationalInterface<int> * addressRequest,
-  //     CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-  //     dataResponse, MemorySource memSource);
-  // void memAccess(CombinationalInterface<int> * addressRequest,
-  //                CombinationalInterface<INPUT_DATATYPE> * dataResponse,
-  //                MemorySource memSource);
-
   void readRequestInputs();
   void sendResponseInputs();
 
@@ -159,13 +143,6 @@ SC_MODULE(Harness) {
 
   void readRequestBias();
   void sendResponseBias();
-
-  void memAccessInputs();
-  void memAccessWeights();
-  void memAccessVector0();
-  void memAccessVector1();
-  void memAccessVector2();
-  void memAccessBias();
 
   void reset();
   void storeVectorOutputs();
