@@ -160,10 +160,11 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   matrixParams->CONCAT_INPUT = params.CONCAT_INPUT;
   matrixParams->CONCAT_HEAD_WEIGHTS = params.CONCAT_WEIGHT;
   matrixParams->TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
-  matrixParams->GRAD_OFFSET = params.WEIGHT_RESIDUAL_OFFSET;
-  matrixParams->COMBINE_GRADS = params.WEIGHT_SPLITTING;
-
-  acceleratorMemoryMap["grad"] = memoryMap.inputs;
+  
+  // bias
+  matrixParams->BIAS_OFFSET = params.BIAS_OFFSET;
+  matrixParams->BIAS = params.BIAS;
+  acceleratorMemoryMap["bias"] = memoryMap.weights;
 
   // P8 learningRate = static_cast<P8>(params.learningRate);
   // matrixParams->learningRate = learningRate.bits;
@@ -211,7 +212,7 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   // bias
   acceleratorMemoryMap["vector2"] = memoryMap.bias;
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams->addressGen2Mode = params.BIAS;
+  vectorParams->addressGen2Mode = 0; 
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen2Loops[0][i] = params.loops[0][i];
   }
@@ -309,13 +310,13 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   vInst0.vOp1 = VectorInstructions::nop;
   vInst0.vOp2 = VectorInstructions::nop;
 
-  if (params.BIAS) {
-    vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
-    vInst0.vOp3 = VectorInstructions::vadd;
-  } else {
+  // if (params.BIAS) {
+  //   vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
+  //   vInst0.vOp3 = VectorInstructions::vadd;
+  // } else {
     vInst0.vOp3Src1 = VectorInstructions::nop;
     vInst0.vOp3 = VectorInstructions::nop;
-  }
+  // }
 
   if (params.RELU) {
     vInst0.vOp4 = VectorInstructions::vrelu;

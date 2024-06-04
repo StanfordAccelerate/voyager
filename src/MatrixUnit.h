@@ -52,9 +52,9 @@ SC_MODULE(MatrixUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(gradAddressRequest);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
-      gradDataResponse);
+      biasDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, DIMENSION> >
       weightBufferWriteReq[2];
   Connections::Combinational<int> weightBufferWriteControl[2];
@@ -91,6 +91,8 @@ SC_MODULE(MatrixUnit) {
   Connections::Combinational<
       Pack1D<INPUT_DATATYPE::AccumulationDatatype, DIMENSION> >
       CCS_INIT_S1(weightsToSystolicArray);
+  Connections::Combinational<Pack1D<ACCUM_DATATYPE, DIMENSION> > CCS_INIT_S1(
+      biasToSystolicArray);
 #endif
   Connections::Out<Pack1D<ACCUM_DATATYPE, DIMENSION> > CCS_INIT_S1(
       outputsFromSystolicArray);
@@ -134,10 +136,10 @@ SC_MODULE(MatrixUnit) {
     weightController.addressRequest(weightAddressRequest);
     weightController.dataResponse(weightDataResponse);
     weightController.serialParamsIn(serialMatrixParams[1]);
-    weightController.gradAddressRequest(gradAddressRequest);
-    weightController.gradDataResponse(gradDataResponse);
-    weightController.weightsFromBuffer(weightsFromBuffer);
+    weightController.biasAddressRequest(biasAddressRequest);
+    weightController.biasDataResponse(biasDataResponse);
     weightController.weightsToSystolicArray(weightsToSystolicArray);
+    weightController.biasToSystolicArray(biasToSystolicArray);
 
     weightBuffer.clk(clk);
     weightBuffer.rstn(rstn);
@@ -157,7 +159,8 @@ SC_MODULE(MatrixUnit) {
     matrixProcessor.clk(clk);
     matrixProcessor.rstn(rstn);
     matrixProcessor.inputsChannel(inputsToSystolicArray);
-    matrixProcessor.weightsChannel(weightsToSystolicArray);
+    matrixProcessor.weightsChannel(weightsFromBuffer);
+    matrixProcessor.biasChannel(biasToSystolicArray);
     matrixProcessor.outputsChannel(outputsFromSystolicArray);
     matrixProcessor.serialParamsIn(serialMatrixParams[2]);
     matrixProcessor.startSignal(startSignal);

@@ -692,6 +692,17 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
     for (int j = 0; j < 6; j++) {
       assert(params.loops[1][j] != 0);
     }
+    if (params.BIAS) {
+      for (int y = 0; y < Y; y++) {
+        for (int x = 0; x < X; x++) {
+          for (int k = 0; k < K; k++) {
+            int outputAddress = y * X * K + x * K + k;
+            ACC_T bias = readInput(biasMatrix, k, true);
+            outputMatrix[outputAddress] = bias;
+          }
+        }
+      }
+    }
 
     for (loop_counters[0][0] = 0; loop_counters[0][0] < params.loops[0][0];
          loop_counters[0][0]++) {
@@ -799,11 +810,6 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
                   if (params.RESIDUAL) {
                     outputMatrix[outputAddress] +=
                         inputResidualMatrix[outputAddress];
-                  }
-
-                  if (params.BIAS) {
-                    ACC_T bias = readInput(biasMatrix, k, true);
-                    outputMatrix[outputAddress] += bias;
                   }
 
                   if (params.RELU) {

@@ -50,6 +50,7 @@ SC_MODULE(MatrixProcessor) {
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputsChannel);
   Connections::In<Pack1D<typename IDTYPE::AccumulationDatatype, NROWS> >
       CCS_INIT_S1(weightsChannel);
+  Connections::In<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(biasChannel);
   Connections::Out<Pack1D<ODTYPE, NROWS> > CCS_INIT_S1(outputsChannel);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
@@ -172,6 +173,7 @@ SC_MODULE(MatrixProcessor) {
 
     inputSkewerDin.ResetWrite();
     inputsChannel.Reset();
+    biasChannel.Reset();
     psumInSkewerDin.ResetWrite();
     outputsChannel.Reset();
     psumOutSkewerDout.ResetRead();
@@ -221,6 +223,14 @@ SC_MODULE(MatrixProcessor) {
           max3(params.reductionLoopIndex[1], params.fxIndex, params.fyIndex);
       for (int i = 5; i > largestReductionLoopIndex; i--) {
         nonAccumulatingTileSize *= params.loops[1][i];
+      }
+
+      Pack1D<ODTYPE, NCOLS> bias;
+
+      // loop indices that are used to determine when to read in a new bias
+      int biasReuseIndices[4] = {5, 5, 5, 5};
+      for (int i = 5; i > params.weightLoopIndex[1]; i--) {
+        biasReuseIndices[5 - i] = i;
       }
 
       // first couple of outputs are garbage (bc of the swap)
@@ -331,6 +341,20 @@ SC_MODULE(MatrixProcessor) {
         READ_ACC_BUFFER:
 #endif
           psum = accumulation_buffer[readAddress];
+        } else if (params.BIAS && step < totalOps && !stallInputs) {
+          // we need to load in a new bias every time the weight loop index
+          // changes
+          bool readBias = true;
+#pragma hls_unroll yes
+          for (int i = 0; i < 4; i++) {
+            readBias = readBias && (loop_counters[1][biasReuseIndices[i]] == 0);
+          }
+
+          if (readBias) {
+            bias = biasChannel.Pop();
+          }
+
+          psum = bias;
         }
 
         if (!stallInputs) {

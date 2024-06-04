@@ -49,7 +49,7 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
       memoryMap(memoryMap),
       inputDataResponse_fifo("inputDataResponse_fifo", 1024),
       weightDataResponse_fifo("weightDataResponse_fifo", 1024),
-      gradDataResponse_fifo("gradDataResponse_fifo", 1024),
+      biasDataResponse_fifo("biasDataResponse_fifo", 1024),
       vectorFetch0DataResponse_fifo("vectorFetch0DataResponse_fifo", 1024),
       vectorFetch1DataResponse_fifo("vectorFetch1DataResponse_fifo", 1024),
       vectorFetch2DataResponse_fifo("vectorFetch2DataResponse_fifo", 1024) {
@@ -61,8 +61,8 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
   accelerator.inputDataResponse(inputDataResponse);
   accelerator.weightAddressRequest(weightAddressRequest);
   accelerator.weightDataResponse(weightDataResponse);
-  accelerator.gradAddressRequest(gradAddressRequest);
-  accelerator.gradDataResponse(gradDataResponse);
+  accelerator.biasAddressRequest(biasAddressRequest);
+  accelerator.biasDataResponse(biasDataResponse);
   accelerator.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
   accelerator.vectorFetch0DataResponse(vectorFetch0DataResponse);
   accelerator.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
@@ -134,11 +134,11 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(readRequestGrad);
+  SC_THREAD(readRequestBias);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseGrad);
+  SC_THREAD(sendResponseBias);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -361,11 +361,11 @@ void Harness::sendResponseVector2() {
   sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vectorFetch2DataResponse);
 }
 
-void Harness::readRequestGrad() {
-  readMemoryRequest(&gradAddressRequest, &gradDataResponse_fifo, "grad");
+void Harness::readRequestBias() {
+  readMemoryRequest(&biasAddressRequest, &biasDataResponse_fifo, "bias");
 }
-void Harness::sendResponseGrad() {
-  sendMemoryResponse(&gradDataResponse_fifo, &gradDataResponse);
+void Harness::sendResponseBias() {
+  sendMemoryResponse(&biasDataResponse_fifo, &biasDataResponse);
 }
 
 void Harness::memAccessInputs() {
@@ -376,8 +376,8 @@ void Harness::memAccessWeights() {
   memAccessBurst(&weightAddressRequest, &weightDataResponse, "weights");
 }
 
-void Harness::memAccessGrad() {
-  memAccessBurst(&gradAddressRequest, &gradDataResponse, "grad");
+void Harness::memAccessBias() {
+  memAccessBurst(&biasAddressRequest, &biasDataResponse, "bias");
 }
 
 void Harness::memAccessVector0() {

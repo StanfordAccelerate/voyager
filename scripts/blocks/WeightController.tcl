@@ -9,5 +9,4 @@ proc pre_architect {} {
   set weight_controller_stripped [string map {" " ""} $full_block_name]
 
   directive set /$weight_controller_stripped/$weight_controller_stripped:transposer/transposer/while:if:transposeBuffer.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE {[Register]}
-  directive set /$weight_controller_stripped/$weight_controller_stripped:transposeGrads/transposeGrads/while:if:transposeBuffer.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE {[Register]}
 }

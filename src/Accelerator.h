@@ -22,9 +22,9 @@ SC_MODULE(Accelerator) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(gradAddressRequest);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
-      gradDataResponse);
+      biasDataResponse);
   Connections::Combinational<Pack1D<ACCUM_DATATYPE, DIMENSION> > CCS_INIT_S1(
       outputsFromSystolicArray);
   Connections::SyncOut CCS_INIT_S1(matrixUnitStartSignal);
@@ -63,8 +63,8 @@ SC_MODULE(Accelerator) {
     matrixUnit.inputDataResponse(inputDataResponse);
     matrixUnit.weightAddressRequest(weightAddressRequest);
     matrixUnit.weightDataResponse(weightDataResponse);
-    matrixUnit.gradAddressRequest(gradAddressRequest);
-    matrixUnit.gradDataResponse(gradDataResponse);
+    matrixUnit.biasAddressRequest(biasAddressRequest);
+    matrixUnit.biasDataResponse(biasDataResponse);
     matrixUnit.outputsFromSystolicArray(outputsFromSystolicArray);
     matrixUnit.startSignal(matrixUnitStartSignal);
     matrixUnit.doneSignal(matrixUnitDoneSignal);

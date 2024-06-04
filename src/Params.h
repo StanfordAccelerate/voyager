@@ -54,10 +54,6 @@ struct MatrixParams : BaseParams {
     CONCAT_INPUT = false;
     CONCAT_HEAD_WEIGHTS = false;
     TRANPOSE_INPUTS = false;
-
-    GRAD_OFFSET = 0;
-    COMBINE_GRADS = false;
-    learningRate = 0;
   }
 #endif
 
@@ -95,13 +91,12 @@ struct MatrixParams : BaseParams {
   bool CONCAT_HEAD_WEIGHTS;
   bool TRANPOSE_INPUTS;
 
-  int GRAD_OFFSET;
-  bool COMBINE_GRADS;
-  ac_int<8, false> learningRate;
+  bool BIAS;
+  int BIAS_OFFSET;
 
   static const unsigned int width =
       3 * 32 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
-      (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 2 + 8;
+      (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 2;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -151,9 +146,8 @@ struct MatrixParams : BaseParams {
     m & CONCAT_INPUT;
     m & CONCAT_HEAD_WEIGHTS;
     m & TRANPOSE_INPUTS;
-    m & GRAD_OFFSET;
-    m & COMBINE_GRADS;
-    m & learningRate;
+    m & BIAS;
+    m & BIAS_OFFSET;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,

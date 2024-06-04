@@ -22,10 +22,8 @@ SC_MODULE(WeightController) {
   Connections::Out<int> readAddress[2];
   Connections::Out<int> readControl[2];
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(gradAddressRequest);
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(gradDataResponse);
-
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(weightsFromBuffer);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
+  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(biasDataResponse);
 
 #ifdef HYBRID_FP8
   Connections::Out<Pack1D<HYBRID_TYPE, NROWS> > CCS_INIT_S1(
@@ -35,14 +33,15 @@ SC_MODULE(WeightController) {
       CCS_INIT_S1(weightsToSystolicArray);
 #endif
 
+  Connections::Out<Pack1D<ACC_DTYPE, NCOLS> > CCS_INIT_S1(biasToSystolicArray);
+
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(gradFetcherParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(transposeGradParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(combineGradParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(biasFetcherParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(biasCombinerParams);
 
   Connections::Combinational<Pack1D<DTYPE, NCOLS> > transposeOut;
   Connections::Combinational<Pack1D<DTYPE, NCOLS> > gradTransposeOut;
@@ -75,15 +74,11 @@ SC_MODULE(WeightController) {
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(gradFetcher);
+    SC_THREAD(biasFetcher);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(transposeGrads);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
-    SC_THREAD(combineGrads);
+    SC_THREAD(biasCombiner);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -691,14 +686,14 @@ SC_MODULE(WeightController) {
     }
   }
 
-  void gradFetcher() {
-    gradFetcherParams.ResetRead();
-    gradAddressRequest.Reset();
+  void biasFetcher() {
+    biasFetcherParams.ResetRead();
+    biasAddressRequest.Reset();
 
     wait();
 
     while (true) {
-      const MatrixParams params = gradFetcherParams.Pop();
+      const MatrixParams params = biasFetcherParams.Pop();
 
       ac_int<8, false> loop_counters[2][6];
       ac_int<8, false> loop_bounds[2][6];
@@ -713,6 +708,9 @@ SC_MODULE(WeightController) {
       // set irrelevant loop bounds to 1
       loop_bounds[1][params.weightReuseIndex[0]] = 1;
       loop_bounds[1][params.weightReuseIndex[1]] = 1;
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex] = 1;
+      loop_bounds[1][params.reductionLoopIndex[1]] = 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -740,53 +738,23 @@ SC_MODULE(WeightController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        for (ac_int<8, false> c0 = 0; c0 < NROWS; c0++) {
-                          ac_int<8, false> k2 = loop_counters
-                              [0][params.weightAddressGenWeightLoopIndex[0]];
-                          ac_int<8, false> K2 = loop_bounds
-                              [0][params.weightAddressGenWeightLoopIndex[0]];
-                          ac_int<8, false> k1 = loop_counters
-                              [1][params.weightAddressGenWeightLoopIndex[1]];
-                          ac_int<8, false> K1 = loop_bounds
-                              [1][params.weightAddressGenWeightLoopIndex[1]];
-                          ac_int<8, false> C1 = loop_bounds
-                              [1][params.weightAddressGenReductionLoopIndex[0]];
-                          ac_int<8, false> c1 = loop_counters
-                              [1][params.weightAddressGenReductionLoopIndex[0]];
-                          ac_int<8, false> fx =
-                              loop_counters[1][params.weightAddressGenFxIndex];
-                          ac_int<8, false> FX =
-                              loop_bounds[1][params.weightAddressGenFxIndex];
-                          ac_int<8, false> fy =
-                              loop_counters[1][params.weightAddressGenFyIndex];
-                          ac_int<8, false> FY =
-                              loop_bounds[1][params.weightAddressGenFyIndex];
+                        ac_int<8, false> k2 = loop_counters
+                            [0][params.weightLoopIndex[0]];
+                        ac_int<8, false> K2 = loop_bounds
+                            [0][params.weightLoopIndex[0]];
+                        ac_int<8, false> k1 = loop_counters
+                            [1][params.weightLoopIndex[1]];
+                        ac_int<8, false> K1 = loop_bounds
+                            [1][params.weightLoopIndex[1]];
 
-                          ac_int<8, false> C0 = NROWS;
+                        ac_int<16, false> k =
+                            k2 * K1 * DIMENSION + k1 * DIMENSION;
+                        ac_int<16, false> K = K2 * K1 * DIMENSION;
 
-                          ac_int<16, false> c = c1 * C0 + c0;
-                          ac_int<16, false> C = C1 * C0;
-                          ac_int<16, false> k =
-                              k2 * K1 * DIMENSION + k1 * DIMENSION;
-                          ac_int<16, false> K = K2 * K1 * DIMENSION;
+                        int baseAddress = params.BIAS_OFFSET + k * 2;
+                        MemoryRequest memRequest = {baseAddress, DIMENSION * 2};
 
-                          int baseAddress =
-                              (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
-                          if (params.WEIGHT_TRANSPOSE) {
-                            baseAddress = (k + c0) * C + c1 * DIMENSION;
-                          } else if (params.CONCAT_HEAD_WEIGHTS) {
-                            baseAddress =
-                                static_cast<ac_int<32, false> >(
-                                    ((k / 32) * C * 32)) +
-                                static_cast<ac_int<16, false> >((c * 32)) +
-                                static_cast<ac_int<32, false> >((k % 32));
-                          }
-                          int burstSize = NCOLS;
-
-                          MemoryRequest memRequest = {
-                              params.GRAD_OFFSET + baseAddress, burstSize};
-                          gradAddressRequest.Push(memRequest);
-                        }
+                        biasAddressRequest.Push(memRequest);
 
                         if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                           break;
@@ -827,15 +795,15 @@ SC_MODULE(WeightController) {
     }
   }
 
-  void transposeGrads() {
-    transposeGradParams.ResetRead();
-    gradTransposeOut.ResetWrite();
-    gradDataResponse.Reset();
+  void biasCombiner() {
+    biasCombinerParams.ResetRead();
+    biasDataResponse.Reset();
+    biasToSystolicArray.Reset();
 
     wait();
 
     while (true) {
-      const MatrixParams params = transposeGradParams.Pop();
+      const MatrixParams params = biasCombinerParams.Pop();
 
       ac_int<8, false> loop_counters[2][6];
       ac_int<8, false> loop_bounds[2][6];
@@ -850,219 +818,87 @@ SC_MODULE(WeightController) {
       // set irrelevant loop bounds to 1
       loop_bounds[1][params.weightReuseIndex[0]] = 1;
       loop_bounds[1][params.weightReuseIndex[1]] = 1;
-
-      if (params.WEIGHT_TRANSPOSE) {
-        INPUT_DATATYPE transposeBuffer[NROWS][NCOLS];
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex] = 1;
+      loop_bounds[1][params.reductionLoopIndex[1]] = 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        // innermost loop must be X0, and must be a multiple of
-                        // NROWS
-                        for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < loop_bounds[1][5];
-                             loop_counters[1][5]++) {
-                          // Fill up transposeBuffer
-                          for (int c0 = 0; c0 < NROWS; c0++) {
-                            Pack1D<DTYPE, NCOLS> originalValue =
-                                gradDataResponse.Pop();
-#pragma hls_unroll yes
-                            for (int dim = 0; dim < NCOLS; dim++) {
-                              transposeBuffer[dim][c0] = originalValue[dim];
-                            }
-                          }
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+           loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+             loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
+               loop_counters[0][2]++) {
+            for (loop_counters[1][0] = 0;
+                 loop_counters[1][0] < loop_bounds[1][0];
+                 loop_counters[1][0]++) {
+              for (loop_counters[1][1] = 0;
+                   loop_counters[1][1] < loop_bounds[1][1];
+                   loop_counters[1][1]++) {
+                for (loop_counters[1][2] = 0;
+                     loop_counters[1][2] < loop_bounds[1][2];
+                     loop_counters[1][2]++) {
+                  for (loop_counters[1][3] = 0;
+                       loop_counters[1][3] < loop_bounds[1][3];
+                       loop_counters[1][3]++) {
+                    for (loop_counters[1][4] = 0;
+                         loop_counters[1][4] < loop_bounds[1][4];
+                         loop_counters[1][4]++) {
+                      for (loop_counters[1][5] = 0;
+                           loop_counters[1][5] < loop_bounds[1][5];
+                           loop_counters[1][5]++) {
+                        Pack1D<ACC_DTYPE, NCOLS> fullPrecisionDataResponse;
 
-                          // Write out from tranposeBuffer
-                          for (int c0 = 0; c0 < NROWS; c0++) {
-                            Pack1D<DTYPE, NCOLS> transposedValue;
+                        for (int precision = 0; precision < 2; precision++) {
+                          Pack1D<DTYPE, NCOLS> response =
+                              biasDataResponse.Pop();
 
 #pragma hls_unroll yes
-                            for (int dim = 0; dim < NCOLS; dim++) {
-                              transposedValue[dim] = transposeBuffer[c0][dim];
-                            }
-                            gradTransposeOut.Push(transposedValue);
-                          }
-
-                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
-                            break;
+                          for (int i = 0; i < NCOLS / 2; i++) {
+                            fullPrecisionDataResponse
+                                .value[NCOLS / 2 * precision + i] =
+                                ACC_DTYPE(&response[i * 2]);
                           }
                         }
-                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+
+                        biasToSystolicArray.Push(fullPrecisionDataResponse);
+
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                   break;
                 }
               }
-              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                 break;
               }
             }
-            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
               break;
             }
           }
-          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
             break;
           }
         }
-      } else {  // passthrough
-        ac_int<32, false> total_count =
-            loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
-            loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-            loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5] * NROWS;
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < total_count; i++) {
-          gradTransposeOut.Push(gradDataResponse.Pop());
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
-      }
-    }
-  }
-
-  void combineGrads() {
-    combineGradParams.ResetRead();
-    weightsFromBuffer.Reset();
-    weightsToSystolicArray.Reset();
-    gradTransposeOut.ResetRead();
-
-    wait();
-
-    while (true) {
-      const MatrixParams params = combineGradParams.Pop();
-
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
-
-#pragma hls_unroll yes
-      for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 6; j++) {
-          loop_bounds[i][j] = params.loops[i][j];
-        }
-      }
-
-      // set irrelevant loop bounds to 1
-      loop_bounds[1][params.weightReuseIndex[0]] = 1;
-      loop_bounds[1][params.weightReuseIndex[1]] = 1;
-
-      DTYPE learningRatePosit;
-      learningRatePosit.setbits(params.learningRate);
-      typename DTYPE::AccumulationDatatype learningRate =
-          static_cast<typename DTYPE::AccumulationDatatype>(learningRatePosit);
-
-      ac_int<32, false> total_count =
-          loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
-          loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-          loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5] * NROWS;
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < total_count; i++) {
-        Pack1D<DTYPE, NROWS> weights = weightsFromBuffer.Pop();
-#ifdef HYBRID_FP8
-        Pack1D<HYBRID_TYPE, NROWS> weightsDecomposed;
-
-        if (params.COMBINE_GRADS) {  // using this to signal that it's E5M2
-          Pack1D<StdFloat<2, 5>, NROWS> castedData;
-
-#pragma hls_unroll yes
-          for (int i = 0; i < NROWS; i++) {
-            castedData[i].float_val.d = weights[i].float_val.d;
-          }
-
-#pragma hls_unroll yes
-          for (int i = 0; i < NROWS; i++) {
-            weightsDecomposed[i].float_val =
-                static_cast<HYBRID_TYPE::ac_float_rep>(castedData[i].float_val);
-          }
-        } else {
-#pragma hls_unroll yes
-          for (int i = 0; i < NROWS; i++) {
-            weightsDecomposed[i].float_val =
-                static_cast<HYBRID_TYPE::ac_float_rep>(weights[i].float_val);
-          }
-        }
-
-#else
-        Pack1D<typename DTYPE::AccumulationDatatype, NROWS> weightsDecomposed;
-
-#pragma hls_unroll yes
-        for (int i = 0; i < NROWS; i++) {
-          weightsDecomposed[i] =
-              static_cast<typename DTYPE::AccumulationDatatype>(weights[i]);
-        }
-#endif
-
-        if (params.COMBINE_GRADS) {
-          Pack1D<DTYPE, NROWS> gradients = gradTransposeOut.Pop();
-          Pack1D<typename ACC_DTYPE::AccumulationDatatype, NROWS>
-              gradientsDecomposed;
-
-          // #pragma hls_unroll yes
-          //           for (int i = 0; i < NROWS; i++) {
-          //             gradientsDecomposed[i] =
-          //                 static_cast<typename
-          //                 ACC_DTYPE::AccumulationDatatype>(
-          //                     static_cast<typename
-          //                     ACC_DTYPE::AccumulationDatatype>(
-          //                         learningRate) *
-          //                     static_cast<typename
-          //                     ACC_DTYPE::AccumulationDatatype>(
-          //                         gradients[i]));
-          //           }
-
-          // CCS_LOG("gradients:\t" << gradients << std::endl
-          //  << "--->\t" << gradientsDecomposed);
-
-          // CCS_LOG("weights\t " << weightsDecomposed);
-          // #pragma hls_unroll yes
-          //           for (int i = 0; i < NROWS; i++) {
-          //             weightsDecomposed[i] = static_cast<typename
-          //             DTYPE::AccumulationDatatype>(
-          //                 static_cast<typename
-          //                 ACC_DTYPE::AccumulationDatatype>(
-          //                     weightsDecomposed[i]) -
-          //                 gradientsDecomposed[i]);
-          //           }
-          // CCS_LOG("--->\t" << weightsDecomposed);
-        }
-
-        weightsToSystolicArray.Push(weightsDecomposed);
       }
     }
   }
@@ -1073,9 +909,8 @@ SC_MODULE(WeightController) {
     writerParams.ResetWrite();
     readerParams.ResetWrite();
     transposerParams.ResetWrite();
-    combineGradParams.ResetWrite();
-    gradFetcherParams.ResetWrite();
-    transposeGradParams.ResetWrite();
+    biasFetcherParams.ResetWrite();
+    biasCombinerParams.ResetWrite();
 
     wait();
 
@@ -1086,11 +921,10 @@ SC_MODULE(WeightController) {
       writerParams.Push(params);
       readerParams.Push(params);
       transposerParams.Push(params);
-      combineGradParams.Push(params);
 
-      if (params.COMBINE_GRADS) {
-        gradFetcherParams.Push(params);
-        transposeGradParams.Push(params);
+      if (params.BIAS) {
+        biasFetcherParams.Push(params);
+        biasCombinerParams.Push(params);
       }
     }
   }

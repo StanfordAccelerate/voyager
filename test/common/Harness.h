@@ -73,10 +73,10 @@ SC_MODULE(Harness) {
   sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > weightDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(gradAddressRequest);
-  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > gradDataResponse_fifo;
+  CombinationalInterface<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > biasDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > CCS_INIT_S1(
-      gradDataResponse);
+      biasDataResponse);
 
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
   sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > vectorFetch0DataResponse_fifo;
@@ -157,15 +157,15 @@ SC_MODULE(Harness) {
   void readRequestVector2();
   void sendResponseVector2();
 
-  void readRequestGrad();
-  void sendResponseGrad();
+  void readRequestBias();
+  void sendResponseBias();
 
   void memAccessInputs();
   void memAccessWeights();
   void memAccessVector0();
   void memAccessVector1();
   void memAccessVector2();
-  void memAccessGrad();
+  void memAccessBias();
 
   void reset();
   void storeVectorOutputs();
