@@ -2,12 +2,12 @@ set block "Accelerator"
 set full_block_name "Accelerator"
 
 proc pre_compile {} {
-  global IO_DATATYPE ACCUM_DATATYPE DIMENSION DATATYPE
+  global IO_DATATYPE ACCUM_DATATYPE IC_DIMENSION OC_DIMENSION DATATYPE
   set MP_IO_DATATYPE $IO_DATATYPE
     if {$DATATYPE == "HYBRID_FP8"} {
       set MP_IO_DATATYPE "F9"
     }
-    foreach mapped_block [list "InputController<$IO_DATATYPE, $DIMENSION>" "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION, 1024>" "VectorUnit<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION>" "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION>"] {
+    foreach mapped_block [list "InputController<$IO_DATATYPE, $IC_DIMENSION>" "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, 1024>" "VectorUnit<$IO_DATATYPE, $ACCUM_DATATYPE, $OC_DIMENSION>" "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"] {
       solution design set $mapped_block -mapped
     }
 }
@@ -20,21 +20,21 @@ proc pre_libraries {} {
 }
 
 proc pre_assembly {} {
-  global IO_DATATYPE DATATYPE ACCUM_DATATYPE DIMENSION
+  global IO_DATATYPE DATATYPE ACCUM_DATATYPE IC_DIMENSION OC_DIMENSION
   set MP_IO_DATATYPE $IO_DATATYPE
   if {$DATATYPE == "HYBRID_FP8"} {
     set MP_IO_DATATYPE "F9"
   }
-  set MatrixProcessorBlock "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION, 1024>"
+  set MatrixProcessorBlock "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, 1024>"
   set MatrixProcessorBlock_stripped [string map {" " ""} $MatrixProcessorBlock]
 
-  set InputControllerBlock "InputController<$IO_DATATYPE, $DIMENSION>"
+  set InputControllerBlock "InputController<$IO_DATATYPE, $IC_DIMENSION>"
   set InputControllerBlock_stripped [string map {" " ""} $InputControllerBlock]
 
-  set WeightControllerBlock "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION, $DIMENSION>"
+  set WeightControllerBlock "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
   set WeightControllerBlock_stripped [string map {" " ""} $WeightControllerBlock]
 
-  set VectorUnitBlock "VectorUnit<$IO_DATATYPE, $ACCUM_DATATYPE, $DIMENSION>"
+  set VectorUnitBlock "VectorUnit<$IO_DATATYPE, $ACCUM_DATATYPE, $OC_DIMENSION>"
   set VectorUnitBlock_stripped [string map {" " ""} $VectorUnitBlock]
 
   directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
@@ -44,10 +44,18 @@ proc pre_assembly {} {
 }
 
 proc pre_architect {} {
-  global IO_DATATYPE DIMENSION C_DATA_REP_NAME IO_DATATYPE_WIDTH
-  set double_buffer "DoubleBuffer<$IO_DATATYPE,$DIMENSION,1024>"
+  global IO_DATATYPE IC_DIMENSION OC_DIMENSION C_DATA_REP_NAME IO_DATATYPE_WIDTH
+  set double_buffer "DoubleBuffer<$IO_DATATYPE,$IC_DIMENSION,1024>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$DIMENSION]
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$DIMENSION]
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$IC_DIMENSION]
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$IC_DIMENSION]
+
+  if {$IC_DIMENSION != $OC_DIMENSION} {
+    set double_buffer "DoubleBuffer<$IO_DATATYPE,$OC_DIMENSION,1024>"
+    set double_buffer_stripped [string map {" " ""} $double_buffer]
+
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$OC_DIMENSION]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$OC_DIMENSION]
+  }
 }

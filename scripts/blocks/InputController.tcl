@@ -1,5 +1,5 @@
 set block "InputController"
-set full_block_name "InputController<$IO_DATATYPE, $DIMENSION>"
+set full_block_name "InputController<$IO_DATATYPE, $IC_DIMENSION>"
 
 proc pre_architect {} {
   global C_DATA_REP_NAME
