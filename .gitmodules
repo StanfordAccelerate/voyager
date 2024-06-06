@@ -7,3 +7,6 @@
 [submodule "quantized-training"]
 	path = quantized-training
 	url = https://github.com/jeffreyyu0602/quantized-training.git
+[submodule "lib/NumCpp"]
+	path = lib/NumCpp
+	url = https://github.com/dpilger26/NumCpp.git
