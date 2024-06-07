@@ -79,7 +79,7 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
     // unrolled reduction loop
     // we can just use the following loop nest:
     // C1, K, FY, FX, C0
-    matrixParams->weightAddressGenLoops[1][4] = IC_DIMENSION;
+    matrixParams->weightAddressGenLoops[1][4] = OC_DIMENSION;
     matrixParams->weightAddressGenReductionLoopIndex[1] = 4;
     matrixParams->weightAddressGenLoops[1][3] = params.loops[1][params.fxIndex];
     matrixParams->weightAddressGenFxIndex = 3;
@@ -87,9 +87,24 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
     matrixParams->weightAddressGenFyIndex = 2;
     matrixParams->weightAddressGenLoops[1][1] =
         params.loops[1][params.weightLoopIndex[1]];
+
+    if (OC_DIMENSION > IC_DIMENSION) {
+      // matrixParams->weightAddressGenLoops[1][1] =
+      //     params.loops[1][params.weightLoopIndex[1]] /
+      //     (OC_DIMENSION / IC_DIMENSION);
+    }
+
     matrixParams->weightAddressGenWeightLoopIndex[1] = 1;
     matrixParams->weightAddressGenLoops[1][0] =
         params.loops[1][params.reductionLoopIndex[1]];
+
+    if (OC_DIMENSION > IC_DIMENSION) {
+      // we can reduce the number of iterations, since we have already fetched
+      // the values
+      matrixParams->weightAddressGenLoops[1][0] =
+          params.loops[1][params.reductionLoopIndex[1]] /
+          (OC_DIMENSION / IC_DIMENSION);
+    }
     matrixParams->weightAddressGenReductionLoopIndex[0] = 0;
   } else {  // if not tranpose, then we have freedom to pick any loop order
     // for efficient memory accesses, addresses should be consecutive
