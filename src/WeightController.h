@@ -157,8 +157,8 @@ SC_MODULE(WeightController) {
                       ac_int<8, false> C0 = loop_bounds
                           [1][params.weightAddressGenReductionLoopIndex[1]];
 
-                      ac_int<16, false> c = c1 * NROWS + c0;
-                      ac_int<16, false> C = C1 * NROWS;
+                      ac_int<16, false> c = c1 * C0 + c0;
+                      ac_int<16, false> C = C1 * C0;
                       ac_int<16, false> k =
                           k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                       ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
