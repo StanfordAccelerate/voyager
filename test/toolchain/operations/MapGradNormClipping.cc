@@ -12,7 +12,7 @@ void MapGradNormClipping(const SimplifiedParams &params,
 
   acceleratorMemoryMap["vector0"] = memoryMap.outputs;
   vectorParams->VECTOR_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;
   }

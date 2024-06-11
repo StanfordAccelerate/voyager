@@ -81,3 +81,7 @@ void MapLoRAQuantize(const SimplifiedParams &params, const MemoryMap &memoryMap,
 void MapAddition(const SimplifiedParams &params, const MemoryMap &memoryMap,
                  std::deque<BaseParams *> &mappedParams,
                  std::deque<AcceleratorMemoryMap> &opMemoryMaps);
+
+void MapMaxpool(const SimplifiedParams &params, const MemoryMap &memoryMap,
+                std::deque<BaseParams *> &mappedParams,
+                std::deque<AcceleratorMemoryMap> &opMemoryMaps);

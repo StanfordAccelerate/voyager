@@ -430,7 +430,7 @@ struct VectorParams : BaseParams {
 
     DP_OUTPUT = false;
 
-    addressGen0Enable = false;
+    addressGen0Mode = 0;
     addressGen0Broadcast = false;
     addressGen0BroadcastCount = 0;
     addressGen1Mode = 0;
@@ -443,6 +443,9 @@ struct VectorParams : BaseParams {
   // Address Gen 0 (vector input)
   int VECTOR_OFFSET;
   ac_int<11, false> addressGen0Loop[2][3];  // tiled 2d tensor
+  ac_int<3, false> addressGen0InputXLoopIndex[2];
+  ac_int<3, false> addressGen0InputYLoopIndex[2];
+  ac_int<3, false> addressGen0WeightLoopIndex[2];
   bool DP_VEC0;
 
   // Address Gen 1 (residual/op0src1)
@@ -472,7 +475,7 @@ struct VectorParams : BaseParams {
 
   bool DP_OUTPUT;
 
-  bool addressGen0Enable;
+  ac_int<2, false> addressGen0Mode;  // 1- 2d tensor, 2- 3d tensor
   bool addressGen0Broadcast;
   ac_int<10, false> addressGen0BroadcastCount;
   ac_int<2, false> addressGen1Mode;  // 1- residual, 2- 2dtensor
@@ -482,7 +485,7 @@ struct VectorParams : BaseParams {
 
   static const unsigned int width =
       5 * 32 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
-      3 * 6 * 3 /* Loop indices */ + 9 * 1 /* Bools */ + 10 + 2 * 2;
+      3 * 6 * 4 /* Loop indices */ + 8 * 1 /* Bools */ + 10 + 3 * 2;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -492,6 +495,15 @@ struct VectorParams : BaseParams {
       for (int j = 0; j < 3; j++) {
         m& addressGen0Loop[i][j];
       }
+    }
+    for (int i = 0; i < 2; i++) {
+      m& addressGen0InputXLoopIndex[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      m& addressGen0InputYLoopIndex[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      m& addressGen0WeightLoopIndex[i];
     }
     m & DP_VEC0;
     m & ADDRESS_GEN1_OFFSET;
@@ -545,7 +557,7 @@ struct VectorParams : BaseParams {
     }
     m & SPLIT_OUTPUT;
     m & DP_OUTPUT;
-    m & addressGen0Enable;
+    m & addressGen0Mode;
     m & addressGen0Broadcast;
     m & addressGen0BroadcastCount;
     m & addressGen1Mode;
@@ -581,10 +593,10 @@ struct VectorInstructionConfig : BaseParams {
   VectorInstructions inst[8];
   ac_int<20, false> instCount[8];
   ac_int<3, false> instLen;
-  ac_int<10, false> instLoopCount;
+  ac_int<16, false> instLoopCount;
 
   static const unsigned int width =
-      VectorInstructions::width * 8 + 20 * 8 + 3 + 10;
+      VectorInstructions::width * 8 + 20 * 8 + 3 + 16;
 
 #ifndef NO_SYSC
   template <unsigned int Size>

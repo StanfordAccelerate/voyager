@@ -33,7 +33,7 @@ void MapLoRACombination(const SimplifiedParams &params,
     // input is a vector of size C
     acceleratorMemoryMap["vector0"] = memoryMap.inputs;
     vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET + tile * xTileSize * C;
-    vectorParams->addressGen0Enable = true;
+    vectorParams->addressGen0Mode = true;
     for (int i = 0; i < 3; i++) {
       vectorParams->addressGen0Loop[0][i] = 1;
     }

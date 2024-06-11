@@ -22,7 +22,7 @@ void MapNop(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   vectorParams->addressGen0Broadcast = false;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;

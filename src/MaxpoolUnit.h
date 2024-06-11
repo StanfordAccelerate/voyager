@@ -48,8 +48,6 @@ SC_MODULE(MaxpoolUnit) {
         loop_bounds[1][params.outputYLoopIndex[1]] = 1;
       }
 
-      Pack1D<DTYPE, WIDTH> maxpool_comparator[16];  // row buffer for maxpool
-
       if (params.DP_OUTPUT) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -121,13 +119,12 @@ SC_MODULE(MaxpoolUnit) {
                         for (int byte = 0; byte < 2; byte++) {
                           dpHalfVec[i * 2 + byte].setbits(
                               dpOutputPixel[vecSlice * (WIDTH / 2) + i]
-                                  .bits_rep().template slc<8>(byte * 8));
+                                  .bits_rep()
+                                  .template slc<8>(byte * 8));
                         }
                       }
                       tensorOut.Push(dpHalfVec);
                     }
-
-                    
 
                     // sc_lv<ACC_DTYPE::width * WIDTH> dpOutputPixelBits =
                     //   TypeToBits<Pack1D<ACC_DTYPE, WIDTH> > (dpOutputPixel);
@@ -135,11 +132,13 @@ SC_MODULE(MaxpoolUnit) {
                     // for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
                     //   Pack1D<DTYPE, WIDTH> dpHalfVec;
 
-                    //   dpHalfVec = 
+                    //   dpHalfVec =
                     //       BitsToType<Pack1D<DTYPE, WIDTH> >(
-                    //       static_cast<sc_lv<DTYPE::width * WIDTH> > 
-                    //       (dpOutputPixelBits[(vecSlice * (WIDTH / 2) * ACC_DTYPE::width), 
-                    //       ((vecSlice + 1) * (WIDTH / 2) * ACC_DTYPE::width)]));
+                    //       static_cast<sc_lv<DTYPE::width * WIDTH> >
+                    //       (dpOutputPixelBits[(vecSlice * (WIDTH / 2) *
+                    //       ACC_DTYPE::width),
+                    //       ((vecSlice + 1) * (WIDTH / 2) *
+                    //       ACC_DTYPE::width)]));
 
                     //   tensorOut.Push(dpHalfVec);
                     // }
@@ -231,49 +230,7 @@ SC_MODULE(MaxpoolUnit) {
                           static_cast<DTYPE>(uncastedOutputPixel[i]);
                     }
 
-                    if (params.MAXPOOL) {
-                      // Don't support maxpool for now
-//                       if (x0 % 2 == 0 && y0 % 2 == 0) {
-// #pragma hls_unroll yes
-//                         for (int i = 0; i < WIDTH; i++) {
-//                           // update maxpool comparator
-//                           maxpool_comparator[(x0 / 2)].value[i] =
-//                               outputPixel.value[i];
-//                         }
-//                       } else if (x0 % 2 == 1 && y0 % 2 == 0) {
-// #pragma hls_unroll yes
-//                         for (int i = 0; i < WIDTH; i++) {
-//                           // update maxpool comparator
-//                           if (maxpool_comparator[(x0 - 1) / 2].value[i] <
-//                               outputPixel.value[i]) {
-//                             maxpool_comparator[(x0 - 1) / 2].value[i] =
-//                                 outputPixel.value[i];
-//                           }
-//                         }
-//                       } else if (x0 % 2 == 0 && y0 % 2 == 1) {
-// #pragma hls_unroll yes
-//                         for (int i = 0; i < WIDTH; i++) {
-//                           // update maxpool comparator
-//                           if (maxpool_comparator[(x0) / 2].value[i] <
-//                               outputPixel.value[i]) {
-//                             maxpool_comparator[(x0) / 2].value[i] =
-//                                 outputPixel.value[i];
-//                           }
-//                         }
-//                       } else {
-// #pragma hls_unroll yes
-//                         for (int i = 0; i < WIDTH; i++) {
-//                           if (maxpool_comparator[(x0 - 1) / 2].value[i] <
-//                               outputPixel.value[i]) {
-//                             maxpool_comparator[(x0 - 1) / 2].value[i] =
-//                                 outputPixel.value[i];
-//                           }
-//                         }
-//                         tensorOut.Push(maxpool_comparator[(x0 - 1) / 2]);
-//                       }
-                    } else {
-                      tensorOut.Push(outputPixel);
-                    }
+                    tensorOut.Push(outputPixel);
 
                     if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;

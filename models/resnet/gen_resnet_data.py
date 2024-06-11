@@ -41,7 +41,7 @@ def prepare_data(args: argparse.Namespace):
     for dir, _, files in os.walk(args.data_dir):
         for f in files:
             image_paths.append(os.path.join(dir, f))
-    
+
     # Only make single sample case deterministic (as per Kartik's request)
     if args.samples == 1:
         image_paths = sorted(image_paths)
@@ -85,7 +85,7 @@ def dump_model_data(args: argparse.Namespace, image_paths: str, image_labels: st
             # print(f"{name}.input")
             activations[f"{name}.input"] = arrange_data(name, inputs[0])
         return hook_fn
-    
+
     def get_forward_hook(name):
         def hook_fn(m, inputs, output):
             # print(f"{name}.comp", type(m).__name__)
@@ -267,12 +267,21 @@ def run_model(args: argparse.Namespace, image_paths: str, image_labels: str, ref
             sample_name = f"{class_id}_{model_id}"
             output_folder_name = os.path.join(args.output_dataset_dir,sample_name)
             os.makedirs(output_folder_name, exist_ok=True)
-            
+
             input_data = vision_models._buffer['conv1.input']
             # Open output file, then pack and write data
 
             with open(os.path.join(output_folder_name, "input"), 'wb') as output:
                 output.write(struct.pack('%sd' % len(input_data), *input_data))
+
+        if not args.no_intermediates:
+            for name, data in vision_models._buffer.items():
+                file_name = re.sub('downsample.0', 'downsample', name)
+                file_name = re.sub('\.', '_', file_name)
+                # Open output file, then pack and write data
+                with open(os.path.join(args.binary_dir, file_name), 'wb') as output:
+                    output.write(struct.pack('%sd' % len(data), *data))
+
 
         if args.dump_pickle:
             os.makedirs(os.path.join(args.model_dir,

@@ -22,7 +22,7 @@ void MapBiasGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap["vector0"] = memoryMap.weights;
   vectorParams->VECTOR_OFFSET = params.WEIGHT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   vectorParams->addressGen0Broadcast = false;
   vectorParams->addressGen0Loop[0][0] = 1;
   vectorParams->addressGen0Loop[0][1] = 1;
@@ -65,6 +65,7 @@ void MapBiasGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   VectorInstructions vInst0;
   vInst0.instType = VectorInstructions::accumulation;
+  vInst0.rOp = VectorInstructions::radd;
   vInst0.rCount = C;
   vectorInstructionConfig->inst[0] = vInst0;
   vectorInstructionConfig->instCount[0] = 1;

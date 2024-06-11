@@ -21,7 +21,7 @@ void MapSoftmax(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   vectorParams->addressGen0Broadcast = false;
   vectorParams->addressGen0Loop[0][0] = 1;
   vectorParams->addressGen0Loop[0][1] = X;

@@ -21,7 +21,7 @@ void MapFCGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;
   }
@@ -131,7 +131,7 @@ void MapFCGradWithNormClipping(const SimplifiedParams &params,
       new VectorInstructionConfig;
 
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;
   }
@@ -207,7 +207,7 @@ void MapFCGradWithNormClipping(const SimplifiedParams &params,
   VectorParams *vectorParams_reread = new VectorParams;
 
   vectorParams_reread->VECTOR_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams_reread->addressGen0Enable = true;
+  vectorParams_reread->addressGen0Mode = true;
   for (int i = 0; i < 3; i++) {
     vectorParams_reread->addressGen0Loop[0][i] = 1;
   }

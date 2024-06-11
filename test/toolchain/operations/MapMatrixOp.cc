@@ -160,7 +160,7 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   matrixParams->CONCAT_INPUT = params.CONCAT_INPUT;
   matrixParams->CONCAT_HEAD_WEIGHTS = params.CONCAT_WEIGHT;
   matrixParams->TRANPOSE_INPUTS = params.INPUT_TRANSPOSE;
-  
+
   // bias
   matrixParams->BIAS_OFFSET = params.BIAS_OFFSET;
   matrixParams->BIAS = params.BIAS;
@@ -175,7 +175,7 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   // memset(vectorParams, 0, sizeof(*vectorParams));
 
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen0Enable = false;  // use matrix unit outputs
+  vectorParams->addressGen0Mode = false;  // use matrix unit outputs
 
   // residual
   acceleratorMemoryMap["vector1"] = memoryMap.residual;
@@ -212,7 +212,7 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   // bias
   acceleratorMemoryMap["vector2"] = memoryMap.bias;
   vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams->addressGen2Mode = 0; 
+  vectorParams->addressGen2Mode = 0;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen2Loops[0][i] = params.loops[0][i];
   }
@@ -314,8 +314,8 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   //   vInst0.vOp3Src1 = VectorInstructions::readNormalInterface;
   //   vInst0.vOp3 = VectorInstructions::vadd;
   // } else {
-    vInst0.vOp3Src1 = VectorInstructions::nop;
-    vInst0.vOp3 = VectorInstructions::nop;
+  vInst0.vOp3Src1 = VectorInstructions::nop;
+  vInst0.vOp3 = VectorInstructions::nop;
   // }
 
   if (params.RELU) {
@@ -331,6 +331,7 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
     // accumulate over X*Y
     VectorInstructions accumulatorInst;
     accumulatorInst.instType = VectorInstructions::accumulation;
+    accumulatorInst.rOp = VectorInstructions::radd;
     accumulatorInst.rCount = X * Y;
     vectorInstructionConfig->instCount[0] = 1;
     vectorInstructionConfig->inst[0] = accumulatorInst;

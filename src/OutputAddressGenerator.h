@@ -52,12 +52,12 @@ SC_MODULE(OutputAddressGenerator) {
         }
       }
 
-      if (params.MAXPOOL) {
-        loop_bounds[1][params.outputXLoopIndex[1]] =
-            loop_bounds[1][params.outputXLoopIndex[1]] / 2;
-        loop_bounds[1][params.outputYLoopIndex[1]] =
-            loop_bounds[1][params.outputYLoopIndex[1]] / 2;
-      }
+      // if (params.MAXPOOL) {
+      //   loop_bounds[1][params.outputXLoopIndex[1]] =
+      //       loop_bounds[1][params.outputXLoopIndex[1]] / 2;
+      //   loop_bounds[1][params.outputYLoopIndex[1]] =
+      //       loop_bounds[1][params.outputYLoopIndex[1]] / 2;
+      // }
 
       if (params.AVGPOOL) {
         loop_bounds[1][params.outputXLoopIndex[1]] = 1;

@@ -40,7 +40,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap_0["vector0"] = memoryMap.inputs;
   vectorParams_0->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams_0->addressGen0Enable = true;
+  vectorParams_0->addressGen0Mode = true;
   for (int i = 0; i < 3; i++) {
     vectorParams_0->addressGen0Loop[0][i] = 1;
   }
@@ -157,7 +157,7 @@ void MapSoftmaxGrad(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   acceleratorMemoryMap_1["vector0"] = memoryMap.outputs;
   vectorParams_1->VECTOR_OFFSET = params.OUTPUT_OFFSET;
-  vectorParams_1->addressGen0Enable = true;
+  vectorParams_1->addressGen0Mode = true;
   for (int i = 0; i < 3; i++) {
     vectorParams_1->addressGen0Loop[0][i] = 1;
   }

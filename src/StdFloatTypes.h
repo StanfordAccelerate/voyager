@@ -328,6 +328,7 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator/=(
   return *this;
 }
 
+#pragma hls_design ccore
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>
 inline bool StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::operator<(

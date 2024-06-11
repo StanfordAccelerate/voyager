@@ -40,6 +40,34 @@ const SimplifiedParams conv1_params = {
     .SOFTMAX = false,
 };
 
+const SimplifiedParams maxpool_params = {
+    .INPUT_OFFSET = 431072,
+    .WEIGHT_OFFSET = 0,
+    .OUTPUT_OFFSET = 131072,
+    .WEIGHT_TRANSPOSE = false,
+    .loops = {{56, 56, 1, 1, 1, 1}, {4, 4, 1, 1, 2, 2}},
+    .inputXLoopIndex = {0, 5},
+    .inputYLoopIndex = {1, 4},
+    .reductionLoopIndex = {3, 0},
+    .weightLoopIndex = {2, 1},
+    .fxIndex = 3,
+    .fyIndex = 2,
+    .weightReuseIndex = {4, 5},
+    .STRIDE = 1,
+    .REPLICATION = false,
+    .RELU = false,
+    .BIAS = false,
+    .BIAS_OFFSET = 0,
+    .RESIDUAL = false,
+    .RESIDUAL_OFFSET = -1,
+    .MAXPOOL = true,
+    .AVGPOOL = false,
+    .WEIGHT = false,
+    .STORE_IN_ACC = false,
+    .ACC_FROM_ACC = false,
+    .SOFTMAX = false,
+};
+
 const SimplifiedParams layer1_0_conv1_params = {
     .INPUT_OFFSET = 431072,
     .WEIGHT_OFFSET = 9536,
@@ -633,6 +661,7 @@ const SimplifiedParams fc_params = {
 
 const std::map<std::string, SimplifiedParams> params{
     {"conv1", conv1_params},
+    {"maxpool", maxpool_params},
     {"layer1_0_conv1", layer1_0_conv1_params},
     {"layer1_0_conv2", layer1_0_conv2_params},
     {"layer1_1_conv1", layer1_1_conv1_params},
@@ -655,6 +684,7 @@ const std::map<std::string, SimplifiedParams> params{
     {"fc", fc_params}};
 
 const std::vector<std::string> order{"conv1",
+                                     "maxpool",
                                      "layer1_0_conv1",
                                      "layer1_0_conv2",
                                      "layer1_1_conv1",
@@ -678,6 +708,7 @@ const std::vector<std::string> order{"conv1",
 
 const std::map<std::string, Files> files{
     {"conv1", {"conv1_input", "conv1_weight", "conv1_bias", "conv1_comp"}},
+    {"maxpool", {"conv1_comp", "", "", "maxpool2d_comp"}},
     {"layer1_0_conv1",
      {"layer1_0_conv1_input", "layer1_0_conv1_weight", "layer1_0_conv1_bias",
       "layer1_0_conv1_comp"}},

@@ -68,42 +68,125 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = addressGen0Params.Pop();
 
+      if (params.addressGen0Mode == 1) {
 #pragma hls_pipeline_init_interval 1
-      for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0]; i0++) {
-        for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
-             j0++) {
-          for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
-               k0++) {
-            for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
-                 i1++) {
-              for (ac_int<11, false> j1 = 0; j1 < params.addressGen0Loop[1][1];
-                   j1++) {
-                for (ac_int<11, false> k1 = 0;
-                     k1 < params.addressGen0Loop[1][2]; k1++) {
-                  ac_int<16, false> j = j0 * params.addressGen0Loop[1][1] + j1;
-                  ac_int<16, false> k =
-                      k0 * params.addressGen0Loop[1][2] * WIDTH + k1 * WIDTH;
-                  ac_int<16, false> K = params.addressGen0Loop[0][2] *
-                                        params.addressGen0Loop[1][2] * WIDTH;
+        for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
+             i0++) {
+          for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
+               j0++) {
+            for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
+                 k0++) {
+              for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
+                   i1++) {
+                for (ac_int<11, false> j1 = 0;
+                     j1 < params.addressGen0Loop[1][1]; j1++) {
+                  for (ac_int<11, false> k1 = 0;
+                       k1 < params.addressGen0Loop[1][2]; k1++) {
+                    ac_int<16, false> j =
+                        j0 * params.addressGen0Loop[1][1] + j1;
+                    ac_int<16, false> k =
+                        k0 * params.addressGen0Loop[1][2] * WIDTH + k1 * WIDTH;
+                    ac_int<16, false> K = params.addressGen0Loop[0][2] *
+                                          params.addressGen0Loop[1][2] * WIDTH;
 
-                  if (params.DP_VEC0) {
-                    for (int precision = 0; precision < 2; precision++) {
-                      int address =
-                          static_cast<ac_int<32, false> >((j * K + k) * 2) +
-                          precision * WIDTH;
+                    if (params.DP_VEC0) {
+                      for (int precision = 0; precision < 2; precision++) {
+                        int address =
+                            static_cast<ac_int<32, false> >((j * K + k) * 2) +
+                            precision * WIDTH;
+                        // DLOG("addressgen0 " << j << " " << k << " " <<
+                        // address);
+
+                        // TODO: change this to burst
+                        MemoryRequest memRequest = {
+                            params.VECTOR_OFFSET + address, WIDTH};
+                        vectorFetch0AddressRequest.Push(memRequest);
+                      }
+
+                    } else {
+                      int address = j * K + k;
+
                       // DLOG("addressgen0 " << j << " " << k << " " <<
                       // address);
-
-                      // TODO: change this to burst
                       MemoryRequest memRequest = {
                           params.VECTOR_OFFSET + address, WIDTH};
                       vectorFetch0AddressRequest.Push(memRequest);
                     }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {  // 3d tensor
+        ac_int<11, false> loop_counters[2][3];
+        ac_int<11, false> loop_bounds[2][3];
 
-                  } else {
-                    int address = j * K + k;
+#pragma hls_unroll yes
+        for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
+          for (int j = 0; j < 3; j++) {
+            loop_bounds[i][j] = params.addressGen0Loop[i][j];
+          }
+        }
 
-                    // DLOG("addressgen0 " << j << " " << k << " " << address);
+#pragma hls_pipeline_init_interval 1
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    ac_int<11, false> x0 =
+                        loop_counters[1][params.addressGen0InputXLoopIndex[1]];
+                    ac_int<11, false> x1 =
+                        loop_counters[0][params.addressGen0InputXLoopIndex[0]];
+                    ac_int<11, false> X0 =
+                        params.addressGen0Loop
+                            [1][params.addressGen0InputXLoopIndex[1]];
+                    ac_int<11, false> X1 =
+                        params.addressGen0Loop
+                            [0][params.addressGen0InputXLoopIndex[0]];
+                    ac_int<11, false> y0 =
+                        loop_counters[1][params.addressGen0InputYLoopIndex[1]];
+                    ac_int<11, false> y1 =
+                        loop_counters[0][params.addressGen0InputYLoopIndex[0]];
+                    ac_int<11, false> Y0 =
+                        params.addressGen0Loop
+                            [1][params.addressGen0InputYLoopIndex[1]];
+                    ac_int<11, false> Y1 =
+                        params.addressGen0Loop
+                            [0][params.addressGen0InputYLoopIndex[0]];
+                    ac_int<11, false> k2 =
+                        loop_counters[0][params.addressGen0WeightLoopIndex[0]];
+                    ac_int<11, false> K2 =
+                        params.addressGen0Loop
+                            [0][params.addressGen0WeightLoopIndex[0]];
+                    ac_int<11, false> k1 =
+                        loop_counters[1][params.addressGen0WeightLoopIndex[1]];
+                    ac_int<11, false> K1 =
+                        params.addressGen0Loop
+                            [1][params.addressGen0WeightLoopIndex[1]];
+                    ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
+                    ac_int<16, false> K = K2 * K1 * WIDTH;
+
+                    ac_int<16, false> x = x0 + x1 * X0;
+                    ac_int<16, false> X = X0 * X1;
+
+                    ac_int<16, false> y = y0 + y1 * Y0;
+                    ac_int<16, false> Y = Y0 * Y1;
+
+                    int address = y * X * K + x * K + k;
                     MemoryRequest memRequest = {params.VECTOR_OFFSET + address,
                                                 WIDTH};
                     vectorFetch0AddressRequest.Push(memRequest);
@@ -668,7 +751,7 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = paramsIn.Pop();
 
-      if (params.addressGen0Enable) {
+      if (params.addressGen0Mode != 0) {
         addressGen0Params.Push(params);
         vector0BroadcastParams.Push(params);
       }

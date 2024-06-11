@@ -47,6 +47,8 @@ void MapOperation(const SimplifiedParams &params, const MemoryMap &memoryMap,
     MapLoRAQuantize(params, memoryMap, mappedParams, opMemoryMaps);
   } else if (params.ELWISE_ADD) {
     MapAddition(params, memoryMap, mappedParams, opMemoryMaps);
+  } else if (params.MAXPOOL) {
+    MapMaxpool(params, memoryMap, mappedParams, opMemoryMaps);
   } else {
     MapMatrixOp(params, memoryMap, mappedParams, opMemoryMaps);
   }

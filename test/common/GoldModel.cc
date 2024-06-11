@@ -570,6 +570,35 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       ACC_T sum = static_cast<ACC_T>(x + y);
       saveOutput(matrixC, i, sum, params.ACC_T_OUTPUT);
     }
+  } else if (params.MAXPOOL) {
+    ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
+    for (int i = 0; i < X * Y * K; i++) {
+      tmpMatrixC[i] = readInput(matrixA, i, params.ACC_T_INPUT);
+    }
+
+    for (int y = 0; y < Y / 2; y++) {
+      for (int x = 0; x < X / 2; x++) {
+        for (int k = 0; k < K; k++) {
+          std::vector<ACC_T> v;
+
+          for (int x_window = 0; x_window < 2; x_window++) {
+            for (int y_window = 0; y_window < 2; y_window++) {
+              int x_maxpool = x * 2 + x_window;
+              int y_maxpool = y * 2 + y_window;
+              v.push_back(tmpMatrixC[y_maxpool * X * K + x_maxpool * K + k]);
+              std::cout << tmpMatrixC[y_maxpool * X * K + x_maxpool * K + k]
+                        << " ";
+            }
+          }
+
+          ACC_T max = *std::max_element(v.begin(), v.end());
+          std::cout << std::endl << "Max: " << max << std::endl;
+          saveOutput(matrixC, y * (X / 2) * K + x * K + k, max,
+                     params.ACC_T_OUTPUT);
+        }
+      }
+    }
+    delete[] tmpMatrixC;
   } else {
     // Large arrays need to go on the heap
     INT_T *inputMatrixA = new INT_T[(STRIDE * X) * (STRIDE * Y) * C];
@@ -845,30 +874,7 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       grad_clip_norm(outputMatrix, Y * X * K);
     }
 
-    if (params.MAXPOOL) {
-      ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
-      memcpy(tmpMatrixC, outputMatrix, sizeof(ACC_T) * X * Y * K);
-
-      for (int y = 0; y < Y / 2; y++) {
-        for (int x = 0; x < X / 2; x++) {
-          for (int k = 0; k < K; k++) {
-            std::vector<ACC_T> v;
-
-            for (int x_window = 0; x_window < 2; x_window++) {
-              for (int y_window = 0; y_window < 2; y_window++) {
-                int x_maxpool = x * 2 + x_window;
-                int y_maxpool = y * 2 + y_window;
-                v.push_back(tmpMatrixC[y_maxpool * X * K + x_maxpool * K + k]);
-              }
-            }
-
-            matrixC[y * (X / 2) * K + x * K + k] =
-                *std::max_element(v.begin(), v.end());
-          }
-        }
-      }
-      delete[] tmpMatrixC;
-    } else if (params.AVGPOOL) {
+    if (params.AVGPOOL) {
       ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
       memcpy(tmpMatrixC, outputMatrix, sizeof(ACC_T) * X * Y * K);
 

@@ -17,11 +17,11 @@ void MapNoNorm(const SimplifiedParams &params, const MemoryMap &memoryMap,
   VectorParams *vectorParams = new VectorParams;
   VectorInstructionConfig *vectorInstructionConfig =
       new VectorInstructionConfig;
-        AcceleratorMemoryMap acceleratorMemoryMap;
+  AcceleratorMemoryMap acceleratorMemoryMap;
 
   acceleratorMemoryMap["vector0"] = memoryMap.inputs;
   vectorParams->VECTOR_OFFSET = params.INPUT_OFFSET;
-  vectorParams->addressGen0Enable = true;
+  vectorParams->addressGen0Mode = true;
   vectorParams->addressGen0Broadcast = false;
   for (int i = 0; i < 3; i++) {
     vectorParams->addressGen0Loop[0][i] = 1;
@@ -49,7 +49,7 @@ void MapNoNorm(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->addressGen2Loops[0][0] = X;
   vectorParams->addressGen2Loops[0][1] = 1;
   vectorParams->addressGen2Loops[0][2] = K / (DIMENSION);
-  vectorParams->addressGen2Loops[1][0] = 1; //C / (DIMENSION);
+  vectorParams->addressGen2Loops[1][0] = 1;  // C / (DIMENSION);
   vectorParams->addressGen2Loops[1][1] = 1;
   vectorParams->addressGen2Loops[1][2] = 1;
   vectorParams->addressGen2InputXLoopIndex[1] = 2;

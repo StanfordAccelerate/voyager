@@ -285,10 +285,14 @@ class ResNet(nn.Module):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        x = self.maxpool(x)
 
         if _export and not _no_intermediates:
             _buffer["conv1.comp"] = arrange_data("conv1.comp", x)
+
+        x = self.maxpool(x)
+        if _export and not _no_intermediates:
+            _buffer["maxpool2d.comp"] = arrange_data("maxpool2d.comp", x)
+
 
         x = self.layer1(x)
         _layer_num += 1

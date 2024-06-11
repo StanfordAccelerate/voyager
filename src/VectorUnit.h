@@ -349,10 +349,17 @@ SC_MODULE(VectorOpUnit) {
         Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> op =
             accumulationOpInput.Pop();
 
+        if (inst.rOp == VectorInstructions::radd) {
 #pragma hls_unroll yes
-        for (int i = 0; i < WIDTH; i++) {
-          // accum[i] = accum[i] + op[i];
-          accum[i] += op[i];
+          for (int i = 0; i < WIDTH; i++) {
+            // accum[i] = accum[i] + op[i];
+            accum[i] += op[i];
+          }
+        } else if (inst.rOp == VectorInstructions::rmax) {
+#pragma hls_unroll yes
+          for (int i = 0; i < WIDTH; i++) {
+            accum[i] = accum[i] < op[i] ? op[i] : accum[i];
+          }
         }
       }
 
@@ -424,9 +431,9 @@ SC_MODULE(VectorOpUnit) {
         } else {
           scalarResult = prevResult;
         }
-        DLOG("Reduction " << index << "/" << iterationCount << " : "
-                          << prevResult << std::endl
-                          << res);
+        CCS_LOG("Reduction " << index << "/" << iterationCount << " : "
+                             << prevResult << std::endl
+                             << res);
       }
 
       if (inst.rSqrt) {
