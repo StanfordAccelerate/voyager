@@ -139,7 +139,6 @@ dependencies:
       - pycparser==2.22
       - pyparsing==3.1.2
       - python-dateutil==2.9.0.post0
-      - python-graphviz==0.20.3
       - pytz==2024.1
       - rapidfuzz==3.9.0
       - regex==2024.5.15
