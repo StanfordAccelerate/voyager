@@ -64,6 +64,22 @@ LAYERS = {
     ],
 }
 
+def add_codegen_layers():
+    sys.path.append("quantized-training/src/quantized_training/codegen/")
+    import param_pb2
+
+    model_params = param_pb2.ModelParams()
+
+    networks = ["resnet18", "resnet50"]
+    for network in networks:
+        if os.path.exists(f"test/compiler/networks/{network}/params.pb"):
+            with open(f"test/compiler/networks/{network}/params.pb", "rb") as f:
+                model_params.ParseFromString(f.read())
+
+            layers = [operation_param.name for operation_param in model_params.params]
+
+            LAYERS[f"codegen-{network}"] = layers
+
 
 def print_test_results(test_results):
     columns = ["Model", "Layer", "Status", "Runtime"]
@@ -289,6 +305,9 @@ def main():
     # create softlink to latest results (delete old if exists)
     os.system("rm -f regression_results/latest")
     os.system(f"cd regression_results && ln -sf {current_time} latest")
+
+    # Add codegen layers
+    add_codegen_layers()
 
     if args.sims == "SystemC":
         success = run_systemc_tests(args.models, args.num_processes, results_folder)
