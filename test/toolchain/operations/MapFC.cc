@@ -31,7 +31,7 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
   }
   vectorParams->addressGen0Loop[1][0] = K;
   vectorParams->addressGen0Loop[1][1] = 1;
-  vectorParams->addressGen0Loop[1][2] = C / IC_DIMENSION;
+  vectorParams->addressGen0Loop[1][2] = C / OC_DIMENSION;
   vectorParams->addressGen0Broadcast = false;
   vectorParams->DP_VEC0 = false;
 
@@ -42,11 +42,11 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
   vectorParams->DP_VEC1 = params.ACC_T_WEIGHT;
 
   vectorParams->addressGen1Loops[0][0] = 1;
-  vectorParams->addressGen1Loops[0][1] = K / OC_DIMENSION;
+  vectorParams->addressGen1Loops[0][1] = K;
   vectorParams->addressGen1Loops[0][2] = 1;
   vectorParams->addressGen1Loops[1][0] = 1;
   vectorParams->addressGen1Loops[1][1] = 1;
-  vectorParams->addressGen1Loops[1][2] = C;
+  vectorParams->addressGen1Loops[1][2] = C / OC_DIMENSION;
 
   // bias
   acceleratorMemoryMap["vector2"] = memoryMap.bias;
@@ -100,7 +100,7 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
   // inst0- start reduction engine
   VectorInstructions vInst0;
   vInst0.instType = VectorInstructions::reduction;
-  vInst0.rCount = C / IC_DIMENSION;
+  vInst0.rCount = C / OC_DIMENSION;
   vInst0.rOp = VectorInstructions::radd;
   vInst0.rDuplicate = 0;
   vInst0.rDest = VectorInstructions::toVectorOp0Src0;
@@ -125,7 +125,7 @@ void MapFC(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   // C/DIMENSION to do the complete reduction
   // DIMENSION to fill up the entire vector (this is now K dimension)
-  vectorInstructionConfig->instCount[1] = OC_DIMENSION * C / IC_DIMENSION;
+  vectorInstructionConfig->instCount[1] = OC_DIMENSION * C / OC_DIMENSION;
 
   // inst2- add bias, write out
   VectorInstructions vInst2;
