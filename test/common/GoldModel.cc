@@ -692,9 +692,16 @@ void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
       // reduce the outer loop
       if ((params.loops[1][params.weightLoopIndex[1]] >= 4 &&
            params.loops[1][params.fxIndex] > 1 &&
-           params.loops[1][params.fyIndex] > 1) ||
-          (params.loops[0][params.weightLoopIndex[0]] == 1)) {
+           params.loops[1][params.fyIndex] > 1)) {
         params.loops[1][params.weightLoopIndex[1]] /= (OC_DIMENSION / 16);
+      } else if (params.loops[0][params.weightLoopIndex[0]] <
+                     (OC_DIMENSION / 16) &&
+                 params.loops[0][params.weightLoopIndex[0]] != 1) {
+        int reductionFactor = OC_DIMENSION / 16;
+        reductionFactor =
+            reductionFactor / params.loops[0][params.weightLoopIndex[0]];
+        params.loops[0][params.weightLoopIndex[0]] = 1;
+        params.loops[1][params.weightLoopIndex[1]] /= reductionFactor;
       } else {
         params.loops[0][params.weightLoopIndex[0]] /= (OC_DIMENSION / 16);
       }
