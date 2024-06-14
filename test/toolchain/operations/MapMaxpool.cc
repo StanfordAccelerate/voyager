@@ -33,7 +33,7 @@ void MapMaxpool(const SimplifiedParams &params, const MemoryMap &memoryMap,
       params.loops[0][params.inputXLoopIndex[0]];
   vectorParams->addressGen0InputXLoopIndex[0] = 2;
 
-  vectorParams->addressGen0Loop[1][0] = C / DIMENSION;
+  vectorParams->addressGen0Loop[1][0] = C / OC_DIMENSION;
   vectorParams->addressGen0WeightLoopIndex[1] = 0;
 
   vectorParams->addressGen0Loop[1][1] =
@@ -61,7 +61,7 @@ void MapMaxpool(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   vectorParams->outputLoops[1][0] = params.loops[0][params.inputYLoopIndex[0]];
   vectorParams->outputLoops[1][1] = params.loops[0][params.inputXLoopIndex[0]];
-  vectorParams->outputLoops[1][2] = K / (DIMENSION);
+  vectorParams->outputLoops[1][2] = K / (OC_DIMENSION);
   vectorParams->outputWeightLoopIndex[1] = 2;
   vectorParams->outputYLoopIndex[1] = 0;
   vectorParams->outputXLoopIndex[1] = 1;
@@ -114,7 +114,7 @@ void MapMaxpool(const SimplifiedParams &params, const MemoryMap &memoryMap,
 
   vectorInstructionConfig->instLen = 3;
   vectorInstructionConfig->instLoopCount =
-      (K / DIMENSION) * params.loops[0][params.inputYLoopIndex[0]] *
+      (K / OC_DIMENSION) * params.loops[0][params.inputYLoopIndex[0]] *
       params.loops[0][params.inputXLoopIndex[0]];
 
   mappedParams.push_back(vectorParams);
