@@ -4,6 +4,7 @@ import subprocess
 import sys
 import os
 import datetime
+import pandas as pd
 
 LAYERS = {
     "resnet18": [
@@ -65,23 +66,42 @@ LAYERS = {
 
 
 def print_test_results(test_results):
-    passed_tests = []
-    failed_tests = []
-    for result in test_results:
-        test_name = result[0]
-        status = result[1]
+    columns = ["Model", "Layer", "Status", "Runtime"]
+    if len(test_results[0]) == 3:
+        columns = columns[:3]
 
-        if status is True:
-            passed_tests.append(test_name)
-        else:
-            failed_tests.append(test_name)
+    # convert list of tuples to DataFrame
+    df = pd.DataFrame(test_results, columns=columns)
 
-    print("=" * 10 + "Passed tests:" + "=" * 10)
-    print(passed_tests)
-    print("=" * 10 + "Failed tests:" + "=" * 10)
-    print(failed_tests)
+    # get models
+    models = df["Model"].unique()
 
-    return len(failed_tests) == 0
+    for model in models:
+        print("=" * 10 + f" {model} " + "=" * 10)
+        
+        model_df = df[df["Model"] == model]
+
+        # sort according to order in LAYERS
+        model_df["Layer"] = pd.Categorical(model_df["Layer"], LAYERS[model])
+        model_df.sort_values("Layer", inplace=True)
+        # turn categorial back to string
+        model_df["Layer"] = model_df["Layer"].astype(str)
+
+        passed = model_df[model_df["Status"] == True]
+        failed = model_df[model_df["Status"] == False]
+
+        print("Passed:")
+        print(passed["Layer"].to_string(index=False) if not passed.empty else "None")
+        print("Failed:")
+        print(failed["Layer"].to_string(index=False) if not failed.empty else "None")
+        
+        # if runtime column exists, print runtime of each layer
+        if "Runtime" in model_df.columns:
+            print("Runtime:")
+            print(model_df[["Layer", "Runtime"]].to_string(index=False))
+
+    # return True if all tests passed
+    return len(df[df["Status"] == False]) == 0
 
 
 def check_environment_vars(required_vars):
@@ -118,14 +138,14 @@ def run_systemc_test(model, layer, output_folder):
     )
     p.communicate()
 
-    return (f"{model}.{layer}", p.returncode == 0)
+    return (model, layer, p.returncode == 0)
 
 
 def run_systemc_tests(models, num_processes, results_folder):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
     # Build TestRunner binary
-    subprocess.run(["make", "clean"], env=os.environ)
+    # subprocess.run(["make", "clean"], env=os.environ)
 
     with open(f"{results_folder}/build.log", "w") as stdout_file:
         subprocess.run(
@@ -181,9 +201,14 @@ def run_rtl_test(model, layer, output_folder):
     )
     p.communicate()
 
-    # TODO: get runtime from log file
+    # capture number after "Runtime: " in the log file
+    p = subprocess.Popen(
+        ["grep", "-oP", "(?<=Runtime: ).\d+", f"{output_folder}/{model}_{layer}.log"],
+        stdout=subprocess.PIPE,
+    )
+    runtime = int(p.communicate()[0].decode("utf-8").strip())
 
-    return (f"{model}.{layer}", p.returncode == 0)
+    return (model, layer, p.returncode == 0, runtime)
 
 
 def run_rtl_tests(models, num_processes, results_folder):
