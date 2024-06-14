@@ -39,6 +39,8 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
           reductionFactor / params.loops[0][params.weightLoopIndex[0]];
       params.loops[0][params.weightLoopIndex[0]] = 1;
       params.loops[1][params.weightLoopIndex[1]] /= reductionFactor;
+    } else if (params.loops[0][params.weightLoopIndex[0]] == 1) {
+      params.loops[1][params.weightLoopIndex[1]] /= (OC_DIMENSION / 16);
     } else {
       params.loops[0][params.weightLoopIndex[0]] /= (OC_DIMENSION / 16);
     }
