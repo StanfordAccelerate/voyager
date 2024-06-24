@@ -66,7 +66,9 @@ void MemoryModel::loadInputs(const SimplifiedParams& params,
   xt::xarray<float> tensor =
       xt::adapt(tmpValues, size, xt::no_ownership(),
                 std::vector<size_t>({1, C, STRIDE * Y, STRIDE * X}));
-  tensor = xt::transpose(tensor, {2, 3, 1, 0});
+  if (params.name == "conv2d") {
+    tensor = xt::transpose(tensor, {2, 3, 1, 0});
+  }
 
   if (params.REPLICATION) {
     int packingFactor;  // number of 3-channel values packed into a single word
@@ -229,7 +231,9 @@ void MemoryModel::loadResiduals(const SimplifiedParams& params,
   // We need to do some reshaping to get the correct values in the correct place
   xt::xarray<float> tensor = xt::adapt(tmpValues, size, xt::no_ownership(),
                                        std::vector<size_t>({K, Y, X}));
-  tensor = xt::transpose(tensor, {1, 2, 0});
+  if (params.name == "conv2d") {
+    tensor = xt::transpose(tensor, {1, 2, 0});
+  }
 
   int address = 0;
   for (auto it = tensor.begin(); it != tensor.end(); ++it) {
@@ -290,7 +294,9 @@ void MemoryModel::loadReferenceOutput(const SimplifiedParams& params,
   // We need to do some reshaping to get the correct values in the correct place
   xt::xarray<float> tensor = xt::adapt(tmpValues, size, xt::no_ownership(),
                                        std::vector<size_t>({K, Y, X}));
-  tensor = xt::transpose(tensor, {1, 2, 0});
+  if (params.name == "conv2d") {
+    tensor = xt::transpose(tensor, {1, 2, 0});
+  }
 
   int address = 0;
   for (auto it = tensor.begin(); it != tensor.end(); ++it) {

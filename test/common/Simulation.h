@@ -10,6 +10,8 @@
 #include "src/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
+#include "test/common/PytorchMemoryModelImpl.h"
+#include "test/common/PyTorchModel.h"
 #include "test/common/SimpleMemoryModel.h"
 #include "test/common/UniversalPosit.h"
 #include "test/compiler/proto/param.pb.h"
@@ -29,6 +31,7 @@ class Simulation {
 
  protected:
   std::vector<Workload> workloads;
+  std::map<std::string, MemoryModel *> memory_models;
   std::vector<std::string> sims;
   std::string out_dir;
   std::string modelName;
@@ -36,8 +39,8 @@ class Simulation {
   std::string task;
   float tolerance = 0.1;
 
-  std::vector<example::AcceleratorParam> params;
-  std::map<std::string, MemoryModel *> memory_models;
+  std::vector<codegen::AcceleratorParam> params;
+  std::map<std::string, PyTorchMemoryModel *> memories;
 
  private:
   std::string get_env_var(std::string const &name);

@@ -33,9 +33,9 @@ class Network {
 
   virtual std::vector<Workload> getAllWorkloads() = 0;
 
-  virtual std::vector<example::AcceleratorParam> get_params(
+  virtual std::vector<codegen::AcceleratorParam> get_params(
       const std::vector<std::string>& names) {
-    return std::vector<example::AcceleratorParam>();
+    return std::vector<codegen::AcceleratorParam>();
   };
 
   const std::string getName() { return modelName; }
