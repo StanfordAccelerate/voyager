@@ -73,6 +73,7 @@ template <class T>
 inline std::vector<T*> PyTorchMemoryModelImpl<T>::get_args(
     const codegen::AcceleratorParam& param) {
   std::vector<T*> args;
+  std::string output_node = "";
   if (param.has_matrix_param()) {
     const codegen::MatrixParam& matrix_param = param.matrix_param();
     args.push_back(get_tensor(matrix_param.input()));
@@ -82,29 +83,34 @@ inline std::vector<T*> PyTorchMemoryModelImpl<T>::get_args(
     } else {
       args.push_back(nullptr);
     }
-  }
-
-  if (param.has_pooling_param()) {
+    output_node = matrix_param.name();
+  } else if (param.has_pooling_param()) {
     const codegen::PoolingParam& pooling_param = param.pooling_param();
     args.push_back(get_tensor(pooling_param.input()));
-  }
-
-  if (param.has_reduce_param()) {
+  } else if (param.has_reduce_param()) {
     const codegen::ReduceParam& reduce_param = param.reduce_param();
     args.push_back(get_tensor(reduce_param.input()));
-  }
-
-  if (param.has_shape_param()) {
-    const codegen::ShapeParam& shape_param = param.shape_param();
-    args.push_back(get_tensor(shape_param.input()));
+  } else if (param.has_reshape_param()) {
+    const codegen::ReshapeParam& reshape_param = param.reshape_param();
+    args.push_back(get_tensor(reshape_param.input()));
+  } else if (param.vector_params_size() > 0) {
+    const auto vector_param = param.vector_params(0);
+    args.push_back(get_tensor(vector_param.input()));
   }
 
   for (auto& vector_param : param.vector_params()) {
     if (vector_param.has_other()) {
-      args.push_back(get_tensor(vector_param.other()));
+      // Check whether input or other is the output of the last operation.
+      const auto input_tensor = vector_param.input();
+      const auto other_tensor = vector_param.other();
+      const auto tensor_to_load =
+          other_tensor.node() == output_node ? input_tensor : other_tensor;
+      args.push_back(get_tensor(tensor_to_load));
     }
+    output_node = vector_param.name();
   }
 
+  // Add the output tensor to the list of arguments
   args.push_back(get_tensor(param.output()));
   return args;
 }

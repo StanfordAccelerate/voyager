@@ -124,33 +124,43 @@ inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
 inline void PyTorchMemoryModel::load_inputs(
     const codegen::AcceleratorParam param, std::string data_dir,
     bool random_data) {
+  // convolution layer inputs/outputs need to be permuted. If the matrix
+  // operation is a convolution, the following fused vector operations will
+  // need to be permuted as well. This logic should be refined in the future.
+  bool is_conv2d = param.matrix_param().opcode() == "conv2d";
+  std::string output_node = "";
   if (param.has_matrix_param()) {
     const codegen::MatrixParam& matrix_param = param.matrix_param();
-    load_tensor(matrix_param.input(), data_dir, true);
-  }
-
-  if (param.has_pooling_param()) {
+    load_tensor(matrix_param.input(), data_dir, is_conv2d);
+    output_node = matrix_param.name();
+  } else if (param.has_pooling_param()) {
     const codegen::PoolingParam& pooling_param = param.pooling_param();
-    load_tensor(pooling_param.input(), data_dir);
-  }
-
-  if (param.has_reduce_param()) {
+    load_tensor(pooling_param.input(), data_dir, true);
+  } else if (param.has_reduce_param()) {
     const codegen::ReduceParam& reduce_param = param.reduce_param();
     load_tensor(reduce_param.input(), data_dir);
+  } else if (param.has_reshape_param()) {
+    const codegen::ReshapeParam& reshape_param = param.reshape_param();
+    load_tensor(reshape_param.input(), data_dir);
+  } else if (param.vector_params_size() > 0) {
+    const auto vector_param = param.vector_params(0);
+    load_tensor(vector_param.input(), data_dir);
   }
 
-  if (param.has_shape_param()) {
-    const codegen::ShapeParam& shape_param = param.shape_param();
-    load_tensor(shape_param.input(), data_dir);
-  }
-
-  for (auto& vector_param : param.vector_params()) {
+  for (const auto& vector_param : param.vector_params()) {
     if (vector_param.has_other()) {
-      auto other_tensor = vector_param.other();
-      if (other_tensor.node().find("param_constant") == std::string::npos) {
-        load_tensor(other_tensor, data_dir);
+      // TODO:
+      // Load the other tensor if it is not the output of last operation and
+      // it is a constant tensor. Might fail if input or other tensor is a nop.
+      const auto input_tensor = vector_param.input();
+      const auto other_tensor = vector_param.other();
+      const auto tensor_to_load =
+          other_tensor.node() == output_node ? input_tensor : other_tensor;
+      if (tensor_to_load.node().find("param_constant") == std::string::npos) {
+        load_tensor(tensor_to_load, data_dir, is_conv2d);
       }
     }
+    output_node = vector_param.name();
   }
 }
 
@@ -159,16 +169,22 @@ inline void PyTorchMemoryModel::load_weights(
     bool random_data) {
   if (param.has_matrix_param()) {
     const codegen::MatrixParam& matrix_param = param.matrix_param();
-    load_tensor(matrix_param.weight(), data_dir, true);
+    bool is_conv2d = matrix_param.opcode() == "conv2d";
+    load_tensor(matrix_param.weight(), data_dir, is_conv2d);
 
     if (matrix_param.has_bias()) {
-      load_tensor(matrix_param.bias(), data_dir, true);
+      load_tensor(matrix_param.bias(), data_dir);
     }
   }
 
-  for (auto& vector_param : param.vector_params()) {
+  for (const auto& vector_param : param.vector_params()) {
     if (vector_param.has_other()) {
-      auto other_tensor = vector_param.other();
+      // Check both input and other tensors to see if they are parameters.
+      const auto input_tensor = vector_param.input();
+      if (input_tensor.node().find("param_constant") != std::string::npos) {
+        load_tensor(input_tensor, data_dir);
+      }
+      const auto other_tensor = vector_param.other();
       if (other_tensor.node().find("param_constant") != std::string::npos) {
         load_tensor(other_tensor, data_dir);
       }
@@ -178,9 +194,8 @@ inline void PyTorchMemoryModel::load_weights(
 
 inline void PyTorchMemoryModel::load_outputs(
     const codegen::AcceleratorParam param, std::string data_dir) {
-  bool is_conv2d =
-      param.has_matrix_param() && param.matrix_param().opcode() == "conv2d";
-  // HACK: hardcode to alwasy store output in the last partition
+  // always store output in the last memory partition with 0 offset
+  bool is_conv2d = param.matrix_param().opcode() == "conv2d";
   codegen::Tensor output_tensor;
   output_tensor.CopyFrom(param.output());
   auto memory = output_tensor.mutable_memory();

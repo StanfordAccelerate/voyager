@@ -792,6 +792,14 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
                               inputs, input_addr, input_double_precision);
                           INTERMEDIATE_T weight = read_tensor(
                               weights, weight_addr, weight_double_precision);
+                          // std::cerr << "input[" << input_addr << "] = " <<
+                          // input
+                          //           << std::endl;
+                          // std::cerr << "weight[" << weight_addr << "] = "
+                          //           << weight << std::endl;
+                          // std::cerr << "output[" << output_addr
+                          //           << "] = " << output_tensor[output_addr]
+                          //           << std::endl;
                           fused_multiply_add(input, weight,
                                              output_tensor[output_addr]);
                         }
@@ -944,7 +952,7 @@ inline T *perform_elwise_operation(const T *tensor1,
 template <typename T>
 inline T *softmax(const T *inputs, const std::vector<int> shape) {
   int num_rows = 1;
-  for (int i = 0; i < shape.size() - 2; i++) {
+  for (int i = 0; i < shape.size() - 1; i++) {
     num_rows *= shape[i];
   }
   int num_cols = shape[shape.size() - 1];
@@ -958,27 +966,27 @@ inline T *softmax(const T *inputs, const std::vector<int> shape) {
       max = inputs[offset + j] > max ? inputs[offset + j] : max;
     }
 
-    T sum = 0.0;
     for (int j = 0; j < num_cols; j++) {
       T normalized = static_cast<T>(inputs[offset + j] - max);
       outputs[offset + j] = exponent(normalized);
     }
 
     // perform a tree addition
-    for (int k = 0; k < num_cols; k += OC_DIMENSION) {
-      T accum[OC_DIMENSION];
+    T sum = 0.0;
+    for (int j = 0; j < num_cols; j += OC_DIMENSION) {
+      T buffer[OC_DIMENSION];
       for (int k = 0; k < OC_DIMENSION; k++) {
-        accum[k] = outputs[2 * (offset + k)];
+        buffer[k] = outputs[offset + j + k];
       }
 
       int depth = OC_DIMENSION;
       while (depth > 1) {
         for (int k = 0; k < depth; k += 2) {
-          accum[k / 2] = static_cast<T>(accum[k] + accum[k + 1]);
+          buffer[k / 2] = static_cast<T>(buffer[k] + buffer[k + 1]);
         }
         depth = depth / 2;
       }
-      sum = static_cast<T>(sum + accum[0]);
+      sum = static_cast<T>(sum + buffer[0]);
     }
 
     T divisor = reciprocal(sum);
@@ -1046,6 +1054,27 @@ void run_pytorch_op(const codegen::AcceleratorParam param,
     arg_index++;
   }
 
+  // std::cerr << "inputs:" << std::endl;
+  // for (int i = 0; i < 256; i++) {
+  //   std::cerr << "inputs[" << i << "]: " << args[0][i]
+  //             << std::endl;
+  // }
+  // std::cerr << "====================" << std::endl;
+
+  // std::cerr << "weights:" << std::endl;
+  // for (int i = 0; i < 256; i++) {
+  //   std::cerr << "weights[" << i << "]: " << args[1][i]
+  //             << std::endl;
+  // }
+  // std::cerr << "====================" << std::endl;
+
+  // std::cerr << "output_tensor:" << std::endl;
+  // for (int i = 0; i < 256; i++) {
+  //   std::cerr << "output_tensor[" << i << "]: " << output_tensor[i]
+  //             << std::endl;
+  // }
+  // std::cerr << "====================" << std::endl;
+
   for (const auto &vector_param : param.vector_params()) {
     std::cerr << "vector_param: " << vector_param.opcode() << std::endl;
     if (activations.find(vector_param.opcode()) != activations.end()) {
@@ -1068,9 +1097,17 @@ void run_pytorch_op(const codegen::AcceleratorParam param,
       }
       arg_index++;
 
+      // TODO: swap input and other tensor if the other tensor is the output
+
       output_tensor =
           perform_elwise_operation(input_tensor, input_shape, other_tensor,
                                    other_shape, vector_param.opcode());
+
+      // std::cerr << "output_tensor:" << std::endl;
+      // for (int i = 0; i < 256; i++) {
+      //   std::cerr << "output_tensor[" << i << "]: " << output_tensor[i]
+      //             << std::endl;
+      // }
 
       delete[] input_tensor;
       delete[] other_tensor;

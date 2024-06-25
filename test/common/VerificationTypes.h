@@ -6,8 +6,9 @@
 
 // By default we have 2MB of SRAM per MINOTAUR SoC
 // organized as 8x 256KB Banks with 2x 128KB Macros each
+// FIXME: use a larger memory partition for testing
 #ifndef NUM_SRAM_BANKS
-#define NUM_SRAM_BANKS 8
+#define NUM_SRAM_BANKS 32
 #endif
 #define SRAM_MEMORY_SIZE (NUM_SRAM_BANKS * 256 * 1024)
 

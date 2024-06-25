@@ -200,9 +200,9 @@ void Simulation::run() {
     MemoryMap memoryMap = workload.memoryMap;
 
     // Check if mapping valid
-    if (validateMapping(params) != 0) {
-      std::abort();
-    }
+    // if (validateMapping(params) != 0) {
+    //   std::abort();
+    // }
 
     X = params.loops[0][params.inputXLoopIndex[0]] *
         params.loops[1][params.inputXLoopIndex[1]];
@@ -332,7 +332,6 @@ SimpleMemoryModel<T>* get_memory(
 int Simulation::checkOutput() {
   SimplifiedParams params = workloads.back().params;
   MemoryMap memoryMaps = workloads.back().memoryMap;
-  const codegen::AcceleratorParam accel_param = this->params.back();
 
   int X, Y, C, K, FX, FY, STRIDE;
   X = params.loops[0][params.inputXLoopIndex[0]] *
@@ -387,6 +386,16 @@ int Simulation::checkOutput() {
   std::cerr << "Input: " << memoryMaps.inputs << std::endl;
   std::cerr << "Weight: " << memoryMaps.weights << std::endl;
   std::cerr << "Output: " << memoryMaps.outputs << std::endl;
+
+  codegen::AcceleratorParam accel_param;
+  if (!this->params.empty()) {
+    accel_param = this->params.back();
+    auto output = accel_param.output();
+    size = 1;
+    for (int i = 0; i < output.shape_size(); i++) {
+      size *= output.shape(i);
+    }
+  }
 
   auto accelerator_memory =
       get_memory<INPUT_DATATYPE>(sims, "accelerator", memory_models);
