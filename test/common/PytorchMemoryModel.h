@@ -64,7 +64,8 @@ class PyTorchMemoryModel {
 
  protected:
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
-                   bool is_conv2d = false, bool random_data = false);
+                   bool is_conv2d = false, bool random_data = false,
+                   bool overwrite_double_precision = false);
   virtual void write_to_memory(const int address, const float value,
                                const int parttion, bool double_precision) = 0;
 
@@ -76,7 +77,8 @@ inline PyTorchMemoryModel::PyTorchMemoryModel(bool isDut) : isDut(isDut) {}
 
 inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
                                             std::string data_dir,
-                                            bool is_conv2d, bool random_data) {
+                                            bool is_conv2d, bool random_data,
+                                            bool overwrite_double_precision) {
   auto repeated_field = tensor.shape();
   std::vector<size_t> shape(repeated_field.begin(), repeated_field.end());
 
@@ -101,7 +103,8 @@ inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
   auto memory = tensor.memory();
   int partition = memory.partition();
   int offset = memory.offset();
-  bool double_precision = is_double_precision(tensor);
+  bool double_precision =
+      overwrite_double_precision || is_double_precision(tensor);
   int address_multiplier = double_precision ? 2 : 1;
 
   std::cerr << "Loading tensor file " << filename << std::endl;
@@ -114,7 +117,7 @@ inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
     write_to_memory(offset + address_multiplier * address, *it, partition,
-                    true);
+                    double_precision);
     address++;
   }
 
@@ -173,7 +176,8 @@ inline void PyTorchMemoryModel::load_weights(
     load_tensor(matrix_param.weight(), data_dir, is_conv2d);
 
     if (matrix_param.has_bias()) {
-      load_tensor(matrix_param.bias(), data_dir);
+      // FIXME: hardcode bias to double precision for now
+      load_tensor(matrix_param.bias(), data_dir, is_conv2d, false, true);
     }
   }
 

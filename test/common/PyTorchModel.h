@@ -728,17 +728,18 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
   }
 
   ACCUMULATE_T *output_tensor = new ACCUMULATE_T[X * Y * K];
-  if (param.has_bias()) {
-    bool bias_double_precision = is_double_precision(param.bias());
-    for (int xy = 0; xy < X * Y; xy++) {
-      for (int k = 0; k < K; k++) {
-        output_tensor[xy * K + k] = read_tensor(bias, k, bias_double_precision);
-      }
-    }
-  }
 
   bool input_double_precision = is_double_precision(param.input());
   bool weight_double_precision = is_double_precision(param.weight());
+  bool bias_double_precision = is_double_precision(param.bias());
+
+  for (int xy = 0; xy < X * Y; xy++) {
+    for (int k = 0; k < K; k++) {
+      // FIXME: hardcode bias to double precision for now
+      output_tensor[xy * K + k] =
+          param.has_bias() ? read_tensor(bias, k, true) : ACCUMULATE_T(0.0);
+    }
+  }
 
   int counters[2][6] = {0};
   for (counters[0][0] = 0; counters[0][0] < tiling.loops[0][0];
@@ -795,8 +796,8 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
                           // std::cerr << "input[" << input_addr << "] = " <<
                           // input
                           //           << std::endl;
-                          // std::cerr << "weight[" << weight_addr << "] = "
-                          //           << weight << std::endl;
+                          // std::cerr << "weight[" << weight_addr
+                          //           << "] = " << weight << std::endl;
                           // std::cerr << "output[" << output_addr
                           //           << "] = " << output_tensor[output_addr]
                           //           << std::endl;
@@ -1056,21 +1057,19 @@ void run_pytorch_op(const codegen::AcceleratorParam param,
 
   // std::cerr << "inputs:" << std::endl;
   // for (int i = 0; i < 256; i++) {
-  //   std::cerr << "inputs[" << i << "]: " << args[0][i]
-  //             << std::endl;
+  //   std::cerr << "inputs[" << i << "]: " << (float)args[0][i] << std::endl;
   // }
   // std::cerr << "====================" << std::endl;
 
   // std::cerr << "weights:" << std::endl;
   // for (int i = 0; i < 256; i++) {
-  //   std::cerr << "weights[" << i << "]: " << args[1][i]
-  //             << std::endl;
+  //   std::cerr << "weights[" << i << "]: " << (float)args[1][i] << std::endl;
   // }
   // std::cerr << "====================" << std::endl;
 
   // std::cerr << "output_tensor:" << std::endl;
   // for (int i = 0; i < 256; i++) {
-  //   std::cerr << "output_tensor[" << i << "]: " << output_tensor[i]
+  //   std::cerr << "output_tensor[" << i << "]: " << (float)output_tensor[i]
   //             << std::endl;
   // }
   // std::cerr << "====================" << std::endl;

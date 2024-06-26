@@ -296,7 +296,7 @@ void Simulation::run() {
     }
 
     if (std::find(sims.begin(), sims.end(), "posit_pt2e") != sims.end()) {
-      auto memory = (PyTorchMemoryModelImpl<INPUT_DATATYPE>*)(memories["fp32"]);
+      auto memory = (PyTorchMemoryModelImpl<INPUT_DATATYPE>*)(memories["posit"]);
       std::vector<INPUT_DATATYPE*> args = memory->get_args(this->params[0]);
       run_pytorch_model(this->params[0], args);
     }
@@ -558,9 +558,9 @@ int Simulation::checkOutput() {
     std::string diffFile = outFilePrefix + "posit_vs_codegen.txt";
 
     rel_err +=
-        compare_arrays(customposit_memory->sram + params.OUTPUT_OFFSET, "fp32",
+        compare_arrays(customposit_memory->sram + params.OUTPUT_OFFSET, "customposit",
                        posit_pt2e_memory->get_args(accel_param).back(),
-                       "fp32_pt2e", size, diffFile, params.ACC_T_OUTPUT);
+                       "posit_pt2e", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
