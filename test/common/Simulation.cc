@@ -179,6 +179,10 @@ void Simulation::loadMemory() {
   if (std::find(sims.begin(), sims.end(), "fp32_pt2e") != sims.end()) {
     memories["fp32"] = new PyTorchMemoryModelImpl<float>(memory_sizes, false);
   }
+  if (std::find(sims.begin(), sims.end(), "accelerator_pt2e") != sims.end()) {
+    memories["accelerator"] =
+        new PyTorchMemoryModelImpl<INPUT_DATATYPE>(memory_sizes, false);
+  }
 
   std::string data_dir = "test/compiler/networks/" +
                          modelName.substr(modelName.find('-') + 1) +
@@ -296,7 +300,8 @@ void Simulation::run() {
     }
 
     if (std::find(sims.begin(), sims.end(), "posit_pt2e") != sims.end()) {
-      auto memory = (PyTorchMemoryModelImpl<INPUT_DATATYPE>*)(memories["posit"]);
+      auto memory =
+          (PyTorchMemoryModelImpl<INPUT_DATATYPE>*)(memories["posit"]);
       std::vector<INPUT_DATATYPE*> args = memory->get_args(this->params[0]);
       run_pytorch_model(this->params[0], args);
     }
@@ -315,6 +320,12 @@ void Simulation::run() {
     }
 
     run_op(params_list, model->sram, model->rram, memoryMap);
+  }
+
+  if (std::find(sims.begin(), sims.end(), "accelerator_pt2e") != sims.end()) {
+    auto memory =
+        (PyTorchMemoryModelImpl<INPUT_DATATYPE>*)(memories["accelerator"]);
+    run_pytorch_op(this->params, memory->memories[0], memory->memories[1]);
   }
 }
 
@@ -413,6 +424,9 @@ int Simulation::checkOutput() {
       static_cast<PyTorchMemoryModelImpl<float>*>(memories["fp32"]);
   auto posit_pt2e_memory =
       static_cast<PyTorchMemoryModelImpl<INPUT_DATATYPE>*>(memories["posit"]);
+  auto accelerator_pt2e_memory =
+      static_cast<PyTorchMemoryModelImpl<INPUT_DATATYPE>*>(
+          memories["accelerator"]);
 
   if (fp32_memory && file) {
     std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
@@ -529,6 +543,10 @@ int Simulation::checkOutput() {
     any_comparison = true;
   }
 
+  //======================================
+  // PT2E Codegen Validation
+  //======================================
+
   if (fp32_pt2e_memory && file) {
     std::cout << "FP32 PyTorch Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
@@ -540,6 +558,36 @@ int Simulation::checkOutput() {
                        "file", size, diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
+
+  if (accelerator_pt2e_memory && file) {
+    std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
+    std::cout << "(reveals bugs in accelerator or memory placement)"
+              << std::endl;
+    std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
+
+    rel_err += compare_arrays(
+        accelerator_pt2e_memory->get_args(accel_param).back(), "accelerator",
+        accelerator_pt2e_memory->get_output(accel_param), "file", size,
+        diffFile, params.ACC_T_OUTPUT);
+    any_comparison = true;
+  }
+
+  if (accelerator_pt2e_memory && posit_pt2e_memory) {
+    std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
+    std::cout << "(reveals bugs in accelerator or memory placement)"
+              << std::endl;
+    std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
+
+    rel_err += compare_arrays(
+        accelerator_pt2e_memory->get_args(accel_param).back(), "accelerator",
+        posit_pt2e_memory->get_args(accel_param).back(), "posit_pt2e", size,
+        diffFile, params.ACC_T_OUTPUT);
+    any_comparison = true;
+  }
+
+  //======================================
+  // PT2E Codegen vs. Old Gold Model
+  //======================================
 
   if (fp32_pt2e_memory && fp32_memory) {
     std::cout << "FP32 Gold Model vs. FP32 Codegen Gold Model" << std::endl;
@@ -557,22 +605,22 @@ int Simulation::checkOutput() {
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
     std::string diffFile = outFilePrefix + "posit_vs_codegen.txt";
 
-    rel_err +=
-        compare_arrays(customposit_memory->sram + params.OUTPUT_OFFSET, "customposit",
-                       posit_pt2e_memory->get_args(accel_param).back(),
-                       "posit_pt2e", size, diffFile, params.ACC_T_OUTPUT);
+    rel_err += compare_arrays(
+        customposit_memory->sram + params.OUTPUT_OFFSET, "customposit",
+        posit_pt2e_memory->get_args(accel_param).back(), "posit_pt2e", size,
+        diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }
 
-  if (posit_pt2e_memory && accelerator_memory) {
+  if (accelerator_pt2e_memory && customposit_memory) {
     std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
     std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
 
     rel_err += compare_arrays(
-        accelerator_memory->sram + params.OUTPUT_OFFSET, "accelerator",
-        posit_pt2e_memory->get_args(accel_param).back(), "posit_pt2e", size,
+        accelerator_pt2e_memory->get_args(accel_param).back(), "accelerator",
+        customposit_memory->sram + params.OUTPUT_OFFSET, "customposit", size,
         diffFile, params.ACC_T_OUTPUT);
     any_comparison = true;
   }

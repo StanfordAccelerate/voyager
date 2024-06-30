@@ -1,6 +1,3 @@
-#ifndef PYTORCH_MEMORY_MODEL_H
-#define PYTORCH_MEMORY_MODEL_H
-
 #pragma once
 
 #include <fstream>
@@ -65,7 +62,7 @@ class PyTorchMemoryModel {
  protected:
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
                    bool is_conv2d = false, bool random_data = false,
-                   bool overwrite_double_precision = false);
+                   bool double_precision_ow = false);
   virtual void write_to_memory(const int address, const float value,
                                const int parttion, bool double_precision) = 0;
 
@@ -78,7 +75,7 @@ inline PyTorchMemoryModel::PyTorchMemoryModel(bool isDut) : isDut(isDut) {}
 inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
                                             std::string data_dir,
                                             bool is_conv2d, bool random_data,
-                                            bool overwrite_double_precision) {
+                                            bool double_precision_ow) {
   auto repeated_field = tensor.shape();
   std::vector<size_t> shape(repeated_field.begin(), repeated_field.end());
 
@@ -103,8 +100,7 @@ inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
   auto memory = tensor.memory();
   int partition = memory.partition();
   int offset = memory.offset();
-  bool double_precision =
-      overwrite_double_precision || is_double_precision(tensor);
+  bool double_precision = double_precision_ow || is_double_precision(tensor);
   int address_multiplier = double_precision ? 2 : 1;
 
   std::cerr << "Loading tensor file " << filename << std::endl;
@@ -207,5 +203,3 @@ inline void PyTorchMemoryModel::load_outputs(
   memory->set_offset(0);
   load_tensor(output_tensor, data_dir, is_conv2d);
 }
-
-#endif  // PYTORCH_MEMORY_MODEL_H

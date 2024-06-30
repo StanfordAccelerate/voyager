@@ -20,6 +20,9 @@ void run_op(std::vector<SimplifiedParams> params_list,
             INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
             std::vector<MemoryMap> memoryMap);
 
+void run_pytorch_op(std::vector<codegen::AcceleratorParam> params,
+                    INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory);
+
 class Simulation {
  public:
   Simulation();

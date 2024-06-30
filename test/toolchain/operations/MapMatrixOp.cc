@@ -227,35 +227,35 @@ void MapMatrixOp(const SimplifiedParams &originalParams,
   }
 
   // bias
-  acceleratorMemoryMap["vector2"] = memoryMap.bias;
-  vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
-  vectorParams->addressGen2Mode = 0;
-  for (int i = 0; i < 3; i++) {
-    vectorParams->addressGen2Loops[0][i] = params.loops[0][i];
-  }
+  // acceleratorMemoryMap["vector2"] = memoryMap.bias;
+  // vectorParams->ADDRESS_GEN2_OFFSET = params.BIAS_OFFSET;
+  // vectorParams->addressGen2Mode = 0;
+  // for (int i = 0; i < 3; i++) {
+  //   vectorParams->addressGen2Loops[0][i] = params.loops[0][i];
+  // }
 
-  vectorParams->addressGen2InputXLoopIndex[0] = params.inputXLoopIndex[0];
-  vectorParams->addressGen2InputYLoopIndex[0] = params.inputYLoopIndex[0];
-  vectorParams->addressGen2WeightLoopIndex[0] = params.weightLoopIndex[0];
+  // vectorParams->addressGen2InputXLoopIndex[0] = params.inputXLoopIndex[0];
+  // vectorParams->addressGen2InputYLoopIndex[0] = params.inputYLoopIndex[0];
+  // vectorParams->addressGen2WeightLoopIndex[0] = params.weightLoopIndex[0];
 
-  int biasLoopIndex = 0;
-  for (int i = 0; i < 6; i++) {
-    // ignore the loops not present in outputs (reduction, fx, fy)
-    if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
-        i == params.inputYLoopIndex[1]) {
-      vectorParams->addressGen2Loops[1][biasLoopIndex] = params.loops[1][i];
-      if (i == params.inputXLoopIndex[1]) {
-        vectorParams->addressGen2InputXLoopIndex[1] = biasLoopIndex;
-      }
-      if (i == params.inputYLoopIndex[1]) {
-        vectorParams->addressGen2InputYLoopIndex[1] = biasLoopIndex;
-      }
-      if (i == params.weightLoopIndex[1]) {
-        vectorParams->addressGen2WeightLoopIndex[1] = biasLoopIndex;
-      }
-      biasLoopIndex++;
-    }
-  }
+  // int biasLoopIndex = 0;
+  // for (int i = 0; i < 6; i++) {
+  //   // ignore the loops not present in outputs (reduction, fx, fy)
+  //   if (i == params.weightLoopIndex[1] || i == params.inputXLoopIndex[1] ||
+  //       i == params.inputYLoopIndex[1]) {
+  //     vectorParams->addressGen2Loops[1][biasLoopIndex] = params.loops[1][i];
+  //     if (i == params.inputXLoopIndex[1]) {
+  //       vectorParams->addressGen2InputXLoopIndex[1] = biasLoopIndex;
+  //     }
+  //     if (i == params.inputYLoopIndex[1]) {
+  //       vectorParams->addressGen2InputYLoopIndex[1] = biasLoopIndex;
+  //     }
+  //     if (i == params.weightLoopIndex[1]) {
+  //       vectorParams->addressGen2WeightLoopIndex[1] = biasLoopIndex;
+  //     }
+  //     biasLoopIndex++;
+  //   }
+  // }
 
   // vectorParams->FULL_HEAD_SIZE = 0;
   vectorParams->SPLIT_OUTPUT = params.SPLIT_OUTPUT;

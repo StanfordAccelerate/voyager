@@ -1,5 +1,4 @@
-#ifndef PYTORCH_MEMORY_MODEL_IMPL_H
-#define PYTORCH_MEMORY_MODEL_IMPL_H
+#pragma once
 
 #include "test/common/PytorchMemoryModel.h"
 
@@ -167,5 +166,3 @@ inline void PyTorchMemoryModelImpl<UniversalPosit>::write_to_memory(
   }
 }
 #endif
-
-#endif  // PYTORCH_MEMORY_MODEL_IMPL_H

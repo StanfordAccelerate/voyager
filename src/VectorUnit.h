@@ -431,9 +431,9 @@ SC_MODULE(VectorOpUnit) {
         } else {
           scalarResult = prevResult;
         }
-        CCS_LOG("Reduction " << index << "/" << iterationCount << " : "
-                             << prevResult << std::endl
-                             << res);
+        // CCS_LOG("Reduction " << index << "/" << iterationCount << " : "
+        //                      << prevResult << std::endl
+        //                      << res);
       }
 
       if (inst.rSqrt) {

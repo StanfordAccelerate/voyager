@@ -159,7 +159,9 @@ void MemoryModel::loadWeights(const SimplifiedParams& params,
   // We need to do some reshaping to get the correct values in the correct place
   xt::xarray<float> tensor = xt::adapt(tmpValues, size, xt::no_ownership(),
                                        std::vector<size_t>({K, C, FY, FX}));
-  tensor = xt::transpose(tensor, {2, 3, 1, 0});
+  if (filename.find("param_constant") != std::string::npos) {
+    tensor = xt::transpose(tensor, {2, 3, 1, 0});
+  }
 
   int address = 0;
   for (auto it = tensor.begin(); it != tensor.end(); ++it) {
