@@ -374,9 +374,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
 
         if (stage == 0) {
           if (size == 1) {
+            // TODO:
             vinst.vOp0Src1 = VectorInstructions::op0immediate0;
-            // TODO: set immediate value
-            // vinst.op0immediate0 = ;
+            // vinst.immediate0 = ;
           } else {
             vinst.vOp0Src1 = VectorInstructions::readInterface;
             set_addr_gen1(tensor_to_load, tiling, accelerator_memory_map,
@@ -384,9 +384,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
           }
         } else if (stage == 3) {
           if (size == 1) {
+            // TODO:
             vinst.vOp3Src1 = VectorInstructions::op3immediate0;
-            // TODO: set immediate value
-            // vinst.op3immediate0 = ;
+            // vinst.immediate0 = ;
           } else {
             vinst.vOp3Src1 = VectorInstructions::readNormalInterface;
             set_addr_gen2(tensor_to_load, tiling, accelerator_memory_map,

@@ -55,7 +55,7 @@ void run_pytorch_op(const codegen::AcceleratorParam param,
     const auto input = param.pooling_param().input();
     const auto input_tensor =
         get_input<INPUT_T, ACCUMULATE_T>(input, args[arg_index++]);
-    output_tensor = pooling(input_tensor, param);
+    output_tensor = pooling<INPUT_T, ACCUMULATE_T>(input_tensor, param);
     delete[] input_tensor;
   }
 

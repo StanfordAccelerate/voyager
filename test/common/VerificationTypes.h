@@ -820,9 +820,20 @@ inline Tiling get_pooling_tiling(codegen::AcceleratorParam param) {
   int C = pooling_param.input().shape(1);
   int K = param.output().shape(1);
 
-  int x0 = pooling_param.kernel_size(0);
+  int x0, y0, stride;
+  if (pooling_param.output_size_size() > 0) {
+    int output_h = pooling_param.output_size(0);
+    int output_w = pooling_param.output_size(1);
+    stride = X / output_h;
+    x0 = X - (output_h - 1) * stride;
+    y0 = Y - (output_w - 1) * stride;
+  } else {
+    x0 = pooling_param.kernel_size(0);
+    y0 = pooling_param.kernel_size(1);
+    stride = pooling_param.stride(0);
+  }
+
   int x1 = X / x0;
-  int y0 = pooling_param.kernel_size(1);
   int y1 = Y / y0;
   int c0 = C / IC_DIMENSION;
   int k0 = K / OC_DIMENSION;
@@ -836,7 +847,7 @@ inline Tiling get_pooling_tiling(codegen::AcceleratorParam param) {
       .fx_index = 3,
       .fy_index = 2,
       .weight_reuse_index = {4, 5},
-      .stride = pooling_param.stride(0),
+      .stride = stride,
       .replication = false,
   };
 }

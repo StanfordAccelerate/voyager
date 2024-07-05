@@ -233,7 +233,7 @@ $(CC_BUILD_DIR)/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryMode
 $(CC_BUILD_DIR)/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h test/common/PytorchMemoryModel.h test/common/PytorchMemoryModelImpl.h test/common/PytorchModel.h test/common/operations/*
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h test/common/PytorchMemoryModel.h test/common/PytorchMemoryModelImpl.h test/common/PytorchModel.h test/common/operations/*.h test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc

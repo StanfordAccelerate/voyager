@@ -180,9 +180,9 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
 
         if (stage == 0) {
           if (size == 1) {
-            vinst.vOp0Src1 = VectorInstructions::op0immediate0;
             // TODO:
-            // vinst.op0immediate0 = ;
+            vinst.vOp0Src1 = VectorInstructions::op0immediate0;
+            // vinst.immediate0 = ;
           } else {
             vinst.vOp0Src1 = VectorInstructions::readInterface;
             set_vector_addr_gen1(tensor_to_load, output_shape,
@@ -190,9 +190,9 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
           }
         } else if (stage == 3) {
           if (size == 1) {
-            vinst.vOp3Src1 = VectorInstructions::op3immediate0;
             // TODO:
-            // vinst.op3immediate0 = ;
+            vinst.vOp3Src1 = VectorInstructions::op3immediate0;
+            // vinst.immediate0 = ;
           } else {
             vinst.vOp3Src1 = VectorInstructions::readNormalInterface;
             set_vector_addr_gen2(tensor_to_load, output_shape,
