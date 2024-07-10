@@ -66,7 +66,7 @@ LAYERS = {
 
 
 def print_test_results(test_results, output_folder):
-    columns = ["Model", "Layer", "Status", "Runtime"]
+    columns = ["Model", "Layer", "Status", "Runtime", "Ideal"]
     if len(test_results[0]) == 3:
         columns = columns[:3]
 
@@ -217,10 +217,23 @@ def run_rtl_test(model, layer, output_folder):
             stdout=subprocess.PIPE,
         )
         runtime = int(p.communicate()[0].decode("utf-8").strip())
+        
+        # capture number after "Ideal cycles: " in the log file
+        p = subprocess.Popen(
+            [
+                "grep",
+                "-oP",
+                "(?<=Ideal cycles: ).\d+",
+                f"{output_folder}/{model}_{layer}.log",
+            ],
+            stdout=subprocess.PIPE,
+        )
+        ideal = int(p.communicate()[0].decode("utf-8").strip())
     else:
         runtime = 0
+        ideal = 0
 
-    return (model, layer, success, runtime)
+    return (model, layer, success, runtime, ideal)
 
 
 def run_rtl_tests(models, num_processes, results_folder):

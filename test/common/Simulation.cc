@@ -205,10 +205,21 @@ void Simulation::run() {
     }
 
     std::cout << "Performing " + workload.name + ":" << std::endl;
-    std::cout << "(" << X << "x" << Y << "x" << C << ")"
-              << " * "
-              << "(" << FX << "x" << FY << "x" << C << "x" << K << ")"
-              << std::endl;
+    std::cout << "(" << X << "x" << Y << "x" << C << ")" << " * " << "(" << FX
+              << "x" << FY << "x" << C << "x" << K << ")" << std::endl;
+
+    int idealCycles;
+    if (params.FC) {
+      idealCycles = (C * K) / (OC_DIMENSION);
+    } else if (params.NO_NORM) {
+      idealCycles = (X * K) / (OC_DIMENSION);
+    } else if (params.SOFTMAX) {
+      idealCycles = (X * Y * 3) / (OC_DIMENSION);
+    } else {
+      idealCycles = (X * Y * C * FX * FY * K) / (IC_DIMENSION * OC_DIMENSION);
+    }
+
+    std::cout << "Ideal cycles: " << idealCycles << std::endl;
 
     // Run gold models
     if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
