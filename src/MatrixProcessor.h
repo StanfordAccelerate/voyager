@@ -19,12 +19,10 @@ SC_MODULE(MatrixProcessor) {
   Connections::Combinational<Pack1D<PEInput<IDTYPE>, NROWS> > CCS_INIT_S1(
       inputSkewerDin);
 
-  WeightSerializedSkewer<typename IDTYPE::AccumulationDatatype,
-                         typename IDTYPE::AccumulationDatatype, NCOLS>
+  WeightSerializedSkewer<IDTYPE, typename IDTYPE::AccumulationDatatype, NCOLS>
       CCS_INIT_S1(weightSkewer);
-  Connections::Combinational<
-      Pack1D<PEWeight<typename IDTYPE::AccumulationDatatype>, NCOLS> >
-      CCS_INIT_S1(weightSkewerDin);
+  Connections::Combinational<Pack1D<PEWeight<IDTYPE>, NCOLS> > CCS_INIT_S1(
+      weightSkewerDin);
 
   SerializedSkewer<ODTYPE, typename ODTYPE::AccumulationDatatype, NCOLS>
       CCS_INIT_S1(psumInSkewer);
@@ -48,8 +46,7 @@ SC_MODULE(MatrixProcessor) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputsChannel);
-  Connections::In<Pack1D<typename IDTYPE::AccumulationDatatype, NCOLS> >
-      CCS_INIT_S1(weightsChannel);
+  Connections::In<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(weightsChannel);
   Connections::In<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(biasChannel);
   Connections::Out<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(outputsChannel);
 
@@ -137,10 +134,9 @@ SC_MODULE(MatrixProcessor) {
     while (true) {
 #pragma hls_pipeline_init_interval 1
       for (int weight_count = 0; weight_count < NROWS; weight_count++) {
-        Pack1D<typename IDTYPE::AccumulationDatatype, NCOLS> arrayWeights =
-            weightsChannel.Pop();
+        Pack1D<IDTYPE, NCOLS> arrayWeights = weightsChannel.Pop();
         // std::cout << "Weights: " << arrayWeights << std::endl;
-        Pack1D<PEWeight<typename IDTYPE::AccumulationDatatype>, NCOLS> weights;
+        Pack1D<PEWeight<IDTYPE>, NCOLS> weights;
 #pragma hls_unroll yes
         for (int i = 0; i < NCOLS; i++) {
           weights[i].data = arrayWeights[i];
