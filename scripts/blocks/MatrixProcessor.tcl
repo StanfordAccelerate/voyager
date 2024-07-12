@@ -21,13 +21,13 @@ proc pre_assembly {} {
 }
 
 proc pre_architect {} {
-  global full_block_name_stripped C_DATA_REP_NAME ACCUM_DATATYPE_WIDTH OC_DIMENSION TECHNOLOGY memories
-  directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
+  global full_block_name_stripped ACC_BUF_C_DATA_REP_NAME ACCUM_DATATYPE_WIDTH OC_DIMENSION TECHNOLOGY memories
+  directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
 
   if {$TECHNOLOGY != "generic"} {
     set memory_width [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
     if {info exists memories(1024,$memory_width)} {
-      directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1024,$memory_width)
+      directive set /$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1024,$memory_width)
     } else {
       error "No memory specified in technology file for depth=1024, width=$memory_width"
     }

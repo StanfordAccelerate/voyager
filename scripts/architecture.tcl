@@ -7,6 +7,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "Posit<8, 1>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "PositFP<8, 7>::AccumulationDatatype"
   set C_DATA_REP_NAME "bits"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -18,6 +19,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, false, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -29,6 +31,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, false, false, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -40,6 +43,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, true, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, true, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -51,6 +55,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, true, false, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, true, false, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -62,6 +67,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<2, 5, false, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -73,6 +79,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<3, 5, false, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 16
@@ -84,6 +91,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<23, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 32
@@ -95,6 +103,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<23, 8, false, false, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 32
@@ -106,6 +115,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<23, 8, false, true, AC_TRN_ZERO>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 32
@@ -117,6 +127,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<23, 8, false, false, AC_TRN_ZERO>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 32
@@ -128,6 +139,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 16
@@ -139,6 +151,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 16
@@ -150,6 +163,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 16
@@ -161,6 +175,7 @@ if { $DATATYPE == "P8_1" } {
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::AccumulationDatatype"
   set PE_PSUM_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
   set ACCUM_DATATYPE_WIDTH 16
