@@ -5,6 +5,7 @@ import sys
 import os
 import datetime
 import pandas as pd
+import re
 
 LAYERS = {
     "resnet18": [
@@ -217,7 +218,7 @@ def run_rtl_test(model, layer, output_folder):
             stdout=subprocess.PIPE,
         )
         runtime = int(p.communicate()[0].decode("utf-8").strip())
-        
+
         # capture number after "Ideal cycles: " in the log file
         p = subprocess.Popen(
             [
@@ -289,6 +290,69 @@ def run_rtl_tests(models, num_processes, results_folder):
     return print_test_results(test_results, results_folder)
 
 
+def run_accuracy(model, dataset, num_processes, output_folder):
+    check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
+
+    if len(model) > 1:
+        print(f"Only testing accuracy for the first model: {model[0]}")
+    model = model[0]
+
+    # Build AccuracyTester binary
+    subprocess.run(["make", "clean"], env=os.environ)
+
+    with open(f"{output_folder}/build.log", "w") as stdout_file:
+        subprocess.run(
+            ["make", "-j", "AccuracyTester"],
+            env=os.environ,
+            stdout=stdout_file,
+            stderr=subprocess.STDOUT,
+        )
+
+    if dataset == "sst2":
+        dataset_path = (
+            "/sim2/shared/MINOTAUR/nn_data/mobilebert_binary_data/tiny_truncated_sst2/"
+        )
+    else:
+        print("Invalid dataset")
+        return False
+
+    with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
+        env_vars = os.environ.copy()
+
+        try:
+            subprocess.run(
+                [
+                    f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}/cc/AccuracyTester",
+                    model,
+                    dataset_path,
+                    str(num_processes),
+                ],
+                env=os.environ,
+                stdout=stdout_file,
+                stderr=subprocess.STDOUT,
+                timeout=1 * 60 * 60,
+            )
+        except subprocess.TimeoutExpired:
+            print(f"Test {model}_{dataset} timed out")
+            stdout_file.write("Test timed out")
+            return False
+
+    accuracy_regex = "Accuracy: \d+\/\d+ \((\d+\.+\d+)%\)"
+    with open(f"{output_folder}/{model}_{dataset}.log", "r") as logfile:
+        text = logfile.read()
+    final_accuracy = re.findall(accuracy_regex, text)[-1]
+
+    print(f"Final accuracy: {final_accuracy}%")
+
+    # save results to dataframe
+    df = pd.DataFrame(
+        [(model, dataset, final_accuracy)], columns=["Model", "Dataset", "Accuracy"]
+    )
+
+    # dump dataframe to pickle
+    df.to_pickle(f"{output_folder}/test_results.pkl")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -296,6 +360,12 @@ def main():
         type=str,
         required=True,
         help="Model(s) to use for regression (resnet18, mobilebert)",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        required=False,
+        help="Dataset to use for accuracy test (imagenet, sst2)",
     )
     parser.add_argument(
         "--sims", type=str, required=True, help="Simulation to run (SystemC or RTL)"
@@ -323,6 +393,9 @@ def main():
         success = run_systemc_tests(args.models, args.num_processes, results_folder)
     elif args.sims == "RTL":
         success = run_rtl_tests(args.models, args.num_processes, results_folder)
+    elif args.sims == "Accuracy":
+        run_accuracy(args.models, args.dataset, args.num_processes, results_folder)
+        success = True
     else:
         print("Invalid simulation type")
         success = False
