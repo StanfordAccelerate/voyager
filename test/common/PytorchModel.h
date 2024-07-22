@@ -70,19 +70,33 @@ void run_pytorch_op(const codegen::AcceleratorParam param,
 
   if (param.has_matrix_param()) {
     const auto &matrix_param = param.matrix_param();
-    const auto &inputs = matrix_param.input();
+
+    // Permute input tensor
+    const auto &input = matrix_param.input();
+    auto input_tensor = get_input<INPUT_T, INPUT_T>(input, args[0]);
+    if (input.has_permutation()) {
+      input_tensor = permute(input_tensor, input.permutation());
+    }
+
+    // Permute weight tensor
+    const auto &weight = matrix_param.weight();
+    auto weight_tensor = get_input<INPUT_T, INPUT_T>(weight, args[1]);
+    if (weight.has_permutation()) {
+      weight_tensor = permute(weight_tensor, weight.permutation());
+    }
+
     int dim = 1;
-    for (int i = 0; i < inputs.shape_size() - 1; i++) {
-      dim *= inputs.shape(i);
+    for (int i = 0; i < input.shape_size() - 1; i++) {
+      dim *= input.shape(i);
     }
 
     if (dim == 1) {
       output_tensor =
           matrix_vector_multiply<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T>(
-              args[0], args[1], args[2], matrix_param);
+              input_tensor, weight_tensor, args[2], matrix_param);
     } else {
       output_tensor = gemm<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T>(
-          args[0], args[1], args[2], param);
+          input_tensor, weight_tensor, args[2], param);
     }
     arg_index = 3;
   } else if (param.vector_params_size() > 0) {
@@ -122,6 +136,10 @@ void run_pytorch_op(const codegen::AcceleratorParam param,
   }
 
   int output_size = get_size(param.output());
+  if (param.output().has_permutation()) {
+    output_tensor = permute(output_tensor, param.output().permutation());
+  }
+
   bool double_precision = is_double_precision(param.output());
   for (int i = 0; i < output_size; i++) {
     save_tensor(args.back(), i, output_tensor[i], double_precision);

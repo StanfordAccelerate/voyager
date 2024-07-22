@@ -186,8 +186,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
       tiling.weight_loop_index[0];
 
   // set outer loop values
-  // if (params.WEIGHT_TRANSPOSE) {
-  if (false) {
+  const auto weight = matrix_param.weight();
+  if (weight.has_permutation() and
+      weight.permutation().opcode() == "transpose") {
     // for tranpose, we need to enforce that the innermost loop is the
     // unrolled reduction loop
     // we can just use the following loop nest:
@@ -285,9 +286,16 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   // TODO:
   matrix_params->STORE_IN_ACC = false;
   matrix_params->ACC_FROM_ACC = false;
-  matrix_params->CONCAT_INPUT = false;
-  matrix_params->CONCAT_HEAD_WEIGHTS = false;
-  matrix_params->TRANPOSE_INPUTS = false;
+
+  // Permute input for transformer attention outputs
+  const auto input = matrix_param.input();
+  const auto permutation = input.permutation();
+  bool has_permutation = input.has_permutation();
+  matrix_params->CONCAT_INPUT =
+      has_permutation && permutation.opcode() == "permute";
+  // matrix_params->CONCAT_HEAD_WEIGHTS = false;
+  matrix_params->TRANPOSE_INPUTS =
+      has_permutation && permutation.opcode() == "transpose";
 
   // bias
   const auto bias_memory = matrix_param.bias().memory();
@@ -332,7 +340,7 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   // TODO: double precision
   vector_params->DP_OUTPUT = false;
   // TODO: Transformer qkv output permutation
-  vector_params->SPLIT_OUTPUT = false;
+  vector_params->SPLIT_OUTPUT = param.output().has_permutation();
 
   VectorInstructions vinst;
   memset(&vinst, 0, sizeof(vinst));

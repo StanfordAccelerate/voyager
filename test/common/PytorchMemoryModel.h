@@ -62,7 +62,8 @@ class PyTorchMemoryModel {
  protected:
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
                    bool transpose = false, bool replication = false,
-                   bool double_precision_ow = false, bool random_data = false);
+                   bool double_precision_ow = false, bool is_output = false,
+                   bool random_data = false);
   virtual void write_to_memory(const int address, const float value,
                                const int parttion, bool double_precision) = 0;
 
@@ -76,13 +77,16 @@ inline void PyTorchMemoryModel::load_tensor(const codegen::Tensor& tensor,
                                             std::string data_dir,
                                             bool transpose, bool replication,
                                             bool double_precision_ow,
-                                            bool random_data) {
+                                            bool is_output, bool random_data) {
   auto repeated_field = tensor.shape();
   std::vector<size_t> shape(repeated_field.begin(), repeated_field.end());
   int size = 1;
   for (int dim : shape) size *= dim;
 
-  std::string filename = data_dir + "/" + tensor.node() + ".bin";
+  std::string input_name = !is_output && tensor.has_permutation()
+                               ? tensor.permutation().node()
+                               : tensor.node();
+  std::string filename = data_dir + "/" + input_name + ".bin";
   auto array_ptr = read_tensor_from_file(filename, size, random_data);
   auto array = xt::adapt(array_ptr, size, xt::no_ownership(), shape);
 
@@ -135,12 +139,12 @@ inline void PyTorchMemoryModel::load_inputs(
   std::string output_node = "";
   if (param.has_matrix_param()) {
     const codegen::MatrixParam& matrix_param = param.matrix_param();
-    output_node = matrix_param.name();
     bool replication = matrix_param.input().shape(1) == 3 && is_dut;
     load_tensor(matrix_param.input(), data_dir, is_conv2d, replication);
     if (matrix_param.opcode() == "matmul") {
       load_tensor(matrix_param.weight(), data_dir);
     }
+    output_node = matrix_param.name();
   } else if (param.has_pooling_param()) {
     const codegen::PoolingParam& pooling_param = param.pooling_param();
     load_tensor(pooling_param.input(), data_dir, true);
@@ -215,5 +219,5 @@ inline void PyTorchMemoryModel::load_outputs(
   memory->set_offset(0);
   bool transpose =
       param.matrix_param().opcode() == "conv2d" || param.has_pooling_param();
-  load_tensor(output_tensor, data_dir, transpose);
+  load_tensor(output_tensor, data_dir, transpose, false, false, true);
 }

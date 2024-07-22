@@ -33,14 +33,12 @@ inline T* permute(const T* inputs, const codegen::ReshapeParam param) {
   if (param.opcode() == "permute") {
     order.insert(order.end(), param.dims().begin(), param.dims().end());
   } else if (param.opcode() == "transpose") {
-    int dim1 = param.dims(0);
-    int dim2 = param.dims(1);
-
-    int size = input.shape_size();
-    if (dim1 < 0) dim1 += size;
-    if (dim2 < 0) dim2 += size;
-
-    order.insert(order.end(), {0, 1, 2, 3});
+    const int size = input.shape_size();
+    const int dim1 = param.dims(0) < 0 ? param.dims(0) + size : param.dims(0);
+    const int dim2 = param.dims(1) < 0 ? param.dims(1) + size : param.dims(1);
+    for (int i = 0; i < size; ++i) {
+      order.push_back(i);
+    }
     std::swap(order[dim1], order[dim2]);
   } else {
     std::cerr << "Unsupported reshape instruction: " << param.opcode()
@@ -73,6 +71,67 @@ inline T* permute(const T* inputs, const codegen::ReshapeParam param) {
     for (int j = input_shape.size() - 1; j >= 0; --j) {
       indices[j]++;
       if (indices[j] < input_shape[j]) {
+        break;
+      }
+      indices[j] = 0;
+    }
+  }
+
+  return outputs;
+}
+
+template <typename T>
+inline T* permute(const T* inputs, const codegen::Permutation& param) {
+  const std::vector<int> shape{param.shape().begin(), param.shape().end()};
+  const std::vector<int> dims{param.dims().begin(), param.dims().end()};
+
+  std::vector<int> order;
+  if (param.opcode() == "permute") {
+    order.insert(order.end(), dims.begin(), dims.end());
+  } else if (param.opcode() == "transpose") {
+    const int size = shape.size();
+    const int dim1 = dims[0] < 0 ? dims[0] + size : dims[0];
+    const int dim2 = dims[1] < 0 ? dims[1] + size : dims[1];
+    for (int i = 0; i < size; ++i) {
+      order.push_back(i);
+    }
+    std::swap(order[dim1], order[dim2]);
+  } else {
+    std::cerr << "Unsupported reshape instruction: " << param.opcode()
+              << std::endl;
+    exit(1);
+  }
+
+  std::cerr << "Permute order: ";
+  for (int dim : order) {
+    std::cerr << dim << " ";
+  }
+  std::cerr << std::endl;
+
+  std::vector<int> permuted_shape(order.size());
+  for (size_t i = 0; i < order.size(); ++i) {
+    permuted_shape[i] = shape[order[i]];
+  }
+  std::vector<int> permuted_strides = compute_strides(permuted_shape);
+
+  const int size = get_size(shape);
+  T* outputs = new T[size];
+  std::vector<int> indices(shape.size(), 0);
+  for (int i = 0; i < size; ++i) {
+    std::vector<int> permuted_indices(order.size());
+    for (size_t j = 0; j < order.size(); ++j) {
+      permuted_indices[j] = indices[order[j]];
+    }
+
+    int permuted_index =
+        compute_linear_index(permuted_indices, permuted_strides);
+
+    outputs[permuted_index] = inputs[i];
+
+    // Update multi-dimensional indices
+    for (int j = shape.size() - 1; j >= 0; --j) {
+      indices[j]++;
+      if (indices[j] < shape[j]) {
         break;
       }
       indices[j] = 0;

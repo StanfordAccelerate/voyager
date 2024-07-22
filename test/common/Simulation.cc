@@ -159,7 +159,7 @@ int Simulation::check_outputs() {
   if (fp32_memory && file) {
     std::cout << "FP32 PyTorch Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
-    std::string filename = prefix + "codegen_vs_pytorch.txt";
+    std::string filename = prefix + "fp32_vs_pytorch.txt";
 
     rel_err += compare_arrays(fp32_memory->get_args(param).back(), "fp32",
                               fp32_memory->get_output(param), "file", size,
@@ -167,11 +167,22 @@ int Simulation::check_outputs() {
     has_valid_comp = true;
   }
 
+  if (systemc_memory && file) {
+    std::cout << "System C Gold Model vs. Pytorch" << std::endl;
+    std::cout << "(reveals issues in data loading or mapping)" << std::endl;
+    std::string filename = prefix + "systemc_vs_pytorch.txt";
+
+    rel_err += compare_arrays(systemc_memory->get_args(param).back(), "systemc",
+                              systemc_memory->get_output(param), "file", size,
+                              filename, false);
+    has_valid_comp = true;
+  }
+
   if (accelerator_memory && file) {
-    std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
+    std::cout << "Accelerator vs. System C Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
-    std::string filename = prefix + "accel_vs_pytorch.txt";
+    std::string filename = prefix + "accelerator_vs_pytorch.txt";
 
     rel_err += compare_arrays(
         accelerator_memory->get_args(param).back(), "accelerator",
@@ -180,10 +191,10 @@ int Simulation::check_outputs() {
   }
 
   if (accelerator_memory && systemc_memory) {
-    std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
+    std::cout << "Accelerator vs. System C Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
-    std::string filename = prefix + "accel_vs_hlsgold.txt";
+    std::string filename = prefix + "accelerator_vs_systemc.txt";
 
     rel_err +=
         compare_arrays(accelerator_memory->get_args(param).back(),

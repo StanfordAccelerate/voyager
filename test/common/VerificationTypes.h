@@ -720,7 +720,7 @@ inline Tiling get_linear_tiling(codegen::MatrixParam param) {
         .replication = false,
     };
   } else {
-    std::cerr << "Unsupported input dimensions" << std::endl;
+    std::cerr << "Unsupported inputs dimensions" << std::endl;
     std::cerr << "Input shape: ";
     for (int dim : input_shape) std::cerr << dim << " ";
     std::cerr << std::endl;
@@ -736,8 +736,10 @@ inline Tiling get_matmul_tiling(codegen::MatrixParam param) {
   std::vector<int> input_shape(repeated_field.begin(), repeated_field.end());
   repeated_field = param.weight().shape();
   std::vector<int> weight_shape(repeated_field.begin(), repeated_field.end());
+  const int ndim = input_shape.size();
 
-  if (input_shape[0] == 128 && input_shape[1] == 32 && weight_shape[1] == 128) {
+  if (input_shape[ndim - 2] == 128 && input_shape[ndim - 1] == 32 &&
+      weight_shape[1] == 128) {
     return {
         .loops = {{4, 1, 1, 1, 1, 1}, {2, 8, 1, 1, 1, 32}},
         .x_loop_index = {0, 5},
@@ -750,7 +752,7 @@ inline Tiling get_matmul_tiling(codegen::MatrixParam param) {
         .stride = 1,
         .replication = false,
     };
-  } else if (input_shape[0] == 128 && input_shape[1] == 128 &&
+  } else if (input_shape[ndim - 2] == 128 && input_shape[ndim - 1] == 128 &&
              weight_shape[1] == 32) {
     return {
         .loops = {{4, 1, 1, 1, 1, 1}, {8, 2, 1, 1, 1, 32}},
@@ -765,7 +767,7 @@ inline Tiling get_matmul_tiling(codegen::MatrixParam param) {
         .replication = false,
     };
   } else {
-    std::cerr << "Unsupported input dimensions" << std::endl;
+    std::cerr << "Unsupported inputs dimensions" << std::endl;
     std::cerr << "Input shape: ";
     for (int dim : input_shape) std::cerr << dim << " ";
     std::cerr << std::endl;
