@@ -161,8 +161,7 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   const auto weight_memory = matrix_param.weight().memory();
   accelerator_memory_map["weights"] = get_partition(weight_memory.partition());
   matrix_params->WEIGHT_OFFSET = weight_memory.offset();
-  // TODO: handle weight transpose
-  matrix_params->WEIGHT_TRANSPOSE = false;
+
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 6; j++) {
       matrix_params->loops[i][j] = tiling.loops[i][j];
@@ -187,8 +186,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
 
   // set outer loop values
   const auto weight = matrix_param.weight();
-  if (weight.has_permutation() and
-      weight.permutation().opcode() == "transpose") {
+  matrix_params->WEIGHT_TRANSPOSE =
+      weight.has_permutation() && weight.permutation().opcode() == "transpose";
+  if (matrix_params->WEIGHT_TRANSPOSE) {
     // for tranpose, we need to enforce that the innermost loop is the
     // unrolled reduction loop
     // we can just use the following loop nest:
