@@ -119,6 +119,7 @@ def run_systemc_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
+    env_vars["CLOCK_PERIOD"] = "1"
     env_vars["SIMS"] = "customposit,accelerator"
     env_vars["DATA_DIR"] = f"/sim2/shared/MINOTAUR/nn_data/unfused_maxpool/{model}/"
 

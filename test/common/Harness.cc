@@ -42,7 +42,7 @@ Harness::Harness(sc_module_name name, std::vector<SimplifiedParams> params_list,
                  INPUT_DATATYPE *sram, INPUT_DATATYPE *rram,
                  std::vector<MemoryMap> memoryMap)
     : sc_module(name),
-      clk("clk", 1, SC_NS, 0.5, 0, SC_NS, true),
+      clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS, true),
       params_list(params_list),
       sramMemory(sram),
       rramMemory(rram),
