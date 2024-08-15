@@ -23,7 +23,7 @@ solution options set Architectural/DefaultRegisterThreshold 4096
 solution options set Flows/Enable-SCVerify yes
 solution options set Flows/VCS/SYSC_VERSION 2.3.3
 solution options set Flows/VCS/VLOGAN_OPTS {+v2k -timescale=1ns/10ps +notimingcheck +define+UNIT_DELAY}
-solution options set Flows/VCS/VCSSIM_OPTS {+fsdbfile+dump.fsdb +fsdb+all=on +fsdb+dumpon+0}
+# solution options set Flows/VCS/VCSSIM_OPTS {+fsdbfile+dump.fsdb +fsdb+all=on +fsdb+dumpon+0}
 solution options set Flows/VCS/VCS_DOFILE dump.do
 solution options set Flows/VCS/COMP_FLAGS "-O3 -Wall -Wno-unknown-pragmas -I$root/lib/ -I$root/src/ -I$root/ -DNO_UNIVERSAL -DSIM_$BLOCK -D$DATATYPE -DIC_DIMENSION=$IC_DIMENSION -DOC_DIMENSION=$OC_DIMENSION"
 solution options set Flows/VCS/VCSELAB_OPTS "-timescale=1ns/1ps -sysc=blocksync -lstdc++fs"
