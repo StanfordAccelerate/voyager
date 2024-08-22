@@ -114,6 +114,18 @@ $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.
 	BLOCK=VectorOpUnit catapult -shell -file scripts/main.tcl
 $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl
+	# Keeping this in case an older version of Catapult is used
+	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/module TS1N40LPB1024X64M4FW /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
+	# Uncommenting memoery macro module in intel16
+	awk -i inplace ' \
+  /\/\*/ { comment = 1 } \
+  /\*\// { comment = 1 } \
+  /module intel16_1024x.*_rf_wrapper/ { within_block = 1 } \
+  !within_block || within_block && !comment { print } \
+  within_block && /endmodule/ { within_block = 0 }
+  comment = 0 \
+' release/concat_rtl.v
+
 .PHONY: rtl InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
 
 ###########################################################
