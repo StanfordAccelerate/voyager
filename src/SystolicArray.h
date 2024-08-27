@@ -92,6 +92,11 @@ SC_MODULE(SystolicArray) {
           new Tieoff<PEInput<IDTYPE> >(sc_gen_unique_name("tieoff"));
 #endif
       inputConnectionTieoff_ptr[i]->in(inputConnection[i][NCOLS - 1]);
+#ifdef CONNECTIONS_FAST_SIM
+      // we need to connect clock and reset if using fast sim
+      inputConnectionTieoff_ptr[i]->clk(clk);
+      inputConnectionTieoff_ptr[i]->rstn(rstn);
+#endif
     }
 
     // last row for weights
@@ -104,6 +109,11 @@ SC_MODULE(SystolicArray) {
           new Tieoff<PEWeight<IDTYPE> >(sc_gen_unique_name("tieoff"));
 #endif
       weightConnectionTieoff_ptr[i]->in(weightConnection[NROWS - 1][i]);
+#ifdef CONNECTIONS_FAST_SIM
+      // we need to connect clock and reset if using fast sim
+      weightConnectionTieoff_ptr[i]->clk(clk);
+      weightConnectionTieoff_ptr[i]->rstn(rstn);
+#endif
     }
   }
 };
