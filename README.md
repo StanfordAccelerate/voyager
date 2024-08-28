@@ -19,9 +19,9 @@ We are using the built-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It trigge
 3. Environment requirements:
   - You need to have [`git lfs`](https://git-lfs.github.com/) installed
   - You need a `g++` with at least C++17 support
+  - You need a python3 environment with required packages installed (try running the tests and you will be notified of the missing packages).
   - You need to include the Catapult lib in your `LD_LIBRARY_PATH`. For example, `export LD_LIBRARY_PATH=/cad/mentor/2024.1/Mgc_home/lib:/cad/mentor/2024.1/Mgc_home/shared/lib:$LD_LIBRARY_PATH`.
   - Note: you can change the `.envrc` file according to your system environment and use [`direnv`](https://direnv.net) to automatically load it.
-> 4. If you want to run more than just the `simple` model, you will need to generate data files. Please see `models/` for Python scripts that help you with that.
 
 ## Test 
 1. The easiest way to run tests is to check the CI files, `.gitlab/ci/sysc.yml` and `.gitlab/ci/rtl.yml`, for SystemC and RTL simulation, respectively. The command to run regression can be found in the `script` field. The result will be written to the `regression_results` directory.
