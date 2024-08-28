@@ -159,6 +159,16 @@ using F32 = StdFloat<23, 8, false, true, AC_RND_CONV>;
 #define ACCUM_DATATYPE F32
 #define OUTPUT_DATATYPE F32
 
+#elif defined(INT8)
+
+using I8 = Int<8, true>;
+using I32 = Int<32, true>;
+
+#define INPUT_DATATYPE I8
+#define WEIGHT_DATATYPE I8
+#define ACCUM_DATATYPE I32
+#define OUTPUT_DATATYPE I8
+
 #else
 
 #error "No datatype specified!"
