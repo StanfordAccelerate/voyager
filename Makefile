@@ -201,13 +201,6 @@ $(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/
 $(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/networks.a
 	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
 
-.PHONY: MobileBERTFinetuning
-MobileBERTFinetuning: $(CC_BUILD_DIR)/Finetuning
-	./$(CC_BUILD_DIR)/Finetuning
-
-$(CC_BUILD_DIR)/Finetuning: $(CC_BUILD_DIR)/Finetuning.o $(CC_BUILD_DIR)/MobileBERTParams.o $(CC_BUILD_DIR)/DatasetIterator.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/networks.a
-	$(CC) -o $@ $^ -lstdc++fs
-
 # Unit tests for custom Posit implementation
 .PHONY: PositTest
 PositTest: $(CC_BUILD_DIR)/PositTest
@@ -215,16 +208,13 @@ PositTest: $(CC_BUILD_DIR)/PositTest
 $(CC_BUILD_DIR)/PositTest: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -fopenmp -DNO_SYSC $< -o $@
 
-$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h) $(wildcard test/toolchain/*.h)
+$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h $(wildcard src/*.h) $(wildcard test/toolchain/*.h)
 	$(CC) $(C11FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h) $(wildcard test/toolchain/*.h)
+$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h $(wildcard src/*.h) $(wildcard test/toolchain/*.h)
 	$(CC) $(C11FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
-$(CC_BUILD_DIR)/Harness2-fast.o: test/common/Harness2.cc test/common/Harness2.h $(wildcard src/*.h)
-	$(CC) $(C11FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
-
-$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h $(wildcard test/common/operations/*.h)
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 $(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
@@ -238,15 +228,6 @@ $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
 
 $(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h $(wildcard test/toolchain/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/Finetuning.o: test/training/Finetuning.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h test/training/DTYPE.h
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
-
-$(CC_BUILD_DIR)/MobileBERTParams.o: test/training/MobileBERTParams.cc test/mobilebert/mobilebert_tiny2/*.h
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
-
-$(CC_BUILD_DIR)/DatasetIterator.o: test/training/DatasetIterator.cc
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 ###########################################################
 # Networks

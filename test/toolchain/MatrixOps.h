@@ -99,15 +99,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   Tiling tiling;
   const auto matrix_param = param.matrix_param();
   if (matrix_param.opcode() == "conv2d") {
-    tiling = get_conv_tiling(matrix_param);
-  } else if (matrix_param.opcode() == "linear") {
-    tiling = get_linear_tiling(matrix_param);
-  } else if (matrix_param.opcode() == "matmul") {
-    tiling = get_matmul_tiling(matrix_param);
+    tiling = get_conv2d_tiling(param);
   } else {
-    std::cerr << "Unsupported matrix instruction: " << matrix_param.opcode()
-              << std::endl;
-    std::abort();
+    tiling = get_linear_tiling(param);
   }
 
   int X = tiling.loops[0][tiling.x_loop_index[0]] *

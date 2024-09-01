@@ -1,9 +1,11 @@
-#include <filesystem>
-#include <future>
 #include <iostream>
 #include <string>
-#include <thread>
 #include <vector>
+#include <stdexcept>
+#include <future>
+#include <filesystem>
+#include <algorithm>   // Include if using standard algorithms
+#include <cmath>       // Include for mathematical operations
 
 #define NO_SYSC
 // clang-format off

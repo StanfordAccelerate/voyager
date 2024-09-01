@@ -1,10 +1,12 @@
 #include "test/common/Simulation.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "test/common/GoldModel.h"
 #include "test/common/Network.h"
@@ -23,63 +25,54 @@ using FloatMemoryModel = MemoryModelImpl<float>;
 using HlsMemoryModel = MemoryModelImpl<INPUT_DATATYPE>;
 
 Simulation::Simulation() {
-  model_name = get_env_var("NETWORK");
-  if (model_name.empty()) model_name = "resnet";
+  model = get_env_var("NETWORK");
+  if (model.empty()) {
+    model = "resnet18";
+  }
 
   tests = get_env_var("TESTS");
-  if (tests.empty()) tests = "fc";
+  if (tests.empty()) {
+    tests = "submodule_0";
+  }
 
-  std::string sims_env(get_env_var("SIMS"));
-  if (sims_env.empty()) sims_env = "fp32,systemc,accelerator";
-
-  // Only applicable when NETWORK=mobilebert
-  task = get_env_var("TASK");
-  if (task.empty()) task = "inference";
-
-  std::string tolerance_str(get_env_var("TOLERANCE"));
-  if (!tolerance_str.empty()) tolerance = std::stof(tolerance_str);
-
-  // Paths are relative to Makefile
-  std::string data_dir(get_env_var("DATA_DIR"));
-
-  out_dir = get_env_var("OUT_DIR");
-  if (out_dir.empty()) out_dir = "./test_outputs/";
-
-  // Parse tests to run
   std::vector<std::string> tests_list;
   split_string(tests, ',', std::back_inserter(tests_list));
-
   if (tests_list.size() > 2) {
-    throw std::runtime_error("Supply at max two TESTS.");
+    throw std::runtime_error("Incorrect number of tests specified.");
   }
 
-  // Parse sims to run
-  split_string(sims_env, ',', std::back_inserter(sims));
-  if (sims.size() & 0x01) {
-    throw std::runtime_error("Need to supply even number of sim pairs.");
+  std::string sims_str(get_env_var("SIMS"));
+  if (sims_str.empty()) {
+    sims_str = "fp32,file";
   }
 
-  // Make model name-matching case insensitive
-  std::string model_name_lower = const_cast<std::string&>(this->model_name);
-  std::transform(model_name_lower.begin(), model_name_lower.end(),
-                 model_name_lower.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
+  split_string(sims_str, ',', std::back_inserter(sims));
+  if (sims.size() != 2) {
+    throw std::runtime_error("Incorrect number of simulators specified.");
+  }
 
-  // Match the model family and construct required network
-  auto network = new Network(model_name_lower);
+  std::string tolerance_str(get_env_var("TOLERANCE"));
+  if (!tolerance_str.empty()) {
+    tolerance = std::stof(tolerance_str);
+  }
+
+  out_dir = get_env_var("OUT_DIR");
+  if (out_dir.empty()) {
+    out_dir = "./test_outputs/";
+  }
+
+  // Get list of params to run
+  auto network = new Network(model);
   params = network->get_params(tests_list);
 
   std::cout << "Starting new simulation with config:";
-  std::cout << "\n> Model: " << model_name;
+  std::cout << "\n> Model: " << model;
   std::cout << "\n> Tests: ";
-  for (const std::string& l : tests_list) std::cout << l << ' ';
+  for (const std::string& t : tests_list) std::cout << t << ' ';
   std::cout << "\n> Sims: ";
   for (const std::string& s : sims) std::cout << s << ' ';
-  if (model_name_lower.find("mobilebert") != std::string::npos)
-    std::cout << "\n> Task: " << task;
   std::cout << "\n> Tolerance: " << tolerance;
-  // std::cout << "\n> Data dir: " << network->getDataDir();
-  std::cout << "\n> Out dir: " << out_dir << "\n";
+  std::cout << "\n> Output dir: " << out_dir << "\n";
   std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
   std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n";
 }
@@ -97,13 +90,12 @@ void Simulation::load_data() {
     memories["accelerator"] = new HlsMemoryModel(memory_sizes, true);
   }
 
-  std::string data_dir =
-      "test/compiler/networks/" + model_name + "/tensor_files";
-  for (const auto& [key, model] : memories) {
-    model->load_inputs(params.front(), data_dir);
-    model->load_outputs(params.back(), data_dir);
+  std::string data_dir = "test/compiler/networks/" + model + "/tensor_files";
+  for (const auto& [key, mem] : memories) {
+    mem->load_inputs(params.front(), data_dir);
+    mem->load_outputs(params.back(), data_dir);
     for (const auto& param : params) {
-      model->load_weights(param, data_dir);
+      mem->load_weights(param, data_dir);
     }
   }
 }
@@ -134,9 +126,9 @@ void Simulation::run() {
 int Simulation::check_outputs() {
   std::string prefix;
   if (params.size() == 1) {
-    prefix = out_dir + model_name + '.' + params.front().name() + '.';
+    prefix = out_dir + model + '.' + params.front().name() + '.';
   } else {
-    prefix = out_dir + model_name + '.' + params.front().name() + "_to_" +
+    prefix = out_dir + model + '.' + params.front().name() + "_to_" +
              params.back().name() + '.';
   }
 

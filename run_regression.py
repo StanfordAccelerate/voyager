@@ -1,140 +1,53 @@
 import argparse
-import multiprocessing as mp
-import subprocess
-import sys
-import os
 import datetime
-import pandas as pd
-
-LAYERS = {
-    "resnet18": [
-        "conv1",
-        "layer1_0_conv1",
-        "layer1_0_conv2",
-        "layer1_1_conv1",
-        "layer1_1_conv2",
-        "layer2_0_downsample",
-        "layer2_0_conv1",
-        "layer2_0_conv2",
-        "layer2_1_conv1",
-        "layer2_1_conv2",
-        "layer3_0_downsample",
-        "layer3_0_conv1",
-        "layer3_0_conv2",
-        "layer3_1_conv1",
-        "layer3_1_conv2",
-        "layer4_0_downsample",
-        "layer4_0_conv1",
-        "layer4_0_conv2",
-        "layer4_1_conv1",
-        "layer4_1_conv2",
-        "fc",
-    ],
-    "mobilebert": [
-        "bottleneck_input_dense",
-        "bottleneck_input_LayerNorm",
-        "bottleneck_attention_dense",
-        "bottleneck_attention_LayerNorm",
-        "attention_self_query_layer",
-        "attention_self_key_layer",
-        "attention_self_value_layer",
-        "attention_self_attention_scores_0",
-        "attention_self_attention_scores_1",
-        "attention_self_attention_scores_2",
-        "attention_self_attention_scores_3",
-        "attention_self_attention_probs_0",
-        "attention_self_attention_probs_1",
-        "attention_self_attention_probs_2",
-        "attention_self_attention_probs_3",
-        "attention_self_context_layer_0",
-        "attention_self_context_layer_1",
-        "attention_self_context_layer_2",
-        "attention_self_context_layer_3",
-        "attention_output_dense",
-        "attention_output_LayerNorm",
-        "ffn_0_intermediate_dense",
-        "ffn_0_output_dense",
-        "ffn_0_output_LayerNorm",
-        "intermediate_dense",
-        "output_dense",
-        "output_LayerNorm",
-        "output_bottleneck_dense",
-        "output_bottleneck_LayerNorm",
-        "classifier",
-    ],
-}
+import multiprocessing as mp
+import os
+import subprocess
+from collections import defaultdict
 
 
-def add_codegen_layers():
-    sys.path.append("quantized-training/src/quantized_training/codegen/")
-    import param_pb2
+def print_test_results(test_results, layers):
+    results_by_model = defaultdict(list)
+    for result in test_results:
+        results_by_model[result[0]].append(result)
 
-    model_params = param_pb2.ModelParams()
+    all_tests_passed = True
+    for model, results in results_by_model.items():
+        # Sort results by layer order
+        results.sort(key=lambda x: layers[model].index(x[1]))
+        passed = [r for r in results if r[2] == True]
+        failed = [r for r in results if r[2] == False]
 
-    networks = ["resnet18", "resnet50"]
-    for network in networks:
-        if os.path.exists(f"test/compiler/networks/{network}/params.pb"):
-            with open(f"test/compiler/networks/{network}/params.pb", "rb") as f:
-                model_params.ParseFromString(f.read())
+        if len(failed) > 0:
+            all_tests_passed = False
 
-            layers = [operation_param.name for operation_param in model_params.params]
+        print(f"Model: {model}")
+        print("=" * 10 + " PASSED " + "=" * 10)
+        print("\n".join(r[1] for r in passed) if passed else "None")
+        print("=" * 10 + " FAILED " + "=" * 10)
+        print("\n".join(r[1] for r in failed) if failed else "None")
 
-            LAYERS[f"codegen-{network}"] = layers
+        if len(results[0]) == 3:
+            continue
 
+        print("Runtime:")
+        for result in results:
+            print(f"{result[1]}: {result[3]}")
 
-def print_test_results(test_results):
-    columns = ["Model", "Layer", "Status", "Runtime"]
-    if len(test_results[0]) == 3:
-        columns = columns[:3]
-
-    # convert list of tuples to DataFrame
-    df = pd.DataFrame(test_results, columns=columns)
-
-    # get models
-    models = df["Model"].unique()
-
-    for model in models:
-        print("=" * 10 + f" {model} " + "=" * 10)
-
-        model_df = df[df["Model"] == model]
-
-        # sort according to order in LAYERS
-        model_df["Layer"] = pd.Categorical(model_df["Layer"], LAYERS[model])
-        model_df.sort_values("Layer", inplace=True)
-        # turn categorial back to string
-        model_df["Layer"] = model_df["Layer"].astype(str)
-
-        passed = model_df[model_df["Status"] == True]
-        failed = model_df[model_df["Status"] == False]
-
-        print("Passed:")
-        print(passed["Layer"].to_string(index=False) if not passed.empty else "None")
-        print("Failed:")
-        print(failed["Layer"].to_string(index=False) if not failed.empty else "None")
-
-        # if runtime column exists, print runtime of each layer
-        if "Runtime" in model_df.columns:
-            print("Runtime:")
-            print(model_df[["Layer", "Runtime"]].to_string(index=False))
-
-    # return True if all tests passed
-    return len(df[df["Status"] == False]) == 0
+    return all_tests_passed
 
 
 def check_environment_vars(required_vars):
-    for var in required_vars:
-        if var not in os.environ:
-            print(f"Please set {var} environment variable")
-            sys.exit(1)
+    unset_vars = [var for var in required_vars if var not in os.environ]
+    if len(unset_vars) > 0:
+        raise ValueError(f"Please set {', '.join(unset_vars)} environment variables")
 
 
-def run_functional_test(model, layer, output_folder):
+def run_fp32_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
-    env_vars["SIMS"] = "customposit,file"
-    env_vars["DATA_DIR"] = f"/sim2/shared/MINOTAUR/nn_data/{model}/"
-    env_vars["DATATYPE"] = "FP32"
+    env_vars["SIMS"] = "fp32,file"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
         try:
@@ -156,14 +69,11 @@ def run_functional_test(model, layer, output_folder):
     )
     p.communicate()
 
-    return (f"{model}.{layer}", p.returncode == 0)
+    return (model, layer, p.returncode == 0)
 
 
-def run_functional_tests(models, num_processes, results_folder):
-    check_environment_vars(["DIMENSION"])
-
-    env_vars = os.environ.copy()
-    env_vars["DATATYPE"] = "FP32"
+def run_fp32_tests(layers, num_processes, results_folder):
+    check_environment_vars(["IC_DIMENSION", "OC_DIMENSION"])
 
     # Build TestRunner binary
     # subprocess.run(["make", "clean"], env=env_vars)
@@ -171,7 +81,7 @@ def run_functional_tests(models, num_processes, results_folder):
     with open(f"{results_folder}/build.log", "w") as stdout_file:
         subprocess.run(
             ["make", "-j", "TestRunner"],
-            env=env_vars,
+            env=os.environ,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
         )
@@ -180,26 +90,25 @@ def run_functional_tests(models, num_processes, results_folder):
 
     test_results = []
 
-    for model in models:
-        for layer in LAYERS[model]:
+    for model, tests in layers.items():
+        for test in tests:
             pool.apply_async(
-                run_functional_test,
-                args=(model, layer, results_folder),
+                run_fp32_unit_test,
+                args=(model, test, results_folder),
                 callback=test_results.append,
             )
 
     pool.close()
     pool.join()
 
-    return print_test_results(test_results)
+    return print_test_results(test_results, layers)
 
 
-def run_systemc_test(model, layer, output_folder):
+def run_systemc_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
-    env_vars["SIMS"] = "customposit,accelerator"
-    env_vars["DATA_DIR"] = f"/sim2/shared/MINOTAUR/nn_data/unfused_maxpool/{model}/"
+    env_vars["SIMS"] = "systemc,accelerator"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
         try:
@@ -224,7 +133,7 @@ def run_systemc_test(model, layer, output_folder):
     return (model, layer, p.returncode == 0)
 
 
-def run_systemc_tests(models, num_processes, results_folder):
+def run_systemc_tests(layers, num_processes, results_folder):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
     # Build TestRunner binary
@@ -242,26 +151,25 @@ def run_systemc_tests(models, num_processes, results_folder):
 
     test_results = []
 
-    for model in models:
-        for layer in LAYERS[model]:
+    for model, tests in layers.items():
+        for test in tests:
             pool.apply_async(
-                run_systemc_test,
-                args=(model, layer, results_folder),
+                run_systemc_unit_test,
+                args=(model, test, results_folder),
                 callback=test_results.append,
             )
 
     pool.close()
     pool.join()
 
-    return print_test_results(test_results)
+    return print_test_results(test_results, layers)
 
 
 def run_rtl_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
-    env_vars["SIMS"] = "customposit,accelerator"
-    env_vars["DATA_DIR"] = f"/sim2/shared/MINOTAUR/nn_data/unfused_maxpool/{model}/"
+    env_vars["SIMS"] = "systemc,accelerator"
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
@@ -295,7 +203,7 @@ def run_rtl_test(model, layer, output_folder):
     return (model, layer, p.returncode == 0, runtime)
 
 
-def run_rtl_tests(models, num_processes, results_folder):
+def run_rtl_tests(layers, num_processes, results_folder):
     check_environment_vars(
         ["DATATYPE", "IC_DIMENSION", "OC_DIMENSION", "TECHNOLOGY", "CLOCK_PERIOD"]
     )
@@ -316,11 +224,7 @@ def run_rtl_tests(models, num_processes, results_folder):
     with open(f"{results_folder}/vcs_build.log", "w") as stdout_file:
         env_vars = os.environ.copy()
         env_vars["NETWORK"] = "resnet18"
-        env_vars["TESTS"] = "layer2_0_downsample"
-        env_vars["SIMS"] = "customposit,accelerator"
-        env_vars["DATA_DIR"] = (
-            f"/sim2/shared/MINOTAUR/nn_data/unfused_maxpool/resnet18/"
-        )
+        env_vars["SIMS"] = "systemc,accelerator"
         env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
 
         subprocess.run(
@@ -335,11 +239,11 @@ def run_rtl_tests(models, num_processes, results_folder):
 
     test_results = []
 
-    for model in models:
-        for layer in LAYERS[model]:
+    for model, tests in layers.items():
+        for test in tests:
             pool.apply_async(
                 run_rtl_test,
-                args=(model, layer, results_folder),
+                args=(model, test, results_folder),
                 callback=test_results.append,
             )
 
@@ -353,15 +257,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--models",
-        type=str,
         required=True,
-        help="Model(s) to use for regression (resnet18, mobilebert)",
+        help="Model(s) to test for regression (resnet18, mobilebert)",
     )
     parser.add_argument(
         "--sims",
-        type=str,
+        choices=["fp32", "systemc", "rtl"],
         required=True,
-        help="Simulation to run (SystemC, RTL, functional)",
+        help="Simulation to run (fp32, systemc, rtl)",
     )
     parser.add_argument(
         "--num_processes",
@@ -369,7 +272,6 @@ def main():
         required=True,
         help="Number of processes to run in parallel",
     )
-
     args = parser.parse_args()
 
     args.models = [s.strip() for s in args.models.split(",")]
@@ -384,19 +286,22 @@ def main():
 
     # Add codegen layers
     subprocess.run(["make", "protos"])
-    add_codegen_layers()
 
-    if args.sims == "SystemC":
-        success = run_systemc_tests(args.models, args.num_processes, results_folder)
-    elif args.sims == "RTL":
-        success = run_rtl_tests(args.models, args.num_processes, results_folder)
-    elif args.sims == "functional":
-        success = run_functional_tests(args.models, args.num_processes, results_folder)
+    layers = {}
+    for network in args.models:
+        with open(f"test/compiler/networks/{network}/layers.txt", "r") as f:
+            layers[network] = f.read().splitlines()
+
+    if args.sims == "systemc":
+        success = run_systemc_tests(layers, args.num_processes, results_folder)
+    elif args.sims == "rtl":
+        success = run_rtl_tests(layers, args.num_processes, results_folder)
+    elif args.sims == "fp32":
+        success = run_fp32_tests(layers, args.num_processes, results_folder)
     else:
-        print("Invalid simulation type")
-        success = False
+        raise ValueError("Invalid simulation type")
 
-    sys.exit(0 if success else 1)
+    exit(0 if success else 1)
 
 
 if __name__ == "__main__":

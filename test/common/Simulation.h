@@ -28,10 +28,9 @@ class Simulation {
 
  protected:
   std::vector<std::string> sims;
-  std::string out_dir;
-  std::string model_name;
+  std::string model;
   std::string tests;
-  std::string task;
+  std::string out_dir;
   float tolerance = 0.1;
 
   std::vector<codegen::AcceleratorParam> params;
