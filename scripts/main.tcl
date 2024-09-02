@@ -1,5 +1,3 @@
-set root [file dirname [file dirname [file normalize [info script] ] ] ]
-
 # Setup environment variables and design parameters
 source scripts/utils/read_env_vars.tcl
 source scripts/architecture.tcl

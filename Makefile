@@ -9,7 +9,8 @@ MSG := Compiling on $(OS) $(VER)
 $(info $(MSG))
 
 # Build folder format is build/DATATYPE_DIMENSIONxDIMENSION
-BUILD_DIR = build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)
+export PROJ_ROOT = $(shell pwd)
+BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 TOOLCHAIN_BUILD_DIR = $(BUILD_DIR)/cc/test/toolchain
 TOOLCHAIN_BUILD_DIRS = $(TOOLCHAIN_BUILD_DIR) $(TOOLCHAIN_BUILD_DIR)/operations
@@ -22,8 +23,9 @@ $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 CC := /cad/mentor/2024.1/Mgc_home/bin/g++
 
 # Check if the environment variable is set
+check_env_var:
 ifndef DATATYPE
-$(error DATATYPE is not set)
+	$(error DATATYPE and other required environment variables are not set)
 endif
 
 INC := \
@@ -66,55 +68,63 @@ LDLIBS += -L/cad/mentor/2024.1/Mgc_home/shared/lib/
 ###########################################################
 # Catapult Synthesis
 ###########################################################
-CATAPULT_BUILD_DIR = build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)/Catapult/$(TECHNOLOGY)/clock_$(CLOCK_PERIOD)/
+export CATAPULT_BUILD_DIR ?= $(BUILD_DIR)/Catapult/$(TECHNOLOGY)/clock_$(CLOCK_PERIOD)
 
 # Main target to run HLS and build RTL (Verilog)
-rtl: $(CATAPULT_BUILD_DIR)Accelerator/Accelerator.v1/concat_rtl.v
+rtl: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 
 # For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
-InputController: $(CATAPULT_BUILD_DIR)InputController/InputController.v1/concat_rtl.v
-WeightController: $(CATAPULT_BUILD_DIR)WeightController/WeightController.v1/concat_rtl.v
-# SystolicArrayRow: $(CATAPULT_BUILD_DIR)SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v
-# SystolicArrayChunk: $(CATAPULT_BUILD_DIR)SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v
-SystolicArray: $(CATAPULT_BUILD_DIR)SystolicArray/SystolicArray.v1/concat_rtl.v
-MatrixProcessor: $(CATAPULT_BUILD_DIR)MatrixProcessor/MatrixProcessor.v1/concat_rtl.v
-ProcessingElement: $(CATAPULT_BUILD_DIR)ProcessingElement/ProcessingElement.v1/concat_rtl.v
-VectorUnit: $(CATAPULT_BUILD_DIR)VectorUnit/VectorUnit.v1/concat_rtl.v
-MaxpoolUnit: $(CATAPULT_BUILD_DIR)MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v
-OutputAddressGenerator: $(CATAPULT_BUILD_DIR)OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v
-VectorFetchUnit: $(CATAPULT_BUILD_DIR)VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v
-VectorOpUnit: $(CATAPULT_BUILD_DIR)VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
+InputController: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v
+WeightController: $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v
+# SystolicArrayRow: $(CATAPULT_BUILD_DIR)/SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v
+# SystolicArrayChunk: $(CATAPULT_BUILD_DIR)/SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v
+SystolicArray: $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v
+MatrixProcessor: $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v
+ProcessingElement: $(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v
+VectorUnit: $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
+MaxpoolUnit: $(CATAPULT_BUILD_DIR)/MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v
+OutputAddressGenerator: $(CATAPULT_BUILD_DIR)/OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v
+VectorFetchUnit: $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v
+VectorOpUnit: $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
 
-$(CATAPULT_BUILD_DIR)InputController/InputController.v1/concat_rtl.v: src/InputController.h
+$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v: src/InputController.h
 	BLOCK=InputController catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)WeightController/WeightController.v1/concat_rtl.v: src/WeightController.h
+$(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v: src/WeightController.h
 	BLOCK=WeightController catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)ProcessingElement/ProcessingElement.v1/concat_rtl.v: src/ProcessingElement.h
+$(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v: src/ProcessingElement.h
 	BLOCK=ProcessingElement catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)ProcessingElement/ProcessingElement.v1/concat_rtl.v
+$(CATAPULT_BUILD_DIR)/SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v
 	BLOCK=SystolicArrayRow catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v
+$(CATAPULT_BUILD_DIR)/SystolicArrayChunk/SystolicArrayChunk.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)/SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v
 	BLOCK=SystolicArrayChunk catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)ProcessingElement/ProcessingElement.v1/concat_rtl.v
+$(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v
 	BLOCK=SystolicArray catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h $(CATAPULT_BUILD_DIR)SystolicArray/SystolicArray.v1/concat_rtl.v
+$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v
 	BLOCK=MatrixProcessor catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)VectorUnit/VectorUnit.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
+$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
 	BLOCK=VectorUnit catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v: src/MaxpoolUnit.h
+$(CATAPULT_BUILD_DIR)/MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v: src/MaxpoolUnit.h
 	BLOCK=MaxpoolUnit catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v: src/OutputAddressGenerator.h
+$(CATAPULT_BUILD_DIR)/OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v: src/OutputAddressGenerator.h
 	BLOCK=OutputAddressGenerator catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v: src/VectorFetch.h
+$(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v: src/VectorFetch.h
 	BLOCK=VectorFetchUnit catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.h
+$(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.h
 	BLOCK=VectorOpUnit catapult -shell -file scripts/main.tcl
-$(CATAPULT_BUILD_DIR)Accelerator/Accelerator.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)VectorUnit/VectorUnit.v1/concat_rtl.v
+$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl
-	sed -i '/^`include/d' $(CATAPULT_BUILD_DIR)Accelerator/Accelerator.v1/concat_sim_rtl.v
-	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/module TS1N40LPB1024X64M4FW /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' $(CATAPULT_BUILD_DIR)Accelerator/Accelerator.v1/concat_rtl.v \
-	> release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v
+	# Keeping this in case an older version of Catapult is used
+	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/module TS1N40LPB1024X64M4FW /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
+	# Uncommenting memoery macro module in intel16
+	awk -i inplace ' \
+  /\/\*/ { comment = 1 } \
+  /\*\// { comment = 1 } \
+  /module intel16_1024x.*_rf_wrapper/ { within_block = 1 } \
+  !within_block || within_block && !comment { print } \
+  within_block && /endmodule/ { within_block = 0 } \
+  comment = 0 \
+' release/concat_rtl.v
 
 .PHONY: rtl InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
 
@@ -130,7 +140,7 @@ ifeq ($(DEBUG), 1)
 endif
 
 sim_sysc:
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.cc
+	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.h
 	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) test/common/Harness.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/GoldModel.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Utils.cc
@@ -141,7 +151,7 @@ sim_sysc:
 	./$(build_folder)/$(simv_name) -ucli -i dump_fsdb.tcl
 
 sim_sysc_gui:
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.cc
+	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.h
 	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) test/common/Harness.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/GoldModel.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Utils.cc
@@ -181,7 +191,7 @@ sim-debug: $(CC_BUILD_DIR)/TestRunner
 	gdb ./$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: TestRunner
-TestRunner: $(CC_BUILD_DIR)/TestRunner
+TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
 
 $(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a $(CC_BUILD_DIR)/toolchain.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
@@ -294,13 +304,13 @@ $(CC_BUILD_DIR)/toolchain.a: $(TOOLCHAIN_OBJ)
 clean-all:
 	rm -rf build/*
 
-clean:
+clean: check_env_var
 	rm -rf $(CC_BUILD_DIR)
 
 clean-test:
 	rm -rf test_outputs/*
 
-clean-catapult:
+clean-catapult: check_env_var
 	rm -rf $(CATAPULT_BUILD_DIR)
 
 clean-rtl-sim:

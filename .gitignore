@@ -1,3 +1,4 @@
+.cache
 build
 pybuild
 .direnv
@@ -16,6 +17,7 @@ venv
 test_outputs/
 test_outputs_e2e/
 logs/
+regression_results/
 # "Manual" test data files
 models/resnet/binary_data*
 models/resnet/model_data/*

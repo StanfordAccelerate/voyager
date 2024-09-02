@@ -6,7 +6,7 @@ It is written in SystemC/C++ and can be used for simulation (which allows for fa
 ## CI 
 [![Tests](https://code.stanford.edu/tsmc40r/brainpower/accelerator/badges/master/pipeline.svg?key_text=Tests)](https://code.stanford.edu/tsmc40r/brainpower/accelerator/-/commits/master)
 
-We are using the build-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It triggers whenever someone pushes to a branch. 
+We are using the built-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It triggers whenever someone pushes to a branch. 
 
 ### Runners
 - We are using a single gitlab runner on `rsgvm9` (two are inactive)
@@ -16,28 +16,26 @@ We are using the build-in [GitLab CI](https://docs.gitlab.com/ee/ci/). It trigge
 ## Setup
 1. Clone the repository `git@code.stanford.edu:tsmc40r/brainpower/accelerator.git`
 2. Initialize the submodules `git submodule update --init --recursive`
-3. A couple of things to check:
-    - You need to have [`git lfs`](https://git-lfs.github.com/) installed
-    - You need a `g++` with at least C++17 support
-    - Make sure you have set `LD_LIBRARY_PATH=/cad/mentor/2021.1/Mgc_home/shared/lib/`
-4. Create a virtual env (conda or venv) and install the packages from `requirements.txt`
-5. If you want to run more than just the `simple` model, you will need to generate data files. Please see `models/` for Python scripts that help you with that.
-6. Alternatively, you can use the ZagZig coden. Please take a look at the GitLab CI files for what commnands to run.
+3. Environment requirements:
+  - You need to have [`git lfs`](https://git-lfs.github.com/) installed
+  - You need a `g++` with at least C++17 support
+  - You need a python3 environment with required packages installed (try running the tests and you will be notified of the missing packages).
+  - You need to include the Catapult lib in your `LD_LIBRARY_PATH`. For example, `export LD_LIBRARY_PATH=/cad/mentor/2024.1/Mgc_home/lib:/cad/mentor/2024.1/Mgc_home/shared/lib:$LD_LIBRARY_PATH`.
+  - Note: you can change the `.envrc` file according to your system environment and use [`direnv`](https://direnv.net) to automatically load it.
 
 ## Test 
-1. After setup, use the `run_tests.py` script to run the tests
-2. If you want to "manually" run the tests, you can invoke `make TestRunner` directly and then use, for example, `NETWORK=resnet TESTS=conv1 SIMS=fp32,file ./build/TestRunner` to run layer `conv1` of resnet, comparing `fp32` (Floating-point gold model) vs `file` (tensor data recorded from PyTorch)
+1. The easiest way to run tests is to check the CI files, `.gitlab/ci/sysc.yml` and `.gitlab/ci/rtl.yml`, for SystemC and RTL simulation, respectively. The command to run regression can be found in the `script` field. The result will be written to the `regression_results` directory.
+2. You can also manually build and run individual configuration and layer. The instruction will be added later.
 
 ## Structure
-- `/data` test data for verification
+- `/data` test data for simulation
 - `/lib` external libraries we are using
 - `/models` DNN models that can be run for verification
 - `/scripts` various `.tcl` scripts for RTL generation
 - `/src` actual SystemC accelerator implementation
 - `/test` contains the testing infrastructure, mostly SystemC/C++ files that invoke the accelerator 
-- `/zagzig` codegen to automatically generate code for MINOTAUR
 - `Makefile` builds the source code
-- `run_test.py` main script to invoke tests from
+- `run_regression.py` main script to invoke regression tests
 
 ## Integration
 The accelerator by itself is not very useful. It has to be integrated into an SoC. We are using the [Chipyard Framework](https://github.com/ucb-bar/chipyard) for that. Our fork [`soc`](https://code.stanford.edu/tsmc40r/brainpower/soc) of Chipyard includes the [`minotaur-blocks`](https://code.stanford.edu/tsmc40r/brainpower/minotaur-blocks) repo as a submodule under `soc/generators/minotaur-blocks`, which in turn includes this [`accelerator`](https://code.stanford.edu/tsmc40r/brainpower/accelerator) repo under `minotaur-blocks/src/main/resources/sysc/accelerator`.
