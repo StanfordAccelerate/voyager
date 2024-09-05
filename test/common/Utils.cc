@@ -6,9 +6,6 @@
 #include <string>
 #include <vector>
 
-// #include "matplotlib-cpp/matplotlibcpp.h"
-// namespace plt = matplotlibcpp;
-
 inline float readValue(INPUT_DATATYPE *matrix, int index,
                        bool doublePrecision) {
   if (!doublePrecision) {
