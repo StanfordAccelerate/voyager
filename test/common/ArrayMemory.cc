@@ -1,31 +1,13 @@
-#pragma once
+#include "test/common/ArrayMemory.h"
 
-#include "test/common/MemoryModel.h"
+// clang-format off
+#include "src/DataTypes.h"
+// clang-format on
 
-#define NO_SYSC
-
-template <class T>
-class MemoryModelImpl : public MemoryModel {
- public:
-  MemoryModelImpl(std::vector<int>, bool);
-  ~MemoryModelImpl();
-
-  std::vector<T*> memories;
-
-  T* get_memory(const int partition);
-  T* get_tensor(const codegen::Tensor& tensor);
-  std::vector<T*> get_args(const codegen::AcceleratorParam& param);
-  T* get_output(const codegen::AcceleratorParam& param);
-
- private:
-  void write_to_memory(const int address, const float value,
-                       const int partition, bool double_precision) override;
-};
+#include "src/ArchitectureParams.h"
 
 template <class T>
-inline MemoryModelImpl<T>::MemoryModelImpl(std::vector<int> sizes,
-                                                         bool is_dut)
-    : MemoryModel(is_dut) {
+ArrayMemory<T>::ArrayMemory(std::vector<int> sizes) : MemoryInterface() {
   memories.reserve(sizes.size());
   try {
     for (int size : sizes) {
@@ -45,14 +27,14 @@ inline MemoryModelImpl<T>::MemoryModelImpl(std::vector<int> sizes,
 }
 
 template <class T>
-inline MemoryModelImpl<T>::~MemoryModelImpl() {
+ArrayMemory<T>::~ArrayMemory() {
   for (T* memory : memories) {
     delete[] memory;
   }
 }
 
 template <class T>
-inline T* MemoryModelImpl<T>::get_memory(int partition) {
+T* ArrayMemory<T>::get_memory(int partition) {
   if (partition < 0) {
     partition += memories.size();
   }
@@ -64,13 +46,13 @@ inline T* MemoryModelImpl<T>::get_memory(int partition) {
 }
 
 template <class T>
-inline T* MemoryModelImpl<T>::get_tensor(const codegen::Tensor& tensor) {
+T* ArrayMemory<T>::get_tensor(const codegen::Tensor& tensor) {
   int partition = tensor.memory().partition();
   return get_memory(partition) + tensor.memory().offset();
 }
 
 template <class T>
-inline std::vector<T*> MemoryModelImpl<T>::get_args(
+std::vector<T*> ArrayMemory<T>::get_args(
     const codegen::AcceleratorParam& param) {
   std::vector<T*> args;
   std::string output_node = "";
@@ -119,8 +101,7 @@ inline std::vector<T*> MemoryModelImpl<T>::get_args(
  * output tensor is stored at the last partition with an offset of 0.
  */
 template <class T>
-inline T* MemoryModelImpl<T>::get_output(
-    const codegen::AcceleratorParam& param) {
+T* ArrayMemory<T>::get_output(const codegen::AcceleratorParam& param) {
   codegen::Tensor output_tensor;
   output_tensor.CopyFrom(param.output());
   auto memory = output_tensor.mutable_memory();
@@ -130,17 +111,18 @@ inline T* MemoryModelImpl<T>::get_output(
 }
 
 template <>
-inline void MemoryModelImpl<float>::write_to_memory(
-    const int address, const float value, const int partition,
-    bool double_precision) {
+void ArrayMemory<float>::write_to_memory(const int address, const float value,
+                                         const int partition,
+                                         bool double_precision) {
   auto memory = get_memory(partition);
   memory[address] = value;
 }
 
 template <>
-inline void MemoryModelImpl<INPUT_DATATYPE>::write_to_memory(
-    const int address, const float value, const int partition,
-    bool double_precision) {
+void ArrayMemory<INPUT_DATATYPE>::write_to_memory(const int address,
+                                                  const float value,
+                                                  const int partition,
+                                                  bool double_precision) {
   auto memory = get_memory(partition);
   if (double_precision) {
     ACCUM_DATATYPE posit16 = static_cast<ACCUM_DATATYPE>(value);
@@ -149,3 +131,6 @@ inline void MemoryModelImpl<INPUT_DATATYPE>::write_to_memory(
     memory[address] = static_cast<INPUT_DATATYPE>(value);
   }
 }
+
+template class ArrayMemory<float>;
+template class ArrayMemory<INPUT_DATATYPE>;

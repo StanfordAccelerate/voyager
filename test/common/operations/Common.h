@@ -8,7 +8,6 @@
 // clang-format on
 
 #include "src/ArchitectureParams.h"
-#include "test/common/MemoryModel.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 

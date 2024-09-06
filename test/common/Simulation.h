@@ -10,7 +10,8 @@
 #include "src/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
-#include "test/common/MemoryModelImpl.h"
+#include "test/common/ArrayMemory.h"
+#include "test/common/DataLoader.h"
 #include "test/compiler/proto/param.pb.h"
 
 void run_gold_model(std::vector<codegen::AcceleratorParam> params,
@@ -33,7 +34,8 @@ class Simulation {
   float tolerance = 0.1;
 
   std::vector<codegen::AcceleratorParam> params;
-  std::map<std::string, MemoryModel *> memories;
+  std::map<std::string, MemoryInterface *> memories;
+  std::map<std::string, DataLoader *> dataLoaders;
 
  private:
   std::string get_env_var(std::string const &name);

@@ -2,7 +2,6 @@
 
 #include "src/AccelTypes.h"
 #include "src/Params.h"
-#include "test/common/MemoryModel.h"
 #include "test/common/GoldModel.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"

@@ -12,8 +12,9 @@
 #include "src/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
+#include "test/common/ArrayMemory.h"
+#include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
-#include "test/common/MemoryModelImpl.h"
 #include "test/common/Network.h"
 #include "test/common/Utils.h"
 #include "test/common/VerificationTypes.h"
@@ -24,15 +25,15 @@ bool run_sample(std::string model_name, std::string data_dir,
                 std::string sample,
                 std::vector<codegen::AcceleratorParam> params) {
   std::vector<int> memory_sizes{SRAM_MEMORY_SIZE};
-  auto memory =
-      std::make_unique<MemoryModelImpl<INPUT_DATATYPE>>(memory_sizes, false);
+  auto memory = std::make_unique<ArrayMemory<INPUT_DATATYPE>>(memory_sizes);
+  auto data_loader = std::make_unique<DataLoader>(memory.get(), false);
 
   int num_classes;
   auto matrix_param = params.front().matrix_param();
   std::string sample_dir = data_dir + "/" + sample;
   if (model_name == "mobilebert") {
     num_classes = 2;
-    memory->load_tensor(matrix_param.input(), sample_dir);
+    data_loader->load_tensor(matrix_param.input(), sample_dir);
 
     // Load attention mask
     bool found_param = false;
@@ -40,7 +41,7 @@ bool run_sample(std::string model_name, std::string data_dir,
       for (const auto& vector_param : param.vector_params()) {
         if (vector_param.has_other() &&
             vector_param.other().node() == "arg1_1") {
-          memory->load_tensor(vector_param.other(), sample_dir);
+          data_loader->load_tensor(vector_param.other(), sample_dir);
           found_param = true;
           break;
         }
@@ -58,7 +59,7 @@ bool run_sample(std::string model_name, std::string data_dir,
     // Uncomment for testing
     // sample_dir = "test/compiler/networks/" + model_name + "/tensor_files";
     // Turn replication padding on only for accelerator (false here).
-    memory->load_tensor(matrix_param.input(), sample_dir, true);
+    data_loader->load_tensor(matrix_param.input(), sample_dir, true);
   }
 
   std::string params_dir =

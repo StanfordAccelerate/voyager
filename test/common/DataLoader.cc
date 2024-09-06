@@ -1,84 +1,15 @@
-#pragma once
-
-#include <fstream>
-#include <iostream>
-#include <random>
+#include "test/common/DataLoader.h"
 
 #include "xtensor/xadapt.hpp"
 #include "xtensor/xarray.hpp"
 
-// clang-format off
-#include "src/DataTypes.h"
-// clang-format on
+DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut)
+    : memory_interface(memory_interface), is_dut(is_dut) {}
 
-#include "src/ArchitectureParams.h"
-#include "test/common/VerificationTypes.h"
-#include "test/compiler/proto/param.pb.h"
-
-// Function to check if the tensor requires double precision
-// Can be updated in the future.
-inline bool is_double_precision(const codegen::Tensor& tensor) {
-  // FIXME: replace with proper check
-  // return tensor.dtype().find("8") == std::string::npos;
-  return false;
-}
-
-inline float* read_tensor_from_file(const std::string& filename, int size,
-                                    bool random_data) {
-  float* value_ptr = new float[size];
-
-  if (!random_data) {
-    std::ifstream input_stream(filename, std::ios::binary);
-    if (!input_stream.good()) {
-      throw std::runtime_error("File \"" + filename + "\" does not exist");
-    }
-    input_stream.read(reinterpret_cast<char*>(value_ptr), size * sizeof(float));
-    if (!input_stream) {
-      throw std::runtime_error(
-          "Failed to read the expected amount of data from the file");
-    }
-  } else {
-    static std::default_random_engine engine;
-    static std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
-
-    for (int i = 0; i < size; i++) {
-      value_ptr[i] = distribution(engine);
-    }
-  }
-
-  return value_ptr;
-}
-
-class MemoryModel {
- public:
-  MemoryModel(bool);
-
-  void load_inputs(const codegen::AcceleratorParam param, std::string data_dir,
-                   bool random_data = false);
-  void load_weights(const codegen::AcceleratorParam param, std::string data_dir,
-                    bool random_data = false);
-  void load_outputs(const codegen::AcceleratorParam param,
-                    std::string data_dir);
-  void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
-                   bool transpose = false, bool replication = false,
-                   bool double_precision_ow = false, bool is_output = false,
-                   bool random_data = false);
-
- protected:
-  virtual void write_to_memory(const int address, const float value,
-                               const int parttion, bool double_precision) = 0;
-
-  // special addressing is sometimes needed for DUT memory (ex. replication)
-  bool is_dut;
-};
-
-inline MemoryModel::MemoryModel(bool is_dut) : is_dut(is_dut) {}
-
-inline void MemoryModel::load_tensor(const codegen::Tensor& tensor,
-                                            std::string data_dir,
-                                            bool transpose, bool replication,
-                                            bool double_precision_ow,
-                                            bool is_output, bool random_data) {
+void DataLoader::load_tensor(const codegen::Tensor& tensor,
+                             std::string data_dir, bool transpose,
+                             bool replication, bool double_precision_ow,
+                             bool is_output, bool random_data) {
   auto repeated_field = tensor.shape();
   std::vector<size_t> shape(repeated_field.begin(), repeated_field.end());
   int size = 1;
@@ -114,8 +45,8 @@ inline void MemoryModel::load_tensor(const codegen::Tensor& tensor,
 
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
-    write_to_memory(offset + address_multiplier * address, *it, partition,
-                    double_precision);
+    memory_interface->write_to_memory(offset + address_multiplier * address,
+                                      *it, partition, double_precision);
     address++;
     if (replication && address % IC_DIMENSION == packing_factor) {
       address += IC_DIMENSION - packing_factor;
@@ -125,9 +56,8 @@ inline void MemoryModel::load_tensor(const codegen::Tensor& tensor,
   delete[] array_ptr;
 }
 
-inline void MemoryModel::load_inputs(
-    const codegen::AcceleratorParam param, std::string data_dir,
-    bool random_data) {
+void DataLoader::load_inputs(const codegen::AcceleratorParam param,
+                             std::string data_dir, bool random_data) {
   // convolution layer inputs/outputs need to be permuted. If the matrix
   // operation is a convolution, the following fused vector operations will
   // need to be permuted as well. This logic should be refined in the future.
@@ -170,9 +100,8 @@ inline void MemoryModel::load_inputs(
   }
 }
 
-inline void MemoryModel::load_weights(
-    const codegen::AcceleratorParam param, std::string data_dir,
-    bool random_data) {
+void DataLoader::load_weights(const codegen::AcceleratorParam param,
+                              std::string data_dir, bool random_data) {
   if (param.has_matrix_param() && param.matrix_param().opcode() != "matmul") {
     const auto matrix_param = param.matrix_param();
     // Transpose linear weights except for matrix vector multiply
@@ -205,8 +134,8 @@ inline void MemoryModel::load_weights(
   }
 }
 
-inline void MemoryModel::load_outputs(
-    const codegen::AcceleratorParam param, std::string data_dir) {
+void DataLoader::load_outputs(const codegen::AcceleratorParam param,
+                              std::string data_dir) {
   codegen::Tensor output_tensor;
   output_tensor.CopyFrom(param.output());
   auto memory = output_tensor.mutable_memory();
@@ -216,4 +145,35 @@ inline void MemoryModel::load_outputs(
   bool transpose =
       param.matrix_param().opcode() == "conv2d" || param.has_pooling_param();
   load_tensor(output_tensor, data_dir, transpose, false, false, true);
+}
+
+bool DataLoader::is_double_precision(const codegen::Tensor& tensor) {
+  // FIXME: replace with proper check
+  return false;
+}
+
+float* DataLoader::read_tensor_from_file(const std::string& filename, int size,
+                                         bool random_data) {
+  float* value_ptr = new float[size];
+
+  if (!random_data) {
+    std::ifstream input_stream(filename, std::ios::binary);
+    if (!input_stream.good()) {
+      throw std::runtime_error("File \"" + filename + "\" does not exist");
+    }
+    input_stream.read(reinterpret_cast<char*>(value_ptr), size * sizeof(float));
+    if (!input_stream) {
+      throw std::runtime_error(
+          "Failed to read the expected amount of data from the file");
+    }
+  } else {
+    static std::default_random_engine engine;
+    static std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
+    for (int i = 0; i < size; i++) {
+      value_ptr[i] = distribution(engine);
+    }
+  }
+
+  return value_ptr;
 }

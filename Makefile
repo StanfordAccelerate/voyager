@@ -191,13 +191,13 @@ MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
 ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
 	./$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
 
-$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a
+$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/networks.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a
+$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/networks.a
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/networks.a
+$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/networks.a
 	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
 
 # Unit tests for custom Posit implementation
@@ -219,7 +219,13 @@ $(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h te
 $(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h test/common/MemoryModel.h test/common/MemoryModelImpl.h test/common/operations/*.h test/common/VerificationTypes.h
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h test/common/operations/*.h test/common/VerificationTypes.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/ArrayMemory.o: test/common/ArrayMemory.cc test/common/ArrayMemory.h test/common/MemoryInterface.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc

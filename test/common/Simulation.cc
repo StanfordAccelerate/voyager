@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "test/common/ArrayMemory.h"
+#include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
 #include "test/common/Network.h"
 #include "test/common/Utils.h"
@@ -20,9 +22,6 @@ namespace std {
 namespace filesystem = experimental::filesystem;
 }
 #endif
-
-using FloatMemoryModel = MemoryModelImpl<float>;
-using HlsMemoryModel = MemoryModelImpl<INPUT_DATATYPE>;
 
 Simulation::Simulation() {
   model = get_env_var("NETWORK");
@@ -81,23 +80,26 @@ void Simulation::load_data() {
   std::vector<int> memory_sizes{SRAM_MEMORY_SIZE, RRAM_MEMORY_SIZE,
                                 REFERENCE_MEMORY_SIZE};
   if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-    memories["fp32"] = new FloatMemoryModel(memory_sizes, false);
+    memories["fp32"] = new ArrayMemory<float>(memory_sizes);
+    dataLoaders["fp32"] = new DataLoader(memories["fp32"], false);
   }
   if (std::find(sims.begin(), sims.end(), "systemc") != sims.end()) {
-    memories["systemc"] = new HlsMemoryModel(memory_sizes, false);
+    memories["systemc"] = new ArrayMemory<INPUT_DATATYPE>(memory_sizes);
+    dataLoaders["systemc"] = new DataLoader(memories["systemc"], false);
   }
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    memories["accelerator"] = new HlsMemoryModel(memory_sizes, true);
+    memories["accelerator"] = new ArrayMemory<INPUT_DATATYPE>(memory_sizes);
+    dataLoaders["accelerator"] = new DataLoader(memories["accelerator"], true);
   }
 
   std::string project_root = std::string(getenv("PROJECT_ROOT"));
   std::string data_dir =
       project_root + "/test/compiler/networks/" + model + "/tensor_files";
-  for (const auto& [key, mem] : memories) {
-    mem->load_inputs(params.front(), data_dir);
-    mem->load_outputs(params.back(), data_dir);
+  for (const auto& [key, dataLoader] : dataLoaders) {
+    dataLoader->load_inputs(params.front(), data_dir);
+    dataLoader->load_outputs(params.back(), data_dir);
     for (const auto& param : params) {
-      mem->load_weights(param, data_dir);
+      dataLoader->load_weights(param, data_dir);
     }
   }
 }
@@ -106,13 +108,13 @@ void Simulation::run() {
   // Run gold models
   for (const auto& param : params) {
     if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-      auto memory = (FloatMemoryModel*)(memories["fp32"]);
+      auto memory = (ArrayMemory<float>*)(memories["fp32"]);
       auto args = memory->get_args(param);
       run_gold_model(param, args);
     }
 
     if (std::find(sims.begin(), sims.end(), "systemc") != sims.end()) {
-      auto memory = (HlsMemoryModel*)(memories["systemc"]);
+      auto memory = (ArrayMemory<INPUT_DATATYPE>*)(memories["systemc"]);
       auto args = memory->get_args(param);
       run_gold_model(param, args);
     }
@@ -120,7 +122,7 @@ void Simulation::run() {
 
   // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    auto memory = (HlsMemoryModel*)(memories["accelerator"]);
+    auto memory = (ArrayMemory<INPUT_DATATYPE>*)(memories["accelerator"]);
     run_gold_model(params, memory->memories[0], memory->memories[1]);
   }
 }
@@ -143,9 +145,10 @@ int Simulation::check_outputs() {
 
   bool file = std::find(sims.begin(), sims.end(), "file") != sims.end();
 
-  auto fp32_memory = (FloatMemoryModel*)memories["fp32"];
-  auto systemc_memory = (HlsMemoryModel*)memories["systemc"];
-  auto accelerator_memory = (HlsMemoryModel*)memories["accelerator"];
+  auto fp32_memory = (ArrayMemory<float>*)memories["fp32"];
+  auto systemc_memory = (ArrayMemory<INPUT_DATATYPE>*)memories["systemc"];
+  auto accelerator_memory =
+      (ArrayMemory<INPUT_DATATYPE>*)memories["accelerator"];
 
   if (fp32_memory && file) {
     std::cout << "FP32 PyTorch Gold Model vs. Pytorch" << std::endl;

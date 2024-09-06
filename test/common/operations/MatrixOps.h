@@ -2,6 +2,12 @@
 
 #include "test/common/operations/Common.h"
 
+inline bool is_double_precision(const codegen::Tensor &tensor) {
+  // FIXME: replace with proper check
+  // return tensor.dtype().find("8") == std::string::npos;
+  return false;
+}
+
 inline void fused_multiply_add(float a, float b, float &c) { c += a * b; }
 
 inline void fused_multiply_add(INPUT_DATATYPE a, INPUT_DATATYPE b,
@@ -26,7 +32,7 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
   Tiling tiling;
   if (matrix_param.opcode() == "conv2d") {
     tiling = get_conv2d_tiling(param);
-  } else  {
+  } else {
     tiling = get_linear_tiling(param);
   }
 
