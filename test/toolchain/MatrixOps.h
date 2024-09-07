@@ -7,6 +7,22 @@
 #include "test/compiler/proto/param.pb.h"
 #include "test/toolchain/Common.h"
 
+inline std::vector<int> get_shape(const codegen::Tensor &tensor) {
+  auto repeated_field = tensor.shape();
+  return std::vector<int>(repeated_field.begin(), repeated_field.end());
+}
+
+inline int get_size(const std::vector<int> &shape) {
+  int size = 1;
+  for (const auto &dim : shape) size *= dim;
+  return size;
+}
+
+inline int get_size(const codegen::Tensor &tensor) {
+  const auto shape = get_shape(tensor);
+  return get_size(shape);
+}
+
 void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
                    AcceleratorMemoryMap &accelerator_memory_map,
                    VectorParams *vector_params) {

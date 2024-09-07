@@ -8,26 +8,32 @@ inline bool is_double_precision(const codegen::Tensor &tensor) {
   return false;
 }
 
-inline void fused_multiply_add(float a, float b, float &c) { c += a * b; }
+// inline void fused_multiply_add(float a, float b, float &c) { c += a * b; }
 
-inline void fused_multiply_add(INPUT_DATATYPE a, INPUT_DATATYPE b,
-                               INTERMEDIATE_DTYPE &c) {
+template <typename T, typename T2>
+inline void fused_multiply_add(T a, T b, T2 &c) {
 #ifdef HYBRID_FP8
   HYBRID_TYPE hybrid_a(a);
   HYBRID_TYPE hybrid_b(b);
   c = hybrid_a.fma(hybrid_b, c);
 #else
-  INPUT_DATATYPE::AccumulationDatatype v1 = a;
-  INPUT_DATATYPE::AccumulationDatatype v2 = b;
+  typename T::AccumulationDatatype v1 = a;
+  typename T::AccumulationDatatype v2 = b;
   c = v1.fma(v2, c);
 #endif
 }
 
 template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T>
-inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
-                          const INPUT_T *bias,
+inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
+                          std::any bias_tensor,
                           const codegen::AcceleratorParam &param) {
+  std::cout << "Running gemm op" << std::endl;
   const auto matrix_param = param.matrix_param();
+
+  INPUT_T *inputs = std::any_cast<INPUT_T *>(input_tensor);
+  INPUT_T *weights = std::any_cast<INPUT_T *>(weight_tensor);
+  // bias is assumed to be in ACCUMULATE_T
+  ACCUMULATE_T *bias = std::any_cast<ACCUMULATE_T *>(bias_tensor);
 
   Tiling tiling;
   if (matrix_param.opcode() == "conv2d") {
@@ -109,9 +115,11 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
   ACCUMULATE_T *outputs = new ACCUMULATE_T[X * Y * K];
   for (int i = 0; i < X * Y; i++) {
     for (int k = 0; k < K; k++) {
-      // TODO: bias is hardcoded to double precision right now
-      outputs[i * K + k] = matrix_param.has_bias() ? read_tensor(bias, k, true)
-                                                   : ACCUMULATE_T(0.0);
+      if (matrix_param.has_bias()) {
+        outputs[i * K + k] = bias[k];
+      } else {
+        outputs[i * K + k] = ACCUMULATE_T(0.0);
+      }
     }
   }
 
@@ -162,10 +170,8 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
                             STRIDE * x + fx < STRIDE * X &&
                             STRIDE * y + fy >= 0 &&
                             STRIDE * y + fy < STRIDE * Y) {
-                          INTERMEDIATE_T input = read_tensor(
-                              inputs, input_addr, input_double_precision);
-                          INTERMEDIATE_T weight = read_tensor(
-                              weights, weight_addr, weight_double_precision);
+                          INTERMEDIATE_T input = inputs[input_addr];
+                          INTERMEDIATE_T weight = weights[weight_addr];
                           fused_multiply_add(input, weight,
                                              outputs[output_addr]);
                         }
@@ -201,13 +207,18 @@ inline ACCUMULATE_T *gemm(const INPUT_T *inputs, const INPUT_T *weights,
 }
 
 template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T>
-inline ACCUMULATE_T *matrix_vector_multiply(const INPUT_T *inputs,
-                                            const INPUT_T *weights,
-                                            const INPUT_T *bias,
+inline ACCUMULATE_T *matrix_vector_multiply(std::any input_tensor,
+                                            std::any weight_tensor,
+                                            std::any bias_tensor,
                                             const codegen::MatrixParam &param) {
   const auto weight = param.weight();
   int K = weight.shape(0);
   int C = weight.shape(1);
+
+  INPUT_T *inputs = std::any_cast<INPUT_T *>(input_tensor);
+  INPUT_T *weights = std::any_cast<INPUT_T *>(weight_tensor);
+  // bias is assumed to be in ACCUMULATE_T
+  ACCUMULATE_T *bias = std::any_cast<ACCUMULATE_T *>(bias_tensor);
 
   bool input_double_precision = is_double_precision(param.input());
   bool weight_double_precision = is_double_precision(param.weight());
@@ -221,9 +232,8 @@ inline ACCUMULATE_T *matrix_vector_multiply(const INPUT_T *inputs,
   for (int k = 0; k < K; k++) {
     ACCUMULATE_T product[C];
     for (int c = 0; c < C; c++) {
-      ACCUMULATE_T input = read_tensor(inputs, c, input_double_precision);
-      ACCUMULATE_T weight =
-          read_tensor(weights, k * C + c, weight_double_precision);
+      ACCUMULATE_T input = inputs[c];
+      ACCUMULATE_T weight = weights[k * C + c];
       product[c] = static_cast<ACCUMULATE_T>(input * weight);
     }
 
@@ -245,7 +255,7 @@ inline ACCUMULATE_T *matrix_vector_multiply(const INPUT_T *inputs,
     }
 
     if (param.has_bias()) {
-      outputs[k] += read_tensor(bias, k, true);
+      outputs[k] += bias[k];
     }
   }
   return outputs;

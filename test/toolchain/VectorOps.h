@@ -7,6 +7,42 @@
 #include "test/compiler/proto/param.pb.h"
 #include "test/toolchain/Common.h"
 
+inline bool are_broadcastable(const std::vector<int> &shape1,
+                              const std::vector<int> &shape2) {
+  size_t len1 = shape1.size();
+  size_t len2 = shape2.size();
+  size_t min_len = std::min(len1, len2);
+
+  for (size_t i = 0; i < min_len; ++i) {
+    int dim1 = shape1[len1 - 1 - i];
+    int dim2 = shape2[len2 - 1 - i];
+    if (dim1 != dim2 && dim1 != 1 && dim2 != 1) {
+      return false;
+    }
+  }
+  return true;
+}
+
+inline std::vector<int> broadcast_shape(const std::vector<int> &shape1,
+                                        const std::vector<int> &shape2) {
+  if (!are_broadcastable(shape1, shape2)) {
+    throw std::invalid_argument("Shapes are not broadcastable");
+  }
+
+  int n1 = shape1.size();
+  int n2 = shape2.size();
+  int max_size = std::max(n1, n2);
+  std::vector<int> result_shape(max_size);
+
+  for (int i = 1; i <= max_size; i++) {
+    int dim1 = n1 - i >= 0 ? shape1[n1 - i] : 1;
+    int dim2 = n2 - i >= 0 ? shape2[n2 - i] : 1;
+    result_shape[max_size - i] = std::max(dim1, dim2);
+  }
+
+  return result_shape;
+}
+
 void set_vector_addr_gen1(const codegen::Tensor &tensor,
                           const std::vector<int> &output_shape,
                           AcceleratorMemoryMap &accelerator_memory_map,

@@ -2,16 +2,20 @@
 
 #include "test/common/operations/Common.h"
 
-inline float exponent(const float &x) { return exp(x); }
+// inline float exponent(const float &x) { return exp(x); }
 
-inline INTERMEDIATE_DTYPE exponent(const INTERMEDIATE_DTYPE &x) {
-  ACCUM_DATATYPE tmp = static_cast<ACCUM_DATATYPE>(x);
+template <typename T>
+inline T exponent(const T &x) {
+  typename T::AccumulationDatatype tmp =
+      static_cast<typename T::AccumulationDatatype>(x);
   tmp.exponential();
-  return static_cast<INTERMEDIATE_DTYPE>(tmp);
+  return static_cast<T>(tmp);
 }
 
 template <typename T>
-inline T *softmax(const T *inputs, const std::vector<int> shape) {
+inline T *softmax(std::any input_tensor, const std::vector<int> shape) {
+  T *inputs = std::any_cast<T *>(input_tensor);
+
   int num_rows = 1;
   for (int i = 0; i < shape.size() - 1; i++) {
     num_rows *= shape[i];
