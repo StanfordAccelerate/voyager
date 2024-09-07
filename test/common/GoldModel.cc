@@ -129,11 +129,6 @@ void run_operation(const codegen::AcceleratorParam param,
   }
 }
 
-// void run_gold_model(const codegen::AcceleratorParam &param,
-//                     std::vector<float *> args) {
-//   run_operation<float, float, float, float>(param, args);
-// }
-
 void run_gold_model(const codegen::AcceleratorParam &param,
                     std::vector<std::any> args) {
   run_operation<INPUT_DATATYPE, INTERMEDIATE_DTYPE, ACCUM_DATATYPE,

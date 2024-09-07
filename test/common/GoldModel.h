@@ -9,8 +9,5 @@
 #include "src/ArchitectureParams.h"
 #include "test/compiler/proto/param.pb.h"
 
-// void run_gold_model(const codegen::AcceleratorParam &param,
-//                     std::vector<float *> args);
-
 void run_gold_model(const codegen::AcceleratorParam &param,
                     std::vector<std::any> args);

@@ -79,10 +79,7 @@ Simulation::Simulation() {
 void Simulation::load_data() {
   std::vector<int> memory_sizes{SRAM_MEMORY_SIZE, RRAM_MEMORY_SIZE,
                                 REFERENCE_MEMORY_SIZE};
-  if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-    memories["fp32"] = new ArrayMemory(memory_sizes);
-    dataLoaders["fp32"] = new DataLoader(memories["fp32"], false);
-  }
+
   if (std::find(sims.begin(), sims.end(), "systemc") != sims.end()) {
     memories["systemc"] = new ArrayMemory(memory_sizes);
     dataLoaders["systemc"] = new DataLoader(memories["systemc"], false);
@@ -109,12 +106,6 @@ void Simulation::load_data() {
 void Simulation::run() {
   // Run gold models
   for (const auto& param : params) {
-    if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-      auto memory = (ArrayMemory*)(memories["fp32"]);
-      auto args = memory->get_args(param);
-      // run_gold_model(param, args);
-    }
-
     if (std::find(sims.begin(), sims.end(), "systemc") != sims.end()) {
       auto memory = (ArrayMemory*)(memories["systemc"]);
       auto args = memory->get_args(param);
@@ -147,20 +138,8 @@ int Simulation::check_outputs() {
 
   bool file = std::find(sims.begin(), sims.end(), "file") != sims.end();
 
-  // auto fp32_memory = (ArrayMemory*)memories["fp32"];
   auto systemc_memory = (ArrayMemory*)memories["systemc"];
   auto accelerator_memory = (ArrayMemory*)memories["accelerator"];
-
-  // if (fp32_memory && file) {
-  //   std::cout << "FP32 PyTorch Gold Model vs. Pytorch" << std::endl;
-  //   std::cout << "(reveals issues in data loading or mapping)" << std::endl;
-  //   std::string filename = prefix + "fp32_vs_pytorch.txt";
-
-  //   rel_err += compare_arrays<CFloat, CFloat>(
-  //       fp32_memory->get_args(param).back(), "fp32",
-  //       fp32_memory->get_output(param), "file", size, filename, false);
-  //   has_valid_comp = true;
-  // }
 
   if (systemc_memory && file) {
     std::cout << "System C Gold Model vs. Pytorch" << std::endl;

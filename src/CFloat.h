@@ -95,4 +95,11 @@ class CFloat {
 
   bool operator<(const CFloat &rhs) const { return float_val < rhs.float_val; }
   operator float() const { return float_val; }
+
+#ifndef NO_SYSC
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    assert(false && "Marshall not implemented for CFloat");
+  }
+#endif
 };
