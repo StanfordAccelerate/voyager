@@ -35,10 +35,9 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   bool double_precision = double_precision_ow || is_double_precision(tensor);
   int address_multiplier = double_precision ? 2 : 1;
 
-  // if offset is 0 and size is 1, then it is a scalar, so it should not be
-  // written to memory ideally, we should not even have a memory field, so we
-  // could use has_memory() instead
-  if (offset == 0 && size == 1) {
+  // if size is 1, then it is a scalar, so it should not be
+  // written to memory
+  if (size == 1) {
     return;
   }
 
