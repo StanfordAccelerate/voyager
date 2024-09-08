@@ -85,30 +85,25 @@ void run_operation(const codegen::AcceleratorParam param,
           input_tensor, weight_tensor, args[2], param);
     }
     arg_index = 3;
+  } else if (param.vector_params_size() > 0) {
+    // fetch the input of the first vector instruction
+    output_tensor = args[arg_index++];
   }
-
-  // else if (param.vector_params_size() > 0) {
-  //   // fetch the input of the first vector instruction
-  //   const auto &vector_param = param.vector_params(0);
-  //   // output_tensor = std::any_cast<INPUT_T *>(args[arg_index++]);
-  //   // convert the input tensor to the correct datatype
-  // }
 
   for (const auto &vector_param : param.vector_params()) {
     if (activations.find(vector_param.opcode()) != activations.end()) {
-      ACCUMULATE_T *tensor = std::any_cast<ACCUMULATE_T *>(output_tensor);
+      VECTOR_T *tensor = std::any_cast<VECTOR_T *>(output_tensor);
       // TODO: Implement different activation functions
       int input_size = get_size(vector_param.input());
       for (int i = 0; i < input_size; i++) {
         relu(tensor[i]);
       }
     } else if (arithmetics.find(vector_param.opcode()) != arithmetics.end()) {
-      ACCUMULATE_T *input_tensor = std::any_cast<ACCUMULATE_T *>(output_tensor);
+      VECTOR_T *input_tensor = std::any_cast<VECTOR_T *>(output_tensor);
       const auto input_shape = get_shape(vector_param.input());
 
       const auto &other = vector_param.other();
-      ACCUMULATE_T *other_tensor =
-          std::any_cast<ACCUMULATE_T *>(args[arg_index]);
+      VECTOR_T *other_tensor = std::any_cast<VECTOR_T *>(args[arg_index]);
       const auto other_shape = get_shape(other);
 
       output_tensor =
@@ -119,11 +114,22 @@ void run_operation(const codegen::AcceleratorParam param,
       delete[] other_tensor;
     } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
       // perform quantization operation
-      VECTOR_T *input_tensor = std::any_cast<VECTOR_T *>(args[arg_index++]);
-      VECTOR_T *scale = std::any_cast<VECTOR_T *>(args[arg_index++]);
-
       output_tensor = quantize<VECTOR_T, INPUT_T>(
-          input_tensor, *scale, get_size(vector_param.input()));
+          output_tensor, args[arg_index++], get_size(vector_param.input()));
+    } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
+      std::cout << "Dequantizing" << std::endl;
+      // perform dequantization operation
+
+      if (vector_param.input().dtype() == "int32") {
+        output_tensor = dequantize<DataTypes::int32, VECTOR_T>(
+            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      } else if (vector_param.input().dtype() == "int8") {
+        output_tensor = dequantize<DataTypes::int8, VECTOR_T>(
+            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      } else {
+        std::cerr << "No dequantization operation for dtype: "
+                  << vector_param.input().dtype() << std::endl;
+      }
     } else {
       std::cerr << "Unsupported vector instruction: " << vector_param.opcode()
                 << std::endl;
