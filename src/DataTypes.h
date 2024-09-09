@@ -1,4 +1,13 @@
 #pragma once
+#include <ac_std_float.h>
+
+// forward declarations
+template <int mantissa, int exp, bool useDWImpl,
+          bool ieee_compliance, ac_q_mode Q>
+class StdFloat;
+
+template <int wdth, bool sgnd>
+class Int;
 
 // #include "FloatTypes.h"
 #include "IntTypes.h"

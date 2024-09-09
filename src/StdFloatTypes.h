@@ -128,6 +128,12 @@ class StdFloat {
       StdFloat &b,
       StdFloat<mantissa2, exp2, useDWImpl2, ieee_compliance2, Q2> &c);
 
+  template <int quantized_width, int quantized_sign>
+  Int<quantized_width, quantized_sign> quantize(ac_int<width, false> scale);
+
+  template <int quantized_width, int quantized_sign>
+  Int<quantized_width, quantized_sign> quantize(StdFloat scale);
+
   StdFloat operator+(const StdFloat &rhs);
   StdFloat operator*(const StdFloat &rhs);
   StdFloat operator/(const StdFloat &rhs);
@@ -356,6 +362,34 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::fma(
     return a_higherprecision.float_val.template fma<Q, !ieee_compliance>(
         b_higherprecision.float_val, c.float_val);
   }
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int quantized_width, int quantized_sign>
+Int<quantized_width, quantized_sign>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
+    ac_int<width, false> scale) {
+  StdFloat scale_float;
+  scale_float.setbits(scale);
+  return quantize<quantized_width, quantized_sign>(scale_float);
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int quantized_width, int quantized_sign>
+Int<quantized_width, quantized_sign>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
+    StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scale) {
+  StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scaledValue =
+      *this / scale;
+
+  Int<quantized_width, quantized_sign> quantizedValue;
+  quantizedValue.int_val =
+      scaledValue.float_val
+          .template convert_to_ac_int<quantized_width, quantized_sign>();
+
+  return quantizedValue;
 }
 
 /*

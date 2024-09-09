@@ -141,6 +141,16 @@ class Int {
   template <int wdth2, bool sgnd2>
   Int<wdth2, sgnd2> fma(Int &b, Int<wdth2, sgnd2> &c);
 
+  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+            ac_q_mode Q>
+  StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> dequantize(
+      ac_int<1 + mantissa + exp, false> scale);
+
+  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+            ac_q_mode Q>
+  StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> dequantize(
+      StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scale);
+
   Int operator+(const Int &rhs);
   Int operator*(const Int &rhs);
   Int operator/(const Int &rhs);
@@ -306,4 +316,28 @@ typename Int<wdth_o, sgnd_o>::AccumulationDatatype decomposed_fma(
 
   return a_higherprecision.int_val.template fma<AC_TRN_ZERO, true>(
       b_higherprecision.int_val, c.int_val);
+}
+
+template <int wdth, bool sgnd>
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
+Int<wdth, sgnd>::dequantize(ac_int<1 + mantissa + exp, false> scale) {
+  StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scale_float;
+  scale_float.setbits(scale);
+  return dequantize(scale_float);
+}
+
+template <int wdth, bool sgnd>
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
+Int<wdth, sgnd>::dequantize(
+    StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scale) {
+  StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> dequantized_value;
+  dequantized_value.float_val.template assign_from<AC_RND_CONV, wdth, sgnd>(
+      int_val);
+  dequantized_value *= scale;
+
+  return dequantized_value;
 }
