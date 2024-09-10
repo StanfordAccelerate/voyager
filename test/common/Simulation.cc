@@ -141,28 +141,21 @@ int Simulation::check_outputs() {
   auto systemc_memory = (ArrayMemory*)memories["systemc"];
   auto accelerator_memory = (ArrayMemory*)memories["accelerator"];
 
+  std::any output_tensor;
+  std::any reference_output_tensor;
+  std::string filename;
+  std::string output_tensor_names[2];
+
   if (systemc_memory && file) {
     std::cout << "System C Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
-    std::string filename = prefix + "systemc_vs_pytorch.txt";
+    filename = prefix + "systemc_vs_pytorch.txt";
 
-    std::any output_tensor = systemc_memory->get_output(param);
-    std::any reference_output_tensor =
-        systemc_memory->get_reference_output(param);
-    if (param.output().dtype() == "int8") {
-      rel_err += compare_arrays<DataTypes::int8, DataTypes::int8>(
-          output_tensor, "gold_model", reference_output_tensor, "file", size,
-          filename, false);
-    } else if (param.output().dtype() == "bfloat16") {
-      rel_err += compare_arrays<DataTypes::bfloat16, DataTypes::bfloat16>(
-          output_tensor, "gold_model", reference_output_tensor, "file", size,
-          filename, false);
-    } else {
-      // if unspecified, we will assume it's INPUT_DATATYPE
-      rel_err += compare_arrays<INPUT_DATATYPE, INPUT_DATATYPE>(
-          output_tensor, "gold_model", reference_output_tensor, "file", size,
-          filename, false);
-    }
+    output_tensor_names[0] = "gold_model";
+    output_tensor = systemc_memory->get_output(param);
+
+    output_tensor_names[1] = "file";
+    reference_output_tensor = systemc_memory->get_reference_output(param);
 
     has_valid_comp = true;
   }
@@ -171,11 +164,14 @@ int Simulation::check_outputs() {
     std::cout << "Accelerator vs. System C Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
-    std::string filename = prefix + "accelerator_vs_pytorch.txt";
+    filename = prefix + "accelerator_vs_pytorch.txt";
 
-    rel_err += compare_arrays<INPUT_DATATYPE, INPUT_DATATYPE>(
-        accelerator_memory->get_args(param).back(), "accelerator",
-        accelerator_memory->get_output(param), "file", size, filename, false);
+    output_tensor_names[0] = "accelerator";
+    output_tensor = accelerator_memory->get_output(param);
+
+    output_tensor_names[1] = "file";
+    reference_output_tensor = accelerator_memory->get_reference_output(param);
+
     has_valid_comp = true;
   }
 
@@ -183,13 +179,32 @@ int Simulation::check_outputs() {
     std::cout << "Accelerator vs. System C Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
-    std::string filename = prefix + "accelerator_vs_systemc.txt";
+    filename = prefix + "accelerator_vs_systemc.txt";
 
-    rel_err += compare_arrays<INPUT_DATATYPE, INPUT_DATATYPE>(
-        accelerator_memory->get_args(param).back(), "accelerator",
-        systemc_memory->get_args(param).back(), "systemc", size, filename,
-        false);
+    output_tensor_names[0] = "accelerator";
+    output_tensor = accelerator_memory->get_output(param);
+
+    output_tensor_names[1] = "gold_model";
+    reference_output_tensor = systemc_memory->get_output(param);
+
     has_valid_comp = true;
+  }
+
+  if (has_valid_comp) {
+    if (param.output().dtype() == "int8") {
+      rel_err += compare_arrays<DataTypes::int8, DataTypes::int8>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
+    } else if (param.output().dtype() == "bfloat16") {
+      rel_err += compare_arrays<DataTypes::bfloat16, DataTypes::bfloat16>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
+    } else {
+      // if unspecified, we will assume it's INPUT_DATATYPE
+      rel_err += compare_arrays<INPUT_DATATYPE, INPUT_DATATYPE>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
+    }
   }
 
   if (!has_valid_comp) {
