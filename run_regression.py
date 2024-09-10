@@ -46,6 +46,7 @@ def run_fp32_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
+    env_vars["CLOCK_PERIOD"] = "1"
     env_vars["SIMS"] = "fp32,file"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
@@ -107,6 +108,7 @@ def run_systemc_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
+    env_vars["CLOCK_PERIOD"] = "1"
     env_vars["SIMS"] = "systemc,accelerator"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
