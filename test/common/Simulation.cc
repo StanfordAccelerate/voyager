@@ -90,8 +90,9 @@ void Simulation::load_data() {
   }
 
   std::string project_root = std::string(getenv("PROJECT_ROOT"));
-  std::string data_dir =
-      project_root + "/test/compiler/networks/" + model + "/tensor_files";
+  std::string datatype = std::string(getenv("DATATYPE"));
+  std::string data_dir = project_root + "/test/compiler/networks/" + model +
+                         "/" + datatype + "/tensor_files";
   for (const auto& [key, dataLoader] : dataLoaders) {
     dataLoader->load_inputs(params.front(), data_dir);
     dataLoader->load_outputs(params.back(), data_dir);

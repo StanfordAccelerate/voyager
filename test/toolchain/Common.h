@@ -40,8 +40,10 @@ inline float read_constant_param(const codegen::Tensor tensor) {
   const char *env_var = std::getenv("NETWORK");
   std::string model_name(env_var);
   std::string project_root = std::string(std::getenv("PROJECT_ROOT"));
+  std::string datatype = std::string(std::getenv("DATATYPE"));
   std::string filename = project_root + "/test/compiler/networks/" +
-                         model_name + "/tensor_files/" + tensor.node() + ".bin";
+                         model_name + "/" + datatype + "/tensor_files/" +
+                         tensor.node() + ".bin";
 
   float *array_ptr = new float[1];
   std::ifstream input_stream(filename, std::ios::binary);
