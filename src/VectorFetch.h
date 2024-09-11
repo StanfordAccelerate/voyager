@@ -1,6 +1,6 @@
 #pragma once
 
-template <typename ODTYPE, typename ACC_DTYPE, int WIDTH>
+template <typename IO_DTYPE, typename VEC_DTYPE, int WIDTH>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -10,16 +10,19 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
 
-  Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch0DataResponse);
-  Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
+  Connections::In<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(
+      vectorFetch0DataResponse);
+  Connections::Out<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch0DataResponseBroadcasted);
 
-  Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1DataResponse);
-  Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
+  Connections::In<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(
+      vectorFetch1DataResponse);
+  Connections::Out<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch1DataResponseConverted);
 
-  Connections::In<Pack1D<ODTYPE, WIDTH> > CCS_INIT_S1(vectorFetch2DataResponse);
-  Connections::Out<Pack1D<ACC_DTYPE, WIDTH> > CCS_INIT_S1(
+  Connections::In<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(
+      vectorFetch2DataResponse);
+  Connections::Out<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(addressGen0Params);
@@ -140,16 +143,13 @@ SC_MODULE(VectorFetchUnit) {
                   }
 
                   if (params.DP_VEC0) {
-                    for (int i = 0; i < 2; i++) {
-                      // TODO: change this to burst
-                      MemoryRequest memRequest = {
-                          params.VECTOR_OFFSET + 2 * address + i * WIDTH,
-                          WIDTH};
-                      vectorFetch0AddressRequest.Push(memRequest);
-                    }
+                    MemoryRequest memRequest = {
+                        params.VECTOR_OFFSET + address * VEC_DTYPE::width,
+                        WIDTH * VEC_DTYPE::width};
+                    vectorFetch0AddressRequest.Push(memRequest);
                   } else {
                     MemoryRequest memRequest = {params.VECTOR_OFFSET + address,
-                                                WIDTH};
+                                                WIDTH * IO_DTYPE::width};
                     vectorFetch0AddressRequest.Push(memRequest);
                   }
                 }
@@ -190,13 +190,14 @@ SC_MODULE(VectorFetchUnit) {
                     ac_int<16, false> K = params.addressGen0Loop[0][2] *
                                           params.addressGen0Loop[1][2] * WIDTH;
 
-                    Pack1D<ODTYPE, WIDTH> data = vectorFetch0DataResponse.Pop();
+                    Pack1D<IO_DTYPE, WIDTH> data =
+                        vectorFetch0DataResponse.Pop();
                     for (int dim = 0; dim < WIDTH; dim++) {
-                      ACC_DTYPE singleVal = static_cast<ACC_DTYPE>(data[dim]);
+                      VEC_DTYPE singleVal = static_cast<VEC_DTYPE>(data[dim]);
 
                       for (int broadcast = 0;
                            broadcast < broadcastCount / WIDTH; broadcast++) {
-                        Pack1D<ACC_DTYPE, WIDTH> broadcastVec;
+                        Pack1D<VEC_DTYPE, WIDTH> broadcastVec;
 
 #pragma hls_unroll yes
                         for (int broadcastDim = 0; broadcastDim < WIDTH;
@@ -227,24 +228,28 @@ SC_MODULE(VectorFetchUnit) {
                      j1 < params.addressGen0Loop[1][1]; j1++) {
                   for (ac_int<11, false> k1 = 0;
                        k1 < params.addressGen0Loop[1][2]; k1++) {
-                    Pack1D<ACC_DTYPE, WIDTH> fullPrecisionDataResponse;
+                    Pack1D<VEC_DTYPE, WIDTH> fullPrecisionDataResponse;
                     if (params.DP_VEC0) {
-                      for (int i = 0; i < 2; i++) {
-                        Pack1D<ODTYPE, WIDTH> response =
-                            vectorFetch0DataResponse.Pop();
-#pragma hls_unroll yes
-                        for (int j = 0; j < WIDTH / 2; j++) {
-                          fullPrecisionDataResponse.value[i * WIDTH / 2 + j] =
-                              ACC_DTYPE(&response[j * 2]);
-                        }
+                      // combine multiple IO_DTYPE into one VEC_DTYPE
+                      constexpr int num_words =
+                          VEC_DTYPE::width / IO_DTYPE::width;
+
+                      Pack1D<IO_DTYPE, WIDTH> response[num_words];
+
+                      for (int i = 0; i < num_words; i++) {
+                        response[i] = vectorFetch0DataResponse.Pop();
                       }
+                      convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                          response, fullPrecisionDataResponse);
                     } else {
-                      Pack1D<ODTYPE, WIDTH> response =
+                      // directly set bits, assume dequantization will happen
+                      // later
+                      Pack1D<IO_DTYPE, WIDTH> response =
                           vectorFetch0DataResponse.Pop();
 #pragma hls_unroll yes
                       for (int dim = 0; dim < WIDTH; dim++) {
-                        fullPrecisionDataResponse[dim] =
-                            static_cast<ACC_DTYPE>(response[dim]);
+                        fullPrecisionDataResponse[dim].setbits(
+                            response[dim].bits_rep());
                       }
                     }
                     vectorFetch0DataResponseBroadcasted.Push(
@@ -340,10 +345,14 @@ SC_MODULE(VectorFetchUnit) {
                   }
 
                   if (params.DP_VEC1) {
-                    for (int i = 0; i < 2; i++) {
-                      MemoryRequest memRequest = {
-                          params.ADDRESS_GEN1_OFFSET + 2 * address + i * WIDTH,
-                          WIDTH};
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
+
+                    for (int i = 0; i < num_words; i++) {
+                      MemoryRequest memRequest = {params.ADDRESS_GEN1_OFFSET +
+                                                      num_words * address +
+                                                      i * WIDTH,
+                                                  WIDTH};
                       vectorFetch1AddressRequest.Push(memRequest);
                     }
                   } else {
@@ -397,24 +406,25 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = 0;
                      loop_counters[1][2] < loop_bounds[1][2];
                      loop_counters[1][2]++) {
-                  Pack1D<ACC_DTYPE, WIDTH> fullPrecisionDataResponse;
+                  Pack1D<VEC_DTYPE, WIDTH> fullPrecisionDataResponse;
                   if (params.DP_VEC1) {
-                    for (int i = 0; i < 2; i++) {
-                      Pack1D<ODTYPE, WIDTH> response =
-                          vectorFetch1DataResponse.Pop();
-#pragma hls_unroll yes
-                      for (int j = 0; j < WIDTH / 2; j++) {
-                        fullPrecisionDataResponse.value[i * WIDTH / 2 + j] =
-                            ACC_DTYPE(&response[j * 2]);
-                      }
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
+
+                    Pack1D<IO_DTYPE, WIDTH> response[num_words];
+
+                    for (int i = 0; i < num_words; i++) {
+                      response[i] = vectorFetch1DataResponse.Pop();
                     }
+                    convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        response, fullPrecisionDataResponse);
                   } else {
-                    Pack1D<ODTYPE, WIDTH> response =
+                    Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch1DataResponse.Pop();
 #pragma hls_unroll yes
                     for (int dim = 0; dim < WIDTH; dim++) {
-                      fullPrecisionDataResponse[dim] =
-                          static_cast<ACC_DTYPE>(response[dim]);
+                      fullPrecisionDataResponse[dim].setbits(
+                          response[dim].bits_rep());
                     }
                   }
                   vectorFetch1DataResponseConverted.Push(
@@ -509,10 +519,13 @@ SC_MODULE(VectorFetchUnit) {
                   }
 
                   if (params.DP_VEC2) {
-                    for (int i = 0; i < 2; i++) {
-                      MemoryRequest memRequest = {
-                          params.ADDRESS_GEN2_OFFSET + 2 * address + i * WIDTH,
-                          WIDTH};
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
+                    for (int i = 0; i < num_words; i++) {
+                      MemoryRequest memRequest = {params.ADDRESS_GEN2_OFFSET +
+                                                      num_words * address +
+                                                      i * WIDTH,
+                                                  WIDTH};
                       vectorFetch2AddressRequest.Push(memRequest);
                     }
                   } else {
@@ -566,24 +579,24 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = 0;
                      loop_counters[1][2] < loop_bounds[1][2];
                      loop_counters[1][2]++) {
-                  Pack1D<ACC_DTYPE, WIDTH> fullPrecisionDataResponse;
+                  Pack1D<VEC_DTYPE, WIDTH> fullPrecisionDataResponse;
                   if (params.DP_VEC2) {
-                    for (int i = 0; i < 2; i++) {
-                      Pack1D<ODTYPE, WIDTH> response =
-                          vectorFetch2DataResponse.Pop();
-#pragma hls_unroll yes
-                      for (int j = 0; j < WIDTH / 2; j++) {
-                        fullPrecisionDataResponse.value[i * WIDTH / 2 + j] =
-                            ACC_DTYPE(&response[j * 2]);
-                      }
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
+                    Pack1D<IO_DTYPE, WIDTH> response[num_words];
+
+                    for (int i = 0; i < num_words; i++) {
+                      response[i] = vectorFetch2DataResponse.Pop();
                     }
+                    convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        response, fullPrecisionDataResponse);
                   } else {
-                    Pack1D<ODTYPE, WIDTH> response =
+                    Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch2DataResponse.Pop();
 #pragma hls_unroll yes
                     for (int dim = 0; dim < WIDTH; dim++) {
-                      fullPrecisionDataResponse[dim] =
-                          static_cast<ACC_DTYPE>(response[dim]);
+                      fullPrecisionDataResponse[dim].setbits(
+                          response[dim].bits_rep());
                     }
                   }
                   vectorFetch2DataResponseConverted.Push(

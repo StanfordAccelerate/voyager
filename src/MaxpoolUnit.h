@@ -102,46 +102,16 @@ SC_MODULE(MaxpoolUnit) {
 
                     Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
-                    Pack1D<DTYPE, WIDTH> outputPixel;
 
-                    Pack1D<ACC_DTYPE, WIDTH> dpOutputPixel;
-#pragma hls_unroll yes
-                    for (int i = 0; i < WIDTH; i++) {
-                      dpOutputPixel[i] =
-                          static_cast<ACC_DTYPE>(uncastedOutputPixel[i]);
+                    constexpr int num_words = ACC_DTYPE::width / DTYPE::width;
+                    Pack1D<DTYPE, WIDTH> outputPixel[num_words];
+
+                    convertPack1D<DTYPE, ACC_DTYPE, WIDTH>(uncastedOutputPixel,
+                                                           outputPixel);
+
+                    for (int word = 0; word < num_words; word++) {
+                      tensorOut.Push(outputPixel[word]);
                     }
-
-                    for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
-                      Pack1D<DTYPE, WIDTH> dpHalfVec;
-#pragma hls_unroll yes
-                      for (int i = 0; i < WIDTH / 2; i++) {
-#pragma hls_unroll yes
-                        for (int byte = 0; byte < 2; byte++) {
-                          dpHalfVec[i * 2 + byte].setbits(
-                              dpOutputPixel[vecSlice * (WIDTH / 2) + i]
-                                  .bits_rep()
-                                  .template slc<8>(byte * 8));
-                        }
-                      }
-                      tensorOut.Push(dpHalfVec);
-                    }
-
-                    // sc_lv<ACC_DTYPE::width * WIDTH> dpOutputPixelBits =
-                    //   TypeToBits<Pack1D<ACC_DTYPE, WIDTH> > (dpOutputPixel);
-
-                    // for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
-                    //   Pack1D<DTYPE, WIDTH> dpHalfVec;
-
-                    //   dpHalfVec =
-                    //       BitsToType<Pack1D<DTYPE, WIDTH> >(
-                    //       static_cast<sc_lv<DTYPE::width * WIDTH> >
-                    //       (dpOutputPixelBits[(vecSlice * (WIDTH / 2) *
-                    //       ACC_DTYPE::width),
-                    //       ((vecSlice + 1) * (WIDTH / 2) *
-                    //       ACC_DTYPE::width)]));
-
-                    //   tensorOut.Push(dpHalfVec);
-                    // }
 
                     if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;
@@ -167,7 +137,6 @@ SC_MODULE(MaxpoolUnit) {
             break;
           }
         }
-
       } else {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -224,11 +193,20 @@ SC_MODULE(MaxpoolUnit) {
                         uncastedOutputPixel = tensorIn.Pop();
                     Pack1D<DTYPE, WIDTH> outputPixel;
 
+                    // TODO: this will need to be different for other datatype
+                    // configurations. currently, i am hardcoding it for an
+                    // int/float configuration
+
 #pragma hls_unroll yes
                     for (int i = 0; i < WIDTH; i++) {
-                      outputPixel[i] =
-                          static_cast<DTYPE>(uncastedOutputPixel[i]);
+                      outputPixel[i].setbits(uncastedOutputPixel[i].bits_rep());
                     }
+
+                    // #pragma hls_unroll yes
+                    //                     for (int i = 0; i < WIDTH; i++) {
+                    //                       outputPixel[i] =
+                    //                           static_cast<DTYPE>(uncastedOutputPixel[i]);
+                    //                     }
 
                     tensorOut.Push(outputPixel);
 

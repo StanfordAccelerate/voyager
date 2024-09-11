@@ -213,6 +213,7 @@ struct MatrixParams : BaseParams {
   }
 };
 
+// TODO: this should be parameterized on VECTOR_DATATYPE
 struct VectorInstructions {
   /*
    * Vector Instruction
@@ -260,6 +261,8 @@ struct VectorInstructions {
   static const unsigned int readFromAccumulation = 3;
   static const unsigned int readFromReduce = 4;
 
+  ac_int<1, false> vDequantize;
+
   // src0 refers to lhs and src1 refers to rhs
 
   // Stage 0: add, mult
@@ -302,6 +305,10 @@ struct VectorInstructions {
   static const unsigned int vrelu = 1;
   static const unsigned int vrelumask = 2;
 
+  // Stage 5: quantize
+  ac_int<1, false> vOp5;
+  static const unsigned int vquantize = 1;
+
   ac_int<1, false> vAccumulatePush;
 
   // Vector Unit write out
@@ -330,13 +337,14 @@ struct VectorInstructions {
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
 
-  static const unsigned int width = 76;
+  static const unsigned int width = 78;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & instType;
     m & vInput;
+    m & vDequantize;
     m & vOp0Src1;
     m & vOp0;
     m & vOp1;
@@ -345,6 +353,7 @@ struct VectorInstructions {
     m & vOp3Src1;
     m & vOp3;
     m & vOp4;
+    m & vOp5;
     m & vAccumulatePush;
     m & vDest;
     m & rCount;
@@ -712,6 +721,9 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].vInput;
     }
     for (int j = 0; j < 8; j++) {
+      m& inst[j].vDequantize;
+    }
+    for (int j = 0; j < 8; j++) {
       m& inst[j].vOp0Src1;
     }
     for (int j = 0; j < 8; j++) {
@@ -734,6 +746,9 @@ struct VectorInstructionConfig : BaseParams {
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vOp4;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].vOp5;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vAccumulatePush;

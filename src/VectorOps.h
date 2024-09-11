@@ -50,10 +50,65 @@ void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH> mask,
 }
 
 #pragma hls_design ccore
+template <typename VEC_DTYPE, typename QUANTIZED_TYPE, int WIDTH>
+void vquantize(Pack1D<VEC_DTYPE, WIDTH>& op0, Pack1D<VEC_DTYPE, WIDTH>& res,
+               ac_int<VEC_DTYPE::width, false> scale) {
+  Pack1D<QUANTIZED_TYPE, WIDTH> tmp;
+
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    tmp[i] = op0[i]
+                 .template quantize<QUANTIZED_TYPE::ac_int_rep::width,
+                                    QUANTIZED_TYPE::ac_int_rep::sign>(scale);
+  }
+
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    ac_int<QUANTIZED_TYPE::ac_int_rep::width, false> tmp_bits =
+        tmp[i].bits_rep();
+    res[i].setbits(tmp_bits);
+  }
+}
+
+#pragma hls_design ccore
+template <typename VEC_DTYPE, typename QUANTIZED_TYPE, int WIDTH>
+void vdequantize(Pack1D<QUANTIZED_TYPE, WIDTH>& op0,
+                 Pack1D<VEC_DTYPE, WIDTH>& res,
+                 ac_int<VEC_DTYPE::width, false> scale_bits) {
+  VEC_DTYPE scale;
+  scale.setbits(scale_bits);
+
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    res[i] = op0[i].dequantize(scale);
+  }
+}
+
+#pragma hls_design ccore
+template <typename VEC_DTYPE, typename QUANTIZED_TYPE, int WIDTH>
+void vdequantize(Pack1D<VEC_DTYPE, WIDTH>& op0, Pack1D<VEC_DTYPE, WIDTH>& res,
+                 ac_int<VEC_DTYPE::width, false> scale_bits) {
+  VEC_DTYPE scale;
+  scale.setbits(scale_bits);
+
+  Pack1D<QUANTIZED_TYPE, WIDTH> tmp;
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    tmp[i].setbits(op0[i].bits_rep());
+  }
+
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    res[i] = tmp[i].dequantize(scale);
+  }
+}
+
+#pragma hls_design ccore
 template <typename ACC_DTYPE, int WIDTH>
 void vexp(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
   // convert to ACCUM_DATATYPE
-  Pack1D<ACCUM_DATATYPE, WIDTH> tmp;
+  // Pack1D<ACCUM_DATATYPE, WIDTH> tmp;
+  Pack1D<ACC_DTYPE, WIDTH> tmp;
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
     tmp[i] = op0[i];

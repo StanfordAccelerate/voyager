@@ -363,7 +363,7 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   auto it = param.vector_params().begin();
   bool has_vector_params = it != param.vector_params().end();
   std::string output_node = matrix_param.name();
-  for (int stage = 0; stage < 5; stage++) {
+  for (int stage = 0; stage < 6; stage++) {
     const auto opcode = has_vector_params ? it->opcode() : "nop";
     bool matched = vector_ops[stage].find(opcode) != vector_ops[stage].end();
     unsigned int vop =
@@ -371,6 +371,11 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
 
     std::cerr << "stage: " << stage << "  opcode: " << opcode
               << "  matched: " << matched << std::endl;
+
+    if (opcode.rfind("dequantize", 0) == 0) {
+      vinst.vDequantize = true;
+      matched = true;
+    }
 
     if (stage == 0) {
       vinst.vOp0 = vop;
@@ -382,6 +387,8 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
       vinst.vOp3 = vop;
     } else if (stage == 4) {
       vinst.vOp4 = vop;
+    } else if (stage == 5) {
+      vinst.vOp5 = vop;
     }
 
     if (matched) {
@@ -391,8 +398,8 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
         const int size = get_size(tensor_to_load);
         if (size == 1) {
           // TODO: Ideally this should be stroed in the vector param.
-          INPUT_DATATYPE constant = read_constant_param(tensor_to_load);
-          ACCUM_DATATYPE immediate = constant;
+          VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
+
           if (it->opcode() == "div" || it->opcode() == "div_") {
             immediate = 1.0 / immediate;
           }
@@ -403,7 +410,14 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
           } else if (stage == 3) {
             vinst.vOp3Src1 = VectorInstructions::op3immediate;
             vinst.immediate1 = immediate.bits_rep();
+          } else if (stage == 5) {
+            vinst.immediate1 = immediate.bits_rep();
           }
+
+          if (opcode.rfind("dequantize", 0) == 0) {
+            vinst.immediate0 = immediate.bits_rep();
+          }
+
         } else {
           if (stage == 0) {
             vinst.vOp0Src1 = VectorInstructions::readInterface;

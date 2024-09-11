@@ -86,21 +86,21 @@ struct PEInput {
 template <typename TYPE>
 struct PEWeight {
   TYPE data;
-  #if IC_DIMENSION == 8
-    ac_int<3, false> tag;
-  #elif IC_DIMENSION == 16
-    ac_int<4, false> tag;
-  #elif IC_DIMENSION == 32
-    ac_int<5, false> tag;
-  #endif  
+#if IC_DIMENSION == 8
+  ac_int<3, false> tag;
+#elif IC_DIMENSION == 16
+  ac_int<4, false> tag;
+#elif IC_DIMENSION == 32
+  ac_int<5, false> tag;
+#endif
 
-  #if IC_DIMENSION == 8
+#if IC_DIMENSION == 8
   static const unsigned int width = TYPE::width + 3;
-  #elif IC_DIMENSION == 16
+#elif IC_DIMENSION == 16
   static const unsigned int width = TYPE::width + 4;
-  #elif IC_DIMENSION == 32
+#elif IC_DIMENSION == 32
   static const unsigned int width = TYPE::width + 5;
-  #endif  
+#endif
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
@@ -495,4 +495,60 @@ inline std::ostream &operator<<(ostream &os, const Pack1D<TYPE, SIZE> &vec) {
     os << vec[i] << " ";
   }
   return os;
+}
+
+// Convert lower precision Pack1D to higher precision Pack1D
+template <typename LOWER_PRECISION_TYPE, typename HIGHER_PRECISION_TYPE,
+          size_t SIZE>
+void convertPack1D(Pack1D<LOWER_PRECISION_TYPE, SIZE>
+                       lowerPrecision[HIGHER_PRECISION_TYPE::width /
+                                      LOWER_PRECISION_TYPE::width],
+                   Pack1D<HIGHER_PRECISION_TYPE, SIZE> &higherPrecision) {
+  static_assert(
+      LOWER_PRECISION_TYPE::width <= HIGHER_PRECISION_TYPE::width,
+      "Lower precision type must be smaller than higher precision type.");
+
+  constexpr int num_words =
+      HIGHER_PRECISION_TYPE::width / LOWER_PRECISION_TYPE::width;
+  ac_int<HIGHER_PRECISION_TYPE::width * SIZE, false> higherPrecisionBits;
+
+#pragma hls_unroll yes
+  for (int i = 0; i < num_words; i++) {
+    higherPrecisionBits.set_slc(
+        static_cast<unsigned int>(i * LOWER_PRECISION_TYPE::width * SIZE),
+        BitsToType<ac_int<LOWER_PRECISION_TYPE::width * SIZE, false> >(
+            TypeToBits(lowerPrecision[i])));
+  }
+
+  higherPrecision = BitsToType<Pack1D<HIGHER_PRECISION_TYPE, SIZE> >(
+      TypeToBits(higherPrecisionBits));
+}
+
+// Convert higher precision Pack1D to lower precision Pack1D
+template <typename LOWER_PRECISION_TYPE, typename HIGHER_PRECISION_TYPE,
+          size_t SIZE>
+void convertPack1D(Pack1D<HIGHER_PRECISION_TYPE, SIZE> &higherPrecision,
+                   Pack1D<LOWER_PRECISION_TYPE, SIZE>
+                       lowerPrecision[HIGHER_PRECISION_TYPE::width /
+                                      LOWER_PRECISION_TYPE::width]) {
+  static_assert(
+      LOWER_PRECISION_TYPE::width <= HIGHER_PRECISION_TYPE::width,
+      "Lower precision type must be smaller than higher precision type.");
+
+  constexpr int num_words =
+      HIGHER_PRECISION_TYPE::width / LOWER_PRECISION_TYPE::width;
+
+  ac_int<HIGHER_PRECISION_TYPE::width * SIZE, false> higherPrecisionBits;
+  higherPrecisionBits =
+      BitsToType<decltype(higherPrecisionBits)>(TypeToBits(higherPrecision));
+
+#pragma hls_unroll yes
+  for (int i = 0; i < num_words; i++) {
+    ac_int<LOWER_PRECISION_TYPE::width * SIZE, false> lowerPrecisionBits;
+    lowerPrecisionBits =
+        higherPrecisionBits.template slc<LOWER_PRECISION_TYPE::width * SIZE>(
+            static_cast<unsigned int>(i * LOWER_PRECISION_TYPE::width * SIZE));
+    lowerPrecision[i] = BitsToType<Pack1D<LOWER_PRECISION_TYPE, SIZE> >(
+        TypeToBits(lowerPrecisionBits));
+  }
 }

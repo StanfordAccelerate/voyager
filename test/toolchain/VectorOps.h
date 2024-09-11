@@ -147,8 +147,9 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
     vector_params->addressGen0WeightLoopIndex[i] = 2;
   }
 
-  // TODO: double precision
-  vector_params->DP_VEC0 = false;
+  // set double precision if the datatype is not the same as the input datatype
+  vector_params->DP_VEC0 =
+      DataTypes::TypeName<INPUT_DATATYPE>::name() != vector_input.dtype();
 
   const auto output_memory = param.output().memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -167,8 +168,8 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
     vector_params->outputWeightLoopIndex[i] = 2;
   }
 
-  // TODO: double precision
-  vector_params->DP_OUTPUT = false;
+  vector_params->DP_OUTPUT =
+      DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
   // TODO: Transformer qkv output permutation
   vector_params->SPLIT_OUTPUT = false;
 
@@ -183,7 +184,7 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
   auto it = param.vector_params().begin();
   bool has_vector_params = it != param.vector_params().end();
   std::string output_node = "";
-  for (int stage = 0; stage < 5; stage++) {
+  for (int stage = 0; stage < 6; stage++) {
     const auto opcode = has_vector_params ? it->opcode() : "nop";
     bool matched = vector_ops[stage].find(opcode) != vector_ops[stage].end();
     auto vop = matched ? vinst_mappings[opcode] : VectorInstructions::nop;
@@ -201,6 +202,8 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
       vinst.vOp3 = vop;
     } else if (stage == 4) {
       vinst.vOp4 = vop;
+    } else if (stage == 5) {
+      vinst.vOp5 = vop;
     }
 
     if (matched) {
@@ -210,8 +213,8 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
         const int size = get_size(tensor_to_load);
         if (size == 1) {
           // TODO: Ideally this should be stroed in the vector param.
-          INPUT_DATATYPE constant = read_constant_param(tensor_to_load);
-          ACCUM_DATATYPE immediate = constant;
+          VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
+
           if (it->opcode() == "div" || it->opcode() == "div_") {
             immediate = 1.0 / immediate;
           }
@@ -221,6 +224,8 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
             vinst.immediate0 = immediate.bits_rep();
           } else if (stage == 3) {
             vinst.vOp3Src1 = VectorInstructions::op3immediate;
+            vinst.immediate1 = immediate.bits_rep();
+          } else if (stage == 5) {
             vinst.immediate1 = immediate.bits_rep();
           }
         } else {
