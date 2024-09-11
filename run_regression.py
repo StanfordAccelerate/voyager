@@ -170,6 +170,8 @@ def run_rtl_test(model, layer, output_folder):
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
     env_vars["SIMS"] = "systemc,accelerator"
+    # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an 
+    # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
