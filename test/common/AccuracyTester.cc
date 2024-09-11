@@ -65,7 +65,7 @@ bool run_sample(std::string model_name, std::string data_dir,
   std::string params_dir =
       "test/compiler/networks/" + model_name + "/tensor_files";
   for (const auto& param : params) {
-    memory->load_weights(param, params_dir);
+    data_loader->load_weights(param, params_dir);
   }
 
   // Run inference
@@ -114,6 +114,11 @@ int main(int argc, char* argv[]) {
     num_threads = std::stoi(argv[3]);
   }
 
+  int num_samples = -1;
+  if (argc > 4) {
+    num_samples = std::stoi(argv[4]);
+  }
+
   // Print out model name, path, and number of threads
   std::cout << "*** Accuracy Tester ***" << std::endl;
   std::cout << "-----------------------" << std::endl;
@@ -149,13 +154,18 @@ int main(int argc, char* argv[]) {
       dataset.push_back(directory);
     }
   }
-  std::cout << "Number of samples: " << dataset.size() << std::endl;
+  if (num_samples == -1) {
+    num_samples = dataset.size();
+  } else {
+    num_samples = std::min(num_samples, (int)dataset.size());
+  }
+  std::cout << "Number of samples: " << num_samples << std::endl;
 
   // Run num_threads samples in parallel
   int num_batches = dataset.size() / num_threads;
   num_batches += dataset.size() % num_threads == 0 ? 0 : 1;
   int num_correct = 0;
-  int num_samples = 0;
+  int num_finished = 0;
 
   for (int batch = 0; batch < num_batches; batch++) {
     std::vector<std::future<bool>> results;
@@ -173,10 +183,10 @@ int main(int argc, char* argv[]) {
       if (results[i].get()) {
         num_correct++;
       }
-      num_samples++;
+      num_finished++;
     }
 
-    std::cout << "Accuracy: " << num_correct << "/" << num_samples << " ("
-              << (float)num_correct / num_samples * 100 << "%)" << std::endl;
+    std::cout << "Accuracy: " << num_correct << "/" << num_finished << " ("
+              << (float)num_correct / num_finished * 100 << "%)" << std::endl;
   }
 }

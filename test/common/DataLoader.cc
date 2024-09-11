@@ -35,7 +35,7 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   bool double_precision = double_precision_ow || is_double_precision(tensor);
   int address_multiplier = double_precision ? 2 : 1;
 
-  std::cerr << "Loading tensor file " << filename << std::endl;
+  // std::cerr << "Loading tensor file " << filename << std::endl;
 
   // number of elements packed into a single word for replication
   const int packing_factor = IC_DIMENSION / 4 * 3;

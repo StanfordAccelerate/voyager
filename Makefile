@@ -198,6 +198,9 @@ sim-debug: $(CC_BUILD_DIR)/TestRunner
 .PHONY: TestRunner
 TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
 
+.PHONY: AccuracyTester
+AccuracyTester: ./$(CC_BUILD_DIR)/AccuracyTester
+
 .PHONY: MobileBertAccuracy
 MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
 	./$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
