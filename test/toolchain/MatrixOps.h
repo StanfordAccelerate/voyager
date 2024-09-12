@@ -36,7 +36,8 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
   vector_params->ADDRESS_GEN1_OFFSET = memory.offset();
   vector_params->addressGen1Mode = nonzero_dims == 1 ? 3 : 1;
   // TODO: double precision
-  vector_params->DP_VEC1 = false;
+  vector_params->DP_VEC1 =
+      DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype();
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
@@ -79,7 +80,8 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
   vector_params->ADDRESS_GEN2_OFFSET = memory.offset();
   vector_params->addressGen2Mode = nonzero_dims == 1 ? 3 : 1;
   // TODO: double precision
-  vector_params->DP_VEC2 = false;
+  vector_params->DP_VEC2 =
+      DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype();
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
@@ -347,8 +349,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
     }
   }
 
-  // TODO: double precision
-  vector_params->DP_OUTPUT = false;
+  vector_params->DP_OUTPUT =
+      DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
+
   // TODO: Transformer qkv output permutation
   vector_params->SPLIT_OUTPUT = param.output().has_permutation();
 
@@ -363,7 +366,7 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   auto it = param.vector_params().begin();
   bool has_vector_params = it != param.vector_params().end();
   std::string output_node = matrix_param.name();
-  for (int stage = 0; stage < 6; stage++) {
+  for (int stage = 0; stage < 5; stage++) {
     const auto opcode = has_vector_params ? it->opcode() : "nop";
     bool matched = vector_ops[stage].find(opcode) != vector_ops[stage].end();
     unsigned int vop =
@@ -373,7 +376,6 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
               << "  matched: " << matched << std::endl;
 
     if (opcode.rfind("dequantize", 0) == 0) {
-      vinst.vDequantize = true;
       matched = true;
     }
 
@@ -387,8 +389,6 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
       vinst.vOp3 = vop;
     } else if (stage == 4) {
       vinst.vOp4 = vop;
-    } else if (stage == 5) {
-      vinst.vOp5 = vop;
     }
 
     if (matched) {

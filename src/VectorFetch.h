@@ -144,12 +144,13 @@ SC_MODULE(VectorFetchUnit) {
 
                   if (params.DP_VEC0) {
                     MemoryRequest memRequest = {
-                        params.VECTOR_OFFSET + address * VEC_DTYPE::width,
-                        WIDTH * VEC_DTYPE::width};
+                        params.VECTOR_OFFSET +
+                            address * (VEC_DTYPE::width / IO_DTYPE::width),
+                        WIDTH * (VEC_DTYPE::width / IO_DTYPE::width)};
                     vectorFetch0AddressRequest.Push(memRequest);
                   } else {
                     MemoryRequest memRequest = {params.VECTOR_OFFSET + address,
-                                                WIDTH * IO_DTYPE::width};
+                                                WIDTH};
                     vectorFetch0AddressRequest.Push(memRequest);
                   }
                 }
@@ -242,14 +243,22 @@ SC_MODULE(VectorFetchUnit) {
                       convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
                           response, fullPrecisionDataResponse);
                     } else {
-                      // directly set bits, assume dequantization will happen
-                      // later
                       Pack1D<IO_DTYPE, WIDTH> response =
                           vectorFetch0DataResponse.Pop();
+
+                      if constexpr (VEC_DTYPE::is_floating_point &&
+                                    IO_DTYPE::is_floating_point) {
+                        // static cast to VEC_DTYPE
 #pragma hls_unroll yes
-                      for (int dim = 0; dim < WIDTH; dim++) {
-                        fullPrecisionDataResponse[dim].setbits(
-                            response[dim].bits_rep());
+                        for (int dim = 0; dim < WIDTH; dim++) {
+                          fullPrecisionDataResponse[dim] =
+                              static_cast<VEC_DTYPE>(response[dim]);
+                        }
+                      } else {
+                        // dequantize IO_DTYPE to VEC_DTYPE
+                        vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                            response, fullPrecisionDataResponse,
+                            params.vec0DequantizeScale);
                       }
                     }
                     vectorFetch0DataResponseBroadcasted.Push(
@@ -348,13 +357,10 @@ SC_MODULE(VectorFetchUnit) {
                     constexpr int num_words =
                         VEC_DTYPE::width / IO_DTYPE::width;
 
-                    for (int i = 0; i < num_words; i++) {
-                      MemoryRequest memRequest = {params.ADDRESS_GEN1_OFFSET +
-                                                      num_words * address +
-                                                      i * WIDTH,
-                                                  WIDTH};
-                      vectorFetch1AddressRequest.Push(memRequest);
-                    }
+                    MemoryRequest memRequest = {
+                        params.ADDRESS_GEN1_OFFSET + num_words * address,
+                        WIDTH * num_words};
+                    vectorFetch1AddressRequest.Push(memRequest);
                   } else {
                     MemoryRequest memRequest = {
                         params.ADDRESS_GEN1_OFFSET + address, WIDTH};
@@ -408,6 +414,7 @@ SC_MODULE(VectorFetchUnit) {
                      loop_counters[1][2]++) {
                   Pack1D<VEC_DTYPE, WIDTH> fullPrecisionDataResponse;
                   if (params.DP_VEC1) {
+                    // combine multiple IO_DTYPE into one VEC_DTYPE
                     constexpr int num_words =
                         VEC_DTYPE::width / IO_DTYPE::width;
 
@@ -421,10 +428,20 @@ SC_MODULE(VectorFetchUnit) {
                   } else {
                     Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch1DataResponse.Pop();
+
+                    if constexpr (VEC_DTYPE::is_floating_point &&
+                                  IO_DTYPE::is_floating_point) {
+                      // static cast to VEC_DTYPE
 #pragma hls_unroll yes
-                    for (int dim = 0; dim < WIDTH; dim++) {
-                      fullPrecisionDataResponse[dim].setbits(
-                          response[dim].bits_rep());
+                      for (int dim = 0; dim < WIDTH; dim++) {
+                        fullPrecisionDataResponse[dim] =
+                            static_cast<VEC_DTYPE>(response[dim]);
+                      }
+                    } else {
+                      // dequantize IO_DTYPE to VEC_DTYPE
+                      vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                          response, fullPrecisionDataResponse,
+                          params.vec1DequantizeScale);
                     }
                   }
                   vectorFetch1DataResponseConverted.Push(
@@ -521,13 +538,11 @@ SC_MODULE(VectorFetchUnit) {
                   if (params.DP_VEC2) {
                     constexpr int num_words =
                         VEC_DTYPE::width / IO_DTYPE::width;
-                    for (int i = 0; i < num_words; i++) {
-                      MemoryRequest memRequest = {params.ADDRESS_GEN2_OFFSET +
-                                                      num_words * address +
-                                                      i * WIDTH,
-                                                  WIDTH};
-                      vectorFetch2AddressRequest.Push(memRequest);
-                    }
+
+                    MemoryRequest memRequest = {
+                        params.ADDRESS_GEN2_OFFSET + num_words * address,
+                        WIDTH * num_words};
+                    vectorFetch2AddressRequest.Push(memRequest);
                   } else {
                     MemoryRequest memRequest = {
                         params.ADDRESS_GEN2_OFFSET + address, WIDTH};
@@ -593,10 +608,21 @@ SC_MODULE(VectorFetchUnit) {
                   } else {
                     Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch2DataResponse.Pop();
+
+                    if constexpr (VEC_DTYPE::is_floating_point &&
+                                  IO_DTYPE::is_floating_point) {
+                      // static cast to VEC_DTYPE
+
 #pragma hls_unroll yes
-                    for (int dim = 0; dim < WIDTH; dim++) {
-                      fullPrecisionDataResponse[dim].setbits(
-                          response[dim].bits_rep());
+                      for (int dim = 0; dim < WIDTH; dim++) {
+                        fullPrecisionDataResponse[dim] =
+                            static_cast<VEC_DTYPE>(response[dim]);
+                      }
+                    } else {
+                      // dequantize IO_DTYPE to VEC_DTYPE
+                      vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                          response, fullPrecisionDataResponse,
+                          params.vec2DequantizeScale);
                     }
                   }
                   vectorFetch2DataResponseConverted.Push(

@@ -470,6 +470,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addressGen0InputYLoopIndex[2];
   ac_int<3, false> addressGen0WeightLoopIndex[2];
   bool DP_VEC0;
+  ac_int<16, false> vec0DequantizeScale;
 
   // Address Gen 1 (residual/op0src1)
   int ADDRESS_GEN1_OFFSET;
@@ -478,6 +479,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addressGen1InputYLoopIndex[2];
   ac_int<3, false> addressGen1WeightLoopIndex[2];
   bool DP_VEC1;
+  ac_int<16, false> vec1DequantizeScale;
 
   // Address Gen 2 (bias/op3src1)
   int ADDRESS_GEN2_OFFSET;
@@ -486,6 +488,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addressGen2InputYLoopIndex[2];
   ac_int<3, false> addressGen2WeightLoopIndex[2];
   bool DP_VEC2;
+  ac_int<16, false> vec2DequantizeScale;
 
   int VECTOR_OUTPUT_OFFSET;
   int SCALAR_OUTPUT_OFFSET;
@@ -497,6 +500,7 @@ struct VectorParams : BaseParams {
   bool SPLIT_OUTPUT;
 
   bool DP_OUTPUT;
+  ac_int<16, false> outputQuantizeScale;
 
   // 1: 3d-tensor, 2: 2d-tensor, 3: 1d-tensor
   ac_int<2, false> addressGen0Mode;
@@ -509,7 +513,8 @@ struct VectorParams : BaseParams {
 
   static const unsigned int width =
       5 * 32 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
-      3 * 6 * 4 /* Loop indices */ + 8 * 1 /* Bools */ + 10 + 3 * 2;
+      3 * 6 * 4 /* Loop indices */ + 8 * 1 /* Bools */ + 10 + 3 * 2 +
+      16 * 4 /* Dequantize scale */;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -530,6 +535,7 @@ struct VectorParams : BaseParams {
       m& addressGen0WeightLoopIndex[i];
     }
     m & DP_VEC0;
+    m & vec0DequantizeScale;
     m & ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -546,6 +552,7 @@ struct VectorParams : BaseParams {
       m& addressGen1WeightLoopIndex[i];
     }
     m & DP_VEC1;
+    m & vec1DequantizeScale;
     m & ADDRESS_GEN2_OFFSET;
 
     for (int i = 0; i < 2; i++) {
@@ -563,6 +570,7 @@ struct VectorParams : BaseParams {
       m& addressGen2WeightLoopIndex[i];
     }
     m & DP_VEC2;
+    m & vec2DequantizeScale;
     m & VECTOR_OUTPUT_OFFSET;
     m & SCALAR_OUTPUT_OFFSET;
     for (int i = 0; i < 2; i++) {
@@ -581,6 +589,7 @@ struct VectorParams : BaseParams {
     }
     m & SPLIT_OUTPUT;
     m & DP_OUTPUT;
+    m & outputQuantizeScale;
     m & addressGen0Mode;
     m & addressGen0Broadcast;
     m & addressGen0BroadcastCount;

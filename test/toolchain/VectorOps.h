@@ -184,10 +184,14 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
   auto it = param.vector_params().begin();
   bool has_vector_params = it != param.vector_params().end();
   std::string output_node = "";
-  for (int stage = 0; stage < 6; stage++) {
+  for (int stage = 0; stage < 5; stage++) {
     const auto opcode = has_vector_params ? it->opcode() : "nop";
     bool matched = vector_ops[stage].find(opcode) != vector_ops[stage].end();
     auto vop = matched ? vinst_mappings[opcode] : VectorInstructions::nop;
+
+    if (opcode.rfind("quantize", 0) == 0) {
+      matched = true;
+    }
 
     std::cerr << "stage: " << stage << "  opcode: " << opcode
               << "  matched: " << matched << std::endl;
@@ -202,8 +206,6 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
       vinst.vOp3 = vop;
     } else if (stage == 4) {
       vinst.vOp4 = vop;
-    } else if (stage == 5) {
-      vinst.vOp5 = vop;
     }
 
     if (matched) {
@@ -227,6 +229,10 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
             vinst.immediate1 = immediate.bits_rep();
           } else if (stage == 5) {
             vinst.immediate1 = immediate.bits_rep();
+          }
+
+          if (opcode.rfind("quantize", 0) == 0) {
+            vector_params->outputQuantizeScale = immediate.bits_rep();
           }
         } else {
           const auto input_shape = get_shape(it->input());

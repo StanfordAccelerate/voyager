@@ -4,12 +4,14 @@
 #include <systemc.h>
 
 #include "AccelTypes.h"
+// clang-format off
+#include "VectorOps.h"
+// clang-format on
 #include "Broadcaster.h"
 #include "MaxpoolUnit.h"
 #include "OutputAddressGenerator.h"
 #include "ParamsDeserializer.h"
 #include "VectorFetch.h"
-#include "VectorOps.h"
 
 template <typename IO_DTYPE, typename VEC_DTYPE, typename MU_OUTPUT_DTYPE,
           int WIDTH>
@@ -148,15 +150,8 @@ SC_MODULE(VectorOpUnit) {
 
         if constexpr (!MU_OUTPUT_DTYPE::is_floating_point &&
                       VEC_DTYPE::is_floating_point) {
-          if (inst.vDequantize) {
-            vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(tmp, op0Src0,
-                                                           inst.immediate0);
-          } else {
-#pragma hls_unroll yes
-            for (int i = 0; i < WIDTH; i++) {
-              op0Src0[i].setbits(tmp[i].bits_rep());
-            }
-          }
+          vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(tmp, op0Src0,
+                                                         inst.immediate0);
         } else {
 #pragma hls_unroll yes
           for (int i = 0; i < WIDTH; i++) {
@@ -166,22 +161,9 @@ SC_MODULE(VectorOpUnit) {
       } else if (inst.vInput == VectorInstructions::readFromVectorFetch) {
         Pack1D<VEC_DTYPE, WIDTH> tmp = vectorFetch0Output.Pop();
 
-        if constexpr (!MU_OUTPUT_DTYPE::is_floating_point &&
-                      VEC_DTYPE::is_floating_point) {
-          if (inst.vDequantize) {
-            vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(tmp, op0Src0,
-                                                    inst.immediate0);
-          } else {
 #pragma hls_unroll yes
-            for (int i = 0; i < WIDTH; i++) {
-              op0Src0[i] = tmp[i];
-            }
-          }
-        } else {
-#pragma hls_unroll yes
-          for (int i = 0; i < WIDTH; i++) {
-            op0Src0[i] = tmp[i];
-          }
+        for (int i = 0; i < WIDTH; i++) {
+          op0Src0[i] = tmp[i];
         }
 
       } else if (inst.vInput == VectorInstructions::readFromAccumulation) {
@@ -325,28 +307,17 @@ SC_MODULE(VectorOpUnit) {
         res4 = res3;
       }
 
-      if constexpr (VEC_DTYPE::is_floating_point &&
-                    !IO_DTYPE::is_floating_point) {
-        if (inst.vOp5 == VectorInstructions::vquantize) {
-          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(res4, res5, inst.immediate1);
-        } else {
-          res5 = res4;
-        }
-      } else {
-        res5 = res4;
-      }
-
       if (inst.vAccumulatePush) {
-        accumulationOpInput.Push(res5);
+        accumulationOpInput.Push(res4);
       }
       if (inst.vOp2 == VectorInstructions::toReduce) {
-        reductionOpInput.Push(res5);
+        reductionOpInput.Push(res4);
       }
 
-      // DLOG("res5: " << res5);
+      // DLOG("res4: " << res4);
 
       if (inst.vDest == VectorInstructions::vWriteOut) {
-        vectorOpUnitOutput.Push(res5);
+        vectorOpUnitOutput.Push(res4);
       }
     }
   }

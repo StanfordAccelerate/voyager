@@ -3,15 +3,15 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename ACC_DTYPE, typename DTYPE, int WIDTH>
+template <typename VEC_DTYPE, typename IO_DTYPE, int WIDTH>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
+  Connections::In<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(tensorIn);
-  Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
+  Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
 
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
@@ -100,14 +100,15 @@ SC_MODULE(MaxpoolUnit) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH>
+                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
 
-                    constexpr int num_words = ACC_DTYPE::width / DTYPE::width;
-                    Pack1D<DTYPE, WIDTH> outputPixel[num_words];
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
+                    Pack1D<IO_DTYPE, WIDTH> outputPixel[num_words];
 
-                    convertPack1D<DTYPE, ACC_DTYPE, WIDTH>(uncastedOutputPixel,
-                                                           outputPixel);
+                    convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        uncastedOutputPixel, outputPixel);
 
                     for (int word = 0; word < num_words; word++) {
                       tensorOut.Push(outputPixel[word]);
@@ -189,24 +190,25 @@ SC_MODULE(MaxpoolUnit) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH>
+                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
-                    Pack1D<DTYPE, WIDTH> outputPixel;
+                    Pack1D<IO_DTYPE, WIDTH> outputPixel;
 
-                    // TODO: this will need to be different for other datatype
-                    // configurations. currently, i am hardcoding it for an
-                    // int/float configuration
-
+                    if constexpr (VEC_DTYPE::is_floating_point &&
+                                  IO_DTYPE::is_floating_point) {
+                      // static cast to VEC_DTYPE
 #pragma hls_unroll yes
-                    for (int i = 0; i < WIDTH; i++) {
-                      outputPixel[i].setbits(uncastedOutputPixel[i].bits_rep());
-                    }
+                      for (int i = 0; i < WIDTH; i++) {
+                        outputPixel[i] =
+                            static_cast<IO_DTYPE>(uncastedOutputPixel[i]);
+                      }
 
-                    // #pragma hls_unroll yes
-                    //                     for (int i = 0; i < WIDTH; i++) {
-                    //                       outputPixel[i] =
-                    //                           static_cast<DTYPE>(uncastedOutputPixel[i]);
-                    //                     }
+                    } else {
+                      // quantize VEC_DTYPE to IO_DTYPE
+                      vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                          uncastedOutputPixel, outputPixel,
+                          params.outputQuantizeScale);
+                    }
 
                     tensorOut.Push(outputPixel);
 
