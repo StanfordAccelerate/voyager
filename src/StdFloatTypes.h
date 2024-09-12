@@ -16,6 +16,8 @@ class StdFloat {
   typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
   static constexpr unsigned int width = ac_float_rep::width;
 
+  static constexpr bool is_floating_point = true;
+
   // TODO: make this a template parameter
   typedef StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
       AccumulationDatatype;

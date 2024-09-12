@@ -17,6 +17,8 @@ class Int {
 
   static constexpr unsigned int width = wdth;
 
+  static constexpr bool is_floating_point = false;
+
   // TODO: make this a template parameter
   typedef Int<wdth, sgnd> AccumulationDatatype;
 

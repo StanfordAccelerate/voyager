@@ -146,21 +146,37 @@ SC_MODULE(VectorOpUnit) {
       if (inst.vInput == VectorInstructions::readFromSystolicArray) {
         Pack1D<MU_OUTPUT_DTYPE, WIDTH> tmp = systolicArrayOutput.Pop();
 
-        if (inst.vDequantize) {
-          vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(tmp, op0Src0,
-                                                         inst.immediate0);
+        if constexpr (!MU_OUTPUT_DTYPE::is_floating_point &&
+                      VEC_DTYPE::is_floating_point) {
+          if (inst.vDequantize) {
+            vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(tmp, op0Src0,
+                                                           inst.immediate0);
+          } else {
+#pragma hls_unroll yes
+            for (int i = 0; i < WIDTH; i++) {
+              op0Src0[i].setbits(tmp[i].bits_rep());
+            }
+          }
         } else {
 #pragma hls_unroll yes
           for (int i = 0; i < WIDTH; i++) {
-            op0Src0[i].setbits(tmp[i].bits_rep());
+            op0Src0[i] = tmp[i];
           }
         }
       } else if (inst.vInput == VectorInstructions::readFromVectorFetch) {
         Pack1D<VEC_DTYPE, WIDTH> tmp = vectorFetch0Output.Pop();
 
-        if (inst.vDequantize) {
-          vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(tmp, op0Src0,
-                                                  inst.immediate0);
+        if constexpr (!MU_OUTPUT_DTYPE::is_floating_point &&
+                      VEC_DTYPE::is_floating_point) {
+          if (inst.vDequantize) {
+            vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(tmp, op0Src0,
+                                                    inst.immediate0);
+          } else {
+#pragma hls_unroll yes
+            for (int i = 0; i < WIDTH; i++) {
+              op0Src0[i] = tmp[i];
+            }
+          }
         } else {
 #pragma hls_unroll yes
           for (int i = 0; i < WIDTH; i++) {
@@ -309,8 +325,13 @@ SC_MODULE(VectorOpUnit) {
         res4 = res3;
       }
 
-      if (inst.vOp5 == VectorInstructions::vquantize) {
-        vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(res4, res5, inst.immediate1);
+      if constexpr (VEC_DTYPE::is_floating_point &&
+                    !IO_DTYPE::is_floating_point) {
+        if (inst.vOp5 == VectorInstructions::vquantize) {
+          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(res4, res5, inst.immediate1);
+        } else {
+          res5 = res4;
+        }
       } else {
         res5 = res4;
       }
