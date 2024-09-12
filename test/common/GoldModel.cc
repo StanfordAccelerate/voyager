@@ -113,35 +113,23 @@ void run_operation(const codegen::AcceleratorParam param,
       delete[] input_tensor;
       delete[] other_tensor;
     } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
-      if constexpr (VECTOR_T::is_floating_point &&
-                    !INPUT_T::is_floating_point) {
-        // perform quantization operation
-        output_tensor = quantize<VECTOR_T, INPUT_T>(
+      // perform quantization operation
+      output_tensor = quantize<VECTOR_T, INPUT_T>(
+          output_tensor, args[arg_index++], get_size(vector_param.input()));
+
+    } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
+      if (vector_param.input().dtype() == "int32") {
+        output_tensor = dequantize<DataTypes::int32, VECTOR_T>(
+            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      } else if (vector_param.input().dtype() == "int8") {
+        output_tensor = dequantize<DataTypes::int8, VECTOR_T>(
+            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      } else if (vector_param.input().dtype() == "fp8_e4m3") {
+        output_tensor = dequantize<DataTypes::e4m3, VECTOR_T>(
             output_tensor, args[arg_index++], get_size(vector_param.input()));
       } else {
-        std::cerr << "No quantization operation should have been generated for "
-                     "this datatype configuration."
-                  << std::endl;
-        std::abort();
-      }
-    } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
-      if constexpr (VECTOR_T::is_floating_point &&
-                    !INPUT_T::is_floating_point) {
-        if (vector_param.input().dtype() == "int32") {
-          output_tensor = dequantize<DataTypes::int32, VECTOR_T>(
-              output_tensor, args[arg_index++], get_size(vector_param.input()));
-        } else if (vector_param.input().dtype() == "int8") {
-          output_tensor = dequantize<DataTypes::int8, VECTOR_T>(
-              output_tensor, args[arg_index++], get_size(vector_param.input()));
-        } else {
-          std::cerr << "No dequantization operation for dtype: "
-                    << vector_param.input().dtype() << std::endl;
-        }
-      } else {
-        std::cerr << "No dequantization operation should have been generated "
-                     "for this datatype configuration."
-                  << std::endl;
-        std::abort();
+        std::cerr << "No dequantization operation for dtype: "
+                  << vector_param.input().dtype() << std::endl;
       }
     } else {
       std::cerr << "Unsupported vector instruction: " << vector_param.opcode()

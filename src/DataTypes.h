@@ -52,12 +52,12 @@ struct TypeName<int32> {
 
 template <>
 struct TypeName<e4m3> {
-  static std::string name() { return "e4m3"; }
+  static std::string name() { return "fp8_e4m3"; }
 };
 
 template <>
 struct TypeName<e5m2> {
-  static std::string name() { return "e5m2"; }
+  static std::string name() { return "fp8_e5m2"; }
 };
 
 template <>
