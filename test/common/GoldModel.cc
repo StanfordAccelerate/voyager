@@ -103,15 +103,13 @@ void run_operation(const codegen::AcceleratorParam param,
       const auto input_shape = get_shape(vector_param.input());
 
       const auto &other = vector_param.other();
-      VECTOR_T *other_tensor = std::any_cast<VECTOR_T *>(args[arg_index]);
+      VECTOR_T *other_tensor = std::any_cast<VECTOR_T *>(args[arg_index++]);
       const auto other_shape = get_shape(other);
 
       output_tensor =
           perform_elwise_operation(input_tensor, input_shape, other_tensor,
                                    other_shape, vector_param.opcode());
 
-      delete[] input_tensor;
-      delete[] other_tensor;
     } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
       // perform quantization operation
       output_tensor = quantize<VECTOR_T, INPUT_T>(
