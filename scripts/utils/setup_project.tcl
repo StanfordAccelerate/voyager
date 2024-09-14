@@ -14,7 +14,7 @@ logfile move "$root/build/${DATATYPE}_${IC_DIMENSION}x${OC_DIMENSION}/Catapult/$
 solution options set Project/SolutionName $BLOCK
 solution options set Message/ErrorOverride ASSERT-1 -remove
 solution options set Input/TargetPlatform x86_64
-solution options set /Input/CppStandard c++11
+solution options set /Input/CppStandard c++17
 solution options set Input/CompilerFlags "-D$DATATYPE -DIC_DIMENSION=$IC_DIMENSION -DOC_DIMENSION=$OC_DIMENSION"
 solution options set Input/SearchPath "$root/lib"
 solution options set Output/OutputVHDL false

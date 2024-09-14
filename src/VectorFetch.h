@@ -172,98 +172,52 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = dataResponse0Params.Pop();
 
-      if (params.addressGen0Broadcast) {
-        ac_int<16, false> broadcastCount = params.addressGen0BroadcastCount;
-
 #pragma hls_pipeline_init_interval 1
-        for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
-             i0++) {
-          for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
-               j0++) {
-            for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
-                 k0++) {
-              for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
-                   i1++) {
-                for (ac_int<11, false> j1 = 0;
-                     j1 < params.addressGen0Loop[1][1]; j1++) {
-                  for (ac_int<11, false> k1 = 0;
-                       k1 < params.addressGen0Loop[1][2]; k1++) {
-                    ac_int<16, false> K = params.addressGen0Loop[0][2] *
-                                          params.addressGen0Loop[1][2] * WIDTH;
+      for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0]; i0++) {
+        for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
+             j0++) {
+          for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
+               k0++) {
+            for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
+                 i1++) {
+              for (ac_int<11, false> j1 = 0; j1 < params.addressGen0Loop[1][1];
+                   j1++) {
+                for (ac_int<11, false> k1 = 0;
+                     k1 < params.addressGen0Loop[1][2]; k1++) {
+                  Pack1D<VEC_DTYPE, WIDTH> fullPrecisionDataResponse;
+                  if (params.DP_VEC0) {
+                    // combine multiple IO_DTYPE into one VEC_DTYPE
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
 
-                    Pack1D<IO_DTYPE, WIDTH> data =
+                    Pack1D<IO_DTYPE, WIDTH> response[num_words];
+
+                    for (int i = 0; i < num_words; i++) {
+                      response[i] = vectorFetch0DataResponse.Pop();
+                    }
+                    convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        response, fullPrecisionDataResponse);
+                  } else {
+                    Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch0DataResponse.Pop();
-                    for (int dim = 0; dim < WIDTH; dim++) {
-                      VEC_DTYPE singleVal = static_cast<VEC_DTYPE>(data[dim]);
 
-                      for (int broadcast = 0;
-                           broadcast < broadcastCount / WIDTH; broadcast++) {
-                        Pack1D<VEC_DTYPE, WIDTH> broadcastVec;
-
+                    if constexpr (VEC_DTYPE::is_floating_point &&
+                                  IO_DTYPE::is_floating_point) {
+                      // static cast to VEC_DTYPE
 #pragma hls_unroll yes
-                        for (int broadcastDim = 0; broadcastDim < WIDTH;
-                             broadcastDim++) {
-                          broadcastVec[broadcastDim] = singleVal;
-                        }
-
-                        vectorFetch0DataResponseBroadcasted.Push(broadcastVec);
+                      for (int dim = 0; dim < WIDTH; dim++) {
+                        fullPrecisionDataResponse[dim] =
+                            static_cast<VEC_DTYPE>(response[dim]);
                       }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } else {
-#pragma hls_pipeline_init_interval 1
-        for (ac_int<11, false> i0 = 0; i0 < params.addressGen0Loop[0][0];
-             i0++) {
-          for (ac_int<11, false> j0 = 0; j0 < params.addressGen0Loop[0][1];
-               j0++) {
-            for (ac_int<11, false> k0 = 0; k0 < params.addressGen0Loop[0][2];
-                 k0++) {
-              for (ac_int<11, false> i1 = 0; i1 < params.addressGen0Loop[1][0];
-                   i1++) {
-                for (ac_int<11, false> j1 = 0;
-                     j1 < params.addressGen0Loop[1][1]; j1++) {
-                  for (ac_int<11, false> k1 = 0;
-                       k1 < params.addressGen0Loop[1][2]; k1++) {
-                    Pack1D<VEC_DTYPE, WIDTH> fullPrecisionDataResponse;
-                    if (params.DP_VEC0) {
-                      // combine multiple IO_DTYPE into one VEC_DTYPE
-                      constexpr int num_words =
-                          VEC_DTYPE::width / IO_DTYPE::width;
-
-                      Pack1D<IO_DTYPE, WIDTH> response[num_words];
-
-                      for (int i = 0; i < num_words; i++) {
-                        response[i] = vectorFetch0DataResponse.Pop();
-                      }
-                      convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
-                          response, fullPrecisionDataResponse);
                     } else {
-                      Pack1D<IO_DTYPE, WIDTH> response =
-                          vectorFetch0DataResponse.Pop();
-
-                      if constexpr (VEC_DTYPE::is_floating_point &&
-                                    IO_DTYPE::is_floating_point) {
-                        // static cast to VEC_DTYPE
-#pragma hls_unroll yes
-                        for (int dim = 0; dim < WIDTH; dim++) {
-                          fullPrecisionDataResponse[dim] =
-                              static_cast<VEC_DTYPE>(response[dim]);
-                        }
-                      } else {
-                        // dequantize IO_DTYPE to VEC_DTYPE
-                        vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                            response, fullPrecisionDataResponse,
-                            params.vec0DequantizeScale);
-                      }
+                      // dequantize IO_DTYPE to VEC_DTYPE
+                      vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                          response, fullPrecisionDataResponse,
+                          params.vec0DequantizeScale);
                     }
-                    vectorFetch0DataResponseBroadcasted.Push(
-                        fullPrecisionDataResponse);
                   }
+                  vectorFetch0DataResponseBroadcasted.Push(
+                      fullPrecisionDataResponse);
                 }
               }
             }

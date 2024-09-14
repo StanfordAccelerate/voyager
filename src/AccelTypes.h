@@ -370,6 +370,97 @@ class Pack1D<PEWeight<StdFloat<mantissa, exp> >, SIZE> {
   }
 };
 
+template <size_t SIZE, int i_width, bool i_signed>
+class Pack1D<Int<i_width, i_signed>, SIZE> {
+ public:
+  Int<i_width, i_signed> value[SIZE];
+  static const unsigned int width = Int<i_width, i_signed>::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const { return Pack1D<Int<i_width, i_signed>, SIZE>(); }
+
+  Int<i_width, i_signed> &operator[](size_t i) { return value[i]; }
+  const Int<i_width, i_signed> &operator[](size_t i) const { return value[i]; }
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].int_val;
+    }
+  }
+};
+
+template <size_t SIZE, int i_width, bool i_signed>
+class Pack1D<PEInput<Int<i_width, i_signed> >, SIZE> {
+ public:
+  PEInput<Int<i_width, i_signed> > value[SIZE];
+
+  static const unsigned int width =
+      PEInput<Int<i_width, i_signed> >::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const {
+    return Pack1D<PEInput<Int<i_width, i_signed> >, SIZE>();
+  }
+
+  PEInput<Int<i_width, i_signed> > &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEInput<Int<i_width, i_signed> > &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.int_val;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].swapWeights;
+    }
+  }
+};
+
+template <size_t SIZE, int i_width, bool i_signed>
+class Pack1D<PEWeight<Int<i_width, i_signed> >, SIZE> {
+ public:
+  PEWeight<Int<i_width, i_signed> > value[SIZE];
+
+  static const unsigned int width =
+      PEWeight<Int<i_width, i_signed> >::width * SIZE;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const {
+    return Pack1D<PEWeight<Int<i_width, i_signed> >, SIZE>();
+  }
+
+  PEWeight<Int<i_width, i_signed> > &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEWeight<Int<i_width, i_signed> > &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].data.int_val;
+    }
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < SIZE; i++) {
+      m &value[i].tag;
+    }
+  }
+};
+
 template <typename TYPE, size_t SIZE>
 struct BufferWriteRequest {
   int address;
