@@ -9,10 +9,11 @@ using namespace google::protobuf;
 
 Network::Network(std::string& model) : model(model) {
   project_root = std::string(getenv("PROJECT_ROOT"));
+  std::string datatype = std::string(getenv("DATATYPE"));
 
   // Open the file
-  std::string filename =
-      project_root + "/test/compiler/networks/" + model + "/params.txt";
+  std::string filename = project_root + "/test/compiler/networks/" + model +
+                         "/" + datatype + "/params.txt";
   if (!std::filesystem::exists(filename)) {
     throw std::runtime_error("Error: File " + filename + " does not exist.");
   }

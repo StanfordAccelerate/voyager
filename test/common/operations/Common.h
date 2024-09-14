@@ -37,19 +37,19 @@ inline int get_size(const codegen::Tensor &tensor) {
  * single or double precision formats.
  ***************************************************************************/
 
-inline float read_tensor(const float *matrix, int index,
-                         bool double_precision) {
-  return double_precision ? matrix[2 * index] : matrix[index];
-}
+// inline float read_tensor(const float *matrix, int index,
+//                          bool double_precision) {
+//   return double_precision ? matrix[2 * index] : matrix[index];
+// }
 
-inline ACCUM_DATATYPE read_tensor(const INPUT_DATATYPE *matrix, int index,
-                                  bool double_precision) {
-  if (!double_precision) {
-    return static_cast<ACCUM_DATATYPE>(matrix[index]);
-  } else {
-    return ACCUM_DATATYPE(&matrix[2 * index]);
-  }
-}
+// inline ACCUM_DATATYPE read_tensor(const INPUT_DATATYPE *matrix, int index,
+//                                   bool double_precision) {
+//   if (!double_precision) {
+//     return static_cast<ACCUM_DATATYPE>(matrix[index]);
+//   } else {
+//     return ACCUM_DATATYPE(&matrix[2 * index]);
+//   }
+// }
 
 /***************************************************************************
  * save_tensor Functions
@@ -59,25 +59,25 @@ inline ACCUM_DATATYPE read_tensor(const INPUT_DATATYPE *matrix, int index,
  * should be stored into.
  ***************************************************************************/
 
-inline void save_tensor(float *matrix, int index, float value,
-                        bool double_precision) {
-  if (!double_precision) {
-    matrix[index] = value;
-  } else {
-    matrix[2 * index] = value;
-    matrix[2 * index + 1] = 0;
-  }
-}
+// inline void save_tensor(float *matrix, int index, float value,
+//                         bool double_precision) {
+//   if (!double_precision) {
+//     matrix[index] = value;
+//   } else {
+//     matrix[2 * index] = value;
+//     matrix[2 * index + 1] = 0;
+//   }
+// }
 
-inline void save_tensor(INPUT_DATATYPE *matrix, int index,
-                        INTERMEDIATE_DTYPE value, bool double_precision) {
-  if (!double_precision) {
-    matrix[index] = static_cast<INPUT_DATATYPE>(value);
-  } else {
-    ACCUM_DATATYPE p16 = value;
-    p16.storeAsLowerPrecision(&matrix[2 * index]);
-  }
-}
+// inline void save_tensor(INPUT_DATATYPE *matrix, int index,
+//                         INTERMEDIATE_DTYPE value, bool double_precision) {
+//   if (!double_precision) {
+//     matrix[index] = static_cast<INPUT_DATATYPE>(value);
+//   } else {
+//     ACCUM_DATATYPE p16 = value;
+//     p16.storeAsLowerPrecision(&matrix[2 * index]);
+//   }
+// }
 
 /***************************************************************************
  * Elementwise Functions
@@ -88,8 +88,9 @@ inline void save_tensor(INPUT_DATATYPE *matrix, int index,
 
 inline float reciprocal(const float &a) { return 1.0f / a; }
 
-inline INTERMEDIATE_DTYPE reciprocal(const INTERMEDIATE_DTYPE &a) {
-  ACCUM_DATATYPE tmp = static_cast<ACCUM_DATATYPE>(a);
+template <typename T>
+inline T reciprocal(const T &a) {
+  T tmp = a;
   tmp.reciprocal();
-  return static_cast<INTERMEDIATE_DTYPE>(tmp);
+  return tmp;
 }

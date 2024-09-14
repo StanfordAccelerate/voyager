@@ -100,14 +100,14 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(vectorUnitStartSignal);
   Connections::SyncChannel CCS_INIT_S1(vectorUnitDoneSignal);
 
-  Harness(sc_module_name, std::vector<codegen::AcceleratorParam>,
-           INPUT_DATATYPE *, INPUT_DATATYPE *);
+  Harness(sc_module_name, std::vector<codegen::AcceleratorParam>, char *,
+          char *);
   SC_HAS_PROCESS(Harness);
 
  private:
   std::vector<codegen::AcceleratorParam> params;
   codegen::AcceleratorParam currentParams;
-  INPUT_DATATYPE *sramMemory, *rramMemory;
+  char *sramMemory, *rramMemory;
   AcceleratorMemoryMap currentMemoryMap;
 
 #ifdef SIM_Accelerator

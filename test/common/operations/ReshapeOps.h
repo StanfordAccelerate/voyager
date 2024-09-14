@@ -23,10 +23,12 @@ inline int compute_linear_index(const std::vector<int>& indices,
 }
 
 template <typename T>
-inline T* permute(const T* inputs, const codegen::ReshapeParam param) {
+inline T* permute(std::any input_tensor, const codegen::ReshapeParam param) {
   const auto input = param.input();
   const int size = get_size(input);
   T* outputs = new T[size];
+
+  T* inputs = std::any_cast<T*>(input_tensor);
 
   const auto input_shape = get_shape(input);
   std::vector<int> order;
@@ -81,9 +83,11 @@ inline T* permute(const T* inputs, const codegen::ReshapeParam param) {
 }
 
 template <typename T>
-inline T* permute(const T* inputs, const codegen::Permutation& param) {
+inline T* permute(std::any input_tensor, const codegen::Permutation& param) {
   const std::vector<int> shape{param.shape().begin(), param.shape().end()};
   const std::vector<int> dims{param.dims().begin(), param.dims().end()};
+
+  T* inputs = std::any_cast<T*>(input_tensor);
 
   std::vector<int> order;
   if (param.opcode() == "permute") {

@@ -35,7 +35,15 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   bool double_precision = double_precision_ow || is_double_precision(tensor);
   int address_multiplier = double_precision ? 2 : 1;
 
+  // if size is 1, then it is a scalar, so it should not be
+  // written to memory
+  if (size == 1) {
+    return;
+  }
+
   // std::cerr << "Loading tensor file " << filename << std::endl;
+  // std::cerr << "Datatype: " << tensor.dtype() << std::endl;
+  // std::cerr << "Offset: " << offset << std::endl;
 
   // number of elements packed into a single word for replication
   const int packing_factor = IC_DIMENSION / 4 * 3;
@@ -45,8 +53,24 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
 
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
-    memory_interface->write_to_memory(offset + address_multiplier * address,
-                                      *it, partition, double_precision);
+    if (tensor.dtype() == "int8") {
+      memory_interface->write_to_memory<DataTypes::int8>(offset, address, *it,
+                                                         partition);
+    } else if (tensor.dtype() == "bfloat16") {
+      memory_interface->write_to_memory<DataTypes::bfloat16>(offset, address,
+                                                             *it, partition);
+    } else if (tensor.dtype() == "int24") {
+      memory_interface->write_to_memory<DataTypes::int24>(offset, address, *it,
+                                                          partition);
+    } else if (tensor.dtype() == "int32") {
+      memory_interface->write_to_memory<DataTypes::int32>(offset, address, *it,
+                                                          partition);
+    } else {
+      // if unspecified, we will assume it's INPUT_DATATYPE
+      memory_interface->write_to_memory<INPUT_DATATYPE>(offset, address, *it,
+                                                        partition);
+    }
+
     address++;
     if (replication && address % IC_DIMENSION == packing_factor) {
       address += IC_DIMENSION - packing_factor;

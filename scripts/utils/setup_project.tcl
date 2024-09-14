@@ -14,7 +14,7 @@ logfile move "$ROOT/$CATAPULT_BUILD_DIR/$BLOCK.log"
 solution options set Project/SolutionName $BLOCK
 solution options set Message/ErrorOverride ASSERT-1 -remove
 solution options set Input/TargetPlatform x86_64
-solution options set /Input/CppStandard c++11
+solution options set /Input/CppStandard c++17
 solution options set Input/CompilerFlags "-D$DATATYPE -DIC_DIMENSION=$IC_DIMENSION -DOC_DIMENSION=$OC_DIMENSION"
 solution options set Input/SearchPath "$ROOT/lib"
 solution options set Output/OutputVHDL false
@@ -44,6 +44,7 @@ solution file add $ROOT/test/common/GoldModel.cc -type C++ -exclude true
 solution file add $ROOT/test/common/Simulation.cc -type C++ -exclude true
 solution file add $ROOT/test/common/ArrayMemory.cc -type C++ -exclude true
 solution file add $ROOT/test/common/DataLoader.cc -type C++ -exclude true
+solution file add $ROOT/test/toolchain/MapOperation.cc -type C++ -exclude true
 
 # Add network files
 solution file add $ROOT/test/common/Network.cc -type C++ -exclude true

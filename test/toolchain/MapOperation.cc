@@ -1,5 +1,3 @@
-#pragma once
-
 #include "src/AccelTypes.h"
 #include "src/Params.h"
 #include "test/common/VerificationTypes.h"
@@ -11,9 +9,9 @@
 #include "test/toolchain/ReshapeOps.h"
 #include "test/toolchain/VectorOps.h"
 
-void MapPytorchOperation(const codegen::AcceleratorParam &param,
-                         std::deque<BaseParams *> &mappedParams,
-                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+void MapOperation(const codegen::AcceleratorParam &param,
+                  std::deque<BaseParams *> &mappedParams,
+                  std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   if (param.has_matrix_param()) {
     const auto &inputs = param.matrix_param().input();
     int dim = 1;

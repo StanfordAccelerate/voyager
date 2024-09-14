@@ -3,11 +3,13 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-T *pooling(const T *inputs, const codegen::AcceleratorParam &param) {
+T *pooling(std::any input_tensor, const codegen::AcceleratorParam &param) {
   const auto &pooling_param = param.pooling_param();
   int input_height = pooling_param.input().shape(2);
   int input_width = pooling_param.input().shape(3);
   int input_depth = pooling_param.input().shape(1);
+
+  T *inputs = std::any_cast<T *>(input_tensor);
 
   int stride;
   int kernel_size;

@@ -6,41 +6,41 @@
 #include <cassert>
 
 #include "AccelTypes.h"
-#include "test/toolchain/Operations.h"
+#include "test/toolchain/MapOperation.h"
 
 #ifdef SOC_COSIM
 extern bool syscDone;
 void init_checkers();
 void register_interface(
-    std::deque<sc_lv<Wrapped<int>::width> > *serialMatrixParamsIn,
-    std::deque<sc_lv<Wrapped<int>::width> > *serialVectorParamsIn,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width> > *inputAddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
+    std::deque<sc_lv<Wrapped<int>::width>> *serialMatrixParamsIn,
+    std::deque<sc_lv<Wrapped<int>::width>> *serialVectorParamsIn,
+    std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *inputAddressRequest,
+    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *inputAddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width> > *weightAddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
+    std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *weightAddressRequest,
+    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *weightAddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width> >
+    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch0AddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
+    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *vectorFetch0AddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width> >
+    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch1AddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
+    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *vectorFetch1AddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width> >
+    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch2AddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
+    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *vectorFetch2AddressResponse,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION> >::width> >
+    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *vectorOutput,
-    std::deque<sc_lv<Wrapped<int>::width> > *vectorOutputAddress);
+    std::deque<sc_lv<Wrapped<int>::width>> *vectorOutputAddress);
 // void copy_output(void *sram, int size, int data_size);
 #endif
 
 Harness::Harness(sc_module_name name,
-                 std::vector<codegen::AcceleratorParam> params,
-                 INPUT_DATATYPE *sram, INPUT_DATATYPE *rram)
+                 std::vector<codegen::AcceleratorParam> params, char *sram,
+                 char *rram)
     : sc_module(name),
       clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS, true),
       params(params),
@@ -160,7 +160,7 @@ void Harness::reset() {
 template <long unsigned int DIMENSION>
 void Harness::readMemoryRequest(
     CombinationalInterface<MemoryRequest> *addressRequest,
-    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse_fifo,
+    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION>> *dataResponse_fifo,
     std::string memSourceType) {
   addressRequest->ResetRead();
 
@@ -181,7 +181,7 @@ void Harness::readMemoryRequest(
       std::abort();
     }
 
-    INPUT_DATATYPE *memory;
+    char *memory;
     if (memSource == RRAM) {
       memory = rramMemory;
     } else {
@@ -191,7 +191,16 @@ void Harness::readMemoryRequest(
     for (int b = 0; b < memRequest.burstSize / DIMENSION; b++) {
       Pack1D<INPUT_DATATYPE, DIMENSION> data;
       for (int i = 0; i < DIMENSION; i++) {
-        data[i] = memory[memRequest.address + b * DIMENSION + i];
+        ac_int<INPUT_DATATYPE::width, false> bits;
+        int num_bytes = INPUT_DATATYPE::width / 8;
+        for (int byte = 0; byte < num_bytes; byte++) {
+          bits.set_slc(
+              byte * 8,
+              static_cast<ac_int<8, false>>(
+                  memory[memRequest.address + b * DIMENSION * num_bytes +
+                         i * num_bytes + byte]));
+        }
+        data[i].setbits(bits);
       }
       DLOG(memSource << " access at addr: " << memRequest.address
                      << " data: " << data << std::endl);
@@ -202,8 +211,8 @@ void Harness::readMemoryRequest(
 
 template <long unsigned int DIMENSION>
 void Harness::sendMemoryResponse(
-    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse_fifo,
-    CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *dataResponse) {
+    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION>> *dataResponse_fifo,
+    CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION>> *dataResponse) {
   dataResponse->ResetWrite();
 
   wait();
@@ -292,8 +301,7 @@ void Harness::sendParams() {
 
     std::deque<AcceleratorMemoryMap> accelerator_memory_maps;
     std::deque<BaseParams *> accelerator_params;
-    MapPytorchOperation(currentParams, accelerator_params,
-                        accelerator_memory_maps);
+    MapOperation(currentParams, accelerator_params, accelerator_memory_maps);
 
     while (accelerator_params.size() > 0) {
       bool matrixParamsValid, vectorParamsValid;
@@ -379,16 +387,20 @@ void Harness::storeVectorOutputs() {
     int address = vectorOutputAddress.Pop();
     DLOG("address: " << address << " data: " << data);
     for (int i = 0; i < OC_DIMENSION; i++) {
-      INPUT_DATATYPE *memory =
+      char *memory =
           currentMemoryMap.at("outputs") == SRAM ? sramMemory : rramMemory;
 
-      memory[address + i] = data[i];
+      ac_int<OUTPUT_DATATYPE::width, false> bits = data[i].bits_rep();
+      for (int byte = 0; byte < OUTPUT_DATATYPE::width / 8; byte++) {
+        memory[address + i * OUTPUT_DATATYPE::width / 8 + byte] =
+            bits.slc<8>(byte * 8);
+      }
     }
   }
 }
 
-void run_gold_model(std::vector<codegen::AcceleratorParam> params,
-                    INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory) {
+void run_accelerator(std::vector<codegen::AcceleratorParam> params,
+                     char *sramMemory, char *rramMemory) {
   Harness harness("harness", params, sramMemory, rramMemory);
   sc_start();
 }

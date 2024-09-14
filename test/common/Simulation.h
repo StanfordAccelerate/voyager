@@ -14,8 +14,8 @@
 #include "test/common/DataLoader.h"
 #include "test/compiler/proto/param.pb.h"
 
-void run_gold_model(std::vector<codegen::AcceleratorParam> params,
-                    INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory);
+void run_accelerator(std::vector<codegen::AcceleratorParam> params,
+                     char *sramMemory, char *rramMemory);
 
 class Simulation {
  public:

@@ -6,9 +6,12 @@ const std::set<std::string> activations = {"relu", "relu_", "gelu", "gelu_"};
 const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
                                            "mul", "mul_", "div", "div_"};
 
-inline void relu(float &x) { x = x > 0 ? x : 0; }
+// inline void relu(float &x) { x = x > 0 ? x : 0; }
 
-inline void relu(INTERMEDIATE_DTYPE &x) { x.relu(); }
+template <typename T>
+inline void relu(T &x) {
+  x.relu();
+}
 
 inline bool are_broadcastable(const std::vector<int> &shape1,
                               const std::vector<int> &shape2) {

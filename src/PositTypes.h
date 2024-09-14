@@ -147,6 +147,7 @@ class Posit {
   static constexpr int max_exp = (nbits - 2) * (1 << es);
   static constexpr int sbits = ac::nbits<max_exp>::val + 1;
   static constexpr int fbits = nbits - 3 - es;
+  static constexpr bool is_floating_point = true;
   typedef PositFP<sbits, fbits> AccumulationDatatype;
 
   ac_int<nbits, false> bits;
@@ -260,8 +261,8 @@ Posit<nbits, es>::Posit(const PositFP<fp_sbits, fp_fbits> &input) {
     const int exp_bias = PositFP<fp_sbits, fp_fbits>::exp_bias;
 
     // bool sign = input.float_val.signbit();
-    // int scale = input.float_val.d.template slc<e_width>(mant_bits) - exp_bias;
-    // ac_int<mant_bits, false> fraction = input.float_val.d;
+    // int scale = input.float_val.d.template slc<e_width>(mant_bits) -
+    // exp_bias; ac_int<mant_bits, false> fraction = input.float_val.d;
     // FIXME: ac::bfloat16 version
     short d = input.float_val.d;
     bool sign = d < 0;
@@ -411,12 +412,13 @@ class PositFP {
   static const int e_width = 8;
   static const int mant_bits = 7;
   static const int exp_bias = (1 << (e_width - 1)) - 1;
+  static constexpr bool is_floating_point = true;
   typedef ac::bfloat16 ac_float_t;
   typedef PositFP<sbits, fbits> AccumulationDatatype;
 
   ac_float_t float_val;
 
-  PositFP(){};
+  PositFP() {};
 
 #ifndef __SYNTHESIS__
   PositFP(const float &fval) : float_val(fval) {}

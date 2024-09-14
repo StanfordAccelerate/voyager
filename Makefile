@@ -184,7 +184,7 @@ gui:
 
 # Main target for accelerator simulations
 .PHONY: sim
-sim: $(CC_BUILD_DIR)/TestRunner protos
+sim: $(CC_BUILD_DIR)/TestRunner network-proto
 	./$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim
@@ -209,13 +209,13 @@ MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
 ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
 	./$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
 
-$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/networks.a
+$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/MapOperation.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/networks.a
+$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/MapOperation.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/networks.a
+$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o
 	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
 
 # Unit tests for custom Posit implementation
@@ -225,64 +225,52 @@ PositTest: $(CC_BUILD_DIR)/PositTest
 $(CC_BUILD_DIR)/PositTest: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -fopenmp -DNO_SYSC $< -o $@
 
-$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h $(wildcard src/*.h) $(wildcard test/toolchain/*.h)
+$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h $(wildcard src/*.h) $(wildcard test/toolchain/*.h)
+$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h)
 	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
-$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h $(wildcard test/common/operations/*.h)
+$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/common/operations/*.h)
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h test/common/operations/*.h test/common/VerificationTypes.h
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/ArrayMemory.o: test/common/ArrayMemory.cc test/common/ArrayMemory.h test/common/MemoryInterface.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h
+$(CC_BUILD_DIR)/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h test/common/MemoryInterface.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/MapOperation.o: test/toolchain/MapOperation.cc $(wildcard test/toolchain/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h $(wildcard test/toolchain/*.h)
+$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/toolchain/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 ###########################################################
 # Networks
 ###########################################################
-.PHONY: networks
-networks: $(CC_BUILD_DIR)/networks.a
-
-$(CC_BUILD_DIR)/networks.a: $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o
-	$(AR) rcs $@ $^
-
-# Autogenerated networks
-$(CC_BUILD_DIR)/Network.o: test/common/Network.cc test/compiler/proto/param.pb.cc
+$(CC_BUILD_DIR)/Network.o: test/common/Network.cc test/compiler/proto/param.pb.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-# protobuf generated files
-.PHONY: protos
-protos: test/compiler/proto/param.pb.cc test/compiler/networks/resnet18/params.pb test/compiler/networks/resnet50/params.pb test/compiler/networks/mobilebert/params.pb
-test/compiler/networks/resnet18/params.pb: quantized-training/test/test_codegen.py
-	mkdir -p test/compiler/networks/resnet18
-	python quantized-training/test/test_codegen.py --model resnet18 --output_dir test/compiler/networks/resnet18 | tee test/compiler/networks/resnet18/codegen.log
-test/compiler/networks/resnet50/params.pb: quantized-training/test/test_codegen.py
-	mkdir -p test/compiler/networks/resnet50
-	python quantized-training/test/test_codegen.py --model resnet50 --output_dir test/compiler/networks/resnet50 | tee test/compiler/networks/resnet50/codegen.log
-test/compiler/networks/mobilebert/params.pb: quantized-training/test/test_codegen.py
-	mkdir -p test/compiler/networks/mobilebert
-	python quantized-training/test/test_codegen.py --model mobilebert --output_dir test/compiler/networks/mobilebert | tee test/compiler/networks/mobilebert/codegen.log
-# test/compiler/networks/segformer/params.pb: quantized-training/test/test_codegen.py
-# 	python quantized-training/test/test_codegen.py --model segformer --output_dir test/compiler/networks/segformer
 test/compiler/proto/param.pb.cc: quantized-training/src/quantized_training/codegen/param.proto
 	protoc -I=quantized-training/src/quantized_training/codegen --cpp_out=test/compiler/proto $<
+
 $(CC_BUILD_DIR)/param.pb.o: test/compiler/proto/param.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
+
+.PHONY: network-proto
+network-proto: test/compiler/networks/$(NETWORK)/$(DATATYPE)/params.pb
+
+include codegen.mk
 
 ###########################################################
 # Cleanup Targets
@@ -304,9 +292,7 @@ clean-rtl-sim:
 	rm -rf build/Catapult_debug/Accelerator.v1/scverify/concat_sim_rtl_v_vcs
 
 clean-protos:
-	rm -rf test/compiler/networks/resnet18/
-	rm -rf test/compiler/networks/resnet50/
-	rm -rf test/compiler/networks/mobilebert/
+	rm -rf test/compiler/networks/*
 	rm -rf test/compiler/proto/param.pb.*
 
 .PHONY: clean clean-test clean-catapult clean-rtl-sim
