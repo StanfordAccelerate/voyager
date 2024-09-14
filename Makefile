@@ -268,7 +268,7 @@ $(CC_BUILD_DIR)/param.pb.o: test/compiler/proto/param.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 .PHONY: network-proto
-network-proto: test/compiler/networks/$(NETWORK)/$(DATATYPE)/params.pb
+network-proto: test/compiler/networks/$(NETWORK)/$(DATATYPE)/params.pb test/compiler/proto/param.pb.cc
 
 include codegen.mk
 
