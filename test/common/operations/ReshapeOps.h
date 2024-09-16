@@ -76,6 +76,8 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeParam param) {
     }
   }
 
+  delete[] inputs;
+
   return outputs;
 }
 
@@ -132,6 +134,8 @@ inline T* permute(std::any input_tensor, const codegen::Permutation& param) {
       indices[j] = 0;
     }
   }
+
+  delete[] inputs;
 
   return outputs;
 }

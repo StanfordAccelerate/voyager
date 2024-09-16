@@ -205,6 +205,13 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
       }
     }
   }
+
+  delete[] inputs;
+  delete[] weights;
+  if (matrix_param.has_bias()) {
+    delete[] bias;
+  }
+
   return outputs;
 }
 
@@ -260,5 +267,10 @@ inline VECTOR_T *matrix_vector_multiply(std::any input_tensor,
       outputs[k] += bias[k];
     }
   }
+
+  delete[] inputs;
+  delete[] weights;
+  delete[] bias;
+
   return outputs;
 }

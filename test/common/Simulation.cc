@@ -76,6 +76,15 @@ Simulation::Simulation() {
   std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n";
 }
 
+Simulation::~Simulation() {
+  for (const auto& [key, memory] : memories) {
+    delete memory;
+  }
+  for (const auto& [key, dataLoader] : dataLoaders) {
+    delete dataLoader;
+  }
+}
+
 void Simulation::load_data() {
   std::vector<int> memory_sizes{SRAM_MEMORY_SIZE, RRAM_MEMORY_SIZE,
                                 REFERENCE_MEMORY_SIZE};

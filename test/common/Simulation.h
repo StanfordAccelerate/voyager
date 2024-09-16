@@ -20,12 +20,13 @@ void run_accelerator(std::vector<codegen::AcceleratorParam> params,
 class Simulation {
  public:
   Simulation();
+  ~Simulation();
 
   void load_data();
   void run();
   int check_outputs();
   void print_help();
-  int get_ideal_runtime(const codegen::AcceleratorParam& param);
+  int get_ideal_runtime(const codegen::AcceleratorParam &param);
 
  protected:
   std::vector<std::string> sims;

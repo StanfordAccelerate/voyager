@@ -118,5 +118,8 @@ inline T *perform_elwise_operation(const T *tensor1,
   perform_elwise_op_recursivly(tensor1, padded_shape1, tensor2, padded_shape2,
                                result, result_shape, operation, 0, 0, 0, 0);
 
+  delete[] tensor1;
+  delete[] tensor2;
+
   return result;
 }

@@ -59,5 +59,8 @@ inline T *softmax(std::any input_tensor, const std::vector<int> shape) {
       outputs[offset + j] *= divisor;
     }
   }
+
+  delete[] inputs;
+
   return outputs;
 }

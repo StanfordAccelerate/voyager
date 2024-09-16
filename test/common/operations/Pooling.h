@@ -65,5 +65,7 @@ T *pooling(std::any input_tensor, const codegen::AcceleratorParam &param) {
     }
   }
 
+  delete[] inputs;
+
   return output;
 }

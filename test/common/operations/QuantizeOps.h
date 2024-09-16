@@ -32,6 +32,9 @@ QUANTIZED_TYPE* quantize(std::any input, std::any scale, int size) {
     }
   }
 
+  delete[] input_tensor;
+  delete[] scale_val;
+
   return quantized_output;
 }
 
@@ -52,5 +55,9 @@ DEQUANTIZED_TYPE* dequantize(std::any input, std::any scale, int size) {
       dequantized_output[i] = static_cast<DEQUANTIZED_TYPE>(input_tensor[i]);
     }
   }
+
+  delete[] input_tensor;
+  delete[] scale_val;
+
   return dequantized_output;
 }

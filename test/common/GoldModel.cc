@@ -21,6 +21,8 @@ void save_tensor(char *output_bytes, std::any output_tensor, int size) {
       output_bytes[i * num_bytes + j] = bits.template slc<8>(j * 8);
     }
   }
+
+  delete[] output_tensor_casted;
 }
 
 template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
