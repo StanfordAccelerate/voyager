@@ -40,7 +40,8 @@ void MapMatrixVectorMultiply(const codegen::AcceleratorParam &param,
     vector_params->addressGen0WeightLoopIndex[i] = 2;
   }
 
-  vector_params->DP_VEC0 = false;
+  vector_params->DP_VEC0 = DataTypes::TypeName<INPUT_DATATYPE>::name() !=
+                           matrix_param.input().dtype();
 
   // weights is a matrix of output_dim x reduction_dim
   const auto weights_memory = weights.memory();
@@ -61,7 +62,8 @@ void MapMatrixVectorMultiply(const codegen::AcceleratorParam &param,
   }
 
   // TODO: double precision
-  vector_params->DP_VEC1 = false;
+  vector_params->DP_VEC1 = DataTypes::TypeName<INPUT_DATATYPE>::name() !=
+                           matrix_param.weight().dtype();
 
   // bias
   const auto bias_memory = matrix_param.bias().memory();
@@ -81,7 +83,8 @@ void MapMatrixVectorMultiply(const codegen::AcceleratorParam &param,
     vector_params->addressGen2WeightLoopIndex[i] = 2;
   }
 
-  vector_params->DP_VEC2 = true;
+  vector_params->DP_VEC2 = DataTypes::TypeName<INPUT_DATATYPE>::name() !=
+                           matrix_param.bias().dtype();
 
   // output
   const auto output_memory = param.output().memory();
@@ -103,7 +106,8 @@ void MapMatrixVectorMultiply(const codegen::AcceleratorParam &param,
 
   vector_params->SPLIT_OUTPUT = false;
   // TODO: double precision
-  vector_params->DP_OUTPUT = false;
+  vector_params->DP_OUTPUT =
+      DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
 
   vector_params->MAXPOOL = false;
   vector_params->AVGPOOL = false;

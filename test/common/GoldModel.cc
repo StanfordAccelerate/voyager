@@ -77,9 +77,9 @@ void run_operation(const codegen::AcceleratorParam param,
     }
 
     if (dim == 1) {
-      output_tensor =
-          matrix_vector_multiply<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T>(
-              input_tensor, weight_tensor, args[2], matrix_param);
+      output_tensor = matrix_vector_multiply<INPUT_T, ACCUMULATE_T,
+                                             INTERMEDIATE_T, VECTOR_T>(
+          input_tensor, weight_tensor, args[2], matrix_param);
     } else {
       output_tensor = gemm<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T>(
           input_tensor, weight_tensor, args[2], param);
