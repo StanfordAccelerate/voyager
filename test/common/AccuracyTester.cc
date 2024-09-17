@@ -25,15 +25,21 @@ bool run_sample(std::string model_name, std::string data_dir,
                 std::string sample,
                 std::vector<codegen::AcceleratorParam> params) {
   std::vector<int> memory_sizes{SRAM_MEMORY_SIZE};
-  auto memory = std::make_unique<ArrayMemory<INPUT_DATATYPE>>(memory_sizes);
+  auto memory = std::make_unique<ArrayMemory>(memory_sizes);
   auto data_loader = std::make_unique<DataLoader>(memory.get(), false);
 
   int num_classes;
   auto matrix_param = params.front().matrix_param();
+  codegen::Tensor input;
+  if (params.front().has_matrix_param()) {
+    input = params.front().matrix_param().input();
+  } else {
+    input = params.front().vector_params(0).input();
+  }
   std::string sample_dir = data_dir + "/" + sample;
   if (model_name == "mobilebert") {
     num_classes = 2;
-    data_loader->load_tensor(matrix_param.input(), sample_dir);
+    data_loader->load_tensor(input, sample_dir);
 
     // Load attention mask
     bool found_param = false;
@@ -56,14 +62,11 @@ bool run_sample(std::string model_name, std::string data_dir,
     }
   } else if (model_name == "resnet18") {
     num_classes = 1000;
-    // Uncomment for testing
-    // sample_dir = "test/compiler/networks/" + model_name + "/tensor_files";
-    // Turn replication padding on only for accelerator (false here).
-    data_loader->load_tensor(matrix_param.input(), sample_dir, true);
+    data_loader->load_tensor(input, sample_dir, true);
   }
 
-  std::string params_dir =
-      "test/compiler/networks/" + model_name + "/tensor_files";
+  std::string params_dir = "test/compiler/networks/" + model_name + "/" +
+                           std::getenv("DATATYPE") + "/tensor_files";
   for (const auto& param : params) {
     data_loader->load_weights(param, params_dir);
   }
@@ -75,10 +78,19 @@ bool run_sample(std::string model_name, std::string data_dir,
   }
 
   // Extract final output
-  auto output = memory->get_args(params.back()).back();
   float logits[num_classes];
-  for (int i = 0; i < num_classes; i++) {
-    logits[i] = output[i];
+  auto output = memory->get_output(params.back());
+  if (params.back().output().dtype() == "bfloat16") {
+    auto output_ptr = std::any_cast<DataTypes::bfloat16*>(output);
+    for (int i = 0; i < num_classes; i++) {
+      logits[i] = output_ptr[i];
+    }
+  } else {
+    // if unspecified, we will assume it's INPUT_DATATYPE
+    auto output_ptr = std::any_cast<INPUT_DATATYPE*>(output);
+    for (int i = 0; i < num_classes; i++) {
+      logits[i] = output_ptr[i];
+    }
   }
 
   // Find the maximum logit index
@@ -162,8 +174,8 @@ int main(int argc, char* argv[]) {
   std::cout << "Number of samples: " << num_samples << std::endl;
 
   // Run num_threads samples in parallel
-  int num_batches = dataset.size() / num_threads;
-  num_batches += dataset.size() % num_threads == 0 ? 0 : 1;
+  int num_batches = num_samples / num_threads;
+  num_batches += num_samples % num_threads == 0 ? 0 : 1;
   int num_correct = 0;
   int num_finished = 0;
 
@@ -172,7 +184,7 @@ int main(int argc, char* argv[]) {
 
     for (int i = 0; i < num_threads; i++) {
       int sample_index = batch * num_threads + i;
-      if (sample_index >= dataset.size()) {
+      if (sample_index >= num_samples) {
         break;
       }
       results.push_back(std::async(std::launch::async, run_sample, model_name,

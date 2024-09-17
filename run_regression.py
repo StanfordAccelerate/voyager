@@ -361,10 +361,64 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid dataset")
 
+    # Dump model parameters
+    if model == "resnet18":
+        model_path = "models/resnet/resnet18_mp2_p8_qat.pth"
+    elif model == "resnet50":
+        model_path = "models/resnet/resnet50.pth"
+    elif model == "mobilebert" and dataset == "sst2":
+        model_path = "models/mobilebert/mobilebert-tiny-sst2-bf16/"
+    elif model == "mobilebert" and dataset == "squad":
+        model_path = "models/mobilebert/mobilebert-tiny-squad-bf16/"
+    else:
+        raise ValueError("Invalid model")
+
+    if os.environ["DATATYPE"] == "E4M3":
+        quantization_args = [
+            "--activation",
+            "fp8_e4m3",
+            "--weight",
+            "fp8_e4m3",
+            "--bf16",
+        ]
+    elif os.environ["DATATYPE"] == "INT8":
+        quantization_args = [
+            "--activation",
+            "int8,qs=per_tensor_symmetric",
+            "--weight",
+            "int8,qs=per_tensor_symmetric",
+            "--bf16",
+        ]
+    elif os.environ["DATATYPE"] == "P8_1":
+        quantization_args = [
+            "--activation",
+            "posit8_1",
+            "--weight",
+            "posit8_1",
+            "--bf16",
+        ]
+    elif os.environ["DATATYPE"] == "CFLOAT":
+        quantization_args = []
+    else:
+        raise ValueError("Invalid datatype")
+
+    subprocess.run(
+        [
+            "python3",
+            "test/compiler/run_compiler.py",
+            model,
+            "--model_name_or_path",
+            model_path,
+            *quantization_args,
+            "--output_dir",
+            "test/compiler/networks/" + model + "/" + os.environ["DATATYPE"],
+        ]
+    )
+
     # Run accuracy test
     additional_args = []
     if dataset == "squad":
-        additional_args = ["--num_samples", "1000"]
+        additional_args = ["1000"] # limit number of samples to 1000 for squad dataset
     with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
         env_vars = os.environ.copy()
 
