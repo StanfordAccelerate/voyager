@@ -111,26 +111,39 @@ void run_operation(const codegen::AcceleratorParam param,
                                    other_shape, vector_param.opcode());
 
     } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
-      // perform quantization operation
-      output_tensor = quantize<VECTOR_T, INPUT_T>(
-          output_tensor, args[arg_index++], get_size(vector_param.input()));
+      if constexpr (std::is_same<VECTOR_T, CFloat>::value) {
+        std::cerr << "No quantization operations should be emitted for CFloat"
+                  << std::endl;
+        std::abort();
+      } else {
+        // perform quantization operation
+        output_tensor = quantize<VECTOR_T, INPUT_T>(
+            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      }
 
     } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
-      if (vector_param.input().dtype() == "int32") {
-        output_tensor = dequantize<DataTypes::int32, VECTOR_T>(
-            output_tensor, args[arg_index++], get_size(vector_param.input()));
-      } else if (vector_param.input().dtype() == "int24") {
-        output_tensor = dequantize<DataTypes::int24, VECTOR_T>(
-            output_tensor, args[arg_index++], get_size(vector_param.input()));
-      } else if (vector_param.input().dtype() == "int8") {
-        output_tensor = dequantize<DataTypes::int8, VECTOR_T>(
-            output_tensor, args[arg_index++], get_size(vector_param.input()));
-      } else if (vector_param.input().dtype() == "fp8_e4m3") {
-        output_tensor = dequantize<DataTypes::e4m3, VECTOR_T>(
-            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      // perform dequantization operation
+      if constexpr (std::is_same<VECTOR_T, CFloat>::value) {
+        std::cerr << "No quantization operations should be emitted for CFloat"
+                  << std::endl;
+        std::abort();
       } else {
-        std::cerr << "No dequantization operation for dtype: "
-                  << vector_param.input().dtype() << std::endl;
+        if (vector_param.input().dtype() == "int32") {
+          output_tensor = dequantize<DataTypes::int32, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.input().dtype() == "int24") {
+          output_tensor = dequantize<DataTypes::int24, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.input().dtype() == "int8") {
+          output_tensor = dequantize<DataTypes::int8, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.input().dtype() == "fp8_e4m3") {
+          output_tensor = dequantize<DataTypes::e4m3, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else {
+          std::cerr << "No dequantization operation for dtype: "
+                    << vector_param.input().dtype() << std::endl;
+        }
       }
     } else {
       std::cerr << "Unsupported vector instruction: " << vector_param.opcode()
