@@ -293,8 +293,8 @@ clean-test:
 clean-catapult: check_env_var
 	rm -rf $(CATAPULT_BUILD_DIR)
 
-clean-rtl-sim:
-	rm -rf build/Catapult_debug/Accelerator.v1/scverify/concat_sim_rtl_v_vcs
+clean-rtl-sim: check_env_var
+	rm -rf $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/scverify/concat_sim_rtl_v_vcs
 
 clean-protos:
 	rm -rf $(CODEGEN_DIR)/networks/*
