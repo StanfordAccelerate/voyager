@@ -59,12 +59,12 @@ def check_environment_vars(required_vars):
         raise ValueError(f"Please set {', '.join(unset_vars)} environment variables")
 
 
-def run_fp32_unit_test(model, layer, output_folder):
+def run_gold_model_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
     env_vars["CLOCK_PERIOD"] = "1"
-    env_vars["SIMS"] = "fp32,file"
+    env_vars["SIMS"] = "systemc,file"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
         try:
@@ -89,8 +89,8 @@ def run_fp32_unit_test(model, layer, output_folder):
     return (model, layer, p.returncode == 0)
 
 
-def run_fp32_tests(layers, num_processes, results_folder):
-    check_environment_vars(["IC_DIMENSION", "OC_DIMENSION"])
+def run_gold_model_tests(layers, num_processes, results_folder):
+    check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
     # Build TestRunner binary
     # subprocess.run(["make", "clean"], env=env_vars)
@@ -110,7 +110,7 @@ def run_fp32_tests(layers, num_processes, results_folder):
     for model, tests in layers.items():
         for test in tests:
             pool.apply_async(
-                run_fp32_unit_test,
+                run_gold_model_unit_test,
                 args=(model, test, results_folder),
                 callback=test_results.append,
             )
@@ -419,9 +419,9 @@ def main():
     )
     parser.add_argument(
         "--sims",
-        choices=["fp32", "systemc", "fast-systemc", "rtl", "accuracy"],
+        choices=["gold_model", "systemc", "fast-systemc", "rtl", "accuracy"],
         required=True,
-        help="Simulation to run (fp32, systemc, rtl, accuracy)",
+        help="Simulation to run (gold_model, systemc, rtl, accuracy)",
     )
     parser.add_argument(
         "--num_processes",
@@ -454,11 +454,13 @@ def main():
             layers[network] = f.read().splitlines()
 
     if args.sims == "systemc" or args.sims == "fast-systemc":
-        success = run_systemc_tests(layers, args.num_processes, results_folder, args.sims == "fast-systemc")
+        success = run_systemc_tests(
+            layers, args.num_processes, results_folder, args.sims == "fast-systemc"
+        )
     elif args.sims == "rtl":
         success = run_rtl_tests(layers, args.num_processes, results_folder)
-    elif args.sims == "fp32":
-        success = run_fp32_tests(layers, args.num_processes, results_folder)
+    elif args.sims == "gold_model":
+        success = run_gold_model_tests(layers, args.num_processes, results_folder)
     elif args.sims == "accuracy":
         run_accuracy(args.models, args.dataset, args.num_processes, results_folder)
         success = True
