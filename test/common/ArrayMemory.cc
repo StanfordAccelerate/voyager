@@ -156,9 +156,10 @@ std::any ArrayMemory::get_tensor(const codegen::Tensor& tensor) {
     std::string model_name(env_var);
     std::string project_root = std::string(std::getenv("PROJECT_ROOT"));
     std::string datatype = std::string(std::getenv("DATATYPE"));
-    std::string filename = project_root + "/test/compiler/networks/" +
-                           model_name + "/" + datatype + "/tensor_files/" +
-                           tensor.node() + ".bin";
+    std::string filename =
+        project_root + "/" + std::string(getenv("CODEGEN_DIR")) + "/networks/" +
+        model_name + "/" + datatype + "/tensor_files/" + tensor.node() + ".bin";
+
     float scalar;
     std::ifstream input_stream(filename, std::ios::binary);
     input_stream.read(reinterpret_cast<char*>(&scalar), sizeof(float));

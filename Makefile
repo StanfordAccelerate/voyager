@@ -20,6 +20,8 @@ $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 # CC := $(CATAPULT_ROOT)/bin/g++
 CC := /cad/mentor/2024.1/Mgc_home/bin/g++
 
+export CODEGEN_DIR ?= test/compiler
+
 # Check if the environment variable is set
 check_env_var:
 ifndef DATATYPE
@@ -271,7 +273,7 @@ $(CC_BUILD_DIR)/param.pb.o: test/compiler/proto/param.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 .PHONY: network-proto
-network-proto: test/compiler/networks/$(NETWORK)/$(DATATYPE)/params.pb test/compiler/proto/param.pb.cc
+network-proto: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/params.pb test/compiler/proto/param.pb.cc
 
 include codegen.mk
 
@@ -295,7 +297,7 @@ clean-rtl-sim:
 	rm -rf build/Catapult_debug/Accelerator.v1/scverify/concat_sim_rtl_v_vcs
 
 clean-protos:
-	rm -rf test/compiler/networks/*
+	rm -rf $(CODEGEN_DIR)/networks/*
 	rm -rf test/compiler/proto/param.pb.*
 
 .PHONY: clean clean-test clean-catapult clean-rtl-sim

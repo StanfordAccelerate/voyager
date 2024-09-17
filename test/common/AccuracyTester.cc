@@ -65,8 +65,9 @@ bool run_sample(std::string model_name, std::string data_dir,
     data_loader->load_tensor(input, sample_dir, true);
   }
 
-  std::string params_dir = "test/compiler/networks/" + model_name + "/" +
-                           std::getenv("DATATYPE") + "/tensor_files";
+  std::string params_dir = std::string(getenv("CODEGEN_DIR")) + "/networks/" +
+                           model_name + "/" + std::getenv("DATATYPE") + "/tensor_files";
+
   for (const auto& param : params) {
     data_loader->load_weights(param, params_dir);
   }
