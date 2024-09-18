@@ -421,6 +421,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         additional_args = ["1000"] # limit number of samples to 1000 for squad dataset
     with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
         env_vars = os.environ.copy()
+        env_vars["NETWORK"] = model
 
         try:
             subprocess.run(
@@ -431,7 +432,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                     str(num_processes),
                     *additional_args,
                 ],
-                env=os.environ,
+                env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
                 timeout=2 * 60 * 60,
