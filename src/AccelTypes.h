@@ -43,6 +43,11 @@ struct MemoryRequest {
 
     return os;
   }
+
+  inline friend bool operator==(const MemoryRequest &lhs,
+                                const MemoryRequest &rhs) {
+    return lhs.address == rhs.address && lhs.burstSize == rhs.burstSize;
+  }
 };
 
 template <typename TYPE>
@@ -81,6 +86,10 @@ struct PEInput {
 
     return os;
   }
+
+  inline friend bool operator==(const PEInput &lhs, const PEInput &rhs) {
+    return lhs.data == rhs.data && lhs.swapWeights == rhs.swapWeights;
+  }
 };
 
 template <typename TYPE>
@@ -114,6 +123,10 @@ struct PEWeight {
 
     return os;
   }
+
+  inline friend bool operator==(const PEWeight &lhs, const PEWeight &rhs) {
+    return lhs.data == rhs.data && lhs.tag == rhs.tag;
+  }
 };
 
 template <typename TYPE, size_t SIZE>
@@ -137,6 +150,16 @@ class Pack1D {
     for (unsigned int i = 0; i < SIZE; i++) {
       m &value[i];
     }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
   }
 };
 
@@ -171,6 +194,16 @@ class Pack1D<PEInput<Posit<nbits, es> >, SIZE> {
       m &value[i].swapWeights;
     }
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <size_t SIZE, int nbits, int es>
@@ -201,6 +234,16 @@ class Pack1D<PEWeight<Posit<nbits, es> >, SIZE> {
     for (unsigned int i = 0; i < SIZE; i++) {
       m &value[i].tag;
     }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
   }
 };
 
@@ -252,6 +295,16 @@ class Pack1D<PEWeight<PositFP<sbits, fbits> >, SIZE> {
       m &value[i].tag;
     }
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <size_t SIZE, int sbits, int fbits>
@@ -294,6 +347,16 @@ class Pack1D<PositFP<sbits, fbits>, SIZE> {
       m &value[i].float_val.d;
     }
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <size_t SIZE, int mantissa, int exp>
@@ -316,6 +379,16 @@ class Pack1D<StdFloat<mantissa, exp>, SIZE> {
     for (unsigned int i = 0; i < SIZE; i++) {
       m &value[i].float_val.d;
     }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
   }
 };
 
@@ -358,6 +431,16 @@ class Pack1D<PEInput<StdFloat<mantissa, exp> >, SIZE> {
     //     }
     // #endif
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <size_t SIZE, int mantissa, int exp>
@@ -392,6 +475,16 @@ class Pack1D<PEWeight<StdFloat<mantissa, exp> >, SIZE> {
       m &value[i].tag;
     }
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <size_t SIZE, int i_width, bool i_signed>
@@ -414,6 +507,16 @@ class Pack1D<Int<i_width, i_signed>, SIZE> {
     for (unsigned int i = 0; i < SIZE; i++) {
       m &value[i].int_val;
     }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
   }
 };
 
@@ -449,6 +552,16 @@ class Pack1D<PEInput<Int<i_width, i_signed> >, SIZE> {
       m &value[i].swapWeights;
     }
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <size_t SIZE, int i_width, bool i_signed>
@@ -483,6 +596,16 @@ class Pack1D<PEWeight<Int<i_width, i_signed> >, SIZE> {
       m &value[i].tag;
     }
   }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < SIZE; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 };
 
 template <typename TYPE, size_t SIZE>
@@ -511,6 +634,11 @@ struct BufferWriteRequest {
     os << bufWrite.data << " ";
 
     return os;
+  }
+
+  inline friend bool operator==(const BufferWriteRequest &lhs,
+                                const BufferWriteRequest &rhs) {
+    return lhs.address == rhs.address && lhs.data == rhs.data;
   }
 };
 

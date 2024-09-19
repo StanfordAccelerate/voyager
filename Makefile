@@ -18,7 +18,7 @@ $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
 # CC := $(CATAPULT_ROOT)/bin/g++
-CC := /cad/mentor/2024.1/Mgc_home/bin/g++
+CC := /cad/mentor/2024.2/Mgc_home/bin/g++
 
 export CODEGEN_DIR ?= test/compiler
 
@@ -35,7 +35,7 @@ ifndef OC_DIMENSION
 endif
 
 INC := \
-	-I/cad/mentor/2024.1/Mgc_home/shared/include/ \
+	-I/cad/mentor/2024.2/Mgc_home/shared/include/ \
 	-Ilib/ \
 	-Ilib/xtensor/include \
 	-Ilib/xtl/include \
@@ -70,7 +70,7 @@ endif
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
 LDFLAGS += -lsystemc -lstdc++fs -labsl_log_internal_message -labsl_log_internal_check_op -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
-LDLIBS += -L/cad/mentor/2024.1/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
+LDLIBS += -L/cad/mentor/2024.2/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
 LDFLAGS_NO_SYSC += -lstdc++fs -labsl_log_internal_message -labsl_log_internal_check_op -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 
