@@ -4,8 +4,8 @@
 #include <string>
 
 // forward declarations
-template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
-          ac_q_mode Q>
+template <int mantissa, int exp, bool useDWImpl = false,
+          bool ieee_compliance = true, ac_q_mode Q = AC_RND_CONV>
 class StdFloat;
 
 template <int wdth, bool sgnd>
@@ -30,6 +30,8 @@ typedef StdFloat<3, 4, false, true, AC_RND_CONV> e4m3;
 typedef StdFloat<2, 5, false, true, AC_RND_CONV> e5m2;
 typedef StdFloat<7, 8, false, true, AC_RND_CONV> bfloat16;
 typedef StdFloat<23, 8, false, true, AC_RND_CONV> fp32;
+
+typedef Posit<8, 1> posit8;
 
 template <typename T>
 struct TypeName {
@@ -75,4 +77,10 @@ template <>
 struct TypeName<fp32> {
   static std::string name() { return "fp32"; }
 };
+
+template <>
+struct TypeName<posit8> {
+  static std::string name() { return "posit8_1"; }
+};
+
 };  // namespace DataTypes

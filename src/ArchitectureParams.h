@@ -3,13 +3,11 @@
 #if defined(P8_1)
 
 using P8 = Posit<8, 1>;
-using P16 = Posit<16, 1>;
-using P8D = Posit<8, 1>::AccumulationDatatype;
-using P16D = Posit<16, 1>::AccumulationDatatype;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+
 #define INPUT_DATATYPE P8
 #define WEIGHT_DATATYPE P8
-// #define ACCUM_DATATYPE P16
-#define ACCUM_DATATYPE PositFP<8, 7>
+#define ACCUM_DATATYPE F16
 #define OUTPUT_DATATYPE P8
 #define VECTOR_DATATYPE ACCUM_DATATYPE
 

@@ -9,8 +9,8 @@
 #include <ac_math/ac_sigmoid_pwl.h>
 #include <ccs_dw_lib.h>
 
-template <int mantissa, int exp, bool useDWImpl = false,
-          bool ieee_compliance = true, ac_q_mode Q = AC_RND_CONV>
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
 class StdFloat {
  public:
   typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
@@ -51,6 +51,9 @@ class StdFloat {
 
   template <int W, bool S>
   StdFloat(const ac_int<W, S> &rhs);
+
+  template <int nbits, int es>
+  StdFloat(const Posit<nbits, es> &input);
 
   template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,
             ac_q_mode Q2>
@@ -222,6 +225,30 @@ template <int W, bool S>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
     const ac_int<W, S> &rhs) {
   float_val = ac_float_rep(rhs);
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int nbits, int es>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
+    const Posit<nbits, es> &input) {
+  if (input.isZero()) {
+    setZero();
+  } else {
+    bool sign;
+    int scale;
+    ac_int<ac_float_rep::mant_bits, false> mantissa_bits;
+    decode<nbits, es, ac_float_rep::mant_bits>(input.bits, sign, scale,
+                                               mantissa_bits);
+
+    ac_int<1, false> sign_bit = sign;
+    ac_int<ac_float_rep::e_width, true> exp_bits =
+        scale + ac_float_rep::exp_bias;
+
+    float_val.d.set_slc(0, mantissa_bits);
+    float_val.d.set_slc(ac_float_rep::mant_bits, exp_bits);
+    float_val.d.set_slc(ac_float_rep::width - 1, sign_bit);
+  }
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
