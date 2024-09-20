@@ -26,7 +26,7 @@ void save_tensor(char *output_bytes, std::any output_tensor, int size) {
 }
 
 template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
-          typename VECTOR_T>
+          typename ACCUMULATION_BUFFER_T, typename VECTOR_T>
 void run_operation(const codegen::AcceleratorParam param,
                    std::vector<std::any> args) {
   int arg_index = 0;
@@ -75,15 +75,29 @@ void run_operation(const codegen::AcceleratorParam param,
     }
 
     // Permute input tensor
-    const auto &input = matrix_param.input();
-    std::any input_tensor = args[0];
+    const auto &input = matrix_param.has_mx_input()
+                            ? matrix_param.mx_input().input()
+                            : matrix_param.input();
+
+    std::any input_tensor = args[arg_index++];
+    std::any input_scale = nullptr;
+    if (matrix_param.has_mx_input()) {
+      input_scale = args[arg_index++];
+    }
     if (input.has_permutation()) {
       input_tensor = permute<INPUT_T>(input_tensor, input);
     }
 
     // Permute weight tensor
-    const auto &weight = matrix_param.weight();
-    std::any weight_tensor = args[1];
+    const auto &weight = matrix_param.has_mx_weight()
+                             ? matrix_param.mx_weight().input()
+                             : matrix_param.weight();
+
+    std::any weight_tensor = args[arg_index++];
+    std::any weight_scale = nullptr;
+    if (matrix_param.has_mx_weight()) {
+      weight_scale = args[arg_index++];
+    }
     if (weight.has_permutation()) {
       weight_tensor = permute<INPUT_T>(weight_tensor, weight);
     }
@@ -96,12 +110,13 @@ void run_operation(const codegen::AcceleratorParam param,
     if (dim == 1) {
       output_tensor = matrix_vector_multiply<INPUT_T, ACCUMULATE_T,
                                              INTERMEDIATE_T, VECTOR_T>(
-          input_tensor, weight_tensor, args[2], matrix_param);
+          input_tensor, weight_tensor, args[arg_index++], matrix_param);
     } else {
-      output_tensor = gemm<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T>(
-          input_tensor, weight_tensor, args[2], param);
+      output_tensor =
+          gemm<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T, ACCUMULATION_BUFFER_T>(
+              input_tensor, input_scale, weight_tensor, weight_scale,
+              args[arg_index++], param);
     }
-    arg_index = 3;
   } else if (param.vector_params_size() > 0) {
     // fetch the input of the first vector instruction
     output_tensor = args[arg_index++];
@@ -242,5 +257,5 @@ void run_operation(const codegen::AcceleratorParam param,
 void run_gold_model(const codegen::AcceleratorParam &param,
                     std::vector<std::any> args) {
   run_operation<INPUT_DATATYPE, INTERMEDIATE_DTYPE, ACCUM_DATATYPE,
-                VECTOR_DATATYPE>(param, args);
+                ACCUM_BUFFER_DATATYPE, VECTOR_DATATYPE>(param, args);
 }

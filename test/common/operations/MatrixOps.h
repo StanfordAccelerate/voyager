@@ -23,22 +23,37 @@ inline void fused_multiply_add(T a, T b, T2 &c) {
 #endif
 }
 
-template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T>
-inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
-                          std::any bias_tensor,
-                          const codegen::AcceleratorParam &param) {
+template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
+          typename ACCUMULATION_BUFFER_T>
+inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
+                                   std::any weight_tensor,
+                                   std::any weight_scale, std::any bias_tensor,
+                                   const codegen::AcceleratorParam &param) {
   const auto matrix_param = param.matrix_param();
 
+  bool is_mx = matrix_param.has_mx_input() && matrix_param.has_mx_weight();
+
   INPUT_T *inputs = std::any_cast<INPUT_T *>(input_tensor);
+  INPUT_T *input_scales;
+  if (matrix_param.has_mx_input()) {
+    input_scales = std::any_cast<INPUT_T *>(input_scale);
+  }
+
   INPUT_T *weights = std::any_cast<INPUT_T *>(weight_tensor);
-  // bias is assumed to be in ACCUMULATE_T
-  ACCUMULATE_T *bias = nullptr;
+  INPUT_T *weight_scales;
+  if (matrix_param.has_mx_weight()) {
+    weight_scales = std::any_cast<INPUT_T *>(weight_scale);
+  }
+
+  // bias is assumed to be in ACCUMULATION_BUFFER_T
+  ACCUMULATION_BUFFER_T *bias = nullptr;
   if (matrix_param.has_bias()) {
-    bias = std::any_cast<ACCUMULATE_T *>(bias_tensor);
+    bias = std::any_cast<ACCUMULATION_BUFFER_T *>(bias_tensor);
   }
 
   Tiling tiling;
-  if (matrix_param.opcode() == "conv2d") {
+  if (matrix_param.opcode() == "conv2d" ||
+      matrix_param.opcode() == "conv2d_mx") {
     tiling = get_conv2d_tiling(param);
   } else {
     tiling = get_linear_tiling(param);
@@ -85,13 +100,19 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
   bool weight_double_precision = is_double_precision(matrix_param.weight());
   bool bias_double_precision = is_double_precision(matrix_param.bias());
 
-  ACCUMULATE_T *outputs = new ACCUMULATE_T[X * Y * K];
+  ACCUMULATION_BUFFER_T *outputs = new ACCUMULATION_BUFFER_T[X * Y * K];
+
+  // initialize to bias
   for (int i = 0; i < X * Y; i++) {
     for (int k = 0; k < K; k++) {
-      if (matrix_param.has_bias()) {
-        outputs[i * K + k] = bias[k];
+      if (is_mx) {
+        outputs[i * K + k] = ACCUMULATION_BUFFER_T(0.0);
       } else {
-        outputs[i * K + k] = ACCUMULATE_T(0.0);
+        if (matrix_param.has_bias()) {
+          outputs[i * K + k] = bias[k];
+        } else {
+          outputs[i * K + k] = ACCUMULATION_BUFFER_T(0.0);
+        }
       }
     }
   }
@@ -132,6 +153,21 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
                       int k = (k1 * K0 + k0) * OC_DIMENSION + oc0;
                       int output_addr = y * X * K + x * K + k;
 
+                      ACCUMULATE_T psum;
+                      if (is_mx) {
+                        psum = ACCUMULATE_T(0.0);
+                      } else {
+                        if constexpr (ACCUMULATE_T::is_floating_point ==
+                                      ACCUMULATION_BUFFER_T::
+                                          is_floating_point) {
+                          psum = outputs[output_addr];
+                        } else {
+                          throw std::runtime_error(
+                              "ACCUMULATE_T and ACCUMULATION_BUFFER_T must "
+                              "have the same floating point type");
+                        }
+                      }
+
                       for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
                         int c = c0 * IC_unroll + ic0;
                         int input_addr = (STRIDE * y + fy) * STRIDE * X * C +
@@ -145,26 +181,81 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
                             STRIDE * y + fy < STRIDE * Y) {
                           INTERMEDIATE_T input = inputs[input_addr];
                           INTERMEDIATE_T weight = weights[weight_addr];
-                          fused_multiply_add(input, weight,
-                                             outputs[output_addr]);
+
+                          fused_multiply_add(input, weight, psum);
                         }
                       }
-                      if (tiling.replication) {
-                        if (IC_DIMENSION == 16) {
-                          if (counters[1][tiling.fx_index] == 3 ||
-                              counters[1][tiling.fx_index] == 6) {
-                            outputs[output_addr] = static_cast<INTERMEDIATE_T>(
-                                outputs[output_addr]);
+
+                      if (is_mx) {
+                        if constexpr (!INPUT_T::is_floating_point &&
+                                      ACCUMULATION_BUFFER_T::
+                                          is_floating_point) {
+                          // only perform scaling if within bounds
+                          if (STRIDE * x + fx >= 0 &&
+                              STRIDE * x + fx < STRIDE * X &&
+                              STRIDE * y + fy >= 0 &&
+                              STRIDE * y + fy < STRIDE * Y) {
+                            int channel_batch = c0 / (32 / IC_DIMENSION);
+                            int num_channel_batches = C / 32;
+
+                            int input_scale_addr =
+                                (STRIDE * y + fy) * STRIDE * X *
+                                    num_channel_batches +
+                                (STRIDE * x + fx) * num_channel_batches +
+                                channel_batch;
+                            assert(input_scale_addr >= 0);
+                            int weight_scale_addr =
+                                (fy + (FY - 1) / 2) * FX * num_channel_batches *
+                                    K +
+                                (fx + (FX - 1) / 2) * num_channel_batches * K +
+                                channel_batch * K + k;
+                            assert(weight_scale_addr >= 0);
+
+                            INPUT_T input_scale =
+                                input_scales[input_scale_addr];
+                            INPUT_T weight_scale =
+                                weight_scales[weight_scale_addr];
+                            INPUT_T scale = input_scale + weight_scale;
+                            ACCUMULATION_BUFFER_T scaled_psum =
+                                static_cast<ACCUMULATION_BUFFER_T>(psum);
+                            scaled_psum.expScale(scale.int_val);
+
+                            outputs[output_addr] += scaled_psum;
                           }
-                        } else if (IC_DIMENSION == 32) {
-                          if (counters[1][tiling.fx_index] == 6) {
-                            outputs[output_addr] = static_cast<INTERMEDIATE_T>(
-                                outputs[output_addr]);
-                          }
+                        } else {
+                          throw std::runtime_error(
+                              "MX operations are not supported for floating "
+                              "point types");
                         }
                       } else {
-                        outputs[output_addr] =
-                            static_cast<INTERMEDIATE_T>(outputs[output_addr]);
+                        if constexpr (ACCUMULATE_T::is_floating_point &&
+                                      !ACCUMULATION_BUFFER_T::
+                                          is_floating_point) {
+                          outputs[output_addr] =
+                              static_cast<ACCUMULATE_T>(psum);
+
+                          if (tiling.replication) {
+                            if (IC_DIMENSION == 16) {
+                              if (counters[1][tiling.fx_index] == 3 ||
+                                  counters[1][tiling.fx_index] == 6) {
+                                outputs[output_addr] =
+                                    static_cast<INTERMEDIATE_T>(psum);
+                              }
+                            } else if (IC_DIMENSION == 32) {
+                              if (counters[1][tiling.fx_index] == 6) {
+                                outputs[output_addr] =
+                                    static_cast<INTERMEDIATE_T>(psum);
+                              }
+                            }
+                          } else {
+                            outputs[output_addr] =
+                                static_cast<INTERMEDIATE_T>(psum);
+                          }
+                        } else {
+                          throw std::runtime_error(
+                              "ACCUMULATE_T and ACCUMULATION_BUFFER_T must "
+                              "have the same floating point type");
+                        }
                       }
                     }
                   }
@@ -177,8 +268,23 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
     }
   }
 
+  if (is_mx && matrix_param.has_bias()) {
+    // apply bias
+    for (int i = 0; i < X * Y; i++) {
+      for (int k = 0; k < K; k++) {
+        outputs[i * K + k] += bias[k];
+      }
+    }
+  }
+
   delete[] inputs;
+  if (matrix_param.has_mx_input()) {
+    delete[] input_scales;
+  }
   delete[] weights;
+  if (matrix_param.has_mx_weight()) {
+    delete[] weight_scales;
+  }
   if (matrix_param.has_bias()) {
     delete[] bias;
   }

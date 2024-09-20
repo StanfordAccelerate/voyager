@@ -90,8 +90,13 @@ inline std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
 
 inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
   const auto matrix_param = param.matrix_param();
-  const auto input_shape = matrix_param.input().shape();
-  const auto weight_shape = matrix_param.weight().shape();
+  const auto input_shape = matrix_param.has_mx_input()
+                               ? matrix_param.mx_input().input().shape()
+                               : matrix_param.input().shape();
+  const auto weight_shape = matrix_param.has_mx_weight()
+                                ? matrix_param.mx_weight().input().shape()
+                                : matrix_param.weight().shape();
+
   const auto output_shape = param.output().shape();
 
   // input shape = (B, C, H, W)
@@ -755,15 +760,15 @@ inline void adjust_tiling_for_dimension(Tiling& tiling) {
 }
 
 inline Tiling get_linear_tiling(codegen::AcceleratorParam param) {
-  const auto& matrix_param = param.matrix_param();
-  const auto& input = matrix_param.input();
-  const auto& weight = matrix_param.weight();
-  const auto input_shape = input.has_permutation()
-                               ? input.permutation().output_shape()
-                               : input.shape();
-  const auto weight_shape = weight.has_permutation()
-                                ? weight.permutation().output_shape()
-                                : weight.shape();
+  const auto matrix_param = param.matrix_param();
+  const auto input_shape = matrix_param.has_mx_input()
+                               ? matrix_param.mx_input().input().shape()
+                               : matrix_param.input().shape();
+  const auto weight_shape = matrix_param.has_mx_weight()
+                                ? matrix_param.mx_weight().input().shape()
+                                : matrix_param.weight().shape();
+  const auto input = matrix_param.input();
+  const auto weight = matrix_param.weight();
 
   // TODO: we should use OC_DIMENSION and IC_DIMENSION instead
   const int oc_dim = 16;

@@ -122,9 +122,14 @@ class StdFloat {
     float_val = static_cast<ac_float_rep>(sigmoid_in_fixed);
   }
 
-  void expScale(ac_int<8, false> offset) {
-    // TODO: fix this to be scale the exponent
-    float_val.d += offset;
+  template <int width, bool sign>
+  void expScale(ac_int<width, sign> offset) {
+    constexpr int exponent_width = ac_float_rep::e_width;
+    constexpr int mantissa_width = ac_float_rep::mant_bits;
+    ac_int<exponent_width, false> exp_bits =
+        float_val.d.template slc<exponent_width>(mantissa_width);
+    exp_bits += offset;
+    float_val.d.set_slc(mantissa_width, exp_bits);
   }
 
   template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,

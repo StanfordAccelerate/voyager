@@ -82,14 +82,30 @@ void DataLoader::load_inputs(const codegen::AcceleratorParam param,
   // convolution layer inputs/outputs need to be permuted. If the matrix
   // operation is a convolution, the following fused vector operations will
   // need to be permuted as well. This logic should be refined in the future.
-  bool is_conv2d = param.matrix_param().opcode() == "conv2d";
+  bool is_conv2d = param.matrix_param().opcode() == "conv2d" ||
+                   param.matrix_param().opcode() == "conv2d_mx";
   std::string output_node = "";
   if (param.has_matrix_param()) {
     const codegen::MatrixParam& matrix_param = param.matrix_param();
-    bool replication = matrix_param.input().shape(1) == 3 && is_dut;
-    load_tensor(matrix_param.input(), data_dir, is_conv2d, replication);
+
+    auto input = matrix_param.has_mx_input() ? matrix_param.mx_input().input()
+                                             : matrix_param.input();
+    bool replication = input.shape(1) == 3 && is_dut;
+    load_tensor(input, data_dir, is_conv2d, replication);
+
+    if (matrix_param.has_mx_input()) {
+      load_tensor(matrix_param.mx_input().scale(), data_dir, is_conv2d);
+    }
+
     if (matrix_param.opcode() == "matmul") {
-      load_tensor(matrix_param.weight(), data_dir);
+      auto weight = matrix_param.has_mx_weight()
+                        ? matrix_param.mx_weight().input()
+                        : matrix_param.weight();
+      load_tensor(weight, data_dir);
+
+      if (matrix_param.has_mx_weight()) {
+        load_tensor(matrix_param.mx_weight().scale(), data_dir);
+      }
     }
     output_node = matrix_param.name();
   } else if (param.has_pooling_param()) {
@@ -125,14 +141,24 @@ void DataLoader::load_weights(const codegen::AcceleratorParam param,
                               std::string data_dir, bool random_data) {
   if (param.has_matrix_param() && param.matrix_param().opcode() != "matmul") {
     const auto matrix_param = param.matrix_param();
+    const auto input = matrix_param.has_mx_input()
+                           ? matrix_param.mx_input().input()
+                           : matrix_param.input();
+    const auto weight = matrix_param.has_mx_weight()
+                            ? matrix_param.mx_weight().input()
+                            : matrix_param.weight();
+
     // Transpose linear weights except for matrix vector multiply
-    const auto inputs = matrix_param.input();
     int dim = 1;
-    for (int i = 0; i < inputs.shape_size() - 1; i++) {
-      dim *= inputs.shape(i);
+    for (int i = 0; i < input.shape_size() - 1; i++) {
+      dim *= input.shape(i);
     }
     bool transpose = dim > 1;
-    load_tensor(matrix_param.weight(), data_dir, transpose);
+    load_tensor(weight, data_dir, transpose);
+
+    if (matrix_param.has_mx_weight()) {
+      load_tensor(matrix_param.mx_weight().scale(), data_dir, transpose);
+    }
 
     if (matrix_param.has_bias()) {
       // bias is hardcoded to double precision right now
@@ -163,8 +189,9 @@ void DataLoader::load_outputs(const codegen::AcceleratorParam param,
   // always store output in the last memory partition with 0 offset
   memory->set_partition(-1);
   memory->set_offset(0);
-  bool transpose =
-      param.matrix_param().opcode() == "conv2d" || param.has_pooling_param();
+  bool transpose = param.matrix_param().opcode() == "conv2d" ||
+                   param.matrix_param().opcode() == "conv2d_mx" ||
+                   param.has_pooling_param();
   load_tensor(output_tensor, data_dir, transpose, false, false, true);
 }
 

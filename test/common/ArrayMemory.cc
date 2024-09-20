@@ -50,8 +50,21 @@ std::vector<std::any> ArrayMemory::get_args(
   std::string output_node = "";
   if (param.has_matrix_param()) {
     const codegen::MatrixParam& matrix_param = param.matrix_param();
-    args.push_back(get_tensor(matrix_param.input()));
-    args.push_back(get_tensor(matrix_param.weight()));
+
+    if (matrix_param.has_mx_input()) {
+      args.push_back(get_tensor(matrix_param.mx_input().input()));
+      args.push_back(get_tensor(matrix_param.mx_input().scale()));
+    } else {
+      args.push_back(get_tensor(matrix_param.input()));
+    }
+
+    if (matrix_param.has_mx_weight()) {
+      args.push_back(get_tensor(matrix_param.mx_weight().input()));
+      args.push_back(get_tensor(matrix_param.mx_weight().scale()));
+    } else {
+      args.push_back(get_tensor(matrix_param.weight()));
+    }
+
     if (matrix_param.has_bias()) {
       args.push_back(get_tensor(matrix_param.bias()));
     } else {
