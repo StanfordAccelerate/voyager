@@ -19,14 +19,20 @@ SC_MODULE(Accelerator) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, IC_DIMENSION> > CCS_INIT_S1(
       inputDataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(inputScaleAddressRequest);
+  Connections::In<Pack1D<INPUT_DATATYPE, 1> > CCS_INIT_S1(
+      inputScaleDataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(weightScaleAddressRequest);
+  Connections::In<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
+      weightScaleDataResponse);
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   Connections::In<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       biasDataResponse);
-  Connections::Combinational<Pack1D<ACCUM_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
-      outputsFromSystolicArray);
+  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION> >
+      CCS_INIT_S1(outputsFromSystolicArray);
   Connections::SyncOut CCS_INIT_S1(matrixUnitStartSignal);
   Connections::SyncOut CCS_INIT_S1(matrixUnitDoneSignal);
 
@@ -35,7 +41,8 @@ SC_MODULE(Accelerator) {
   CCS_DESIGN((VectorUnit<VECTOR_DATATYPE, VECTOR_ACCUM_DATATYPE, ACCUM_DATATYPE, OC_DIMENSION>)) CCS_INIT_S1(vectorUnit);
   // clang-format on
 #else
-  VectorUnit<INPUT_DATATYPE, VECTOR_DATATYPE, ACCUM_DATATYPE, OC_DIMENSION>
+  VectorUnit<INPUT_DATATYPE, VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE,
+             OC_DIMENSION>
       CCS_INIT_S1(vectorUnit);
 #endif
   Connections::In<int> CCS_INIT_S1(serialVectorParamsIn);
@@ -61,8 +68,12 @@ SC_MODULE(Accelerator) {
     matrixUnit.serialMatrixParamsIn(serialMatrixParamsIn);
     matrixUnit.inputAddressRequest(inputAddressRequest);
     matrixUnit.inputDataResponse(inputDataResponse);
+    matrixUnit.inputScaleAddressRequest(inputScaleAddressRequest);
+    matrixUnit.inputScaleDataResponse(inputScaleDataResponse);
     matrixUnit.weightAddressRequest(weightAddressRequest);
     matrixUnit.weightDataResponse(weightDataResponse);
+    matrixUnit.weightScaleAddressRequest(weightScaleAddressRequest);
+    matrixUnit.weightScaleDataResponse(weightScaleDataResponse);
     matrixUnit.biasAddressRequest(biasAddressRequest);
     matrixUnit.biasDataResponse(biasDataResponse);
     matrixUnit.outputsFromSystolicArray(outputsFromSystolicArray);

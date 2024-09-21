@@ -58,7 +58,9 @@ struct MatrixParams : BaseParams {
 #endif
 
   int INPUT_OFFSET;
+  int INPUT_SCALE_OFFSET;
   int WEIGHT_OFFSET;
+  int WEIGHT_SCALE_OFFSET;
 
   // systolic array loop
   ac_int<10, false> loops[2][6];
@@ -95,14 +97,16 @@ struct MatrixParams : BaseParams {
   int BIAS_OFFSET;
 
   static const unsigned int width =
-      3 * 32 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
+      5 * 32 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
       (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 2;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & INPUT_OFFSET;
+    m & INPUT_SCALE_OFFSET;
     m & WEIGHT_OFFSET;
+    m & WEIGHT_SCALE_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
         m& loops[i][j];
@@ -159,6 +163,7 @@ struct MatrixParams : BaseParams {
   inline friend std::ostream& operator<<(ostream& os,
                                          const MatrixParams& params) {
     os << "INPUT_OFFSET: " << params.INPUT_OFFSET << std::endl;
+    os << "INPUT_SCALE_OFFSET: " << params.INPUT_SCALE_OFFSET << std::endl;
     os << "WEIGHT_OFFSET: " << params.WEIGHT_OFFSET << std::endl;
     os << "WEIGHT_TRANSPOSE: " << params.WEIGHT_TRANSPOSE << std::endl;
     for (int i = 0; i < 2; i++) {

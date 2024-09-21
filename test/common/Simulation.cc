@@ -156,7 +156,7 @@ void Simulation::run() {
   // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     auto memory = (ArrayMemory*)(memories["accelerator"]);
-    // run_accelerator(params, memory->memories[0], memory->memories[1]);
+    run_accelerator(params, memory->memories[0], memory->memories[1]);
   }
 }
 

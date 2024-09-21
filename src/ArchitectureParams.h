@@ -195,8 +195,10 @@ using BF16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define WEIGHT_DATATYPE I8
 #define ACCUM_DATATYPE I32
 #define ACCUM_BUFFER_DATATYPE BF16
-#define OUTPUT_DATATYPE BF16
+#define OUTPUT_DATATYPE I8
 #define VECTOR_DATATYPE BF16
+
+#define MX true
 
 #elif defined(CFLOAT)
 
