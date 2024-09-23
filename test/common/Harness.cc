@@ -6,6 +6,7 @@
 #include <cassert>
 
 #include "AccelTypes.h"
+#include "sysc/kernel/sc_time.h"
 #include "test/toolchain/MapOperation.h"
 
 #ifdef SOC_COSIM
@@ -337,6 +338,8 @@ void Harness::sendParams() {
       }
 
       sc_time start = sc_time_stamp();
+      CCS_LOG("----- Accelerator Layer '" << currentParams.name()
+              << "' Started. -----");
 
       if (vectorParamsValid) {
         sendSerializedParams<VectorParams, 32>(*vectorParams,
@@ -345,10 +348,6 @@ void Harness::sendParams() {
             *vectorInstructionConfig, &serialVectorParamsIn);
         vectorUnitStartSignal.SyncPop();
       }
-
-      CCS_LOG("----- Accelerator Layer '" << currentParams.name()
-                                          << "' Started. -----");
-
 
       if (matrixParamsValid) {
         matrixUnitDoneSignal.SyncPop();
@@ -359,7 +358,10 @@ void Harness::sendParams() {
       CCS_LOG("----- Accelerator Layer '" << currentParams.name()
                                           << "' Finished. -----");
       sc_time end = sc_time_stamp();
-      std::cout << "Runtime: " << end - start << std::endl;
+
+      std::cout << "Default time unit: " << sc_get_default_time_unit()
+                << std::endl;
+      std::cout << "Runtime: " << int(end.to_default_time_units() - start.to_default_time_units()) << " ns" << std::endl;
 
       accelerator_memory_maps.pop_front();
     }
