@@ -278,30 +278,31 @@ void StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::
   output[0].float_val = float_val;
 }
 
-template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
-          ac_q_mode Q>
-StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> exponent(
-    StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> element) {
-  // TODO: clean this up
-  typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
+// template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+//           ac_q_mode Q>
+// StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> exponent(
+//     StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> element) {
+//   // TODO: clean this up
+//   typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
 
-  typedef ac_fixed<2 * mantissa, mantissa, true, AC_TRN, AC_WRAP>
-      ac_float_to_fixed_rep;
-  typedef ac_fixed<2 * mantissa, mantissa, false> ac_float_to_fixed_out_rep;
-  // convert to fixed point
-  ac_float_to_fixed_rep converted_to_fixed =
-      element.float_val.template convert_to_ac_fixed<2 * mantissa, mantissa,
-                                                     true, AC_TRN, AC_WRAP>();
-  // ac_float_to_fixed_rep converted_to_fixed =
-  // element.float_val.convert_to_ac_fixed<2 * mantissa, mantissa, true>();
-  ac_float_to_fixed_out_rep exponent_in_fixed;
-  // take fixed point exponent
-  ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
-  // convert back to float
-  ac_float_rep exponent_in_float = ac_float_rep(exponent_in_fixed);
+//   typedef ac_fixed<2 * mantissa, mantissa, true, AC_TRN, AC_WRAP>
+//       ac_float_to_fixed_rep;
+//   typedef ac_fixed<2 * mantissa, mantissa, false> ac_float_to_fixed_out_rep;
+//   // convert to fixed point
+//   ac_float_to_fixed_rep converted_to_fixed =
+//       element.float_val.template convert_to_ac_fixed<2 * mantissa, mantissa,
+//                                                      true, AC_TRN,
+//                                                      AC_WRAP>();
+//   // ac_float_to_fixed_rep converted_to_fixed =
+//   // element.float_val.convert_to_ac_fixed<2 * mantissa, mantissa, true>();
+//   ac_float_to_fixed_out_rep exponent_in_fixed;
+//   // take fixed point exponent
+//   ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
+//   // convert back to float
+//   ac_float_rep exponent_in_float = ac_float_rep(exponent_in_fixed);
 
-  return static_cast<StdFloat<mantissa, exp, useDWImpl> >(exponent_in_float);
-}
+//   return static_cast<StdFloat<mantissa, exp, useDWImpl> >(exponent_in_float);
+// }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>
