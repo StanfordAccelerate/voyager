@@ -33,7 +33,8 @@ inline T *softmax(std::any input_tensor, const std::vector<int> shape) {
 
     for (int j = 0; j < num_cols; j++) {
       T normalized = static_cast<T>(inputs[offset + j] - max);
-      outputs[offset + j] = exponent(normalized);
+      normalized.exponential();
+      outputs[offset + j] = normalized;
     }
 
     // perform a tree addition
@@ -54,7 +55,8 @@ inline T *softmax(std::any input_tensor, const std::vector<int> shape) {
       sum = static_cast<T>(sum + buffer[0]);
     }
 
-    T divisor = reciprocal(sum);
+    T divisor = sum;
+    divisor.reciprocal();
     for (int j = 0; j < num_cols; j++) {
       outputs[offset + j] *= divisor;
     }

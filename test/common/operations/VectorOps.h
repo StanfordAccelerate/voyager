@@ -6,8 +6,6 @@ const std::set<std::string> activations = {"relu", "relu_", "gelu", "gelu_"};
 const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
                                            "mul", "mul_", "div", "div_"};
 
-// inline void relu(float &x) { x = x > 0 ? x : 0; }
-
 template <typename T>
 inline void relu(T &x) {
   x.relu();
@@ -73,7 +71,8 @@ inline void perform_elwise_op_recursivly(
     } else if (operation == "mul" || operation == "mul_") {
       result[offset_res] = tensor1[offset1] * tensor2[offset2];
     } else if (operation == "div" || operation == "div_") {
-      T immediate = 1.0 / tensor2[offset2];
+      T immediate = tensor2[offset2];
+      immediate.reciprocal();
       result[offset_res] = tensor1[offset1] * immediate;
     } else {
       throw std::invalid_argument("Invalid operation: " + operation);

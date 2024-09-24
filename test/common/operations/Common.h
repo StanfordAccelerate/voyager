@@ -85,12 +85,3 @@ inline int get_size(const codegen::Tensor &tensor) {
  * These functions calculating the reciprocal of various data types: `float`,
  * `INTERMEDIATE_DTYPE`, and `UniversalPositAccum`.
  ***************************************************************************/
-
-inline float reciprocal(const float &a) { return 1.0f / a; }
-
-template <typename T>
-inline T reciprocal(const T &a) {
-  T tmp = a;
-  tmp.reciprocal();
-  return tmp;
-}
