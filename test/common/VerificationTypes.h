@@ -292,7 +292,7 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 &&
              OC == 128) {  // layer2
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 2, 28, 28}},
+    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
