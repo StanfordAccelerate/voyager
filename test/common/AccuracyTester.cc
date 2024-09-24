@@ -60,7 +60,7 @@ bool run_sample(std::string model_name, std::string data_dir,
     if (!found_param) {
       throw std::runtime_error("Error: Could not find attention mask.");
     }
-  } else if (model_name == "resnet18") {
+  } else if (model_name == "resnet18" || model_name == "resnet50") {
     num_classes = 1000;
     data_loader->load_tensor(input, sample_dir, true);
   }
@@ -107,7 +107,7 @@ bool run_sample(std::string model_name, std::string data_dir,
   if (model_name == "mobilebert") {
     // last character of folder name is 0 or 1
     ground_truth = sample.back() - '0';
-  } else if (model_name == "resnet18") {
+  } else if (model_name == "resnet18" || model_name == "resnet50") {
     // split folder name by underscore, first part is ground truth
     ground_truth = std::stoi(sample.substr(0, sample.find("_")));
   }

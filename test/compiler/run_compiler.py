@@ -235,7 +235,7 @@ if __name__ == "__main__":
 
         if args.model_name_or_path:
             checkpoint = torch.load(args.model_name_or_path, map_location="cpu")
-            model.load_state_dict(checkpoint["state_dict"])
+            model.load_state_dict(checkpoint["state_dict"], strict=False)
 
         if args.bf16:
             model.bfloat16()
