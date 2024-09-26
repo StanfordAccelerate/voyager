@@ -417,7 +417,10 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
   Int<quantized_width, quantized_sign> quantizedValue;
   quantizedValue.int_val =
       scaledValue.float_val
-          .template convert_to_ac_int<quantized_width, quantized_sign>();
+          .template convert_to_ac_fixed<quantized_width, quantized_width,
+                                        quantized_sign, AC_RND_CONV, AC_WRAP>(
+              false)
+          .to_ac_int();
 
   return quantizedValue;
 }
