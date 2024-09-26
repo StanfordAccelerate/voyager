@@ -60,36 +60,7 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
     C = 3;
   }
 
-  // adjust loop counters for dimension != 16
-  if (IC_DIMENSION < 16) {
-    tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
-  } else if (IC_DIMENSION > 16) {
-    tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
-  }
-
-  if (OC_DIMENSION < 16) {
-    tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
-  } else if (OC_DIMENSION > 16) {
-    // if the inner weight loop is >=4, we should reduce the inner loop
-    // (otherwise, we violate the weight buffer constraint) otherwise, we
-    // reduce the outer loop
-    if ((tiling.loops[1][tiling.weight_loop_index[1]] >= 4 &&
-         tiling.loops[1][tiling.fx_index] > 1 &&
-         tiling.loops[1][tiling.fy_index] > 1)) {
-      tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-    } else if (tiling.loops[0][tiling.weight_loop_index[0]] <
-                   (OC_DIMENSION / 16) &&
-               tiling.loops[0][tiling.weight_loop_index[0]] != 1) {
-      const int reduction_factor =
-          OC_DIMENSION / 16 / tiling.loops[0][tiling.weight_loop_index[0]];
-      tiling.loops[0][tiling.weight_loop_index[0]] = 1;
-      tiling.loops[1][tiling.weight_loop_index[1]] /= reduction_factor;
-    } else if (tiling.loops[0][tiling.weight_loop_index[0]] == 1) {
-      tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-    } else {
-      tiling.loops[0][tiling.weight_loop_index[0]] /= (OC_DIMENSION / 16);
-    }
-  }
+  adjust_tiling_for_dimension(tiling);
 
   int X0 = tiling.loops[1][tiling.x_loop_index[1]];
   int Y0 = tiling.loops[1][tiling.y_loop_index[1]];

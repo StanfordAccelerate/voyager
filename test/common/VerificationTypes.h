@@ -188,7 +188,12 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
   if (IH == 224 && IW == 224 && IC == 3 && KH == 7 && KW == 7 &&
       OC == 64) {  // conv1
 
-    tiling = {.loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, 2, 16, 16}},
+    tiling = {.loops = {{7, 7, 2, 1, 1, 1},
+                        {1, 2, 7,
+                         (IC_DIMENSION == 16   ? 2
+                          : IC_DIMENSION == 32 ? 1
+                                               : 7),
+                         16, 16}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -487,7 +492,8 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 1 && KW == 1 &&
-             OC == 512 && matrix_param.stride(0) == 2) {  // layer4_0_downsample (resnet18)
+             OC == 512 &&
+             matrix_param.stride(0) == 2) {  // layer4_0_downsample (resnet18)
 
     tiling = {.loops = {{1, 1, 2, 1, 1, 1}, {16, 1, 1, 16, 7, 7}},
               .x_loop_index = {0, 5},
@@ -600,6 +606,7 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
               .replication = false};
 
   } else {
+    std::cout << "Using generated tiling" << std::endl;
     tiling = {
         .loops = {{x1, y1, k1, 1, 1, 1}, {c0, k0, fy, fx, y0, x0}},
         .x_loop_index = {0, 5},
@@ -614,6 +621,137 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
     };
   }
   return tiling;
+}
+
+inline void adjust_tiling_for_dimension(Tiling& tiling) {
+  // adjust loop counters for dimension != 16
+  if (IC_DIMENSION < 16) {
+    tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
+  } else if (IC_DIMENSION > 16) {
+    if (!tiling.replication) {
+      tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
+    }
+  }
+
+  if (!tiling.replication) {
+    // adjust loop counters for weight buffer constraint
+    while (tiling.loops[1][tiling.fx_index] * tiling.loops[1][tiling.fy_index] *
+               tiling.loops[1][tiling.weight_loop_index[1]] * IC_DIMENSION >
+           WEIGHT_BUFFER_SIZE) {
+      tiling.loops[1][tiling.weight_loop_index[1]] /= 2;
+      tiling.loops[0][tiling.weight_loop_index[0]] *= 2;
+    }
+  }
+
+  if (OC_DIMENSION < 16) {
+    tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
+  } else if (OC_DIMENSION > 16) {
+    int div_factor = OC_DIMENSION / 16;
+    // cut down the outer loop first
+    while (tiling.loops[0][tiling.weight_loop_index[0]] > 1 && div_factor > 1) {
+      tiling.loops[0][tiling.weight_loop_index[0]] /= 2;
+      div_factor /= 2;
+    }
+    while (tiling.loops[1][tiling.weight_loop_index[1]] > 1 && div_factor > 1) {
+      tiling.loops[1][tiling.weight_loop_index[1]] /= 2;
+      div_factor /= 2;
+    }
+  }
+
+  // if (OC_DIMENSION < 16) {
+  //   tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
+  // } else if (OC_DIMENSION > 16) {
+  //   // if the inner weight loop is >=4, we should reduce the inner loop
+  //   // (otherwise, we violate the weight buffer constraint) otherwise, we
+  //   // reduce the outer loop
+  //   if ((tiling.loops[1][tiling.weight_loop_index[1]] >= 4 &&
+  //        tiling.loops[1][tiling.fx_index] > 1 &&
+  //        tiling.loops[1][tiling.fy_index] > 1)) {
+  //     tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
+  //   } else if (tiling.loops[0][tiling.weight_loop_index[0]] <
+  //                  (OC_DIMENSION / 16) &&
+  //              tiling.loops[0][tiling.weight_loop_index[0]] != 1) {
+  //     const int reduction_factor =
+  //         OC_DIMENSION / 16 / tiling.loops[0][tiling.weight_loop_index[0]];
+  //     tiling.loops[0][tiling.weight_loop_index[0]] = 1;
+  //     tiling.loops[1][tiling.weight_loop_index[1]] /= reduction_factor;
+  //   } else if (tiling.loops[0][tiling.weight_loop_index[0]] == 1) {
+  //     tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
+  //   } else {
+  //     tiling.loops[0][tiling.weight_loop_index[0]] /= (OC_DIMENSION / 16);
+  //   }
+  // }
+
+  // if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 && OC == 256 &&
+  //     matrix_param.stride(0) == 2 && IC_DIMENSION == 32 && OC_DIMENSION ==
+  //     64) {
+  //   tiling = {.loops = {{2, 2, 2, 1, 1, 1}, {4, 3, 3, 2, 7, 7}},
+  //             .x_loop_index = {0, 5},
+  //             .y_loop_index = {1, 4},
+  //             .reduction_loop_index = {3, 0},
+  //             .weight_loop_index = {2, 3},
+  //             .fx_index = 2,
+  //             .fy_index = 1,
+  //             .weight_reuse_index = {4, 5},
+  //             .stride = matrix_param.stride(0),
+  //             .replication = false};
+
+  // } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
+  //            OC == 128 && IC_DIMENSION == 32 && OC_DIMENSION == 64) {
+  //   tiling = {.loops = {{2, 2, 1, 1, 1, 1}, {2, 2, 1, 1, 14, 14}},
+  //             .x_loop_index = {0, 5},
+  //             .y_loop_index = {1, 4},
+  //             .reduction_loop_index = {3, 0},
+  //             .weight_loop_index = {2, 1},
+  //             .fx_index = 3,
+  //             .fy_index = 2,
+  //             .weight_reuse_index = {4, 5},
+  //             .stride = matrix_param.stride(0),
+  //             .replication = false};
+  // } else if (IH == 14 && IW == 14 && IC == 256 && KH == 3 && KW == 3 &&
+  //            OC == 256 && IC_DIMENSION == 32 && OC_DIMENSION == 64) {
+  //   tiling = {.loops = {{2, 2, 1, 1, 1, 1}, {8, 3, 3, 4, 7, 7}},
+  //             .x_loop_index = {0, 5},
+  //             .y_loop_index = {1, 4},
+  //             .reduction_loop_index = {3, 0},
+  //             .weight_loop_index = {2, 3},
+  //             .fx_index = 2,
+  //             .fy_index = 1,
+  //             .weight_reuse_index = {4, 5},
+  //             .stride = matrix_param.stride(0),
+  //             .replication = false};
+  // } else {
+  //   // adjust loop counters for dimension != 16
+  //   if (IC_DIMENSION < 16) {
+  //     tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
+  //   } else if (IC_DIMENSION > 16) {
+  //     tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
+  //   }
+
+  //   if (OC_DIMENSION < 16) {
+  //     tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
+  //   } else if (OC_DIMENSION > 16) {
+  //     // if the inner weight loop is >=4, we should reduce the inner loop
+  //     // (otherwise, we violate the weight buffer constraint) otherwise, we
+  //     // reduce the outer loop
+  //     if ((tiling.loops[1][tiling.weight_loop_index[1]] >= 4 &&
+  //          tiling.loops[1][tiling.fx_index] > 1 &&
+  //          tiling.loops[1][tiling.fy_index] > 1)) {
+  //       tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
+  //     } else if (tiling.loops[0][tiling.weight_loop_index[0]] <
+  //                    (OC_DIMENSION / 16) &&
+  //                tiling.loops[0][tiling.weight_loop_index[0]] != 1) {
+  //       const int reduction_factor =
+  //           OC_DIMENSION / 16 / tiling.loops[0][tiling.weight_loop_index[0]];
+  //       tiling.loops[0][tiling.weight_loop_index[0]] = 1;
+  //       tiling.loops[1][tiling.weight_loop_index[1]] /= reduction_factor;
+  //     } else if (tiling.loops[0][tiling.weight_loop_index[0]] == 1) {
+  //       tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
+  //     } else {
+  //       tiling.loops[0][tiling.weight_loop_index[0]] /= (OC_DIMENSION / 16);
+  //     }
+  //   }
+  // }
 }
 
 inline Tiling get_linear_tiling(codegen::AcceleratorParam param) {
