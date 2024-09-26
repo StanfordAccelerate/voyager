@@ -133,35 +133,7 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   int FY = tiling.loops[1][tiling.fy_index];
   int STRIDE = tiling.stride;
 
-  if (IC_DIMENSION < 16) {
-    tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
-  } else if (IC_DIMENSION > 16) {
-    if (!tiling.replication) {
-      tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
-    }
-  }
-
-  if (OC_DIMENSION < 16) {
-    tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
-  } else if (OC_DIMENSION > 16) {
-    if ((tiling.loops[1][tiling.weight_loop_index[1]] >= 4 &&
-         tiling.loops[1][tiling.fx_index] > 1 &&
-         tiling.loops[1][tiling.fy_index] > 1)) {
-      tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-    } else if (tiling.loops[0][tiling.weight_loop_index[0]] <
-                   (OC_DIMENSION / 16) &&
-               tiling.loops[0][tiling.weight_loop_index[0]] != 1) {
-      int reductionFactor = OC_DIMENSION / 16;
-      reductionFactor =
-          reductionFactor / tiling.loops[0][tiling.weight_loop_index[0]];
-      tiling.loops[0][tiling.weight_loop_index[0]] = 1;
-      tiling.loops[1][tiling.weight_loop_index[1]] /= reductionFactor;
-    } else if (tiling.loops[0][tiling.weight_loop_index[0]] == 1) {
-      tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-    } else {
-      tiling.loops[0][tiling.weight_loop_index[0]] /= (OC_DIMENSION / 16);
-    }
-  }
+  adjust_tiling_for_dimension(tiling);
 
   MatrixParams *matrix_params = new MatrixParams;
   AcceleratorMemoryMap accelerator_memory_map;
