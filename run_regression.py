@@ -192,19 +192,27 @@ def run_rtl_test(model, layer, output_folder):
     # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
 
-    with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
-                cwd=f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=3 * 60 * 60,
-            )
-        except subprocess.TimeoutExpired:
-            print(f"Test {model}_{layer} timed out")
-            stdout_file.write("Test timed out")
+    # we occasionally see the test fail due to filesystem issues ("no rule to make target", but the target exists), so we retry up to 3 times
+    for attempt in range(3):
+        with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
+            try:
+                subprocess.run(
+                    ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
+                    cwd=f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+                    env=env_vars,
+                    stdout=stdout_file,
+                    stderr=subprocess.STDOUT,
+                    timeout=3 * 60 * 60,
+                )
+            except subprocess.TimeoutExpired:
+                print(f"Test {model}_{layer} timed out")
+                stdout_file.write("Test timed out")
+                break
+
+        with open(f"{output_folder}/{model}_{layer}.log", "r") as logfile:
+            text = logfile.read()
+            if "No rule to make target" not in text:
+                break
 
     # search if the test passed
     p = subprocess.Popen(
