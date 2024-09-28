@@ -3,15 +3,15 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename ACC_DTYPE, typename DTYPE, int WIDTH>
+template <typename VEC_DTYPE, typename IO_DTYPE, int WIDTH>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH> >
+  Connections::In<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(tensorIn);
-  Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
+  Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
 
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
@@ -32,8 +32,8 @@ SC_MODULE(MaxpoolUnit) {
     while (true) {
       VectorParams params = paramsIn.Pop();
 
-      ac_int<10, false> loop_counters[2][3];
-      ac_int<10, false> loop_bounds[2][3];
+      ac_int<11, false> loop_counters[2][3];
+      ac_int<11, false> loop_bounds[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -67,29 +67,29 @@ SC_MODULE(MaxpoolUnit) {
                   for (loop_counters[1][2] = 0;
                        loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
-                    ac_int<10, false> x0 =
+                    ac_int<11, false> x0 =
                         loop_counters[1][params.outputXLoopIndex[1]];
-                    ac_int<10, false> x1 =
+                    ac_int<11, false> x1 =
                         loop_counters[0][params.outputXLoopIndex[0]];
-                    ac_int<10, false> X0 =
+                    ac_int<11, false> X0 =
                         params.outputLoops[1][params.outputXLoopIndex[1]];
-                    ac_int<10, false> X1 =
+                    ac_int<11, false> X1 =
                         params.outputLoops[0][params.outputXLoopIndex[0]];
-                    ac_int<10, false> y0 =
+                    ac_int<11, false> y0 =
                         loop_counters[1][params.outputYLoopIndex[1]];
-                    ac_int<10, false> y1 =
+                    ac_int<11, false> y1 =
                         loop_counters[0][params.outputYLoopIndex[0]];
-                    ac_int<10, false> Y0 =
+                    ac_int<11, false> Y0 =
                         params.outputLoops[1][params.outputYLoopIndex[1]];
-                    ac_int<10, false> Y1 =
+                    ac_int<11, false> Y1 =
                         params.outputLoops[0][params.outputYLoopIndex[0]];
-                    ac_int<10, false> k2 =
+                    ac_int<11, false> k2 =
                         loop_counters[0][params.outputWeightLoopIndex[0]];
-                    ac_int<10, false> K2 =
+                    ac_int<11, false> K2 =
                         params.outputLoops[0][params.outputWeightLoopIndex[0]];
-                    ac_int<10, false> k1 =
+                    ac_int<11, false> k1 =
                         loop_counters[1][params.outputWeightLoopIndex[1]];
-                    ac_int<10, false> K1 =
+                    ac_int<11, false> K1 =
                         params.outputLoops[1][params.outputWeightLoopIndex[1]];
                     ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
                     ac_int<16, false> K = K2 * K1 * WIDTH;
@@ -100,48 +100,19 @@ SC_MODULE(MaxpoolUnit) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH>
+                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
-                    Pack1D<DTYPE, WIDTH> outputPixel;
 
-                    Pack1D<ACC_DTYPE, WIDTH> dpOutputPixel;
-#pragma hls_unroll yes
-                    for (int i = 0; i < WIDTH; i++) {
-                      dpOutputPixel[i] =
-                          static_cast<ACC_DTYPE>(uncastedOutputPixel[i]);
+                    constexpr int num_words =
+                        VEC_DTYPE::width / IO_DTYPE::width;
+                    Pack1D<IO_DTYPE, WIDTH> outputPixel[num_words];
+
+                    convertPack1D<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        uncastedOutputPixel, outputPixel);
+
+                    for (int word = 0; word < num_words; word++) {
+                      tensorOut.Push(outputPixel[word]);
                     }
-
-                    for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
-                      Pack1D<DTYPE, WIDTH> dpHalfVec;
-#pragma hls_unroll yes
-                      for (int i = 0; i < WIDTH / 2; i++) {
-#pragma hls_unroll yes
-                        for (int byte = 0; byte < 2; byte++) {
-                          dpHalfVec[i * 2 + byte].setbits(
-                              dpOutputPixel[vecSlice * (WIDTH / 2) + i]
-                                  .bits_rep()
-                                  .template slc<8>(byte * 8));
-                        }
-                      }
-                      tensorOut.Push(dpHalfVec);
-                    }
-
-                    // sc_lv<ACC_DTYPE::width * WIDTH> dpOutputPixelBits =
-                    //   TypeToBits<Pack1D<ACC_DTYPE, WIDTH> > (dpOutputPixel);
-
-                    // for (int vecSlice = 0; vecSlice < 2; vecSlice++) {
-                    //   Pack1D<DTYPE, WIDTH> dpHalfVec;
-
-                    //   dpHalfVec =
-                    //       BitsToType<Pack1D<DTYPE, WIDTH> >(
-                    //       static_cast<sc_lv<DTYPE::width * WIDTH> >
-                    //       (dpOutputPixelBits[(vecSlice * (WIDTH / 2) *
-                    //       ACC_DTYPE::width),
-                    //       ((vecSlice + 1) * (WIDTH / 2) *
-                    //       ACC_DTYPE::width)]));
-
-                    //   tensorOut.Push(dpHalfVec);
-                    // }
 
                     if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;
@@ -167,7 +138,6 @@ SC_MODULE(MaxpoolUnit) {
             break;
           }
         }
-
       } else {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -187,29 +157,29 @@ SC_MODULE(MaxpoolUnit) {
                   for (loop_counters[1][2] = 0;
                        loop_counters[1][2] < loop_bounds[1][2];
                        loop_counters[1][2]++) {
-                    ac_int<10, false> x0 =
+                    ac_int<11, false> x0 =
                         loop_counters[1][params.outputXLoopIndex[1]];
-                    ac_int<10, false> x1 =
+                    ac_int<11, false> x1 =
                         loop_counters[0][params.outputXLoopIndex[0]];
-                    ac_int<10, false> X0 =
+                    ac_int<11, false> X0 =
                         params.outputLoops[1][params.outputXLoopIndex[1]];
-                    ac_int<10, false> X1 =
+                    ac_int<11, false> X1 =
                         params.outputLoops[0][params.outputXLoopIndex[0]];
-                    ac_int<10, false> y0 =
+                    ac_int<11, false> y0 =
                         loop_counters[1][params.outputYLoopIndex[1]];
-                    ac_int<10, false> y1 =
+                    ac_int<11, false> y1 =
                         loop_counters[0][params.outputYLoopIndex[0]];
-                    ac_int<10, false> Y0 =
+                    ac_int<11, false> Y0 =
                         params.outputLoops[1][params.outputYLoopIndex[1]];
-                    ac_int<10, false> Y1 =
+                    ac_int<11, false> Y1 =
                         params.outputLoops[0][params.outputYLoopIndex[0]];
-                    ac_int<10, false> k2 =
+                    ac_int<11, false> k2 =
                         loop_counters[0][params.outputWeightLoopIndex[0]];
-                    ac_int<10, false> K2 =
+                    ac_int<11, false> K2 =
                         params.outputLoops[0][params.outputWeightLoopIndex[0]];
-                    ac_int<10, false> k1 =
+                    ac_int<11, false> k1 =
                         loop_counters[1][params.outputWeightLoopIndex[1]];
-                    ac_int<10, false> K1 =
+                    ac_int<11, false> K1 =
                         params.outputLoops[1][params.outputWeightLoopIndex[1]];
                     ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
                     ac_int<16, false> K = K2 * K1 * WIDTH;
@@ -220,14 +190,24 @@ SC_MODULE(MaxpoolUnit) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename ACC_DTYPE::AccumulationDatatype, WIDTH>
+                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
                         uncastedOutputPixel = tensorIn.Pop();
-                    Pack1D<DTYPE, WIDTH> outputPixel;
+                    Pack1D<IO_DTYPE, WIDTH> outputPixel;
 
-#pragma hls_unroll yes
-                    for (int i = 0; i < WIDTH; i++) {
-                      outputPixel[i] =
-                          static_cast<DTYPE>(uncastedOutputPixel[i]);
+                    if constexpr (VEC_DTYPE::is_floating_point &&
+                                  IO_DTYPE::is_floating_point) {
+                    // static cast to VEC_DTYPE
+                    UNROLL:
+                      for (int i = 0; i < WIDTH; i++) {
+                        outputPixel[i] =
+                            static_cast<IO_DTYPE>(uncastedOutputPixel[i]);
+                      }
+
+                    } else {
+                      // quantize VEC_DTYPE to IO_DTYPE
+                      vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                          uncastedOutputPixel, outputPixel,
+                          params.outputQuantizeScale);
                     }
 
                     tensorOut.Push(outputPixel);

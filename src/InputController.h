@@ -332,12 +332,12 @@ SC_MODULE(InputController) {
     writeRequest[0].Reset();
     writeRequest[1].Reset();
 
+    bool bankSel = 0;
+
     wait();
 
     while (true) {
       const MatrixParams params = writerParams.Pop();
-
-      bool bankSel = 0;
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
       if (params.REPLICATION) {
@@ -557,6 +557,8 @@ SC_MODULE(InputController) {
     readAddress[0].Reset();
     readAddress[1].Reset();
 
+    bool bankSel = 0;
+
     wait();
 
     while (true) {
@@ -575,8 +577,6 @@ SC_MODULE(InputController) {
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
       bool isDownsample = FX == 1 && FY == 1;
-
-      bool bankSel = 0;
 
       ac_int<8, false> loop_counters[2][6];
       ac_int<8, false> loop_bounds[2][6];
@@ -735,7 +735,12 @@ SC_MODULE(InputController) {
       int additionalUnrollingFactor;  // additional x values packed in a word
                                       // sent to the systolic array, but are
                                       // unused by the systolic array
-      if (IC_DIMENSION == 16) {
+
+      if (IC_DIMENSION == 8) {
+        packingFactor = 4;
+        unrollingFactor = 4;
+        additionalUnrollingFactor = 1;
+      } else if (IC_DIMENSION == 16) {
         packingFactor = 4;
         unrollingFactor = 4;
         additionalUnrollingFactor = 1;

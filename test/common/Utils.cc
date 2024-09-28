@@ -1,248 +1,22 @@
 #include "test/common/Utils.h"
 
 #include <algorithm>
-#include <fstream>
-#include <iostream>
 #include <string>
 #include <vector>
 
-// #include "matplotlib-cpp/matplotlibcpp.h"
-// namespace plt = matplotlibcpp;
-
-#ifndef NO_UNIVERSAL
-inline float readValue(UniversalPosit *matrix, int index,
-                       bool doublePrecision) {
-  if (!doublePrecision) {
-    return static_cast<float>(matrix[index]);
-  }
-
-  int lower = matrix[2 * index].encoding();
-  int upper = matrix[2 * index + 1].encoding();
-  UniversalPositAccum p16;
-  p16.setbits((upper << 8) + lower);
-  return static_cast<float>(p16);
-}
-#endif
-
-inline float readValue(INPUT_DATATYPE *matrix, int index,
-                       bool doublePrecision) {
-  if (!doublePrecision) {
-    return static_cast<float>(matrix[index]);
-  }
-
-  int lower = matrix[2 * index].bits_rep();
-  int upper = matrix[2 * index + 1].bits_rep();
-  ACCUM_DATATYPE p16;
-  p16.setbits((upper << 8) + lower);
-  return static_cast<float>(p16);
-}
-
-inline float readValue(float *matrix, int index, bool doublePrecision) {
-  return doublePrecision ? matrix[2 * index] : matrix[index];
-}
-
-// template <typename T>
-// std::vector<float> get_float_vector(T *matrix, size_t size) {
-//   std::vector<float> vector(size);
-//   for (int i = 0; i < size; i++) {
-//     vector[i] = (float)matrix[i];
-//   }
-//   return vector;
-// }
-
-// template <typename TA, typename TB>
-// void plot_histograms(TA *matrixA, TB *matrixB, size_t size,
-//                      std::string &filename) {
-//   // convert to float
-//   std::vector<float> vectorA = get_float_vector<TA>(matrixA, size);
-//   std::vector<float> vectorB = get_float_vector<TB>(matrixB, size);
-
-//   // plt::hist(vectorA, 100, "b");
-//   // plt::hist(vectorB, 100, "r");
-//   // plt::save(filename + ".png");
-// }
-
-template <typename TA, typename TB>
-float compare_arrays_internal(TA *matrixA, std::string matrixA_name,
-                              TB *matrixB, std::string matrixB_name,
-                              size_t size, std::string filename,
-                              bool doublePrecision) {
-  std::cout << "Writing comparison between " << matrixA_name << " and "
-            << matrixB_name << " to file: " << filename << std::endl;
-  std::ofstream diffFile(filename);
-  diffFile << matrixA_name << " vs. " << matrixB_name << std::endl;
-
-  // Records absolute differences
-  int abs_diff_buckets[5] = {0, 0, 0, 0, 0};
-  // Records relative differences
-  int rel_diff_buckets[5] = {0, 0, 0, 0, 0};
-
-  double always_zero = 0.0;
-
-  for (int index = 0; index < size; index++) {
-    // Calculate absolute difference
-    float a = readValue(matrixA, index, doublePrecision);
-    float b = readValue(matrixB, index, doublePrecision);
-    always_zero += abs(a) + abs(b);
-    float abs_diff = abs(a - b);
-
-    // Write the two values + error scale indicator to file
-    diffFile << a << " vs. " << b << " ";
-    for (float i = 0.001; i < abs_diff; i *= 10.0) {
-      diffFile << "*";
-    }
-    diffFile << std::endl;
-
-    if (abs_diff < 0.001) {
-      abs_diff_buckets[0]++;
-    }
-    if (abs_diff < 0.01) {
-      abs_diff_buckets[1]++;
-    }
-    if (abs_diff < 0.1) {
-      abs_diff_buckets[2]++;
-    }
-    if (abs_diff < 1) {
-      abs_diff_buckets[3]++;
-    } else if (!std::isinf(abs_diff) && !std::isnan(abs_diff)) {
-      abs_diff_buckets[4]++;
-    }
-
-    // Does not fully protect against overflow, but lets not over engineer
-    if ((a == 0 && b == 0) || std::isinf(a) || std::isinf(b)) {
-      rel_diff_buckets[0]++;
-      rel_diff_buckets[1]++;
-      rel_diff_buckets[2]++;
-      rel_diff_buckets[3]++;
-      continue;
-    } else {
-      // See https://en.wikipedia.org/wiki/Relative_change_and_difference
-      float rel_diff = abs_diff / ((abs(a) + abs(b)) / 2);
-      if (rel_diff < 0.001) {
-        rel_diff_buckets[0]++;
-      }
-      if (rel_diff < 0.01) {
-        rel_diff_buckets[1]++;
-      }
-      if (rel_diff < 0.1) {
-        rel_diff_buckets[2]++;
-      }
-      if (rel_diff < 1) {
-        rel_diff_buckets[3]++;
-      } else {
-        rel_diff_buckets[4]++;
-      }
-    }
-  }
-
-  std::cout << "Difference Count:" << std::endl;
-  std::cout << "< 0.001: " << abs_diff_buckets[0] << "("
-            << (float)abs_diff_buckets[0] / size * 100.0 << "%)" << std::endl;
-  std::cout << "< 0.01: " << abs_diff_buckets[1] << "("
-            << (float)abs_diff_buckets[1] / size * 100.0 << "%)" << std::endl;
-  std::cout << "< 0.1: " << abs_diff_buckets[2] << "("
-            << (float)abs_diff_buckets[2] / size * 100.0 << "%)" << std::endl;
-  std::cout << "< 1: " << abs_diff_buckets[3] << "("
-            << (float)abs_diff_buckets[3] / size * 100.0 << "%)" << std::endl;
-  std::cout << "> 1: " << abs_diff_buckets[4] << "("
-            << (float)abs_diff_buckets[4] / size * 100.0 << "%)" << std::endl;
-
-  std::cout << "Percent Difference Count:" << std::endl;
-  std::cout << "< 0.001: " << rel_diff_buckets[0] << "("
-            << (float)rel_diff_buckets[0] / size * 100.0 << "%)" << std::endl;
-  std::cout << "< 0.01: " << rel_diff_buckets[1] << "("
-            << (float)rel_diff_buckets[1] / size * 100.0 << "%)" << std::endl;
-  std::cout << "< 0.1: " << rel_diff_buckets[2] << "("
-            << (float)rel_diff_buckets[2] / size * 100.0 << "%)" << std::endl;
-  std::cout << "< 1: " << rel_diff_buckets[3] << "("
-            << (float)rel_diff_buckets[3] / size * 100.0 << "%)" << std::endl;
-  std::cout << "> 1: " << rel_diff_buckets[4] << "("
-            << (float)rel_diff_buckets[4] / size * 100.0 << "%)" << std::endl;
-  std::cout << std::endl;
-
-  if (always_zero == 0.0) {
-    std::cout << "WARNING: All compared values are zero!" << std::endl;
-  }
-
-  // Ideally, these buckets should be non-overlapping...
-  // TODO(fpedd): Subtract the next smaller bucket to make them non-overlapping
-  float err = (1 - (float)rel_diff_buckets[1] / size) * 0.001 +
-              (1 - (float)rel_diff_buckets[2] / size) * 0.01 +
-              (1 - (float)rel_diff_buckets[3] / size) * 0.1 +
-              (float)rel_diff_buckets[4] / size;
-  return err * 100;
-}
-
-float compare_arrays(INPUT_DATATYPE *matrixA, std::string matrixA_name,
-                     INPUT_DATATYPE *matrixB, std::string matrixB_name,
-                     size_t size, std::string filename, bool doublePrecision) {
-  return compare_arrays_internal<INPUT_DATATYPE, INPUT_DATATYPE>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
-      doublePrecision);
-}
-
-float compare_arrays(INPUT_DATATYPE *matrixA, std::string matrixA_name,
-                     float *matrixB, std::string matrixB_name, size_t size,
-                     std::string filename, bool doublePrecision) {
-  return compare_arrays_internal<INPUT_DATATYPE, float>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
-      doublePrecision);
-}
-
-#ifndef NO_UNIVERSAL
-float compare_arrays(INPUT_DATATYPE *matrixA, std::string matrixA_name,
-                     UniversalPosit *matrixB, std::string matrixB_name,
-                     size_t size, std::string filename, bool doublePrecision) {
-  return compare_arrays_internal<INPUT_DATATYPE, UniversalPosit>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
-      doublePrecision);
-}
-
-float compare_arrays(UniversalPosit *matrixA, std::string matrixA_name,
-                     UniversalPosit *matrixB, std::string matrixB_name,
-                     size_t size, std::string filename, bool doublePrecision) {
-  return compare_arrays_internal<UniversalPosit, UniversalPosit>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
-      doublePrecision);
-}
-
-float compare_arrays(UniversalPosit *matrixA, std::string matrixA_name,
-                     float *matrixB, std::string matrixB_name, size_t size,
-                     std::string filename, bool doublePrecision) {
-  return compare_arrays_internal<UniversalPosit, float>(
-      matrixA, matrixA_name, matrixB, matrixB_name, size, filename,
-      doublePrecision);
-}
-#endif
-
-float compare_arrays(float *matrixA, std::string matrixA_name, float *matrixB,
-                     std::string matrixB_name, size_t size,
-                     std::string filename, bool doublePrecision) {
-  return compare_arrays_internal<float, float>(matrixA, matrixA_name, matrixB,
-                                               matrixB_name, size, filename,
-                                               doublePrecision);
-}
-
-int validateMapping(SimplifiedParams params) {
-  int x0 = params.loops[1][params.inputXLoopIndex[1]];
-  int y0 = params.loops[1][params.inputYLoopIndex[1]];
-  int c0 = params.loops[1][params.reductionLoopIndex[1]];
-  int k0 = params.loops[1][params.weightLoopIndex[1]];
-  int fx = params.loops[1][params.fxIndex];
-  int fy = params.loops[1][params.fyIndex];
-  int stride = params.STRIDE;
-
-  if (params.FC || params.FC_GRAD || params.SOFTMAX || params.SOFTMAX_GRAD ||
-      params.NO_NORM || params.NO_NORM_GRAD || params.CROSS_ENTROPY_GRAD ||
-      params.GRAD_CLIPPING_UNIT_TEST || params.BIAS_GRAD ||
-      params.WEIGHT_UPDATE || params.MAXPOOL) {  // don't check for vector ops
-    return 0;
-  }
+int validateMapping(Tiling tiling) {
+  int x0 = tiling.loops[1][tiling.x_loop_index[1]];
+  int y0 = tiling.loops[1][tiling.y_loop_index[1]];
+  int c0 = tiling.loops[1][tiling.reduction_loop_index[1]];
+  int k0 = tiling.loops[1][tiling.weight_loop_index[1]];
+  int fx = tiling.loops[1][tiling.fx_index];
+  int fy = tiling.loops[1][tiling.fy_index];
+  int stride = tiling.stride;
 
   // TODO(fpedd): Fix and re-enable these checks
   // // Input buffer
   // int input_buffer_tile_size = (x0 * stride + fx - 1) * (y0 * stride + fy -
-  // 1); if (params.REPLICATION) {
+  // 1); if (tiling.replication) {
   //   // don't check temporarily TODO(fpedd): Why not?
   //   input_buffer_tile_size = 1;
   // }
@@ -256,12 +30,12 @@ int validateMapping(SimplifiedParams params) {
   // TODO(fpedd): The constraint should be c0, not 16. But this is causing
   // issues with the the last 3 conv layers of the ResNet18 model. Need to
   // investigate...
-  if (fx * fy * k0 * (params.REPLICATION ? 3 : 16) > WEIGHT_BUFFER_SIZE) {
+  if (fx * fy * k0 * (tiling.replication ? 3 : 16) > WEIGHT_BUFFER_SIZE) {
     std::cerr << "ERROR: Weight buffer tile size violation." << std::endl
               << "Constraint " << WEIGHT_BUFFER_SIZE << " but is " << fx
               << " * " << fy << " * " << k0 << " * "
-              << (params.REPLICATION ? 3 : 16) << " = "
-              << fx * fy * k0 * (params.REPLICATION ? 3 : 16) << std::endl;
+              << (tiling.replication ? 3 : 16) << " = "
+              << fx * fy * k0 * (tiling.replication ? 3 : 16) << std::endl;
     return -1;
   }
 
@@ -274,106 +48,26 @@ int validateMapping(SimplifiedParams params) {
     return -1;
   }
 
-  int x_check = params.inputXLoopIndex[1] >= 4
-                    ? params.loops[1][params.inputXLoopIndex[1]]
-                    : 1;
-  int y_check = params.inputYLoopIndex[1] >= 4
-                    ? params.loops[1][params.inputYLoopIndex[1]]
-                    : 1;
+  int x_check =
+      tiling.x_loop_index[1] >= 4 ? tiling.loops[1][tiling.x_loop_index[1]] : 1;
+  int y_check =
+      tiling.y_loop_index[1] >= 4 ? tiling.loops[1][tiling.y_loop_index[1]] : 1;
   if (x_check * y_check < 32) {
     std::cerr << "ERROR: Innermost X*Y must be >= 32." << std::endl;
-    std::cerr << "X -> params.loops[1][" << params.inputXLoopIndex[1]
-              << "] = " << params.loops[1][params.inputXLoopIndex[1]]
-              << std::endl;
-    std::cerr << "Y -> params.loops[1][" << params.inputYLoopIndex[1]
-              << "] = " << params.loops[1][params.inputYLoopIndex[1]]
-              << std::endl;
+    std::cerr << "X -> tiling.loops[1][" << tiling.x_loop_index[1]
+              << "] = " << tiling.loops[1][tiling.x_loop_index[1]] << std::endl;
+    std::cerr << "Y -> tiling.loops[1][" << tiling.y_loop_index[1]
+              << "] = " << tiling.loops[1][tiling.y_loop_index[1]] << std::endl;
     std::cerr << "X*Y (with index >= 4) is " << x_check * y_check << std::endl;
     return -1;
   }
 
-  if (params.reductionLoopIndex[1] != 0) {
+  if (tiling.reduction_loop_index[1] != 0) {
     std::cerr << "ERROR: Input channel needs to be outermost loop of buffer "
                  "level. But is "
-              << params.reductionLoopIndex[1] << std::endl;
+              << tiling.reduction_loop_index[1] << std::endl;
     return -1;
   }
 
   return 0;
-}
-
-/* This function checks for overlaps in weight/bias memory for a set of
- * workloads. */
-void validateMemoryMapping(std::vector<Workload> workloads) {
-  // put addresses and sizes of weights of all workloads into a vector of pairs
-  std::vector<std::tuple<Workload, int, int> > weightRanges;
-
-  for (const Workload &workload : workloads) {
-    const SimplifiedParams &params = workload.params;
-    if (!params.WEIGHT) {  // skip layers that don't use weights from weight
-                           // memory
-      continue;
-    }
-
-    // compute size of weights
-    int X = params.loops[0][params.inputXLoopIndex[0]] *
-            params.loops[1][params.inputXLoopIndex[1]];
-    int Y = params.loops[0][params.inputYLoopIndex[0]] *
-            params.loops[1][params.inputYLoopIndex[1]];
-    int C = params.loops[1][params.reductionLoopIndex[1]] * (16);
-    int K = params.loops[0][params.weightLoopIndex[0]] *
-            params.loops[1][params.weightLoopIndex[1]] * (16);
-    int FX = params.loops[1][params.fxIndex];
-    int FY = params.loops[1][params.fyIndex];
-    int STRIDE = params.STRIDE;
-    if (params.REPLICATION) {
-      FX = 7;
-      C = 3;
-    }
-
-    int size = FY * FX * C * K;
-    if (params.NO_NORM) {
-      size = C;
-    } else if (params.CROSS_ENTROPY_GRAD) {
-      size = X;
-    } else if (params.NO_NORM_GRAD) {
-      size = X * K;
-    } else if (params.WEIGHT_UPDATE) {
-      size = X * C;
-    }
-
-    if (params.NO_NORM || params.ACC_T_WEIGHT) {
-      size *= 2;
-    }
-
-    std::tuple<Workload, int, int> weightRange = std::make_tuple(
-        workload, params.WEIGHT_OFFSET, params.WEIGHT_OFFSET + size);
-
-    weightRanges.push_back(weightRange);
-  }
-
-  // sort weight ranges by start address
-  std::sort(weightRanges.begin(), weightRanges.end(),
-            [](const std::tuple<Workload, int, int> &a,
-               const std::tuple<Workload, int, int> &b) {
-              return std::get<1>(a) < std::get<1>(b);
-            });
-
-  // check for overlaps
-  for (int i = 0; i < weightRanges.size() - 1; i++) {
-    int start = std::get<1>(weightRanges[i]);
-    int end = std::get<2>(weightRanges[i]);
-    int nextStart = std::get<1>(weightRanges[i + 1]);
-    int nextEnd = std::get<2>(weightRanges[i + 1]);
-
-    if (nextStart < end) {
-      std::cerr << "ERROR: Weight memory overlap detected." << std::endl;
-      std::cerr << "Workload 1: " << std::get<0>(weightRanges[i]).name
-                << std::endl;
-      std::cerr << "Workload 2: " << std::get<0>(weightRanges[i + 1]).name
-                << std::endl;
-      std::cerr << "Overlap: [" << start << ", " << end << "] and ["
-                << nextStart << ", " << nextEnd << "]" << std::endl;
-    }
-  }
 }

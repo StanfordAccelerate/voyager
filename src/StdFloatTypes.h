@@ -9,12 +9,14 @@
 #include <ac_math/ac_sigmoid_pwl.h>
 #include <ccs_dw_lib.h>
 
-template <int mantissa, int exp, bool useDWImpl = false,
-          bool ieee_compliance = true, ac_q_mode Q = AC_RND_CONV>
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
 class StdFloat {
  public:
   typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
   static constexpr unsigned int width = ac_float_rep::width;
+
+  static constexpr bool is_floating_point = true;
 
   // TODO: make this a template parameter
   typedef StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>
@@ -49,6 +51,9 @@ class StdFloat {
 
   template <int W, bool S>
   StdFloat(const ac_int<W, S> &rhs);
+
+  template <int nbits, int es>
+  StdFloat(const Posit<nbits, es> &input);
 
   template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,
             ac_q_mode Q2>
@@ -127,6 +132,12 @@ class StdFloat {
   StdFloat<mantissa2, exp2, useDWImpl2, ieee_compliance2, Q2> fma(
       StdFloat &b,
       StdFloat<mantissa2, exp2, useDWImpl2, ieee_compliance2, Q2> &c);
+
+  template <int quantized_width, int quantized_sign>
+  Int<quantized_width, quantized_sign> quantize(ac_int<width, false> scale);
+
+  template <int quantized_width, int quantized_sign>
+  Int<quantized_width, quantized_sign> quantize(StdFloat scale);
 
   StdFloat operator+(const StdFloat &rhs);
   StdFloat operator*(const StdFloat &rhs);
@@ -218,6 +229,30 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>
+template <int nbits, int es>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
+    const Posit<nbits, es> &input) {
+  if (input.isZero()) {
+    setZero();
+  } else {
+    bool sign;
+    int scale;
+    ac_int<ac_float_rep::mant_bits, false> mantissa_bits;
+    decode<nbits, es, ac_float_rep::mant_bits>(input.bits, sign, scale,
+                                               mantissa_bits);
+
+    ac_int<1, false> sign_bit = sign;
+    ac_int<ac_float_rep::e_width, true> exp_bits =
+        scale + ac_float_rep::exp_bias;
+
+    float_val.d.set_slc(0, mantissa_bits);
+    float_val.d.set_slc(ac_float_rep::mant_bits, exp_bits);
+    float_val.d.set_slc(ac_float_rep::width - 1, sign_bit);
+  }
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
 template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,
           ac_q_mode Q2>
 void StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::
@@ -243,30 +278,31 @@ void StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::
   output[0].float_val = float_val;
 }
 
-template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
-          ac_q_mode Q>
-StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> exponent(
-    StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> element) {
-  // TODO: clean this up
-  typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
+// template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+//           ac_q_mode Q>
+// StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> exponent(
+//     StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> element) {
+//   // TODO: clean this up
+//   typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
 
-  typedef ac_fixed<2 * mantissa, mantissa, true, AC_TRN, AC_WRAP>
-      ac_float_to_fixed_rep;
-  typedef ac_fixed<2 * mantissa, mantissa, false> ac_float_to_fixed_out_rep;
-  // convert to fixed point
-  ac_float_to_fixed_rep converted_to_fixed =
-      element.float_val.template convert_to_ac_fixed<2 * mantissa, mantissa,
-                                                     true, AC_TRN, AC_WRAP>();
-  // ac_float_to_fixed_rep converted_to_fixed =
-  // element.float_val.convert_to_ac_fixed<2 * mantissa, mantissa, true>();
-  ac_float_to_fixed_out_rep exponent_in_fixed;
-  // take fixed point exponent
-  ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
-  // convert back to float
-  ac_float_rep exponent_in_float = ac_float_rep(exponent_in_fixed);
+//   typedef ac_fixed<2 * mantissa, mantissa, true, AC_TRN, AC_WRAP>
+//       ac_float_to_fixed_rep;
+//   typedef ac_fixed<2 * mantissa, mantissa, false> ac_float_to_fixed_out_rep;
+//   // convert to fixed point
+//   ac_float_to_fixed_rep converted_to_fixed =
+//       element.float_val.template convert_to_ac_fixed<2 * mantissa, mantissa,
+//                                                      true, AC_TRN,
+//                                                      AC_WRAP>();
+//   // ac_float_to_fixed_rep converted_to_fixed =
+//   // element.float_val.convert_to_ac_fixed<2 * mantissa, mantissa, true>();
+//   ac_float_to_fixed_out_rep exponent_in_fixed;
+//   // take fixed point exponent
+//   ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
+//   // convert back to float
+//   ac_float_rep exponent_in_float = ac_float_rep(exponent_in_fixed);
 
-  return static_cast<StdFloat<mantissa, exp, useDWImpl> >(exponent_in_float);
-}
+//   return static_cast<StdFloat<mantissa, exp, useDWImpl> >(exponent_in_float);
+// }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>
@@ -356,6 +392,37 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::fma(
     return a_higherprecision.float_val.template fma<Q, !ieee_compliance>(
         b_higherprecision.float_val, c.float_val);
   }
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int quantized_width, int quantized_sign>
+Int<quantized_width, quantized_sign>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
+    ac_int<width, false> scale) {
+  StdFloat scale_float;
+  scale_float.setbits(scale);
+  return quantize<quantized_width, quantized_sign>(scale_float);
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int quantized_width, int quantized_sign>
+Int<quantized_width, quantized_sign>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
+    StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scale) {
+  StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scaledValue =
+      *this / scale;
+
+  Int<quantized_width, quantized_sign> quantizedValue;
+  quantizedValue.int_val =
+      scaledValue.float_val
+          .template convert_to_ac_fixed<quantized_width, quantized_width,
+                                        quantized_sign, AC_RND_CONV, AC_WRAP>(
+              false)
+          .to_ac_int();
+
+  return quantizedValue;
 }
 
 /*

@@ -1,945 +1,186 @@
-#include "test/common/GoldModel.h"
+#include "GoldModel.h"
 
-#include <algorithm>
-#include <cstring>
 #include <vector>
 
-#ifndef NO_UNIVERSAL
-inline void gold_fma(UniversalPosit a, UniversalPosit b,
-                     UniversalPositAccum &c) {
-  UniversalPositAccum product;
-  sw::universal::value<15> internal = sw::universal::fma<8, 1>(a, b, 0);
-  sw::universal::convert<16, 1, 15>(internal, product);
-  c += product;
-}
-#endif
+#include "test/common/VerificationTypes.h"
+#include "test/common/operations/MatrixOps.h"
+#include "test/common/operations/Pooling.h"
+#include "test/common/operations/QuantizeOps.h"
+#include "test/common/operations/ReduceOps.h"
+#include "test/common/operations/ReshapeOps.h"
+#include "test/common/operations/VectorOps.h"
 
-inline void gold_fma(INPUT_DATATYPE a, INPUT_DATATYPE b,
-                     ACCUM_DATATYPE::AccumulationDatatype &c) {
-#ifdef HYBRID_FP8
-  HYBRID_TYPE hybrid_a(a);
-  HYBRID_TYPE hybrid_b(b);
-  c = hybrid_a.fma(hybrid_b, c);
-#else
-  INPUT_DATATYPE::AccumulationDatatype v1 = a;
-  INPUT_DATATYPE::AccumulationDatatype v2 = b;
-  c = v1.fma(v2, c);
-#endif
-}
+template <typename T>
+void save_tensor(char *output_bytes, std::any output_tensor, int size) {
+  T *output_tensor_casted = std::any_cast<T *>(output_tensor);
 
-inline void gold_fma(float a, float b, float &c) { c += a * b; }
-
-#ifndef NO_UNIVERSAL
-inline void gold_relu(UniversalPositAccum &a) { a = a < 0 ? 0 : a; }
-#endif
-inline void gold_relu(ACCUM_DATATYPE::AccumulationDatatype &a) { a.relu(); }
-inline void gold_relu(float &a) { a = a < 0 ? 0 : a; }
-
-#ifndef NO_UNIVERSAL
-inline void gold_exp(UniversalPositAccum &a) { a = sw::universal::exp(a); }
-#endif
-inline void gold_exp(ACCUM_DATATYPE::AccumulationDatatype &a) {
-  ACCUM_DATATYPE tmp = static_cast<ACCUM_DATATYPE>(a);
-  tmp.exponential();
-  a = static_cast<ACCUM_DATATYPE::AccumulationDatatype>(tmp);
-}
-inline void gold_exp(float &a) { a = exp(a); }
-
-#ifndef NO_UNIVERSAL
-inline void gold_reciprocal(UniversalPositAccum &a) { a = a.reciprocate(); }
-#endif
-inline void gold_reciprocal(ACCUM_DATATYPE::AccumulationDatatype &a) {
-  ACCUM_DATATYPE tmp = static_cast<ACCUM_DATATYPE>(a);
-  tmp.reciprocal();
-  a = static_cast<ACCUM_DATATYPE::AccumulationDatatype>(tmp);
-}
-inline void gold_reciprocal(float &a) { a = 1.0f / a; }
-
-#ifndef NO_UNIVERSAL
-inline void gold_inv_sqrt(UniversalPositAccum &a) {
-  a = sw::universal::rsqrt(a);
-}
-#endif
-inline void gold_inv_sqrt(ACCUM_DATATYPE::AccumulationDatatype &a) {
-  a = a.inv_sqrt();
-}
-inline void gold_inv_sqrt(float &a) { a = 1.0f / std::sqrt(a); }
-
-#ifndef NO_UNIVERSAL
-inline UniversalPositAccum readInput(UniversalPosit *matrix, int index,
-                                     bool doublePrecision) {
-  if (!doublePrecision) {
-    return static_cast<UniversalPositAccum>(matrix[index]);
-  }
-
-  int encoding1 = matrix[2 * index].encoding();
-  int encoding2 = matrix[2 * index + 1].encoding();
-  UniversalPositAccum p16;
-  p16.setbits((encoding2 << 8) + encoding1);
-  return p16;
-}
-#endif
-
-inline ACCUM_DATATYPE readInput(INPUT_DATATYPE *matrix, int index,
-                                bool doublePrecision) {
-  if (!doublePrecision) {
-    return static_cast<ACCUM_DATATYPE>(matrix[index]);
-  } else {
-    ACCUM_DATATYPE dpValue(&matrix[2 * index]);
-    return dpValue;
-  }
-}
-
-inline float readInput(float *matrix, int index, bool doublePrecision) {
-  return doublePrecision ? matrix[2 * index] : matrix[index];
-}
-
-#ifndef NO_UNIVERSAL
-inline void saveOutput(UniversalPosit *matrix, int index,
-                       UniversalPositAccum value, bool doublePrecision) {
-  if (!doublePrecision) {
-    matrix[index] = static_cast<UniversalPosit>(value);
-  } else {
-    int bits = value.encoding();
-    matrix[2 * index].setbits(bits & 0xFF);
-    matrix[2 * index + 1].setbits((bits >> 8) & 0xFF);
-  }
-}
-#endif
-
-inline void saveOutput(INPUT_DATATYPE *matrix, int index,
-                       ACCUM_DATATYPE::AccumulationDatatype value,
-                       bool doublePrecision) {
-  if (!doublePrecision) {
-    matrix[index] = static_cast<INPUT_DATATYPE>(value);
-  } else {
-    ACCUM_DATATYPE p16 = value;
-    p16.storeAsLowerPrecision(&matrix[2 * index]);
-  }
-}
-
-inline void saveOutput(float *matrix, int index, float value,
-                       bool doublePrecision) {
-  if (!doublePrecision) {
-    matrix[index] = value;
-  } else {
-    matrix[2 * index] = value;
-    matrix[2 * index + 1] = 0;
-  }
-}
-
-#ifndef NO_UNIVERSAL
-inline void adjustExp(UniversalPositAccum &value, int expBias) {
-  value *= pow(2, expBias);
-}
-#endif
-inline void adjustExp(ACCUM_DATATYPE::AccumulationDatatype &value,
-                      int expBias) {
-  value.expScale(expBias);
-}
-inline void adjustExp(float &value, int expBias) { value *= pow(2, expBias); }
-
-template <typename ACC_T>
-void grad_clip_norm(ACC_T *matrix, int size) {
-  // tree add
-  ACC_T norm = static_cast<ACC_T>(0.0);
-  for (int reductionCount = 0; reductionCount < size;
-       reductionCount += OC_DIMENSION) {
-    // perform a tree addition
-    ACC_T accum[OC_DIMENSION];
-    for (int i = 0; i < OC_DIMENSION; i++) {
-      accum[i] = static_cast<ACC_T>(matrix[reductionCount + i] *
-                                    matrix[reductionCount + i]);
-    }
-
-    int depth = OC_DIMENSION;
-    while (depth > 1) {
-      for (int i = 0; i < depth; i += 2) {
-        accum[i / 2] = static_cast<ACC_T>(accum[i] + accum[i + 1]);
-      }
-      depth = depth / 2;
-    }
-    norm = static_cast<ACC_T>(norm + accum[0]);
-  }
-
-  gold_inv_sqrt(norm);
-
-  if (static_cast<float>(norm) < 1) {
-    for (int i = 0; i < size; i++) {
-      matrix[i] *= norm;
+  for (int i = 0; i < size; i++) {
+    auto bits = static_cast<T>(output_tensor_casted[i]).bits_rep();
+    constexpr int num_bytes = T::width / 8;
+    for (int j = 0; j < num_bytes; j++) {
+      output_bytes[i * num_bytes + j] = bits.template slc<8>(j * 8);
     }
   }
+
+  delete[] output_tensor_casted;
 }
 
-template <typename T, typename ACC_T, typename INT_T>
-void run_gold_op(SimplifiedParams params, T *matrixA, T *matrixB, T *matrixC,
-                 T *biasMatrix, T *residualMatrix, T *weightResidualMatrix) {
-  // std::cerr << "Running gold model " << std::endl;
-
-  int X = params.loops[0][params.inputXLoopIndex[0]] *
-          params.loops[1][params.inputXLoopIndex[1]];
-  int Y = params.loops[0][params.inputYLoopIndex[0]] *
-          params.loops[1][params.inputYLoopIndex[1]];
-  int C = params.loops[1][params.reductionLoopIndex[1]] * (16);
-  int K = params.loops[0][params.weightLoopIndex[0]] *
-          params.loops[1][params.weightLoopIndex[1]] * (16);
-  int FX = params.loops[1][params.fxIndex];
-  int FY = params.loops[1][params.fyIndex];
-  int STRIDE = params.STRIDE;
-
-  if (params.REPLICATION) {
-    FX = 7;
-    C = 3;
-  }
-
-  ACC_T learningRate = static_cast<T>(params.learningRate);
-
-  if (params.SOFTMAX) {
-    for (int x = 0; x < X; x++) {
-      ACC_T outputMatrix[Y];
-      for (int y = 0; y < Y; y++) {
-        outputMatrix[y] = readInput(matrixA, x * Y + y, params.ACC_T_INPUT);
-      }
-
-      ACC_T max = static_cast<ACC_T>(-9999);
-      for (int y = 0; y < Y; y++) {
-        max = outputMatrix[y] > max ? outputMatrix[y] : max;
-      }
-
-      ACC_T sum = static_cast<ACC_T>(0.0);
-      for (int y = 0; y < Y; y++) {
-        ACC_T exp = static_cast<ACC_T>(outputMatrix[y] - max);
-        gold_exp(exp);
-        outputMatrix[y] = exp;
-      }
-
-      for (int reductionCount = 0; reductionCount < Y;
-           reductionCount += OC_DIMENSION) {
-        // perform a tree addition
-        ACC_T accum[OC_DIMENSION];
-        for (int i = 0; i < OC_DIMENSION; i++) {
-          accum[i] = outputMatrix[reductionCount + i];
-        }
-
-        int depth = OC_DIMENSION;
-        while (depth > 1) {
-          for (int i = 0; i < depth; i += 2) {
-            accum[i / 2] = static_cast<ACC_T>(accum[i] + accum[i + 1]);
-          }
-          depth = depth / 2;
-        }
-        sum = static_cast<ACC_T>(sum + accum[0]);
-      }
-
-      ACC_T divisor = sum;
-      gold_reciprocal(divisor);
-      for (int y = 0; y < Y; y++) {
-        outputMatrix[y] *= divisor;
-        saveOutput(matrixC, x * Y + y, outputMatrix[y], params.ACC_T_OUTPUT);
-      }
-    }
-  } else if (params.FC) {
-    // fully connected layer (matrix-vector)
-    for (int k = 0; k < K; k++) {
-      ACC_T acc = static_cast<ACC_T>(0.0);
-
-      ACC_T flattened_mult[C];
-      for (int c = 0; c < C; c++) {
-        ACC_T a = readInput(matrixA, c, params.ACC_T_INPUT);
-        ACC_T b = readInput(matrixB, k * C + c, params.ACC_T_WEIGHT);
-
-        if (params.WEIGHT_SPLITTING) {
-          ACC_T grad = readInput(weightResidualMatrix, k * C + c, false);
-          b -= static_cast<ACC_T>(learningRate * grad);
-        }
-
-        flattened_mult[c] =
-            static_cast<ACC_T>(static_cast<ACC_T>(a) * static_cast<ACC_T>(b));
-      }
-
-      for (int reductionCount = 0; reductionCount < C;
-           reductionCount += OC_DIMENSION) {
-        // perform a tree addition
-        ACC_T accum[OC_DIMENSION];
-        for (int i = 0; i < OC_DIMENSION; i++) {
-          accum[i] = flattened_mult[reductionCount + i];
-        }
-
-        int depth = OC_DIMENSION;
-        while (depth > 1) {
-          for (int i = 0; i < depth; i += 2) {
-            accum[i / 2] = static_cast<ACC_T>(accum[i] + accum[i + 1]);
-          }
-          depth = depth / 2;
-        }
-        acc = static_cast<ACC_T>(acc + accum[0]);
-      }
-
-      if (params.BIAS) {
-        acc += readInput(biasMatrix, k, true);
-      }
-
-      saveOutput(matrixC, k, acc, params.ACC_T_OUTPUT);
-    }
-  } else if (params.NO_NORM) {
-    for (int x = 0; x < X; x++) {
-      for (int k = 0; k < K; k++) {
-        ACC_T a = readInput(matrixA, x * K + k, params.ACC_T_INPUT);
-        ACC_T b = readInput(matrixB, k, true);
-        ACC_T acc = static_cast<ACC_T>(a * b);
-
-        if (params.BIAS) {
-          ACC_T bias = readInput(biasMatrix, k, true);
-          acc += bias;
-        }
-
-        saveOutput(matrixC, x * K + k, acc, params.ACC_T_OUTPUT);
-      }
-    }
-  } else if (params.SOFTMAX_GRAD) {
-    ACC_T outputMatrix[X * Y];
-    ACC_T attentionProbs[X * Y];
-    ACC_T sums[X];
-    for (int i = 0; i < X; i++) {
-      sums[i] = static_cast<ACC_T>(0.0);
-    }
-
-    for (int i = 0; i < X * Y; i++) {
-      outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-      attentionProbs[i] = readInput(residualMatrix, i, params.ACC_T_OUTPUT);
-    }
-
-    for (int x = 0; x < X; x++) {
-      for (int y = 0; y < Y; y++) {
-        outputMatrix[x * Y + y] *= attentionProbs[x * Y + y];
-      }
-
-      // perform sum with a tree addition
-      for (int reductionCount = 0; reductionCount < Y;
-           reductionCount += OC_DIMENSION) {
-        // perform a tree addition
-        ACC_T accum[OC_DIMENSION];
-        for (int i = 0; i < OC_DIMENSION; i++) {
-          accum[i] = outputMatrix[x * Y + reductionCount + i];
-        }
-
-        int depth = OC_DIMENSION;
-        while (depth > 1) {
-          for (int i = 0; i < depth; i += 2) {
-            accum[i / 2] = static_cast<ACC_T>(accum[i] + accum[i + 1]);
-          }
-          depth = depth / 2;
-        }
-        sums[x] = static_cast<ACC_T>(sums[x] + accum[0]);
-      }
-    }
-
-    for (int x = 0; x < X; x++) {
-      for (int y = 0; y < Y; y++) {
-        outputMatrix[x * Y + y] -=
-            static_cast<ACC_T>(sums[x] * attentionProbs[x * Y + y]);
-        saveOutput(matrixC, x * Y + y, outputMatrix[x * Y + y],
-                   params.ACC_T_OUTPUT);
-      }
-    }
-  } else if (params.FC_GRAD) {
-    ACC_T outputMatrix[X * K];
-    for (int x = 0; x < X; x++) {
-      for (int k = 0; k < K; k++) {
-        ACC_T a = readInput(matrixA, x, params.ACC_T_INPUT);
-        ACC_T b = readInput(matrixB, k, params.ACC_T_WEIGHT);
-        outputMatrix[x * K + k] = static_cast<ACC_T>(a * b);
-      }
-    }
-
-    for (int i = 0; i < X * K; i++) {
-      adjustExp(outputMatrix[i], params.outputExpBias);
-    }
-
-    if (params.RESIDUAL) {
-      for (int i = 0; i < X * K; i++) {
-        ACC_T grad = readInput(residualMatrix, i, params.ACC_T_RESIDUAL);
-        outputMatrix[i] += grad;
-      }
-    }
-
-    if (params.GRAD_CLIPPING) {
-      grad_clip_norm(outputMatrix, X * K);
-    }
-
-    for (int i = 0; i < X * K; i++) {
-      saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
-    }
-  } else if (params.NO_NORM_GRAD) {
-    ACC_T outputMatrix[K];
-    for (int i = 0; i < K; i++) {
-      outputMatrix[i] = static_cast<ACC_T>(0.0);
-    }
-
-    for (int i = 0; i < X; i++) {
-      for (int j = 0; j < K; j++) {
-        ACC_T a = readInput(matrixA, i * K + j, params.ACC_T_INPUT);
-        ACC_T b = readInput(matrixB, i * K + j, params.ACC_T_WEIGHT);
-        outputMatrix[j] += static_cast<ACC_T>(a * b);
-      }
-    }
-
-    for (int i = 0; i < K; i++) {
-      adjustExp(outputMatrix[i], params.outputExpBias);
-    }
-
-    if (params.RESIDUAL) {
-      for (int i = 0; i < K; i++) {
-        ACC_T grad = readInput(residualMatrix, i, params.ACC_T_RESIDUAL);
-        outputMatrix[i] += grad;
-      }
-    }
-
-    if (params.GRAD_CLIPPING) {
-      grad_clip_norm(outputMatrix, K);
-    }
-
-    for (int i = 0; i < K; i++) {
-      saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
-    }
-  } else if (params.BIAS_GRAD) {
-    INT_T inputMatrixB[C * K];
-    for (int i = 0; i < C * K; i++) {
-      inputMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
-    }
-
-    if (params.CONCAT_WEIGHT) {
-      INT_T copyMatrixB[C * K];
-      memcpy(copyMatrixB, inputMatrixB, sizeof(copyMatrixB));
-      for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < C; j++) {
-          for (int k = 0; k < K / 4; k++) {
-            inputMatrixB[i * K / 4 + j * K + k] =
-                copyMatrixB[i * C * K / 4 + j * K / 4 + k];
-          }
-        }
-      }
-    }
-
-    ACC_T outputMatrix[K];
-    for (int i = 0; i < K; i++) {
-      outputMatrix[i] = static_cast<ACC_T>(0.0);
-    }
-
-    for (int i = 0; i < C; i++) {
-      for (int j = 0; j < K; j++) {
-        outputMatrix[j] += inputMatrixB[i * K + j];
-      }
-    }
-
-    for (int i = 0; i < X * K; i++) {
-      adjustExp(outputMatrix[i], params.outputExpBias);
-    }
-
-    if (params.RESIDUAL) {
-      for (int i = 0; i < X * K; i++) {
-        ACC_T grad = readInput(residualMatrix, i, params.ACC_T_RESIDUAL);
-        outputMatrix[i] += grad;
-      }
-    }
-
-    if (params.GRAD_CLIPPING) {
-      grad_clip_norm(outputMatrix, K);
-    }
-
-    for (int i = 0; i < K; i++) {
-      saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
-    }
-  } else if (params.CROSS_ENTROPY_GRAD) {
-    ACC_T labels[X];
-    ACC_T logits[X];
-    ACC_T outputs[X];
-
-    for (int i = 0; i < X; i++) {
-      logits[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-      labels[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
-    }
-
-    ACC_T max = static_cast<ACC_T>(0.0);
-    for (int i = 0; i < X; i++) {
-      max = logits[i] > max ? logits[i] : max;
-    }
-
-    ACC_T sum = static_cast<ACC_T>(0.0);
-    for (int i = 0; i < X; i++) {
-      ACC_T exp = static_cast<ACC_T>(logits[i] - max);
-      gold_exp(exp);
-      outputs[i] = exp;
-      sum += exp;
-    }
-
-    ACC_T divisor = sum;
-    gold_reciprocal(divisor);
-    for (int i = 0; i < X; i++) {
-      outputs[i] *= divisor;
-      outputs[i] -= labels[i];
-      if (params.outputExpBias) {
-        adjustExp(outputs[i], params.outputExpBias);
-      }
-      saveOutput(matrixC, i, outputs[i], params.ACC_T_OUTPUT);
-    }
-  } else if (params.MSE_GRAD) {
-    INT_T divisor = static_cast<INT_T>(2 / X);
-    for (int i = 0; i < X; i++) {
-      matrixC[i] = static_cast<INT_T>(matrixA[i] - matrixB[i]) * divisor;
-    }
-  } else if (params.BCE_WITH_LOGITS_GRAD) {
-    INT_T divisor = static_cast<INT_T>(1 / X);
-    for (int i = 0; i < X; i++) {
-      matrixC[i] = static_cast<INT_T>(matrixA[i] - matrixB[i]) * divisor;
-    }
-  } else if (params.GRAD_CLIPPING_UNIT_TEST) {
-    ACC_T outputMatrix[X * C];
-    for (int i = 0; i < X * C; i++) {
-      outputMatrix[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-    }
-
-    for (int i = 0; i < X * C; i++) {
-      adjustExp(outputMatrix[i], params.outputExpBias);
-    }
-
-    if (params.RESIDUAL) {
-      for (int i = 0; i < X * K; i++) {
-        ACC_T grad = readInput(residualMatrix, i, params.ACC_T_RESIDUAL);
-        outputMatrix[i] += grad;
-      }
-    }
-
-    grad_clip_norm(outputMatrix, X * C);
-
-    for (int i = 0; i < X * C; i++) {
-      saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
-    }
-  } else if (params.MERGE_LORA_WEIGHT) {
-    ACC_T outputMatrix[X * K];
-    for (int i = 0; i < X * K; i++) {
-      outputMatrix[i] = static_cast<ACC_T>(0.0);
-    }
-
-    for (int x = 0; x < X; x++) {
-      for (int k = 0; k < K; k++) {
-        for (int c = 0; c < C; c++) {
-          ACC_T lora_a = readInput(matrixA, x * C + c, true);
-          // lora b is stored in tranposed order in memory
-          ACC_T lora_b = readInput(matrixB, k * C + c, true);
-          outputMatrix[x * K + k] += static_cast<ACC_T>(lora_a * lora_b);
-        }
-      }
-    }
-
-    if (params.RESIDUAL) {
-      for (int i = 0; i < X * K; i++) {
-        ACC_T weight = readInput(residualMatrix, i, false);
-        outputMatrix[i] += weight;
-      }
-    }
-
-    for (int i = 0; i < X * K; i++) {
-      saveOutput(matrixC, i, outputMatrix[i], false);
-    }
-  } else if (params.QUANTIZE_TO_P8) {
-    // Read double precision inputs and save in single precision format
-    for (int i = 0; i < X * C; i++) {
-      ACC_T val = readInput(matrixA, i, true);
-      saveOutput(matrixC, i, val, false);
-    }
-  } else if (params.WEIGHT_UPDATE) {
-    ACC_T *weights = new ACC_T[X * C];
-    ACC_T *gradients = new ACC_T[X * C];
-    for (int i = 0; i < X * C; i++) {
-      gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-      weights[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
-      weights[i] -= static_cast<ACC_T>(learningRate * gradients[i]);
-      saveOutput(matrixB, i, weights[i], params.ACC_T_OUTPUT);
-    }
-  } else if (params.MAX_REDUCE) {
-    // TODO:
-    ACC_T *gradients = new ACC_T[X * C];
-    for (int i = 0; i < X * C; i++) {
-      gradients[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-    }
-  } else if (params.ELWISE_ADD) {
-    for (int i = 0; i < X * C; i++) {
-      ACC_T x = readInput(matrixA, i, params.ACC_T_INPUT);
-      ACC_T y = readInput(matrixB, i, params.ACC_T_WEIGHT);
-      ACC_T sum = static_cast<ACC_T>(x + y);
-      saveOutput(matrixC, i, sum, params.ACC_T_OUTPUT);
-    }
-  } else if (params.MAXPOOL) {
-    ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
-    for (int i = 0; i < X * Y * K; i++) {
-      tmpMatrixC[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-    }
-
-    for (int y = 0; y < Y / 2; y++) {
-      for (int x = 0; x < X / 2; x++) {
-        for (int k = 0; k < K; k++) {
-          std::vector<ACC_T> v;
-
-          for (int x_window = 0; x_window < 2; x_window++) {
-            for (int y_window = 0; y_window < 2; y_window++) {
-              int x_maxpool = x * 2 + x_window;
-              int y_maxpool = y * 2 + y_window;
-              v.push_back(tmpMatrixC[y_maxpool * X * K + x_maxpool * K + k]);
-              std::cout << tmpMatrixC[y_maxpool * X * K + x_maxpool * K + k]
-                        << " ";
-            }
-          }
-
-          ACC_T max = *std::max_element(v.begin(), v.end());
-          std::cout << std::endl << "Max: " << max << std::endl;
-          saveOutput(matrixC, y * (X / 2) * K + x * K + k, max,
-                     params.ACC_T_OUTPUT);
-        }
-      }
-    }
-    delete[] tmpMatrixC;
-  } else {
-    // Large arrays need to go on the heap
-    INT_T *inputMatrixA = new INT_T[(STRIDE * X) * (STRIDE * Y) * C];
-    INT_T *inputMatrixB = new INT_T[FX * FY * C * K];
-    ACC_T *inputResidualMatrix = new ACC_T[X * Y * K];
-    ACC_T *outputMatrix = new ACC_T[X * Y * K];
-
-    for (int i = 0; i < X * Y * K; i++) {
-      outputMatrix[i] = static_cast<ACC_T>(0.0);
-    }
-
-    for (int i = 0; i < (STRIDE * X) * (STRIDE * Y) * C; i++) {
-      inputMatrixA[i] = readInput(matrixA, i, params.ACC_T_INPUT);
-    }
-
-    for (int i = 0; i < FX * FY * C * K; i++) {
-      inputMatrixB[i] = readInput(matrixB, i, params.ACC_T_WEIGHT);
-
-      if (params.WEIGHT_SPLITTING) {
-        ACC_T grad = readInput(weightResidualMatrix, i, false);
-        inputMatrixB[i] -= learningRate * grad;
-        inputMatrixB[i] = static_cast<T>(inputMatrixB[i]);
-      }
-    }
-
-    if (params.RESIDUAL || params.RELU_GRAD) {
-      for (int i = 0; i < X * Y * K; i++) {
-        inputResidualMatrix[i] =
-            readInput(residualMatrix, i, params.ACC_T_RESIDUAL);
-      }
-    }
-
-    if (params.CONCAT_INPUT) {
-      INT_T copyMatrixA[X * C];
-      memcpy(copyMatrixA, inputMatrixA, sizeof(copyMatrixA));
-      for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < X; j++) {
-          for (int k = 0; k < C / 4; k++) {
-            inputMatrixA[i * C / 4 + j * C + k] =
-                copyMatrixA[i * X * C / 4 + j * C / 4 + k];
-          }
-        }
-      }
-    }
-
-    if (params.INPUT_TRANSPOSE) {
-      INT_T copyMatrixA[X * C];
-      memcpy(copyMatrixA, inputMatrixA, sizeof(copyMatrixA));
-      for (int x = 0; x < X; x++) {
-        for (int c = 0; c < C; c++) {
-          inputMatrixA[x * C + c] = copyMatrixA[c * X + x];
-        }
-      }
-    }
-
-    if (params.CONCAT_WEIGHT) {
-      INT_T copyMatrixB[C * K];
-      memcpy(copyMatrixB, inputMatrixB, sizeof(copyMatrixB));
-      for (int i = 0; i < 4; i++) {
-        for (int j = 0; j < C; j++) {
-          for (int k = 0; k < K / 4; k++) {
-            inputMatrixB[i * K / 4 + j * K + k] =
-                copyMatrixB[i * C * K / 4 + j * K / 4 + k];
-          }
-        }
-      }
-    }
-
-    if (params.WEIGHT_TRANSPOSE) {
-      INT_T copyMatrixB[C * K];
-      memcpy(copyMatrixB, inputMatrixB, sizeof(copyMatrixB));
-      for (int c = 0; c < C; c++) {
-        for (int k = 0; k < K; k++) {
-          inputMatrixB[c * K + k] = copyMatrixB[k * C + c];
-        }
-      }
-    }
-
-    // adjust loop counters for dimension != 16
-    if (IC_DIMENSION < 16) {
-      params.loops[1][params.reductionLoopIndex[1]] *= (16 / IC_DIMENSION);
-    } else if (IC_DIMENSION > 16) {
-      params.loops[1][params.reductionLoopIndex[1]] /= (IC_DIMENSION / 16);
-    }
-
-    if (OC_DIMENSION < 16) {
-      params.loops[0][params.weightLoopIndex[0]] *= (16 / OC_DIMENSION);
-    } else if (OC_DIMENSION > 16) {
-      // if the inner weight loop is >=4, we should reduce the inner loop
-      // (otherwise, we violate the weight buffer constraint) otherwise, we
-      // reduce the outer loop
-      if ((params.loops[1][params.weightLoopIndex[1]] >= 4 &&
-           params.loops[1][params.fxIndex] > 1 &&
-           params.loops[1][params.fyIndex] > 1)) {
-        params.loops[1][params.weightLoopIndex[1]] /= (OC_DIMENSION / 16);
-      } else if (params.loops[0][params.weightLoopIndex[0]] <
-                     (OC_DIMENSION / 16) &&
-                 params.loops[0][params.weightLoopIndex[0]] != 1) {
-        int reductionFactor = OC_DIMENSION / 16;
-        reductionFactor =
-            reductionFactor / params.loops[0][params.weightLoopIndex[0]];
-        params.loops[0][params.weightLoopIndex[0]] = 1;
-        params.loops[1][params.weightLoopIndex[1]] /= reductionFactor;
-      } else if(params.loops[0][params.weightLoopIndex[0]] == 1){
-        params.loops[1][params.weightLoopIndex[1]] /= (OC_DIMENSION / 16);
-      } else {
-        params.loops[0][params.weightLoopIndex[0]] /= (OC_DIMENSION / 16);
-      }
-    }
-
-    int loop_counters[2][6] = {0};
-
-    int X0 = params.loops[1][params.inputXLoopIndex[1]];
-    // int X1 = params.loops[0][params.inputXLoopIndex[0]];
-    int Y0 = params.loops[1][params.inputYLoopIndex[1]];
-    // int Y1 = params.loops[0][params.inputYLoopIndex[0]];
-    // int C0 = params.loops[1][params.reductionLoopIndex[1]];
-    // int C1 = params.loops[0][params.reductionLoopIndex[0]];
-    int K0 = params.loops[1][params.weightLoopIndex[1]];
-    // int K1 = params.loops[0][params.weightLoopIndex[0]];
-    int IC_unroll = IC_DIMENSION;
-
-    if (params.REPLICATION) {
-      params.loops[1][params.fxIndex] = 7;
-      IC_unroll = 3;
-      params.loops[1][params.reductionLoopIndex[1]] = 1;
-    }
-
-    // assert that none of params.loops are 0
-    for (int j = 0; j < 3; j++) {
-      assert(params.loops[0][j] != 0);
-    }
-    for (int j = 0; j < 6; j++) {
-      assert(params.loops[1][j] != 0);
-    }
-    if (params.BIAS) {
-      for (int y = 0; y < Y; y++) {
-        for (int x = 0; x < X; x++) {
-          for (int k = 0; k < K; k++) {
-            int outputAddress = y * X * K + x * K + k;
-            ACC_T bias = readInput(biasMatrix, k, true);
-            outputMatrix[outputAddress] = bias;
-          }
-        }
-      }
-    }
-
-    for (loop_counters[0][0] = 0; loop_counters[0][0] < params.loops[0][0];
-         loop_counters[0][0]++) {
-      for (loop_counters[0][1] = 0; loop_counters[0][1] < params.loops[0][1];
-           loop_counters[0][1]++) {
-        for (loop_counters[0][2] = 0; loop_counters[0][2] < params.loops[0][2];
-             loop_counters[0][2]++) {
-          int x1 = loop_counters[0][params.inputXLoopIndex[0]];
-          int y1 = loop_counters[0][params.inputYLoopIndex[0]];
-          int k1 = loop_counters[0][params.weightLoopIndex[0]];
-
-          for (loop_counters[1][0] = 0;
-               loop_counters[1][0] < params.loops[1][0];
-               loop_counters[1][0]++) {
-            for (loop_counters[1][1] = 0;
-                 loop_counters[1][1] < params.loops[1][1];
-                 loop_counters[1][1]++) {
-              for (loop_counters[1][2] = 0;
-                   loop_counters[1][2] < params.loops[1][2];
-                   loop_counters[1][2]++) {
-                for (loop_counters[1][3] = 0;
-                     loop_counters[1][3] < params.loops[1][3];
-                     loop_counters[1][3]++) {
-                  for (loop_counters[1][4] = 0;
-                       loop_counters[1][4] < params.loops[1][4];
-                       loop_counters[1][4]++) {
-                    for (loop_counters[1][5] = 0;
-                         loop_counters[1][5] < params.loops[1][5];
-                         loop_counters[1][5]++) {
-                      int x0 = loop_counters[1][params.inputXLoopIndex[1]];
-                      int y0 = loop_counters[1][params.inputYLoopIndex[1]];
-                      int c0 = loop_counters[1][params.reductionLoopIndex[1]];
-                      int k0 = loop_counters[1][params.weightLoopIndex[1]];
-                      int fx = loop_counters[1][params.fxIndex] - (FX - 1) / 2;
-                      int fy = loop_counters[1][params.fyIndex] - (FY - 1) / 2;
-
-                      int x = x1 * X0 + x0;
-                      int y = y1 * Y0 + y0;
-
-                      for (int oc0 = 0; oc0 < OC_DIMENSION; oc0++) {
-                        int k = (k1 * K0 + k0) * OC_DIMENSION + oc0;
-                        int outputAddress = y * X * K + x * K + k;
-
-                        for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
-                          int c = c0 * IC_unroll + ic0;
-                          int inputAddress =
-                              (STRIDE * y + fy) * STRIDE * X * C +
-                              (STRIDE * x + fx) * C + c;
-                          int weightAddress = (fy + (FY - 1) / 2) * FX * C * K +
-                                              (fx + (FX - 1) / 2) * C * K +
-                                              c * K + k;
-                          if (STRIDE * x + fx >= 0 &&
-                              STRIDE * x + fx < STRIDE * X &&
-                              STRIDE * y + fy >= 0 &&
-                              STRIDE * y + fy < STRIDE * Y) {
-                            gold_fma(inputMatrixA[inputAddress],
-                                     inputMatrixB[weightAddress],
-                                     outputMatrix[outputAddress]);
-                          }
-                        }
-                        if (params.REPLICATION) {
-                          if (IC_DIMENSION == 16) {
-                            if (loop_counters[1][params.fxIndex] == 3 ||
-                                loop_counters[1][params.fxIndex] == 6) {
-                              outputMatrix[outputAddress] = static_cast<INT_T>(
-                                  outputMatrix[outputAddress]);
-                            }
-                          } else if (IC_DIMENSION == 32) {
-                            if (loop_counters[1][params.fxIndex] == 6) {
-                              outputMatrix[outputAddress] = static_cast<INT_T>(
-                                  outputMatrix[outputAddress]);
-                            }
-                          }
-                        } else {
-                          outputMatrix[outputAddress] =
-                              static_cast<INT_T>(outputMatrix[outputAddress]);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          int X0 = params.loops[1][params.inputXLoopIndex[1]];
-          int Y0 = params.loops[1][params.inputYLoopIndex[1]];
-
-          for (int y0 = 0; y0 < Y0; y0++) {
-            for (int x0 = 0; x0 < X0; x0++) {
-              for (int k0 = 0; k0 < K0; k0++) {
-                for (int oc0 = 0; oc0 < OC_DIMENSION; oc0++) {
-                  int x = x1 * X0 + x0;
-                  int y = y1 * Y0 + y0;
-                  int k = (k1 * K0 + k0) * OC_DIMENSION + oc0;
-                  int outputAddress = y * X * K + x * K + k;
-
-                  if (params.ATTENTION_SCALING) {
-                    T scale = static_cast<T>(1.0f / sqrt(32));
-                    outputMatrix[outputAddress] *= static_cast<ACC_T>(scale);
-                  }
-
-                  adjustExp(outputMatrix[outputAddress], params.outputExpBias);
-
-                  if (params.RESIDUAL) {
-                    outputMatrix[outputAddress] +=
-                        inputResidualMatrix[outputAddress];
-                  }
-
-                  if (params.RELU) {
-                    gold_relu(outputMatrix[outputAddress]);
-                  }
-
-                  if (params.RELU_GRAD &&
-                      inputResidualMatrix[outputAddress] == 0) {
-                    outputMatrix[outputAddress] = static_cast<ACC_T>(0.0);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    if (params.SPLIT_OUTPUT) {
-      ACC_T copyMatrixC[X * K];
-      memcpy(copyMatrixC, outputMatrix, sizeof(copyMatrixC));
-      for (int i = 0; i < X; i++) {
-        for (int j = 0; j < 4; j++) {
-          for (int k = 0; k < K / 4; k++) {
-            outputMatrix[j * X * K / 4 + i * K / 4 + k] =
-                copyMatrixC[i * K + j * K / 4 + k];
-          }
-        }
-      }
-    }
-
-    if (params.GRAD_CLIPPING) {
-      grad_clip_norm(outputMatrix, Y * X * K);
-    }
-
-    if (params.AVGPOOL) {
-      ACC_T *tmpMatrixC = new ACC_T[X * Y * K];
-      memcpy(tmpMatrixC, outputMatrix, sizeof(ACC_T) * X * Y * K);
-
-      for (int k = 0; k < K; k++) {
-        ACC_T acc = static_cast<ACC_T>(0.0);
-        for (int y = 0; y < Y; y++) {
-          for (int x = 0; x < X; x++) {
-            acc += tmpMatrixC[y * X * K + x * K + k];
-          }
-        }
-        float scale = 1.0 / (X * Y);
-        T divisor = static_cast<T>(scale);
-        matrixC[k] = acc * static_cast<ACC_T>(divisor);
-      }
-      delete[] tmpMatrixC;
+template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
+          typename VECTOR_T>
+void run_operation(const codegen::AcceleratorParam param,
+                   std::vector<std::any> args) {
+  int arg_index = 0;
+  std::any output_tensor;
+
+  if (param.has_reduce_param()) {
+    const auto &reduce_param = param.reduce_param();
+    if (reduce_param.opcode() == "softmax") {
+      const auto &input = reduce_param.input();
+      const auto input_shape = get_shape(input);
+      output_tensor = softmax<VECTOR_T>(args[arg_index++], input_shape);
     } else {
-      for (int i = 0; i < X * Y * K; i++) {
-        saveOutput(matrixC, i, outputMatrix[i], params.ACC_T_OUTPUT);
-      }
+      std::cerr << "Unsupported reduce instruction: " << reduce_param.opcode()
+                << std::endl;
+      exit(1);
+    }
+  }
+
+  if (param.has_pooling_param()) {
+    const auto input = param.pooling_param().input();
+    output_tensor = pooling<VECTOR_T>(args[arg_index++], param);
+  }
+
+  if (param.has_reshape_param()) {
+    const auto &reshape_param = param.reshape_param();
+    const auto &input = reshape_param.input();
+    output_tensor = permute<INPUT_T>(args[arg_index++], reshape_param);
+  }
+
+  if (param.has_matrix_param()) {
+    const auto &matrix_param = param.matrix_param();
+
+    // Permute input tensor
+    const auto &input = matrix_param.input();
+    std::any input_tensor = args[0];
+    if (input.has_permutation()) {
+      input_tensor = permute<INPUT_T>(input_tensor, input.permutation());
     }
 
-    delete[] inputMatrixA;
-    delete[] inputMatrixB;
-    delete[] inputResidualMatrix;
-    delete[] outputMatrix;
+    // Permute weight tensor
+    const auto &weight = matrix_param.weight();
+    std::any weight_tensor = args[1];
+    if (weight.has_permutation()) {
+      weight_tensor = permute<INPUT_T>(weight_tensor, weight.permutation());
+    }
+
+    int dim = 1;
+    for (int i = 0; i < input.shape_size() - 1; i++) {
+      dim *= input.shape(i);
+    }
+
+    if (dim == 1) {
+      output_tensor = matrix_vector_multiply<INPUT_T, ACCUMULATE_T,
+                                             INTERMEDIATE_T, VECTOR_T>(
+          input_tensor, weight_tensor, args[2], matrix_param);
+    } else {
+      output_tensor = gemm<INPUT_T, ACCUMULATE_T, INTERMEDIATE_T>(
+          input_tensor, weight_tensor, args[2], param);
+    }
+    arg_index = 3;
+  } else if (param.vector_params_size() > 0) {
+    // fetch the input of the first vector instruction
+    output_tensor = args[arg_index++];
+  }
+
+  for (const auto &vector_param : param.vector_params()) {
+    if (activations.find(vector_param.opcode()) != activations.end()) {
+      VECTOR_T *tensor = std::any_cast<VECTOR_T *>(output_tensor);
+      // TODO: Implement different activation functions
+      int input_size = get_size(vector_param.input());
+      for (int i = 0; i < input_size; i++) {
+        relu(tensor[i]);
+      }
+    } else if (arithmetics.find(vector_param.opcode()) != arithmetics.end()) {
+      VECTOR_T *input_tensor = std::any_cast<VECTOR_T *>(output_tensor);
+      const auto input_shape = get_shape(vector_param.input());
+
+      const auto &other = vector_param.other();
+      VECTOR_T *other_tensor = std::any_cast<VECTOR_T *>(args[arg_index++]);
+      const auto other_shape = get_shape(other);
+
+      output_tensor =
+          perform_elwise_operation(input_tensor, input_shape, other_tensor,
+                                   other_shape, vector_param.opcode());
+
+    } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
+      if constexpr (std::is_same<VECTOR_T, CFloat>::value) {
+        std::cerr << "No quantization operations should be emitted for CFloat"
+                  << std::endl;
+        std::abort();
+      } else {
+        // perform quantization operation
+        output_tensor = quantize<VECTOR_T, INPUT_T>(
+            output_tensor, args[arg_index++], get_size(vector_param.input()));
+      }
+
+    } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
+      // perform dequantization operation
+      if constexpr (std::is_same<VECTOR_T, CFloat>::value) {
+        std::cerr << "No quantization operations should be emitted for CFloat"
+                  << std::endl;
+        std::abort();
+      } else {
+        if (vector_param.input().dtype() == "int32") {
+          output_tensor = dequantize<DataTypes::int32, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.input().dtype() == "int24") {
+          output_tensor = dequantize<DataTypes::int24, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.input().dtype() == "int8") {
+          output_tensor = dequantize<DataTypes::int8, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.input().dtype() == "fp8_e4m3") {
+          output_tensor = dequantize<DataTypes::e4m3, VECTOR_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else {
+          std::cerr << "No dequantization operation for dtype: "
+                    << vector_param.input().dtype() << std::endl;
+        }
+      }
+    } else {
+      std::cerr << "Unsupported vector instruction: " << vector_param.opcode()
+                << std::endl;
+      std::abort();
+    }
+  }
+
+  int output_size = get_size(param.output());
+  if (param.output().has_permutation()) {
+    if (param.output().dtype() == "bfloat16") {
+      output_tensor = permute<DataTypes::bfloat16>(
+          std::any_cast<DataTypes::bfloat16 *>(output_tensor),
+          param.output().permutation());
+    } else {  // assume INPUT_T if the output tensor is not bfloat16
+      output_tensor = permute<INPUT_T>(std::any_cast<INPUT_T *>(output_tensor),
+                                       param.output().permutation());
+    }
+  }
+
+  // save the output tensor
+  char *output_bytes = std::any_cast<char *>(args.back());
+
+  if (param.output().dtype() == "bfloat16") {
+    save_tensor<DataTypes::bfloat16>(output_bytes, output_tensor, output_size);
+  } else if (param.output().dtype() == "int8") {
+    save_tensor<DataTypes::int8>(output_bytes, output_tensor, output_size);
+  } else {
+    // assume INPUT_T if the output tensor is not bfloat16 or int8
+    save_tensor<INPUT_T>(output_bytes, output_tensor, output_size);
   }
 }
 
-void run_gold_model(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
-                    INPUT_DATATYPE *matrixB, INPUT_DATATYPE *matrixC,
-                    INPUT_DATATYPE *biasMatrix, INPUT_DATATYPE *residualMatrix,
-                    INPUT_DATATYPE *weightResidualMatrix) {
-  run_gold_op<INPUT_DATATYPE, ACCUM_DATATYPE::AccumulationDatatype,
-              ACCUM_DATATYPE>(params, matrixA, matrixB, matrixC, biasMatrix,
-                              residualMatrix, weightResidualMatrix);
-}
-
-#ifndef NO_UNIVERSAL
-void run_gold_model(const SimplifiedParams params, UniversalPosit *matrixA,
-                    UniversalPosit *matrixB, UniversalPosit *matrixC,
-                    UniversalPosit *biasMatrix, UniversalPosit *residualMatrix,
-                    UniversalPosit *weightResidualMatrix) {
-  run_gold_op<UniversalPosit, UniversalPositAccum, UniversalPositAccum>(
-      params, matrixA, matrixB, matrixC, biasMatrix, residualMatrix,
-      weightResidualMatrix);
-}
-#endif
-
-void run_gold_model(const SimplifiedParams params, float *matrixA,
-                    float *matrixB, float *matrixC, float *biasMatrix,
-                    float *residualMatrix, float *weightResidualMatrix) {
-  run_gold_op<float, float, float>(params, matrixA, matrixB, matrixC,
-                                   biasMatrix, residualMatrix,
-                                   weightResidualMatrix);
+void run_gold_model(const codegen::AcceleratorParam &param,
+                    std::vector<std::any> args) {
+  run_operation<INPUT_DATATYPE, INTERMEDIATE_DTYPE, ACCUM_DATATYPE,
+                VECTOR_DATATYPE>(param, args);
 }

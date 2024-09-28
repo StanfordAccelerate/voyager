@@ -1,10 +1,9 @@
 #pragma once
 
 #include "src/AccelTypes.h"
-#include "src/ArchitectureParams.h"
 #include "src/Params.h"
-#include "test/common/VerificationTypes.h"
+#include "test/compiler/proto/param.pb.h"
 
-void MapOperation(const SimplifiedParams &params, const MemoryMap &memoryMap,
+void MapOperation(const codegen::AcceleratorParam &param,
                   std::deque<BaseParams *> &mappedParams,
                   std::deque<AcceleratorMemoryMap> &opMemoryMaps);

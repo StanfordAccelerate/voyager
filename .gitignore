@@ -1,5 +1,6 @@
 .cache
 build
+data
 pybuild
 .direnv
 .vscode
@@ -10,6 +11,7 @@ verdiLog/
 __pycache__
 *.py[cod]
 venv
+.envrc
 .env
 .swp
 .gitlab-ci-local
@@ -18,13 +20,4 @@ test_outputs/
 test_outputs_e2e/
 logs/
 regression_results/
-# "Manual" test data files
-models/resnet/binary_data*
-models/resnet/model_data/*
-!models/resnet/model_data/*.pth
-models/mobilebert/binary_data/*
-datafile
-# ZagZig codegen files
-test/*/gen_data
-test/*/*_networks_codegen.py
-test/*/paramsCodeGen.h
+.conda-env/

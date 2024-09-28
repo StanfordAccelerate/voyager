@@ -9,7 +9,7 @@
 
 extern "C" int sc_main(int argc, char* argv[]) {
   Simulation sim;
-  sim.loadMemory();
+  sim.load_data();
   sim.run();
-  return sim.checkOutput();
+  return sim.check_outputs();
 }

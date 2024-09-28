@@ -1,6 +1,9 @@
-[submodule "lib/universal"]
-	path = lib/universal
-	url = https://github.com/stillwater-sc/universal.git
-[submodule "lib/matplotlib-cpp"]
-	path = lib/matplotlib-cpp
-	url = https://github.com/lava/matplotlib-cpp.git
+[submodule "quantized-training"]
+	path = quantized-training
+	url = https://github.com/jeffreyyu0602/quantized-training.git
+[submodule "lib/xtensor"]
+	path = lib/xtensor
+	url = https://github.com/xtensor-stack/xtensor.git
+[submodule "lib/xtl"]
+	path = lib/xtl
+	url = https://github.com/xtensor-stack/xtl.git

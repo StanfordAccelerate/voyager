@@ -1,44 +1,36 @@
-#include "test/toolchain/MapOperation.h"
+#include "src/AccelTypes.h"
+#include "src/Params.h"
+#include "test/common/VerificationTypes.h"
+#include "test/compiler/proto/param.pb.h"
+#include "test/toolchain/MatrixOps.h"
+#include "test/toolchain/MatrixVectorMultiply.h"
+#include "test/toolchain/Pooling.h"
+#include "test/toolchain/ReduceOps.h"
+#include "test/toolchain/ReshapeOps.h"
+#include "test/toolchain/VectorOps.h"
 
-#include "test/toolchain/operations/Operations.h"
-
-// create Matrix and Vector Params from SimplifiedParams
-void MapOperation(const SimplifiedParams &params, const MemoryMap &memoryMap,
+void MapOperation(const codegen::AcceleratorParam &param,
                   std::deque<BaseParams *> &mappedParams,
                   std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
-  if (params.GRAD_CLIPPING_UNIT_TEST) {
-    MapGradNormUnitTest(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.SOFTMAX) {
-    MapSoftmax(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.SOFTMAX_GRAD) {
-    MapSoftmaxGrad(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.FC_GRAD) {
-    MapFCGrad(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.FC) {
-    MapFC(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.NO_NORM) {
-    MapNoNorm(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.NO_NORM_GRAD) {
-    MapNoNormGrad(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.MSE_GRAD || params.BCE_WITH_LOGITS_GRAD) {
-    MapGenericErrorGrad(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.BIAS_GRAD) {
-    MapBiasGrad(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.CROSS_ENTROPY_GRAD) {
-    MapCrossEntropyGrad(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.WEIGHT_UPDATE) {
-    MapWeightUpdate(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.NOP) {
-    MapNop(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.MERGE_LORA_WEIGHT) {
-    MapLoRACombination(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.QUANTIZE_TO_P8) {
-    MapLoRAQuantize(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.ELWISE_ADD) {
-    MapAddition(params, memoryMap, mappedParams, opMemoryMaps);
-  } else if (params.MAXPOOL) {
-    MapMaxpool(params, memoryMap, mappedParams, opMemoryMaps);
-  } else {
-    MapMatrixOp(params, memoryMap, mappedParams, opMemoryMaps);
+  if (param.has_matrix_param()) {
+    const auto &inputs = param.matrix_param().input();
+    int dim = 1;
+    for (int i = 0; i < inputs.shape_size() - 1; i++) {
+      dim *= inputs.shape(i);
+    }
+
+    if (dim == 1) {
+      MapMatrixVectorMultiply(param, mappedParams, opMemoryMaps);
+    } else {
+      MapMatrixOperation(param, mappedParams, opMemoryMaps);
+    }
+  } else if (param.has_reduce_param()) {
+    MapReduceOperation(param, mappedParams, opMemoryMaps);
+  } else if (param.has_pooling_param()) {
+    MapPoolingOperation(param, mappedParams, opMemoryMaps);
+  } else if (param.has_reshape_param()) {
+    MapReshapeOperation(param, mappedParams, opMemoryMaps);
+  } else if (param.vector_params_size() > 0) {
+    MapVectorOperations(param, mappedParams, opMemoryMaps);
   }
 }

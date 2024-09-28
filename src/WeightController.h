@@ -225,12 +225,12 @@ SC_MODULE(WeightController) {
     writeRequest[0].Reset();
     writeRequest[1].Reset();
 
+    bool bankSel = 0;
+
     wait();
 
     while (true) {
       const MatrixParams params = writerParams.Pop();
-
-      bool bankSel = 0;
 
       ac_int<8, false> loop_counters[2][5];
       ac_int<8, false> loop_bounds[2][5];
@@ -369,12 +369,12 @@ SC_MODULE(WeightController) {
     readAddress[0].Reset();
     readAddress[1].Reset();
 
+    bool bankSel = 0;
+
     wait();
 
     while (true) {
       const MatrixParams params = readerParams.Pop();
-
-      bool bankSel = 0;
 
       ac_int<8, false> loop_counters[2][6];
       ac_int<8, false> loop_bounds[2][6];
@@ -784,9 +784,12 @@ SC_MODULE(WeightController) {
                             k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                         ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
 
-                        int baseAddress = params.BIAS_OFFSET + k * 2;
+                        constexpr int num_words =
+                            ACC_DTYPE::width / DTYPE::width;
+
+                        int baseAddress = params.BIAS_OFFSET + k * num_words;
                         MemoryRequest memRequest = {baseAddress,
-                                                    OC_DIMENSION * 2};
+                                                    OC_DIMENSION * num_words};
 
                         biasAddressRequest.Push(memRequest);
 
@@ -882,19 +885,16 @@ SC_MODULE(WeightController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        Pack1D<ACC_DTYPE, NCOLS> fullPrecisionDataResponse;
-
-                        for (int precision = 0; precision < 2; precision++) {
-                          Pack1D<DTYPE, NCOLS> response =
-                              biasDataResponse.Pop();
-
-#pragma hls_unroll yes
-                          for (int i = 0; i < NCOLS / 2; i++) {
-                            fullPrecisionDataResponse
-                                .value[NCOLS / 2 * precision + i] =
-                                ACC_DTYPE(&response[i * 2]);
-                          }
+                        constexpr int num_words =
+                            ACC_DTYPE::width / DTYPE::width;
+                        Pack1D<DTYPE, NCOLS> response[num_words];
+                        for (int word = 0; word < num_words; word++) {
+                          response[word] = biasDataResponse.Pop();
                         }
+
+                        Pack1D<ACC_DTYPE, NCOLS> fullPrecisionDataResponse;
+                        convertPack1D<DTYPE, ACC_DTYPE, NCOLS>(
+                            response, fullPrecisionDataResponse);
 
                         biasToSystolicArray.Push(fullPrecisionDataResponse);
 

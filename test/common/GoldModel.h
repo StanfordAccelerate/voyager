@@ -1,24 +1,13 @@
 #pragma once
 #define NO_SYSC
+
+#include <any>
+
 // clang-format off
 #include "src/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
-#include "test/common/UniversalPosit.h"
-#include "test/common/VerificationTypes.h"
+#include "test/compiler/proto/param.pb.h"
 
-void run_gold_model(const SimplifiedParams params, INPUT_DATATYPE *matrixA,
-                    INPUT_DATATYPE *matrixB, INPUT_DATATYPE *matrixC,
-                    INPUT_DATATYPE *biasMatrix, INPUT_DATATYPE *residualMatrix,
-                    INPUT_DATATYPE *weightResidualMatrix);
-
-#ifndef NO_UNIVERSAL
-void run_gold_model(const SimplifiedParams params, UniversalPosit *matrixA,
-                    UniversalPosit *matrixB, UniversalPosit *matrixC,
-                    UniversalPosit *biasMatrix, UniversalPosit *residualMatrix,
-                    UniversalPosit *weightResidualMatrix);
-                    #endif
-
-void run_gold_model(const SimplifiedParams params, float *matrixA,
-                    float *matrixB, float *matrixC, float *biasMatrix,
-                    float *residualMatrix, float *weightResidualMatrix);
+void run_gold_model(const codegen::AcceleratorParam &param,
+                    std::vector<std::any> args);

@@ -10,36 +10,34 @@
 #include "src/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
-#include "test/common/SimpleMemoryModel.h"
-#include "test/common/UniversalPosit.h"
+#include "test/common/ArrayMemory.h"
+#include "test/common/DataLoader.h"
+#include "test/compiler/proto/param.pb.h"
 
-void run_op(std::vector<SimplifiedParams> params_list,
-            INPUT_DATATYPE *sramMemory, INPUT_DATATYPE *rramMemory,
-            std::vector<MemoryMap> memoryMap);
+void run_accelerator(std::vector<codegen::AcceleratorParam> params,
+                     char *sramMemory, char *rramMemory);
 
 class Simulation {
  public:
   Simulation();
+  ~Simulation();
 
-  void loadMemory();
+  void load_data();
   void run();
-  int checkOutput();
+  int check_outputs();
   void print_help();
+  int get_ideal_runtime(const codegen::AcceleratorParam &param);
 
  protected:
-  std::vector<Workload> workloads;
   std::vector<std::string> sims;
-  std::string out_dir;
-  std::string modelName;
+  std::string model;
   std::string tests;
-  std::string task;
+  std::string out_dir;
   float tolerance = 0.1;
 
-  SimpleMemoryModel<INPUT_DATATYPE> *acceleratorMemory;
-  SimpleMemoryModel<INPUT_DATATYPE> *positMemory;
-  SimpleMemoryModel<INPUT_DATATYPE> *customFloatMemory;
-  SimpleMemoryModel<float> *floatMemory;
-  SimpleMemoryModel<UniversalPosit> *universalPositMemory;
+  std::vector<codegen::AcceleratorParam> params;
+  std::map<std::string, MemoryInterface *> memories;
+  std::map<std::string, DataLoader *> dataLoaders;
 
  private:
   std::string get_env_var(std::string const &name);

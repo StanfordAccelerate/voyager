@@ -12,27 +12,35 @@ $(info $(MSG))
 export PROJ_ROOT = $(shell pwd)
 BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
-TOOLCHAIN_BUILD_DIR = $(BUILD_DIR)/cc/test/toolchain
-TOOLCHAIN_BUILD_DIRS = $(TOOLCHAIN_BUILD_DIR) $(TOOLCHAIN_BUILD_DIR)/operations
 ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 # Create build dirs automatically
 $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
 # CC := $(CATAPULT_ROOT)/bin/g++
-CC := /cad/mentor/2024.1/Mgc_home/bin/g++
+CC := /cad/mentor/2024.2/Mgc_home/bin/g++
+
+export CODEGEN_DIR ?= test/compiler
 
 # Check if the environment variable is set
 check_env_var:
 ifndef DATATYPE
-	$(error DATATYPE and other required environment variables are not set)
+	$(error DATATYPE environment variables are not set)
+endif
+ifndef IC_DIMENSION
+	$(error IC_DIMENSION environment variables are not set)
+endif
+ifndef OC_DIMENSION
+	$(error OC_DIMENSION environment variables are not set)
 endif
 
 INC := \
-	-I/cad/mentor/2024.1/Mgc_home/shared/include/ \
+	-I/cad/mentor/2024.2/Mgc_home/shared/include/ \
 	-Ilib/ \
-	-Ilib/universal/include/ \
+	-Ilib/xtensor/include \
+	-Ilib/xtl/include \
 	-Isrc/ \
+	-I$(CONDA_PREFIX)/include \
 	-I.
 
 # TODO(fpedd): Fix code and remove Wno-* flags step by step
@@ -60,10 +68,11 @@ endif
 
 # We need to work with multiple C++ standards, as the SystemC lib is only
 # compatible with C++11 and the Universal Numbers Library requires C++17
-C11FLAGS += $(BASE_FLAGS) -std=c++11 -Wno-deprecated-declarations
-C17FLAGS += $(BASE_FLAGS) -std=c++17
-LDFLAGS += -lsystemc -lstdc++fs
-LDLIBS += -L/cad/mentor/2024.1/Mgc_home/shared/lib/
+C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
+LDFLAGS += -lsystemc -lstdc++fs -labsl_log_internal_message -labsl_log_internal_check_op -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
+LDLIBS += -L/cad/mentor/2024.2/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
+LDFLAGS_NO_SYSC += -lstdc++fs -labsl_log_internal_message -labsl_log_internal_check_op -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
+LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 
 ###########################################################
 # Catapult Synthesis
@@ -71,7 +80,8 @@ LDLIBS += -L/cad/mentor/2024.1/Mgc_home/shared/lib/
 export CATAPULT_BUILD_DIR ?= $(BUILD_DIR)/Catapult/$(TECHNOLOGY)/clock_$(CLOCK_PERIOD)
 
 # Main target to run HLS and build RTL (Verilog)
-rtl: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
+rtl: release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v
+
 
 # For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
@@ -114,17 +124,9 @@ $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.
 	BLOCK=VectorOpUnit catapult -shell -file scripts/main.tcl
 $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl
-	# Keeping this in case an older version of Catapult is used
-	sed '/module CGHpart/,/endmodule/d;/module TSDN/,/endmodule/d;/module TS1N40LPB1024X128M4FWBA /,/endmodule/d;/module TS1N40LPB1024X64M4FW /,/endmodule/d;/^`include/d;s/module Accelerator_rtl/module Accelerator/g;s/VectorUnit_rtl/VectorUnit/g' $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v > release/concat_rtl.v
-	# Uncommenting memoery macro module in intel16
-	awk -i inplace ' \
-  /\/\*/ { comment = 1 } \
-  /\*\// { comment = 1 } \
-  /module intel16_1024x.*_rf_wrapper/ { within_block = 1 } \
-  !within_block || within_block && !comment { print } \
-  within_block && /endmodule/ { within_block = 0 } \
-  comment = 0 \
-' release/concat_rtl.v
+
+release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v 
+	cp $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v $@
 
 .PHONY: rtl InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
 
@@ -140,24 +142,22 @@ ifeq ($(DEBUG), 1)
 endif
 
 sim_sysc:
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.h
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) test/common/Harness.cc
+	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.h
+	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Harness.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/GoldModel.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Utils.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/DataLoader.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/TestRunner.cc
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) test/toolchain/MapOperation.cc
 	vcs -full64 -sysc sc_main -kdb -debug_access+all -Mdir=$(build_folder) -o $(build_folder)/$(simv_name)
 	./$(build_folder)/$(simv_name) -ucli -i dump_fsdb.tcl
 
 sim_sysc_gui:
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.h
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) test/common/Harness.cc
+	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) src/Accelerator.h
+	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Harness.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/GoldModel.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/Utils.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/DataLoader.cc
 	syscan -kdb -cflags "$(C17FLAGS) -g" -Mdir=$(build_folder) test/common/TestRunner.cc
-	syscan -kdb -cflags "$(C11FLAGS) -g" -Mdir=$(build_folder) test/toolchain/MapOperation.cc
 	vcs -full64 -sysc sc_main -kdb -debug_access+all -Mdir=$(build_folder) -o $(build_folder)/$(simv_name)
 	./$(build_folder)/$(simv_name) -verdi
 
@@ -179,7 +179,7 @@ gui:
 
 # Main target for accelerator simulations
 .PHONY: sim
-sim: $(CC_BUILD_DIR)/TestRunner
+sim: $(CC_BUILD_DIR)/TestRunner network-proto
 	./$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim
@@ -193,32 +193,28 @@ sim-debug: $(CC_BUILD_DIR)/TestRunner
 .PHONY: TestRunner
 TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
 
-$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a $(CC_BUILD_DIR)/toolchain.a
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+.PHONY: TestRunner-fast
+TestRunner-fast: check_env_var $(CC_BUILD_DIR)/TestRunner-fast
 
-$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/networks.a $(CC_BUILD_DIR)/toolchain.a
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+.PHONY: AccuracyTester
+AccuracyTester: ./$(CC_BUILD_DIR)/AccuracyTester
 
-.PHONY: MobileBERTAccuracy
-MobileBERTAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester mobilebert models/mobilebert/binary_data/tiny_truncated_sst2/ 64
+.PHONY: MobileBertAccuracy
+MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
+	./$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
 
 .PHONY: ResNetAccuracy
 ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester resnet18 models/resnet/binary_data/imagenet_1000/
+	./$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
 
-.PHONY: AccuracyTester
-AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester
+$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/MapOperation.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/networks.a
-	$(CC) -o $@ $^ -lstdc++fs -pthread
+$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/MapOperation.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
-.PHONY: MobileBERTFinetuning
-MobileBERTFinetuning: $(CC_BUILD_DIR)/Finetuning
-	./$(CC_BUILD_DIR)/Finetuning
-
-$(CC_BUILD_DIR)/Finetuning: $(CC_BUILD_DIR)/Finetuning.o $(CC_BUILD_DIR)/MobileBERTParams.o $(CC_BUILD_DIR)/DatasetIterator.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/MemoryModel.o $(CC_BUILD_DIR)/SimpleMemoryModel.o $(CC_BUILD_DIR)/networks.a
-	$(CC) -o $@ $^ -lstdc++fs
+$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o
+	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
 
 # Unit tests for custom Posit implementation
 .PHONY: PositTest
@@ -227,75 +223,52 @@ PositTest: $(CC_BUILD_DIR)/PositTest
 $(CC_BUILD_DIR)/PositTest: test/common/PositTest.cc src/PositTypes.h
 	$(CC) $(C17FLAGS) -fopenmp -DNO_SYSC $< -o $@
 
-$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
-	$(CC) $(C11FLAGS) -c -o $@ $<
+$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h)
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h $(wildcard src/*.h)
-	$(CC) $(C11FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
+$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h)
+	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
-$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/common/operations/*.h)
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/MemoryModel.o: test/common/MemoryModel.cc test/common/MemoryModel.h src/ArchitectureParams.h
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/SimpleMemoryModel.o: test/common/SimpleMemoryModel.cc test/common/SimpleMemoryModel.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/ArrayMemory.o: test/common/ArrayMemory.cc test/common/ArrayMemory.h test/common/MemoryInterface.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h test/common/MemoryInterface.h
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/MapOperation.o: test/toolchain/MapOperation.cc $(wildcard test/toolchain/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h
+$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/toolchain/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/Finetuning.o: test/training/Finetuning.cc test/training/forward_pass.h test/training/backward_pass.h test/training/model_arch.h test/training/memory_plan.h test/training/DTYPE.h
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
-
-$(CC_BUILD_DIR)/MobileBERTParams.o: test/training/MobileBERTParams.cc test/mobilebert/mobilebert_tiny2/*.h
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
-
-$(CC_BUILD_DIR)/DatasetIterator.o: test/training/DatasetIterator.cc
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
 ###########################################################
 # Networks
 ###########################################################
-.PHONY: networks
-networks: $(CC_BUILD_DIR)/networks.a
-
-$(CC_BUILD_DIR)/networks.a: $(CC_BUILD_DIR)/ResNet.o $(CC_BUILD_DIR)/MobileBERT.o $(CC_BUILD_DIR)/Generic.o
-	$(AR) rcs $@ $^
-
-$(CC_BUILD_DIR)/ResNet.o: test/resnet/ResNet.cc test/resnet/*.h
+$(CC_BUILD_DIR)/Network.o: test/common/Network.cc test/compiler/proto/param.pb.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/MobileBERT.o: test/mobilebert/MobileBERT.cc test/mobilebert/*.h test/mobilebert/mobilebert_tiny2/*.h test/common/VerificationTypes.h
+test/compiler/proto/param.pb.cc: quantized-training/src/quantized_training/codegen/param.proto
+	protoc -I=quantized-training/src/quantized_training/codegen --cpp_out=test/compiler/proto $<
+
+$(CC_BUILD_DIR)/param.pb.o: test/compiler/proto/param.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Generic.o: test/generic/Generic.cc
-	$(CC) $(C17FLAGS) -c -o $@ $<
+.PHONY: network-proto
+network-proto: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/params.pb test/compiler/proto/param.pb.cc
 
-###########################################################
-# Toolchain
-###########################################################
-
-TOOLCHAIN_SRC = test/toolchain/MapOperation.cc $(wildcard test/toolchain/operations/*.cc)
-TOOLCHAIN_OBJ = $(addprefix $(CC_BUILD_DIR)/,  $(TOOLCHAIN_SRC:.cc=.o) )
-
-$(CC_BUILD_DIR)/test/toolchain/%.o: test/toolchain/%.cc
-	$(CC) $(C11FLAGS) -c -o $@ $<
-
-.PHONY: toolchain
-toolchain: $(CC_BUILD_DIR)/toolchain.a
-
-$(CC_BUILD_DIR)/toolchain.a: $(TOOLCHAIN_OBJ)
-	$(AR) rcs $@ $^
+include codegen.mk
 
 ###########################################################
 # Cleanup Targets
@@ -313,7 +286,11 @@ clean-test:
 clean-catapult: check_env_var
 	rm -rf $(CATAPULT_BUILD_DIR)
 
-clean-rtl-sim:
-	rm -rf build/Catapult_debug/Accelerator.v1/scverify/concat_sim_rtl_v_vcs
+clean-rtl-sim: check_env_var
+	rm -rf $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/scverify/concat_sim_rtl_v_vcs
+
+clean-protos:
+	rm -rf $(CODEGEN_DIR)/networks/*
+	rm -rf test/compiler/proto/param.pb.*
 
 .PHONY: clean clean-test clean-catapult clean-rtl-sim

@@ -1,16 +1,18 @@
 #include "test/common/Simulation.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
+#include "test/common/ArrayMemory.h"
+#include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
-#include "test/common/UniversalPosit.h"
+#include "test/common/Network.h"
 #include "test/common/Utils.h"
-#include "test/mobilebert/MobileBERT.h"
-#include "test/resnet/ResNet.h"
 
 #if __has_include(<filesystem>)
 #include <filesystem>
@@ -22,477 +24,230 @@ namespace filesystem = experimental::filesystem;
 #endif
 
 Simulation::Simulation() {
-  modelName = get_env_var("NETWORK");
-  if (modelName.empty()) modelName = "resnet";
+  model = get_env_var("NETWORK");
+  if (model.empty()) {
+    model = "resnet18";
+  }
 
   tests = get_env_var("TESTS");
-  if (tests.empty()) tests = "fc";
+  if (tests.empty()) {
+    tests = "submodule_0";
+  }
 
-  std::string simsEnv(get_env_var("SIMS"));
-  if (simsEnv.empty()) simsEnv = "accelerator,customposit,customfloat";
-
-  // Only applicable when NETWORK=mobilebert
-  task = get_env_var("TASK");
-  if (task.empty()) task = "inference";
-
-  std::string tolerance_str(get_env_var("TOLERANCE"));
-  if (!tolerance_str.empty()) tolerance = std::stof(tolerance_str);
-
-  // Paths are relative to Makefile
-  std::string data_dir(get_env_var("DATA_DIR"));
-
-  out_dir = get_env_var("OUT_DIR");
-  if (out_dir.empty()) out_dir = "./test_outputs/";
-
-  // Parse tests to run
   std::vector<std::string> tests_list;
   split_string(tests, ',', std::back_inserter(tests_list));
-
   if (tests_list.size() > 2) {
-    throw std::runtime_error("Supply at max two TESTS.");
+    throw std::runtime_error("Incorrect number of tests specified.");
   }
 
-  // Parse sims to run
-  split_string(simsEnv, ',', std::back_inserter(sims));
-  if (sims.size() & 0x01) {
-    throw std::runtime_error("Need to supply even number of sim pairs.");
+  std::string sims_str(get_env_var("SIMS"));
+  if (sims_str.empty()) {
+    sims_str = "fp32,file";
   }
 
-  // Make "modelName"-matching case insensitive
-  std::string modelNameLower = const_cast<std::string&>(this->modelName);
-  std::transform(modelNameLower.begin(), modelNameLower.end(),
-                 modelNameLower.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-
-  // Match the model family and construct required network
-  Network* network;
-  if (modelNameLower.find("resnet") != std::string::npos) {
-    if (data_dir.empty()) {
-      network = new ResNet(modelName);
-    } else {
-      network = new ResNet(modelName, data_dir);
-    }
-  } else if (modelNameLower.find("mobilebert") != std::string::npos) {
-    if (data_dir.empty()) {
-      network = new MobileBERT(modelName, task);
-    } else {
-      network = new MobileBERT(modelName, task, data_dir);
-    }
-  } else {
-    throw std::runtime_error("Unknown model: " + modelName);
+  split_string(sims_str, ',', std::back_inserter(sims));
+  if (sims.size() != 2) {
+    throw std::runtime_error("Incorrect number of simulators specified.");
   }
 
-  // Override opt level present in the modelName using the OPT env var, if
-  // present. Makes it possible to run the same model with different opt levels
-  std::string opt(get_env_var("OPT_LEVEL"));
-  if (!opt.empty()) {
-    if (opt == "O0") {
-      network->opt = Network::O0;
-    } else if (opt == "O1") {
-      network->opt = Network::O1;
-    } else if (opt == "O2") {
-      network->opt = Network::O2;
-    } else {
-      throw std::runtime_error("Unknown opt level: " + opt);
-    }
+  std::string tolerance_str(get_env_var("TOLERANCE"));
+  if (!tolerance_str.empty()) {
+    tolerance = std::stof(tolerance_str);
   }
 
-  // Collect workloads (aka. layers) from Network
-  workloads = network->getWorkloadsInRange(tests_list);
+  out_dir = get_env_var("OUT_DIR");
+  if (out_dir.empty()) {
+    out_dir = "./test_outputs/";
+  }
+
+  // Get list of params to run
+  auto network = new Network(model);
+  params = network->get_params(tests_list);
 
   std::cout << "Starting new simulation with config:";
-  std::cout << "\n> Model: " << modelName;
+  std::cout << "\n> Model: " << model;
   std::cout << "\n> Tests: ";
-  for (const std::string& l : tests_list) std::cout << l << ' ';
+  for (const std::string& t : tests_list) std::cout << t << ' ';
   std::cout << "\n> Sims: ";
   for (const std::string& s : sims) std::cout << s << ' ';
-  if (modelNameLower.find("mobilebert") != std::string::npos)
-    std::cout << "\n> Task: " << task;
   std::cout << "\n> Tolerance: " << tolerance;
-  std::cout << "\n> Data dir: " << network->getDataDir();
-  std::cout << "\n> Out dir: " << out_dir << "\n";
+  std::cout << "\n> Output dir: " << out_dir << "\n";
   std::cout << "> SRAM: " << SRAM_MEMORY_SIZE / 1024 << " KB\n";
   std::cout << "> RRAM: " << RRAM_MEMORY_SIZE / 1024 << " KB\n";
-  std::cout << "> Opt level: " << network->optToString() << std::endl;
 }
 
-void Simulation::loadMemory() {
-  std::vector<MemoryModel*> memories;
+Simulation::~Simulation() {
+  for (const auto& [key, memory] : memories) {
+    delete memory;
+  }
+  for (const auto& [key, dataLoader] : dataLoaders) {
+    delete dataLoader;
+  }
+}
+
+void Simulation::load_data() {
+  std::vector<int> memory_sizes{SRAM_MEMORY_SIZE, RRAM_MEMORY_SIZE,
+                                REFERENCE_MEMORY_SIZE};
+
+  if (std::find(sims.begin(), sims.end(), "systemc") != sims.end()) {
+    memories["systemc"] = new ArrayMemory(memory_sizes);
+    dataLoaders["systemc"] = new DataLoader(memories["systemc"], false);
+  }
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    acceleratorMemory = new SimpleMemoryModel<INPUT_DATATYPE>(true);
-    memories.push_back(acceleratorMemory);
-  }
-  // TODO: don't use customposit/customfloat anymore. It should instead be
-  // called "hlstype"
-  if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
-    positMemory = new SimpleMemoryModel<INPUT_DATATYPE>(false);
-    memories.push_back(positMemory);
-  }
-  if (std::find(sims.begin(), sims.end(), "customfloat") != sims.end()) {
-    customFloatMemory = new SimpleMemoryModel<INPUT_DATATYPE>(false);
-    memories.push_back(customFloatMemory);
-  }
-  if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
-    universalPositMemory = new SimpleMemoryModel<UniversalPosit>(false);
-    memories.push_back(universalPositMemory);
-  }
-  if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-    floatMemory = new SimpleMemoryModel<float>(false);
-    memories.push_back(floatMemory);
+    memories["accelerator"] = new ArrayMemory(memory_sizes);
+    dataLoaders["accelerator"] = new DataLoader(memories["accelerator"], true);
   }
 
-  // Load first tests input
-  for (MemoryModel* memModel : memories) {
-    memModel->loadModelActivations(workloads.front().params,
-                                   workloads.front().files,
-                                   workloads.front().memoryMap, true);
-  }
+  std::string project_root = std::string(getenv("PROJECT_ROOT"));
+  std::string datatype = std::string(getenv("DATATYPE"));
+  std::string data_dir = project_root + "/" +
+                         std::string(getenv("CODEGEN_DIR")) + "/networks/" +
+                         model + "/" + datatype + "/tensor_files";
 
-  // Load weights, biases for all layers
-  for (MemoryModel* memModel : memories) {
-    for (const Workload& workload : workloads) {
-      if (workload.loadWeight) {
-        memModel->loadModelParams(workload.params, workload.files,
-                                  workload.memoryMap, true);
-      }
+  for (const auto& [key, dataLoader] : dataLoaders) {
+    dataLoader->load_inputs(params.front(), data_dir);
+    dataLoader->load_outputs(params.back(), data_dir);
+    for (const auto& param : params) {
+      dataLoader->load_weights(param, data_dir);
     }
   }
 
-  // Load last layer reference outputs
-  for (MemoryModel* memModel : memories) {
-    Workload workload = workloads.back();
-    memModel->loadReferenceOutput(workload.params, workload.files,
-                                  workload.params.ACC_T_OUTPUT);
+  std::cout << "Data loaded successfully" << std::endl;
+}
+
+int Simulation::get_ideal_runtime(const codegen::AcceleratorParam& param) {
+  int cycles;
+  if (param.has_matrix_param()) {
+    // the total number of operations is X*Y*C*FX*FY*K.
+    int num_ops = 1;
+
+    for (const auto& dim : param.output().shape()) num_ops *= dim;  // X * Y * K
+
+    // skip the first dimension (K) since it is already accounted for
+    for (int i = 1; i < param.matrix_param().weight().shape_size(); i++) {
+      num_ops *= param.matrix_param().weight().shape(i);  // FX * FY * C
+    }
+
+    cycles = num_ops / (IC_DIMENSION * OC_DIMENSION);
+  } else {
+    int num_ops = 1;
+    for (const auto& dim : param.output().shape()) num_ops *= dim;
+
+    cycles = num_ops / OC_DIMENSION;
   }
+  // read CLOCK_PERIOD from environment
+  int clock_period =
+      std::getenv("CLOCK_PERIOD") ? std::stoi(std::getenv("CLOCK_PERIOD")) : 1;
+  return cycles * clock_period;
 }
 
 void Simulation::run() {
-  // Run tests in sequence
-  int X, Y, C, K, FX, FY, STRIDE;
-  for (const Workload& workload : workloads) {
-    SimplifiedParams params = workload.params;
-    MemoryMap memoryMap = workload.memoryMap;
+  // Run gold models
+  for (const auto& param : params) {
+    std::cout << "Ideal runtime: " << get_ideal_runtime(param) << std::endl;
 
-    // Check if mapping valid
-    if (validateMapping(params) != 0) {
-      std::abort();
-    }
-
-    X = params.loops[0][params.inputXLoopIndex[0]] *
-        params.loops[1][params.inputXLoopIndex[1]];
-    Y = params.loops[0][params.inputYLoopIndex[0]] *
-        params.loops[1][params.inputYLoopIndex[1]];
-    C = params.loops[1][params.reductionLoopIndex[1]] * (16);
-    K = params.loops[0][params.weightLoopIndex[0]] *
-        params.loops[1][params.weightLoopIndex[1]] * (16);
-    FX = params.loops[1][params.fxIndex];
-    FY = params.loops[1][params.fyIndex];
-    STRIDE = params.STRIDE;
-
-    if (params.REPLICATION) {
-      FX = 7;
-      C = 3;
-    }
-
-    int idealCycles;
-    if (params.FC) {
-      idealCycles = (C * K) / (OC_DIMENSION);
-    } else if (params.NO_NORM) {
-      idealCycles = (X * K) / (OC_DIMENSION);
-    } else if (params.SOFTMAX) {
-      idealCycles = (X * Y * 3) / (OC_DIMENSION);
-    } else {
-      idealCycles = (X * Y * C * FX * FY * K) / (IC_DIMENSION * OC_DIMENSION);
-    }
-
-    std::cout << "Ideal cycles: " << idealCycles << std::endl;
-
-    if (params.MAXPOOL) {
-      X /= 2;
-      Y /= 2;
-    }
-
-    if (params.AVGPOOL) {
-      X = 1;
-      Y = 1;
-    }
-
-    std::cout << "Performing " + workload.name + ":" << std::endl;
-    std::cout << "(" << X << "x" << Y << "x" << C << ")" << " * " << "(" << FX
-              << "x" << FY << "x" << C << "x" << K << ")" << std::endl;
-
-    // Run gold models
-    if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
-      run_gold_model(
-          params, positMemory->sram + params.INPUT_OFFSET,
-          (memoryMap.weights ? positMemory->rram : positMemory->sram) +
-              params.WEIGHT_OFFSET,
-          positMemory->sram + params.OUTPUT_OFFSET,
-          (params.ATTENTION_MASK ? positMemory->sram : positMemory->rram) +
-              params.BIAS_OFFSET,
-          positMemory->sram + params.RESIDUAL_OFFSET,
-          positMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
-    }
-    if (std::find(sims.begin(), sims.end(), "customfloat") != sims.end()) {
-      run_gold_model(params, customFloatMemory->sram + params.INPUT_OFFSET,
-                     (memoryMap.weights ? customFloatMemory->rram
-                                        : customFloatMemory->sram) +
-                         params.WEIGHT_OFFSET,
-                     customFloatMemory->sram + params.OUTPUT_OFFSET,
-                     (params.ATTENTION_MASK ? customFloatMemory->sram
-                                            : customFloatMemory->rram) +
-                         params.BIAS_OFFSET,
-                     customFloatMemory->sram + params.RESIDUAL_OFFSET,
-                     customFloatMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
-    }
-    if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
-      run_gold_model(
-          params, universalPositMemory->sram + params.INPUT_OFFSET,
-          (memoryMap.weights ? universalPositMemory->rram
-                             : universalPositMemory->sram) +
-              params.WEIGHT_OFFSET,
-          universalPositMemory->sram + params.OUTPUT_OFFSET,
-          (params.ATTENTION_MASK ? universalPositMemory->sram
-                                 : universalPositMemory->rram) +
-              params.BIAS_OFFSET,
-          universalPositMemory->sram + params.RESIDUAL_OFFSET,
-          universalPositMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
-    }
-    if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-      run_gold_model(
-          params, floatMemory->sram + params.INPUT_OFFSET,
-          (memoryMap.weights ? floatMemory->rram : floatMemory->sram) +
-              params.WEIGHT_OFFSET,
-          floatMemory->sram + params.OUTPUT_OFFSET,
-          (params.ATTENTION_MASK ? floatMemory->sram : floatMemory->rram) +
-              params.BIAS_OFFSET,
-          floatMemory->sram + params.RESIDUAL_OFFSET,
-          floatMemory->sram + params.WEIGHT_RESIDUAL_OFFSET);
+    if (std::find(sims.begin(), sims.end(), "systemc") != sims.end()) {
+      auto memory = (ArrayMemory*)(memories["systemc"]);
+      auto args = memory->get_args(param);
+      run_gold_model(param, args);
     }
   }
 
   // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    std::vector<SimplifiedParams> params_list;
-    std::vector<MemoryMap> memoryMap;
-
-    for (const Workload& workload : workloads) {
-      params_list.push_back(workload.params);
-      memoryMap.push_back(workload.memoryMap);
-    }
-
-    run_op(params_list, acceleratorMemory->sram, acceleratorMemory->rram,
-           memoryMap);
+    auto memory = (ArrayMemory*)(memories["accelerator"]);
+    run_accelerator(params, memory->memories[0], memory->memories[1]);
   }
 }
 
-int Simulation::checkOutput() {
-  SimplifiedParams params = workloads.back().params;
-  MemoryMap memoryMaps = workloads.back().memoryMap;
-
-  int X, Y, C, K, FX, FY, STRIDE;
-  X = params.loops[0][params.inputXLoopIndex[0]] *
-      params.loops[1][params.inputXLoopIndex[1]];
-  Y = params.loops[0][params.inputYLoopIndex[0]] *
-      params.loops[1][params.inputYLoopIndex[1]];
-  C = params.loops[1][params.reductionLoopIndex[1]] * (16);
-  K = params.loops[0][params.weightLoopIndex[0]] *
-      params.loops[1][params.weightLoopIndex[1]] * (16);
-  FX = params.loops[1][params.fxIndex];
-  FY = params.loops[1][params.fyIndex];
-  STRIDE = params.STRIDE;
-
-  if (params.REPLICATION) {
-    FX = 7;
-    C = 3;
+int Simulation::check_outputs() {
+  std::string prefix;
+  if (params.size() == 1) {
+    prefix = out_dir + model + '.' + params.front().name() + '.';
+  } else {
+    prefix = out_dir + model + '.' + params.front().name() + "_to_" +
+             params.back().name() + '.';
   }
 
-  if (params.MAXPOOL) {
-    X /= 2;
-    Y /= 2;
-  }
+  bool has_valid_comp = false;
+  double rel_err = 0.0;
 
-  if (params.AVGPOOL) {
-    X = 1;
-    Y = 1;
-  }
+  auto param = params.back();
+  int size = 1;
+  for (const auto& dim : param.output().shape()) size *= dim;
 
-  size_t size = X * Y * K;
-
-  if (params.SOFTMAX || params.SOFTMAX_GRAD) {
-    size = X * Y;
-  } else if (params.CROSS_ENTROPY_GRAD) {
-    size = X;
-  } else if (params.NO_NORM_GRAD) {
-    size = C;
-  } else if (params.WEIGHT_UPDATE) {
-    size = X * C;
-  }
-
-  bool accelerator =
-      std::find(sims.begin(), sims.end(), "accelerator") != sims.end();
-  bool customposit =
-      std::find(sims.begin(), sims.end(), "customposit") != sims.end();
-  bool customfloat =
-      std::find(sims.begin(), sims.end(), "customfloat") != sims.end();
-  bool universal =
-      std::find(sims.begin(), sims.end(), "universal") != sims.end();
-  bool fp32 = std::find(sims.begin(), sims.end(), "fp32") != sims.end();
   bool file = std::find(sims.begin(), sims.end(), "file") != sims.end();
 
-  std::string outFilePrefix;
-  if (workloads.size() == 1) {
-    outFilePrefix = out_dir + modelName + '.' + workloads.front().name + '.';
-  } else {
-    outFilePrefix = out_dir + modelName + '.' + workloads.front().name +
-                    "_to_" + workloads.back().name + '.';
-  }
+  auto systemc_memory = (ArrayMemory*)memories["systemc"];
+  auto accelerator_memory = (ArrayMemory*)memories["accelerator"];
 
-  double rel_err;
-  bool any_comparison = false;
+  std::any output_tensor;
+  std::any reference_output_tensor;
+  std::string filename;
+  std::string output_tensor_names[2];
 
-  float* floatOutput;
-  UniversalPosit* universalOutput;
-  INPUT_DATATYPE* positOutput;
-  INPUT_DATATYPE* customFloatOutput;
-  INPUT_DATATYPE* acceleratorOutput;
-
-  std::cerr << "Input: " << memoryMaps.inputs << std::endl;
-  std::cerr << "Weight: " << memoryMaps.weights << std::endl;
-  std::cerr << "Output: " << memoryMaps.outputs << std::endl;
-
-  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    acceleratorOutput =
-        memoryMaps.outputs ? acceleratorMemory->rram : acceleratorMemory->sram;
-  }
-  if (std::find(sims.begin(), sims.end(), "customposit") != sims.end()) {
-    positOutput = memoryMaps.outputs ? positMemory->rram : positMemory->sram;
-  }
-  if (std::find(sims.begin(), sims.end(), "customfloat") != sims.end()) {
-    customFloatOutput =
-        memoryMaps.outputs ? customFloatMemory->rram : customFloatMemory->sram;
-  }
-  if (std::find(sims.begin(), sims.end(), "universal") != sims.end()) {
-    universalOutput = memoryMaps.outputs ? universalPositMemory->rram
-                                         : universalPositMemory->sram;
-  }
-  if (std::find(sims.begin(), sims.end(), "fp32") != sims.end()) {
-    floatOutput = memoryMaps.outputs ? floatMemory->rram : floatMemory->sram;
-  }
-
-  if (fp32 && file) {
-    std::cout << "FP32 Gold Model vs. Pytorch" << std::endl;
+  if (systemc_memory && file) {
+    std::cout << "System C Gold Model vs. Pytorch" << std::endl;
     std::cout << "(reveals issues in data loading or mapping)" << std::endl;
-    std::string diffFile = outFilePrefix + "fpgold_vs_pytorch.txt";
+    filename = prefix + "systemc_vs_pytorch.txt";
 
-    rel_err += compare_arrays(floatOutput + params.OUTPUT_OFFSET, "fp32",
-                              floatMemory->reference, "file", size, diffFile,
-                              params.ACC_T_OUTPUT);
-    any_comparison = true;
+    output_tensor_names[0] = "gold_model";
+    output_tensor = systemc_memory->get_output(param);
+
+    output_tensor_names[1] = "file";
+    reference_output_tensor = systemc_memory->get_reference_output(param);
+
+    has_valid_comp = true;
   }
 
-  if (customposit && file) {
-    std::cout << "HLS Posit Gold Model vs. Pytorch" << std::endl;
-    std::cout << "(reveals bugs in mapping operations to accelerator)"
-              << std::endl;
-    std::string diffFile = outFilePrefix + "hlsgold_vs_pytorch.txt";
-
-    rel_err += compare_arrays(positOutput + params.OUTPUT_OFFSET, "customposit",
-                              positMemory->reference, "file", size, diffFile,
-                              params.ACC_T_OUTPUT);
-    any_comparison = true;
-  }
-
-  if (universal && file) {
-    std::cout << "Universal Posit Gold Model vs. Pytorch" << std::endl;
-    std::cout << "(reveals issues in representing float as Posit)" << std::endl;
-    std::string diffFile = outFilePrefix + "universal_vs_pytorch.txt";
-
-    rel_err += compare_arrays(universalOutput + params.OUTPUT_OFFSET,
-                              "universal", universalPositMemory->reference,
-                              "file", size, diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
-  }
-
-  if (accelerator && file) {
-    std::cout << "Accelerator vs. PyTorch" << std::endl;
+  if (accelerator_memory && file) {
+    std::cout << "Accelerator vs. System C Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
-    std::string diffFile = outFilePrefix + "accel_vs_pytorch.txt";
+    filename = prefix + "accelerator_vs_pytorch.txt";
 
-    rel_err += compare_arrays(acceleratorOutput + params.OUTPUT_OFFSET,
-                              "accelerator", acceleratorMemory->reference,
-                              "file", size, diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
+    output_tensor_names[0] = "accelerator";
+    output_tensor = accelerator_memory->get_output(param);
+
+    output_tensor_names[1] = "file";
+    reference_output_tensor = accelerator_memory->get_reference_output(param);
+
+    has_valid_comp = true;
   }
 
-  if (customposit && accelerator) {
-    std::cout << "Accelerator vs. HLS Posit Gold Model" << std::endl;
+  if (accelerator_memory && systemc_memory) {
+    std::cout << "Accelerator vs. System C Gold Model" << std::endl;
     std::cout << "(reveals bugs in accelerator or memory placement)"
               << std::endl;
-    std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
+    filename = prefix + "accelerator_vs_systemc.txt";
 
-    rel_err +=
-        compare_arrays(acceleratorOutput + params.OUTPUT_OFFSET, "accelerator",
-                       positOutput + params.OUTPUT_OFFSET, "customposit", size,
-                       diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
+    output_tensor_names[0] = "accelerator";
+    output_tensor = accelerator_memory->get_output(param);
+
+    output_tensor_names[1] = "gold_model";
+    reference_output_tensor = systemc_memory->get_output(param);
+
+    has_valid_comp = true;
   }
 
-  if (customfloat && accelerator) {
-    std::cout << "Accelerator vs. HLS custom Float Gold Model" << std::endl;
-    std::cout << "(reveals bugs in accelerator or memory placement)"
-              << std::endl;
-    std::string diffFile = outFilePrefix + "accel_vs_hlsgold.txt";
-
-    rel_err +=
-        compare_arrays(acceleratorOutput + params.OUTPUT_OFFSET, "accelerator",
-                       customFloatOutput + params.OUTPUT_OFFSET, "customfloat",
-                       size, diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
+  if (has_valid_comp) {
+    if (param.output().dtype() == "int8") {
+      rel_err += compare_arrays<DataTypes::int8, DataTypes::int8>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
+    } else if (param.output().dtype() == "bfloat16") {
+      rel_err += compare_arrays<DataTypes::bfloat16, DataTypes::bfloat16>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
+    } else {
+      // if unspecified, we will assume it's INPUT_DATATYPE
+      rel_err += compare_arrays<INPUT_DATATYPE, INPUT_DATATYPE>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
+    }
   }
 
-  if (customposit && universal) {
-    std::cout << "HLS Posit Gold Model vs. Universal Posit Gold Model"
-              << std::endl;
-    std::cout
-        << "(reveals bugs in implementation of custom HLS Posit operators)"
-        << std::endl;
-    std::string diffFile = outFilePrefix + "hlsgold_vs_universal.txt";
-
-    rel_err += compare_arrays(positOutput + params.OUTPUT_OFFSET, "customposit",
-                              universalOutput + params.OUTPUT_OFFSET,
-                              "universal", size, diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
-  }
-
-  if (customposit && fp32) {
-    std::cout << "HLS Posit Gold Model vs. FP32 Gold Model" << std::endl;
-    std::cout
-        << "(reveals bugs between FP32 and HLS Posit Gold Model implementation)"
-        << std::endl;
-    std::string diffFile = outFilePrefix + "hlsgold_vs_fpgold.txt";
-
-    rel_err += compare_arrays(positOutput + params.OUTPUT_OFFSET, "customposit",
-                              floatOutput + params.OUTPUT_OFFSET, "fp32", size,
-                              diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
-  }
-
-  if (accelerator && fp32) {
-    std::cout << "Accelerator vs. FP32 Gold Model" << std::endl;
-    std::cout << "(reveals bugs between Accelerator and FP32 Gold Model "
-                 "implementation)"
-              << std::endl;
-    std::string diffFile = outFilePrefix + "accel_vs_fpgold.txt";
-
-    rel_err += compare_arrays(acceleratorOutput + params.OUTPUT_OFFSET,
-                              "accelerator", floatOutput + params.OUTPUT_OFFSET,
-                              "fp32", size, diffFile, params.ACC_T_OUTPUT);
-    any_comparison = true;
-  }
-
-  if (!any_comparison) {
+  if (!has_valid_comp) {
     std::cout << "No valid comparisons specified" << std::endl;
     std::abort();
   }
