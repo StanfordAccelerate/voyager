@@ -2,6 +2,10 @@
 
 #include "test/common/operations/Common.h"
 
+#ifdef CHECK_PE
+#include "test/checker/PEChecker.h"
+#endif
+
 inline bool is_double_precision(const codegen::Tensor &tensor) {
   // FIXME: replace with proper check
   // return tensor.dtype().find("8") == std::string::npos;
@@ -66,11 +70,22 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
   int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
   int K0 = tiling.loops[1][tiling.weight_loop_index[1]];
   int IC_unroll = IC_DIMENSION;
+  int FX_UNROLL = 1;
 
   if (tiling.replication) {
     tiling.loops[1][tiling.fx_index] = 7;
     IC_unroll = 3;
     tiling.loops[1][tiling.reduction_loop_index[1]] = 1;
+
+    if (IC_DIMENSION == 4) {
+      FX_UNROLL = 1;
+    } else if (IC_DIMENSION == 8) {
+      FX_UNROLL = 2;
+    } else if (IC_DIMENSION == 16) {
+      FX_UNROLL = 4;
+    } else if (IC_DIMENSION == 32) {
+      FX_UNROLL = 7;
+    }
   }
 
   // assert that none of tiling.loops are 0
@@ -145,8 +160,30 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
                             STRIDE * y + fy < STRIDE * Y) {
                           INTERMEDIATE_T input = inputs[input_addr];
                           INTERMEDIATE_T weight = weights[weight_addr];
+#ifdef CHECK_PE
+                          int pe_num = ic0 * OC_DIMENSION + oc0;
+                          if (tiling.replication) {
+                            pe_num =
+                                (fx / FX_UNROLL) * 3 + ic0 + (fx % FX_UNROLL);
+                          }
+                          pe_checker.addReference(pe_num, input, weight,
+                                                  outputs[output_addr]);
+#endif
                           fused_multiply_add(input, weight,
                                              outputs[output_addr]);
+                        } else {
+#ifdef CHECK_PE
+                          int pe_num = ic0 * OC_DIMENSION + oc0;
+                          if (tiling.replication) {
+                            pe_num =
+                                (fx / FX_UNROLL) * 3 + ic0 + (fx % FX_UNROLL);
+                          }
+                          INTERMEDIATE_T input;
+                          input.setZero();
+                          INTERMEDIATE_T weight = weights[weight_addr];
+                          pe_checker.addReference(pe_num, input, weight,
+                                                  outputs[output_addr]);
+#endif
                         }
                       }
                       if (tiling.replication) {

@@ -186,6 +186,10 @@ sim: $(CC_BUILD_DIR)/TestRunner network-proto
 fast-sim: $(CC_BUILD_DIR)/TestRunner-fast
 	./$(CC_BUILD_DIR)/TestRunner-fast
 
+.PHONY: fast-sim-check
+fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker
+	./$(CC_BUILD_DIR)/TestRunner-checker
+
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner
 	gdb ./$(CC_BUILD_DIR)/TestRunner
@@ -195,6 +199,9 @@ TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
 
 .PHONY: TestRunner-fast
 TestRunner-fast: check_env_var $(CC_BUILD_DIR)/TestRunner-fast
+
+.PHONY: TestRunner-checker
+TestRunner-checker: check_env_var $(CC_BUILD_DIR)/TestRunner-checker
 
 .PHONY: AccuracyTester
 AccuracyTester: ./$(CC_BUILD_DIR)/AccuracyTester
@@ -213,6 +220,9 @@ $(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner
 $(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/MapOperation.o
 	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
 
+$(CC_BUILD_DIR)/TestRunner-checker: $(CC_BUILD_DIR)/Harness-checker.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel-checker.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/PEChecker.o
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
 $(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Utils.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o
 	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
 
@@ -229,8 +239,14 @@ $(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h test/com
 $(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h)
 	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
+$(CC_BUILD_DIR)/Harness-checker.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h) test/checker/PEChecker.h
+	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
+
 $(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/common/operations/*.h)
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
+
+$(CC_BUILD_DIR)/GoldModel-checker.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/common/operations/*.h) test/checker/PEChecker.h
+	$(CC) $(C17FLAGS) -DCHECK_PE -g -c -o $@ $<
 
 $(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
@@ -248,6 +264,9 @@ $(CC_BUILD_DIR)/MapOperation.o: test/toolchain/MapOperation.cc $(wildcard test/t
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/PEChecker.o: test/checker/PEChecker.cc test/checker/PEChecker.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/toolchain/*.h)
