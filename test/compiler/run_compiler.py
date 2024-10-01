@@ -517,6 +517,7 @@ if __name__ == "__main__":
                 
             def forward(self, x):
                 x = torch.sqrt(torch.abs(x))
+                x = torch.sum(x, dim=[2,0,1])
                 return x
 
         model = LayerTest()

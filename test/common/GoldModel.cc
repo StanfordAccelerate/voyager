@@ -38,6 +38,16 @@ void run_operation(const codegen::AcceleratorParam param,
       const auto &input = reduce_param.input();
       const auto input_shape = get_shape(input);
       output_tensor = softmax<VECTOR_T>(args[arg_index++], input_shape);
+    } else if (reduce_param.opcode() == "sum") {
+      const auto &input = reduce_param.input();
+      const auto input_shape = get_shape(input);
+
+      std::vector<int> dims;
+      for (int dim : reduce_param.dim()) {
+	  dims.push_back(dim);
+      }
+
+      output_tensor = sum<VECTOR_T>(args[arg_index++], input_shape, dims);
     } else {
       std::cerr << "Unsupported reduce instruction: " << reduce_param.opcode()
                 << std::endl;
