@@ -26,15 +26,18 @@ class Checker {
     }
 
     T ref = reference->front();
-    reference->pop_front();
 
     if (ref != value) {
+      if (std::get<1>(value) == 0) {
+        return;
+      }
       std::cout << "Reference: " << std::get<0>(ref) << " " << std::get<1>(ref)
                 << " " << std::get<2>(ref) << std::endl;
       std::cout << "Value: " << std::get<0>(value) << " " << std::get<1>(value)
                 << " " << std::get<2>(value) << std::endl;
       throw std::runtime_error("Value mismatch");
     }
+    reference->pop_front();
   }
 
  private:

@@ -87,12 +87,21 @@ SC_MODULE(InputController) {
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
       ac_int<2, false> STRIDE = params.STRIDE;
 
-      // replication packing factor
-      int packingFactor;
-      if (IC_DIMENSION == 16) {
+      int packingFactor;  // num x values packed in a word
+      int boundaryWords;  // num words needed to store the boundary pixels.
+                          // essentially ceil(3/packingFactor)
+      if (IC_DIMENSION == 4) {
+        packingFactor = 1;
+        boundaryWords = 3;
+      } else if (IC_DIMENSION == 8) {
+        packingFactor = 2;
+        boundaryWords = 2;
+      } else if (IC_DIMENSION == 16) {
         packingFactor = 4;
+        boundaryWords = 1;
       } else if (IC_DIMENSION == 32) {
         packingFactor = 8;
+        boundaryWords = 1;
       }
 
       bool isDownsample = FX == 1 && FY == 1;
@@ -148,12 +157,12 @@ SC_MODULE(InputController) {
             if (params.REPLICATION) {
               if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                 x_min_offset = (FX - 1) / 2;
-                loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+                loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
               }
               if (loop_counters[0][params.inputXLoopIndex[0]] !=
                   loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
                 x_max_offset = (FX - 1) / 2;
-                loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+                loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
               }
             } else {
               if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
@@ -232,7 +241,8 @@ SC_MODULE(InputController) {
 
                         if (params.REPLICATION) {
                           if (x0 != 0 && x_min_offset == 3) {
-                            x0 = x_min_offset + (x0 - 1) * packingFactor;
+                            x0 = x_min_offset +
+                                 (x0 - boundaryWords) * packingFactor;
                           } else {
                             x0 = x0 * packingFactor;
                           }
@@ -346,10 +356,19 @@ SC_MODULE(InputController) {
 
       // replication packing factor
       int packingFactor;
-      if (IC_DIMENSION == 16) {
+      int boundaryWords;
+      if (IC_DIMENSION == 4) {
+        packingFactor = 1;
+        boundaryWords = 3;
+      } else if (IC_DIMENSION == 8) {
+        packingFactor = 2;
+        boundaryWords = 2;
+      } else if (IC_DIMENSION == 16) {
         packingFactor = 4;
+        boundaryWords = 1;
       } else if (IC_DIMENSION == 32) {
         packingFactor = 8;
+        boundaryWords = 1;
       }
 
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
@@ -403,7 +422,7 @@ SC_MODULE(InputController) {
             if (params.REPLICATION) {
               // make sure to grab border pixels
               loop_bounds[1][params.inputXLoopIndex[1]] =
-                  STRIDE * X0 / packingFactor + 2;
+                  STRIDE * X0 / packingFactor + 2 * boundaryWords;
               loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
             } else {
               loop_bounds[1][params.inputXLoopIndex[1]] += FX - 1;
@@ -423,12 +442,13 @@ SC_MODULE(InputController) {
                                 loop_bounds[1][3] * loop_bounds[1][4]) *
                                loop_bounds[1][5];
               } else {
-                total_writes = static_cast<ac_int<32, false> >(
-                                   loop_bounds[1][1] * loop_bounds[1][2] *
-                                   loop_bounds[1][3] * loop_bounds[1][4]) *
-                               static_cast<ac_int<32, false> >(
-                                   (STRIDE)*X0 / packingFactor +
-                                   2);  // 2 extra writes for padding
+                total_writes =
+                    static_cast<ac_int<32, false> >(
+                        loop_bounds[1][1] * loop_bounds[1][2] *
+                        loop_bounds[1][3] * loop_bounds[1][4]) *
+                    static_cast<ac_int<32, false> >(
+                        (STRIDE)*X0 / packingFactor +
+                        2 * boundaryWords);  // 2 extra writes for padding
               }
 
               writeControl[bankSel].Push(total_writes);
@@ -459,7 +479,8 @@ SC_MODULE(InputController) {
 
                         if (params.REPLICATION) {
                           if (x0 != 0) {
-                            x0 = x_min_offset + (x0 - 1) * packingFactor;
+                            x0 = x_min_offset +
+                                 (x0 - boundaryWords) * packingFactor;
                           }
                         }
 
@@ -492,7 +513,8 @@ SC_MODULE(InputController) {
                                       (x0);
 
                         if (params.REPLICATION) {
-                          address = y0 * (STRIDE * X0 / packingFactor + 2) +
+                          address = y0 * (STRIDE * X0 / packingFactor +
+                                          2 * boundaryWords) +
                                     loop_counters[1][params.inputXLoopIndex[1]];
                         }
 
@@ -566,10 +588,19 @@ SC_MODULE(InputController) {
 
       // replication packing factor
       int packingFactor;
-      if (IC_DIMENSION == 16) {
+      int boundaryWords;
+      if (IC_DIMENSION == 4) {
+        packingFactor = 1;
+        boundaryWords = 3;
+      } else if (IC_DIMENSION == 8) {
+        packingFactor = 2;
+        boundaryWords = 2;
+      } else if (IC_DIMENSION == 16) {
         packingFactor = 4;
+        boundaryWords = 1;
       } else if (IC_DIMENSION == 32) {
         packingFactor = 8;
+        boundaryWords = 1;
       }
 
       ac_int<8, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
@@ -589,11 +620,16 @@ SC_MODULE(InputController) {
         }
       }
 
-      if (params.REPLICATION) {
+      if (params.REPLICATION && IC_DIMENSION >= 16) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
             2;
+      } else if (params.REPLICATION && IC_DIMENSION == 8) {
+        loop_bounds[1][params.inputXLoopIndex[1]] =
+            (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
+             packingFactor) +
+            1;
       }
 
 #pragma hls_pipeline_init_interval 1
@@ -642,8 +678,9 @@ SC_MODULE(InputController) {
                         ac_int<16, false> x = STRIDE * x0 + fx;
                         ac_int<16, false> y = STRIDE * y0 + fy;
                         int address;
-                        if (params.REPLICATION) {
-                          address = y * (((STRIDE * X0) / packingFactor) + 2) +
+                        if (params.REPLICATION && IC_DIMENSION >= 8) {
+                          address = y * (((STRIDE * X0) / packingFactor) +
+                                         2 * boundaryWords) +
                                     x0 + fx;
                         } else {
                           if (isDownsample) {
@@ -735,22 +772,31 @@ SC_MODULE(InputController) {
       int additionalUnrollingFactor;  // additional x values packed in a word
                                       // sent to the systolic array, but are
                                       // unused by the systolic array
+      constexpr int initialReuseFactor = (IC_DIMENSION == 8) ? 1 : 3;
+      int shiftFactor;
 
-      if (IC_DIMENSION == 8) {
-        packingFactor = 4;
-        unrollingFactor = 4;
-        additionalUnrollingFactor = 1;
+      if (IC_DIMENSION == 4) {
+        packingFactor = 1;
+        unrollingFactor = 1;
+        additionalUnrollingFactor = 0;
+      } else if (IC_DIMENSION == 8) {
+        packingFactor = 2;
+        unrollingFactor = 2;
+        additionalUnrollingFactor = 0;
+        shiftFactor = 1;
       } else if (IC_DIMENSION == 16) {
         packingFactor = 4;
         unrollingFactor = 4;
         additionalUnrollingFactor = 1;
+        shiftFactor = 2;
       } else if (IC_DIMENSION == 32) {
         packingFactor = 8;
         unrollingFactor = 7;
         additionalUnrollingFactor = 0;
+        shiftFactor = 2;
       }
 
-      if (params.REPLICATION) {
+      if (params.REPLICATION && IC_DIMENSION >= 16) {
         // #pragma hls_pipeline_init_interval 1
         // #pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -853,6 +899,60 @@ SC_MODULE(InputController) {
             }
           }
         }
+      } else if (params.REPLICATION && IC_DIMENSION == 8) {
+        // no window buffer reuse, but need to combine multiple words together
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              // inner memory
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          Pack1D<DTYPE, NROWS> data;
+#pragma hls_unroll yes
+                          for (int dim = 0; dim < 3; dim++) {
+                            data[dim] = buffer[3 + dim];
+                          }
+
+                          buffer = windowBufferIn.Pop();
+
+#pragma hls_unroll yes
+                          for (int dim = 0; dim < 3; dim++) {
+                            data[3 + dim] = buffer[dim];
+                          }
+                          windowBufferOut.Push(data);
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       } else {  // bypass
 
         ac_int<32, false> total_count =
@@ -883,12 +983,21 @@ SC_MODULE(InputController) {
         FX = 7;
       }
 
-      // replication packing factor
-      int packingFactor;
-      if (IC_DIMENSION == 16) {
+      int packingFactor;  // num x values packed in a word
+      int boundaryWords;  // num words needed to store the boundary pixels.
+                          // essentially ceil(3/packingFactor)
+      if (IC_DIMENSION == 4) {
+        packingFactor = 1;
+        boundaryWords = 3;
+      } else if (IC_DIMENSION == 8) {
+        packingFactor = 2;
+        boundaryWords = 2;
+      } else if (IC_DIMENSION == 16) {
         packingFactor = 4;
+        boundaryWords = 1;
       } else if (IC_DIMENSION == 32) {
         packingFactor = 8;
+        boundaryWords = 1;
       }
 
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
@@ -1009,12 +1118,12 @@ SC_MODULE(InputController) {
               if (params.REPLICATION) {
                 if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                   x_min_offset = (FX - 1) / 2;
-                  loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
                 }
                 if (loop_counters[0][params.inputXLoopIndex[0]] !=
                     loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
                   x_max_offset = (FX - 1) / 2;
-                  loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
                 }
               } else {
                 if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {

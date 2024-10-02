@@ -203,6 +203,19 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
               .weight_reuse_index = {4, 5},
               .stride = matrix_param.stride(0),
               .replication = true};
+
+    if (IC_DIMENSION == 4) {
+      tiling.loops[1][tiling.fx_index] = 7;
+    } else if (IC_DIMENSION == 8) {
+      tiling.loops[1][tiling.fx_index] = 4;
+    } else if (IC_DIMENSION == 16) {
+      tiling.loops[1][tiling.fx_index] = 2;
+    } else if (IC_DIMENSION == 32) {
+      tiling.loops[1][tiling.fx_index] = 1;
+    } else {
+      throw std::runtime_error("replication not supported for IC_DIMENSION=" +
+                               std::to_string(IC_DIMENSION));
+    }
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
              OC == 64) {  // layer1
     tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
@@ -626,7 +639,9 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
 inline void adjust_tiling_for_dimension(Tiling& tiling) {
   // adjust loop counters for dimension != 16
   if (IC_DIMENSION < 16) {
-    tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
+    if (!tiling.replication) {
+      tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
+    }
   } else if (IC_DIMENSION > 16) {
     if (!tiling.replication) {
       tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);

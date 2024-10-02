@@ -447,7 +447,19 @@ SC_MODULE(WeightController) {
                           if (params.REPLICATION) {
                             startingC = 3 - 1;
                             endingC = 3;
-                            if (IC_DIMENSION == 16) {
+                            if (IC_DIMENSION == 4) {
+                              numPadding = NROWS - 3;
+                              replicationBound = 1;
+                            } else if (IC_DIMENSION == 8) {
+                              if (loop_counters[1][params.fxIndex] ==
+                                  3) {  // last iteration only unrolls 1 fx
+                                numPadding = NROWS - 3;
+                                replicationBound = 1;
+                              } else {
+                                numPadding = NROWS - 6;
+                                replicationBound = 2;
+                              }
+                            } else if (IC_DIMENSION == 16) {
                               if (loop_counters[1][params.fxIndex] == 0) {
                                 numPadding = NROWS - 12;
                                 replicationBound = 4;
@@ -490,7 +502,12 @@ SC_MODULE(WeightController) {
                               ac_int<8, false> C = IC_DIMENSION;
                               if (params.REPLICATION) {
                                 C = 3;
-                                if (IC_DIMENSION == 16) {
+                                if (IC_DIMENSION == 4) {
+                                  fx = loop_counters[1][params.fxIndex];
+                                } else if (IC_DIMENSION == 8) {
+                                  fx = loop_counters[1][params.fxIndex] * 2 +
+                                       fx_repl;
+                                } else if (IC_DIMENSION == 16) {
                                   fx = loop_counters[1][params.fxIndex] * 4 +
                                        fx_repl;
                                 } else if (IC_DIMENSION == 32) {

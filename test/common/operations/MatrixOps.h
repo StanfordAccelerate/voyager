@@ -164,7 +164,10 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
                           int pe_num = ic0 * OC_DIMENSION + oc0;
                           if (tiling.replication) {
                             pe_num =
-                                (fx / FX_UNROLL) * 3 + ic0 + (fx % FX_UNROLL);
+                                ic0 * OC_DIMENSION +
+                                (counters[1][tiling.fx_index] % FX_UNROLL) *
+                                    IC_unroll * OC_DIMENSION +
+                                oc0;
                           }
                           pe_checker.addReference(pe_num, input, weight,
                                                   outputs[output_addr]);
@@ -176,7 +179,10 @@ inline ACCUMULATE_T *gemm(std::any input_tensor, std::any weight_tensor,
                           int pe_num = ic0 * OC_DIMENSION + oc0;
                           if (tiling.replication) {
                             pe_num =
-                                (fx / FX_UNROLL) * 3 + ic0 + (fx % FX_UNROLL);
+                                ic0 * OC_DIMENSION +
+                                (counters[1][tiling.fx_index] % FX_UNROLL) *
+                                    IC_unroll * OC_DIMENSION +
+                                oc0;
                           }
                           INTERMEDIATE_T input;
                           input.setZero();

@@ -215,4 +215,8 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define WEIGHT_BUFFER_SIZE 1024
 #define ACCUMULATION_BUFFER_SIZE 1024
 
+#if IC_DIMENSION == 4
+#define INPUT_BUFFER_SIZE 1024
+#endif
+
 // #define PIPE_INPUT 1
