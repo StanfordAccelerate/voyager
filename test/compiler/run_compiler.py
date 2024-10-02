@@ -510,6 +510,57 @@ if __name__ == "__main__":
             output_file="bert",
             output_dir=args.output_dir,
         )
+    elif args.model == "gesture":
+        from mmengine.config import Config
+        from mmengine.runner import Runner
+
+        if args.model_name_or_path is None:
+            args.model_name_pr_path = "gesture/model256.pth"
+
+        ld = torch.load(args.model_name_or_path, map_location="cpu")
+        cfg = Config.fromstring(ld['meta']['cfg'], ".py")
+        cfg.load_from = args.model_name_or_path
+        runner = Runner.from_cfg(cfg)
+        model = runner.model
+        model.eval()
+
+        example_args = (torch.randn(1, 3, 224, 224,), None, 'tensor')
+
+        model = prepare_pt2e(model, quantizer, example_args)
+
+        convert_pt2e(model)
+
+        pt_out, gm_out = transform(
+            model,
+            example_args,
+            output_file=args.model,
+            output_dir=args.output_dir,
+        )
+    elif args.model == "layertest":
+        class LayerTest(torch.nn.Module):
+            def __init__(self):
+                super(LayerTest, self).__init__()
+                
+            def forward(self, x):
+                x = torch.sqrt(torch.abs(x))
+                x = torch.sum(x, dim=[-1])
+                return x
+
+        model = LayerTest()
+        model.eval()
+
+        example_args = (torch.randn(1, 8, 8, 8,))
+
+        model = prepare_pt2e(model, quantizer, example_args)
+
+        convert_pt2e(model)
+
+        pt_out, gm_out = transform(
+            model,
+            example_args,
+            output_file=args.model,
+            output_dir=args.output_dir,
+        )
     else:
         raise ValueError(f"Model {args.model} not supported")
 

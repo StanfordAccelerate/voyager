@@ -11,6 +11,23 @@ inline void relu(T &x) {
   x.relu();
 }
 
+template <typename T>
+inline T * sqrt(T * tensor, const std::vector<int> &shape) {
+  int result_size = get_size(shape);
+  T * result = new T[result_size];
+
+  for (int i = 0; i < shape[0]; ++i) {
+    for (int j = 0; j < shape[1]; ++j) {
+      for (int k = 0; k < shape[2]; ++k) {
+	  result[i * shape[1] * shape[2] + j * shape[2] + k]
+	      = tensor[i * shape[1] * shape[2] + j * shape[2] + k].sqrt();
+      }
+    }
+  }
+
+  return result;
+}
+
 inline bool are_broadcastable(const std::vector<int> &shape1,
                               const std::vector<int> &shape2) {
   size_t len1 = shape1.size();

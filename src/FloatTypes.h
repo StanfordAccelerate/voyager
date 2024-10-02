@@ -90,7 +90,11 @@ class Float{
         ac_math::ac_exp_pwl(converted_to_fixed, exponent_in_fixed);
         // convert back to float
         float_val = static_cast<ac_float_rep>(exponent_in_fixed);
-    }    
+    }
+
+    void sqrt() {
+	throw "Float sqrt function not implemented.";
+    }
 
     // log_mult not implemented for float type
 

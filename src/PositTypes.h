@@ -167,6 +167,10 @@ class Posit {
   void setbits(int i) { bits = i; }
   void setZero() { bits = 0; }
 
+  void sqrt() {
+      throw "Posit sqrt function not implemented.";
+  }
+
   void relu() {
     if (bits[nbits - 1] == 1) bits = 0;
   }

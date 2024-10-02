@@ -92,3 +92,18 @@ test/compiler/networks/mobilebert_encoder/CFLOAT/params.pb: test/compiler/run_co
 test/compiler/networks/mobilebert_encoder/BF16/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py mobilebert_encoder --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+
+################################################################################
+# Gesture
+################################################################################
+test/compiler/networks/gesture/CFLOAT/params.pb: test/compiler/run_compiler.py
+	mkdir -p $(dir $@)
+	python test/compiler/run_compiler.py gesture --model_name_or_path models/gesture/model.pth --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+
+################################################################################
+# Layer Tests
+################################################################################
+test/compiler/networks/layertest/CFLOAT/params.pb: test/compiler/run_compiler.py
+	mkdir -p $(dir $@)
+	python test/compiler/run_compiler.py layertest --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+

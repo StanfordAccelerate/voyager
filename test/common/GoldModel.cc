@@ -38,6 +38,16 @@ void run_operation(const codegen::AcceleratorParam param,
       const auto &input = reduce_param.input();
       const auto input_shape = get_shape(input);
       output_tensor = softmax<VECTOR_T>(args[arg_index++], input_shape);
+    } else if (reduce_param.opcode() == "sum") {
+      const auto &input = reduce_param.input();
+      const auto input_shape = get_shape(input);
+
+      std::vector<int> dims;
+      for (int dim : reduce_param.dim()) {
+	  dims.push_back(dim);
+      }
+
+      output_tensor = sum<VECTOR_T>(args[arg_index++], input_shape, dims);
     } else {
       std::cerr << "Unsupported reduce instruction: " << reduce_param.opcode()
                 << std::endl;
@@ -93,7 +103,10 @@ void run_operation(const codegen::AcceleratorParam param,
   }
 
   for (const auto &vector_param : param.vector_params()) {
-    if (activations.find(vector_param.opcode()) != activations.end()) {
+    if (vector_param.opcode().rfind("sqrt", 0) == 0) {
+      VECTOR_T *input_tensor = std::any_cast<VECTOR_T *>(output_tensor);
+      output_tensor = sqrt(input_tensor, get_shape(vector_param.input()));
+    } else if (activations.find(vector_param.opcode()) != activations.end()) {
       VECTOR_T *tensor = std::any_cast<VECTOR_T *>(output_tensor);
       // TODO: Implement different activation functions
       int input_size = get_size(vector_param.input());
