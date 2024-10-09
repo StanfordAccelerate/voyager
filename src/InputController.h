@@ -6,6 +6,12 @@
 #include "AccelTypes.h"
 #include "ParamsDeserializer.h"
 
+#if IC_DIMENSION < 16 || OC_DIMENSION < 16
+#define LOOP_WIDTH (8 + 16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION : OC_DIMENSION))
+#else
+#define LOOP_WIDTH 8
+#endif
+
 template <typename DTYPE, int NROWS>
 SC_MODULE(InputController) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -105,9 +111,9 @@ SC_MODULE(InputController) {
       }
 
       bool isDownsample = FX == 1 && FY == 1;
-
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+        
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -209,25 +215,25 @@ SC_MODULE(InputController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        ac_int<8, false> x0 =
+                        ac_int<LOOP_WIDTH, false> x0 =
                             loop_counters[1][params.inputXLoopIndex[1]];
-                        ac_int<8, false> x1 =
+                        ac_int<LOOP_WIDTH, false> x1 =
                             loop_counters[0][params.inputXLoopIndex[0]];
                         ac_int<16, false> X0 =
                             STRIDE * params.loops[1][params.inputXLoopIndex[1]];
-                        ac_int<8, false> X1 =
+                        ac_int<LOOP_WIDTH, false> X1 =
                             params.loops[0][params.inputXLoopIndex[0]];
-                        ac_int<8, false> y0 =
+                        ac_int<LOOP_WIDTH, false> y0 =
                             loop_counters[1][params.inputYLoopIndex[1]];
-                        ac_int<8, false> y1 =
+                        ac_int<LOOP_WIDTH, false> y1 =
                             loop_counters[0][params.inputYLoopIndex[0]];
                         ac_int<16, false> Y0 =
                             STRIDE * params.loops[1][params.inputYLoopIndex[1]];
-                        ac_int<8, false> Y1 =
+                        ac_int<LOOP_WIDTH, false> Y1 =
                             params.loops[0][params.inputYLoopIndex[0]];
-                        ac_int<8, false> c1 =
+                        ac_int<LOOP_WIDTH, false> c1 =
                             loop_counters[1][params.reductionLoopIndex[1]];
-                        ac_int<8, false> C1 =
+                        ac_int<LOOP_WIDTH, false> C1 =
                             params.loops[1][params.reductionLoopIndex[1]];
 
                         ac_int<16, false> c = c1 * NROWS;
@@ -379,8 +385,8 @@ SC_MODULE(InputController) {
       ac_int<4, false> fx_bound = (FX - 1) / 2;
       ac_int<4, false> fy_bound = (FY - 1) / 2;
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -394,11 +400,11 @@ SC_MODULE(InputController) {
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
-      ac_int<8, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
-      ac_int<8, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
 
-      ac_int<8, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
-      ac_int<8, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
 
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
@@ -467,14 +473,14 @@ SC_MODULE(InputController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        ac_int<8, true> x0 =
+                        ac_int<LOOP_WIDTH, true> x0 =
                             loop_counters[1][params.inputXLoopIndex[1]];
-                        ac_int<8, true> x1 =
+                        ac_int<LOOP_WIDTH, true> x1 =
                             loop_counters[0][params.inputXLoopIndex[0]];
 
-                        ac_int<8, true> y0 =
+                        ac_int<LOOP_WIDTH, true> y0 =
                             loop_counters[1][params.inputYLoopIndex[1]];
-                        ac_int<8, true> y1 =
+                        ac_int<LOOP_WIDTH, true> y1 =
                             loop_counters[0][params.inputYLoopIndex[0]];
 
                         if (params.REPLICATION) {
@@ -603,14 +609,14 @@ SC_MODULE(InputController) {
         boundaryWords = 1;
       }
 
-      ac_int<8, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
       bool isDownsample = FX == 1 && FY == 1;
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
       ac_int<2, false> STRIDE = params.STRIDE;
 
 #pragma hls_unroll yes
@@ -664,16 +670,16 @@ SC_MODULE(InputController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        ac_int<8, false> x0 =
+                        ac_int<LOOP_WIDTH, false> x0 =
                             loop_counters[1][params.inputXLoopIndex[1]];
-                        ac_int<8, false> X0 =
+                        ac_int<LOOP_WIDTH, false> X0 =
                             params.loops[1][params.inputXLoopIndex[1]];
-                        ac_int<8, false> y0 =
+                        ac_int<LOOP_WIDTH, false> y0 =
                             loop_counters[1][params.inputYLoopIndex[1]];
-                        ac_int<8, false> Y0 =
+                        ac_int<LOOP_WIDTH, false> Y0 =
                             params.loops[1][params.inputYLoopIndex[1]];
-                        ac_int<8, false> fx = loop_counters[1][params.fxIndex];
-                        ac_int<8, false> fy = loop_counters[1][params.fyIndex];
+                        ac_int<LOOP_WIDTH, false> fx = loop_counters[1][params.fxIndex];
+                        ac_int<LOOP_WIDTH, false> fy = loop_counters[1][params.fyIndex];
 
                         ac_int<16, false> x = STRIDE * x0 + fx;
                         ac_int<16, false> y = STRIDE * y0 + fy;
@@ -756,8 +762,8 @@ SC_MODULE(InputController) {
 
     while (true) {
       const MatrixParams params = windowBufferParams.Pop();
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -1004,8 +1010,8 @@ SC_MODULE(InputController) {
 
       bool isDownsample = FX == 1 && FY == 1;
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
