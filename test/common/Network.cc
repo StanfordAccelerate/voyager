@@ -30,8 +30,13 @@ Network::Network(std::string& model) : model(model) {
 }
 
 std::vector<codegen::AcceleratorParam> Network::get_params() {
-  return std::vector<codegen::AcceleratorParam>(model_params.params().begin(),
-                                                model_params.params().end());
+  std::vector<codegen::AcceleratorParam> params;
+  for (const auto& param : model_params.params()) {
+    if (!param.has_nop()) {
+      params.push_back(param);
+    }
+  }
+  return params;
 }
 
 std::vector<codegen::AcceleratorParam> Network::get_params(

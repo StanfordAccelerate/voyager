@@ -148,25 +148,34 @@ void run_operation(const codegen::AcceleratorParam param,
 
       VECTOR_T *other_tensor;
       if (other.dtype() != input.dtype()) {
-        // A dequantize is needed
-        VECTOR_T *scale = new VECTOR_T[1];
-        scale[0] = other.scale() != 0 ? other.scale() : 1.0;
-        if (other.dtype() == "int32") {
-          other_tensor = dequantize<DataTypes::int32, VECTOR_T>(
-              args[arg_index++], scale, get_size(other));
-        } else if (other.dtype() == "int24") {
-          other_tensor = dequantize<DataTypes::int24, VECTOR_T>(
-              args[arg_index++], scale, get_size(other));
-        } else if (other.dtype() == "int8") {
-          other_tensor = dequantize<DataTypes::int8, VECTOR_T>(
-              args[arg_index++], scale, get_size(other));
-        } else if (other.dtype() == "fp8_e4m3") {
-          other_tensor = dequantize<DataTypes::e4m3, VECTOR_T>(
-              args[arg_index++], scale, get_size(other));
-        } else {
-          std::cerr << "No dequantization operation for dtype: "
-                    << other.dtype() << std::endl;
+        if constexpr (std::is_same<VECTOR_T, CFloat>::value) {
+          std::cerr << "No quantization operations should be emitted for CFloat"
+                    << std::endl;
           std::abort();
+        } else {
+          // A dequantize is needed
+          VECTOR_T *scale = new VECTOR_T[1];
+          scale[0] = other.scale() != 0 ? other.scale() : 1.0;
+          if (other.dtype() == "int32") {
+            other_tensor = dequantize<DataTypes::int32, VECTOR_T>(
+                args[arg_index++], scale, get_size(other));
+          } else if (other.dtype() == "int24") {
+            other_tensor = dequantize<DataTypes::int24, VECTOR_T>(
+                args[arg_index++], scale, get_size(other));
+          } else if (other.dtype() == "int8") {
+            other_tensor = dequantize<DataTypes::int8, VECTOR_T>(
+                args[arg_index++], scale, get_size(other));
+          } else if (other.dtype() == "fp8_e4m3") {
+            other_tensor = dequantize<DataTypes::e4m3, VECTOR_T>(
+                args[arg_index++], scale, get_size(other));
+          } else if (other.dtype() == "posit8_1") {
+            other_tensor = dequantize<DataTypes::posit8, VECTOR_T>(
+                args[arg_index++], scale, get_size(other));
+          } else {
+            std::cerr << "No dequantization operation for dtype: "
+                      << other.dtype() << std::endl;
+            std::abort();
+          }
         }
       } else {
         other_tensor = std::any_cast<VECTOR_T *>(args[arg_index++]);

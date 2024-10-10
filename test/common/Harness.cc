@@ -43,7 +43,8 @@ Harness::Harness(sc_module_name name,
                  std::vector<codegen::AcceleratorParam> params, char *sram,
                  char *rram)
     : sc_module(name),
-      clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS, true),
+      clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS,
+          true),
       params(params),
       sramMemory(sram),
       rramMemory(rram),
@@ -339,7 +340,7 @@ void Harness::sendParams() {
 
       sc_time start = sc_time_stamp();
       CCS_LOG("----- Accelerator Layer '" << currentParams.name()
-              << "' Started. -----");
+                                          << "' Started. -----");
 
       if (vectorParamsValid) {
         sendSerializedParams<VectorParams, 32>(*vectorParams,
@@ -361,7 +362,10 @@ void Harness::sendParams() {
 
       std::cout << "Default time unit: " << sc_get_default_time_unit()
                 << std::endl;
-      std::cout << "Runtime: " << int(end.to_default_time_units() - start.to_default_time_units()) << " ns" << std::endl;
+      std::cout << "Runtime: "
+                << int(end.to_default_time_units() -
+                       start.to_default_time_units())
+                << " ns" << std::endl;
 
       accelerator_memory_maps.pop_front();
     }
