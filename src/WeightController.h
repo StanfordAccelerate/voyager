@@ -7,11 +7,6 @@
 #include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
 
-#if IC_DIMENSION < 16 || OC_DIMENSION < 16
-#define LOOP_WIDTH (8 + 16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION : OC_DIMENSION))
-#else
-#define LOOP_WIDTH 8
-#endif
 
 template <typename DTYPE, typename ACC_DTYPE, int NROWS, int NCOLS>
 SC_MODULE(WeightController) {
@@ -30,6 +25,12 @@ SC_MODULE(WeightController) {
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(biasDataResponse);
+
+  static constexpr int int_log2(unsigned int n) {
+    return (n <= 1) ? 0 : 1 + int_log2(n / 2);
+  }
+
+  static constexpr int LOOP_WIDTH = (8 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION : OC_DIMENSION)));
 
 #ifdef HYBRID_FP8
   Connections::Out<Pack1D<HYBRID_TYPE, NCOLS> > CCS_INIT_S1(

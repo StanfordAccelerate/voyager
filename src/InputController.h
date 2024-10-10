@@ -6,12 +6,6 @@
 #include "AccelTypes.h"
 #include "ParamsDeserializer.h"
 
-#if IC_DIMENSION < 16 || OC_DIMENSION < 16
-#define LOOP_WIDTH (8 + 16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION : OC_DIMENSION))
-#else
-#define LOOP_WIDTH 8
-#endif
-
 template <typename DTYPE, int NROWS>
 SC_MODULE(InputController) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -45,6 +39,14 @@ SC_MODULE(InputController) {
   Connections::Combinational<Pack1D<DTYPE, NROWS> > transposeOut;
 
   MatrixParamsDeserializer<0> CCS_INIT_S1(paramsDeserializer);
+
+  static constexpr int int_log2(unsigned int n) {
+    return (n <= 1) ? 0 : 1 + int_log2(n / 2);
+  }
+
+  static constexpr int LOOP_WIDTH =
+      (8 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
+                                                      : OC_DIMENSION)));
 
   SC_CTOR(InputController) {
     paramsDeserializer.clk(clk);
