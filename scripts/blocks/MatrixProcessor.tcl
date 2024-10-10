@@ -1,5 +1,5 @@
 set block "MatrixProcessor"
-set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, 1024>"
+set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
 set full_block_name_stripped [string map {" " ""} $full_block_name]
 
 proc pre_compile {} {

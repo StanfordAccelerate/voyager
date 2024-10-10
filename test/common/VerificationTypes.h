@@ -161,7 +161,7 @@ inline Tiling get_conv2d_tiling(codegen::AcceleratorParam param) {
 
     // Reduce either OC0, or OX0 and OY0, to meet accumulation buffer constraint
     const int max_k0 = k0;
-    while (x0 * y0 * k0 > ACCUMULATION_BUFFER_SIZE) {
+    while (x0 * y0 * k0 > ACCUM_BUFFER_SIZE) {
       if (k0 % 2 == 0) {
         k0 /= 2;
         k1 *= 2;
@@ -805,7 +805,7 @@ inline Tiling get_linear_tiling(codegen::AcceleratorParam param) {
     }
   }
 
-  while (x0 * k0 > ACCUMULATION_BUFFER_SIZE) {
+  while (x0 * k0 > ACCUM_BUFFER_SIZE) {
     if (k0 % 2 == 0) {
       k0 /= 2;
       k1 *= 2;

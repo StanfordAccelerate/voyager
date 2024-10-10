@@ -10,6 +10,7 @@ $(info $(MSG))
 
 # Build folder format is build/DATATYPE_DIMENSIONxDIMENSION
 export PROJ_ROOT = $(shell pwd)
+# TODO: buffer size info is not in the build dir name currently
 BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
@@ -59,6 +60,24 @@ override BASE_FLAGS += \
 	-D$(DATATYPE) \
 	-DIC_DIMENSION=$(IC_DIMENSION) \
 	-DOC_DIMENSION=$(OC_DIMENSION)
+
+ifndef INPUT_BUFFER_SIZE
+	export INPUT_BUFFER_SIZE = 1024
+else
+	override BASE_FLAGS += -DINPUT_BUFFER_SIZE=$(INPUT_BUFFER_SIZE)
+endif
+
+ifndef WEIGHT_BUFFER_SIZE
+	export WEIGHT_BUFFER_SIZE = 1024
+else
+	override BASE_FLAGS += -DWEIGHT_BUFFER_SIZE=$(WEIGHT_BUFFER_SIZE)
+endif
+
+ifndef ACCUM_BUFFER_SIZE
+	export ACCUM_BUFFER_SIZE = 1024
+else
+	override BASE_FLAGS += -DACCUM_BUFFER_SIZE=$(ACCUM_BUFFER_SIZE)
+endif
 
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG_LOG -g -ggdb
