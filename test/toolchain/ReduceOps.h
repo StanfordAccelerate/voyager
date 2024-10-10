@@ -156,6 +156,132 @@ void MapReduceOperation(const codegen::AcceleratorParam &param,
     mappedParams.push_back(vector_params);
     mappedParams.push_back(vector_instruction_config);
     opMemoryMaps.push_back(accelerator_memory_map);
+  } else if (reduce_param.opcode() == "calculate_mx_qparam") {
+    // send to reduce unit, configure to calculate max exponent value
+    VectorParams *vector_params = new VectorParams;
+    VectorInstructionConfig *vector_instruction_config =
+        new VectorInstructionConfig;
+    AcceleratorMemoryMap accelerator_memory_map;
+
+    const auto vector_input = reduce_param.input();
+
+    // reduction dimension depends on the input shape
+    // if it's a 4d tensor (conv), then the reduction dimension is the second
+    // dimension if it's a 3d tensor (gemm), then the reduction dimension is the
+    // last dimension
+
+    int reduction_dim_size = 1;
+    int tensor_dim_size = 1;
+    if (vector_input.shape_size() == 4) {
+      reduction_dim_size = vector_input.shape(1);
+      tensor_dim_size = vector_input.shape(2) * vector_input.shape(3);
+    } else if (vector_input.shape_size() == 3) {
+      reduction_dim_size = vector_input.shape(2);
+      tensor_dim_size = vector_input.shape(1);
+    } else {
+      std::cerr << "Unsupported tensor shape for calculate_mx_qparam"
+                << std::endl;
+      exit(1);
+    }
+
+    // assume block size of 32
+    int block_size = 32;
+
+    int dim = 1;
+    for (int i = 0; i < vector_input.shape_size(); i++) {
+      dim *= vector_input.shape(i);
+    }
+    int dim_factors[2];
+    factorizeForAddressGen(dim / OC_DIMENSION, dim_factors);
+
+    // inputs
+    const auto input_memory = vector_input.memory();
+    accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
+    vector_params->VECTOR_OFFSET = input_memory.offset();
+    vector_params->addressGen0Mode = 1;
+    vector_params->addressGen0Broadcast = false;
+    vector_params->addressGen0Loop[0][0] = 1;
+    vector_params->addressGen0Loop[0][1] = 1;
+    vector_params->addressGen0Loop[0][2] = 1;
+    vector_params->addressGen0Loop[1][0] = 1;
+    vector_params->addressGen0Loop[1][1] = dim_factors[0];
+    vector_params->addressGen0Loop[1][2] = dim_factors[1];
+
+    for (int i = 0; i < 2; i++) {
+      vector_params->addressGen0InputXLoopIndex[i] = 0;
+      vector_params->addressGen0InputYLoopIndex[i] = 1;
+      vector_params->addressGen0WeightLoopIndex[i] = 2;
+    }
+
+    vector_params->DP_VEC0 =
+        DataTypes::TypeName<INPUT_DATATYPE>::name() != vector_input.dtype();
+
+    // turn off address generators
+    vector_params->addressGen1Mode = 0;
+    vector_params->addressGen2Mode = 0;
+
+    int output_dim_factors[2];
+    factorizeForAddressGen(dim / OC_DIMENSION / block_size, output_dim_factors);
+
+    // output
+    const auto output_mem = param.output().memory();
+    accelerator_memory_map["outputs"] = get_partition(output_mem.partition());
+    vector_params->VECTOR_OUTPUT_OFFSET = output_mem.offset();
+    for (int i = 0; i < 3; i++) {
+      vector_params->outputLoops[0][i] = 1;
+    }
+    vector_params->outputLoops[1][0] = 1;
+    vector_params->outputLoops[1][1] = output_dim_factors[0];
+    vector_params->outputLoops[1][2] = output_dim_factors[1];
+
+    for (int i = 0; i < 2; i++) {
+      vector_params->outputXLoopIndex[i] = 0;
+      vector_params->outputYLoopIndex[i] = 1;
+      vector_params->outputWeightLoopIndex[i] = 2;
+    }
+
+    vector_params->DP_OUTPUT = false;
+    vector_params->OUTPUT_QUANTIZE = false;
+
+    // inst 0 - start reduction engine to calculate mx scale
+    VectorInstructions vinst0;
+    vinst0.instType = VectorInstructions::reduction;
+    vinst0.rCount = block_size / OC_DIMENSION;
+    vinst0.rOp = VectorInstructions::rmxscale;
+    vinst0.rDest = VectorInstructions::toVectorOp0Src0;
+    vector_instruction_config->inst[0] = vinst0;
+    vector_instruction_config->instCount[0] = 1;
+
+    // inst 1 - send to reduction engine
+    VectorInstructions vinst1;
+    vinst1.instType = VectorInstructions::vector;
+    vinst1.vInput = VectorInstructions::readFromVectorFetch;
+    vinst1.vAccumulatePush = VectorInstructions::nop;
+    vinst1.vOp0Src1 = VectorInstructions::nop;
+    vinst1.vOp0 = VectorInstructions::nop;
+    vinst1.vOp1 = VectorInstructions::nop;
+    vinst1.vOp2 = VectorInstructions::toReduce;
+    vinst1.vOp3Src1 = VectorInstructions::nop;
+    vinst1.vOp3 = VectorInstructions::nop;
+    vinst1.vOp4 = VectorInstructions::nop;
+    vinst1.vDest = VectorInstructions::nop;
+    vector_instruction_config->inst[1] = vinst1;
+    vector_instruction_config->instCount[1] = block_size;
+
+    // inst 2 - write out
+    VectorInstructions vinst2;
+    vinst2.instType = VectorInstructions::vector;
+    vinst2.vInput = VectorInstructions::readFromReduce;
+    vinst2.vDest = VectorInstructions::vWriteOut;
+    vector_instruction_config->inst[2] = vinst2;
+    vector_instruction_config->instCount[2] = 1;
+
+    vector_instruction_config->instLen = 3;
+    vector_instruction_config->instLoopCount = dim / OC_DIMENSION / block_size;
+
+    mappedParams.push_back(vector_params);
+    mappedParams.push_back(vector_instruction_config);
+    opMemoryMaps.push_back(accelerator_memory_map);
   } else {
     std::cerr << "Unsupported reduce instruction: " << reduce_param.opcode()
               << std::endl;

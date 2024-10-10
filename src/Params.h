@@ -372,9 +372,10 @@ struct VectorInstructions {
   static const unsigned int vWriteOut = 1;
 
   ac_int<10, false> rCount;
-  ac_int<2, false> rOp;
+  ac_int<3, false> rOp;
   static const unsigned int radd = 1;
   static const unsigned int rmax = 2;
+  static const unsigned int rmxscale = 3;
 
   ac_int<1, false> rSqrt;
   ac_int<1, false> rReciprocal;
@@ -393,7 +394,7 @@ struct VectorInstructions {
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
 
-  static const unsigned int width = 94;
+  static const unsigned int width = 95;
 
 #ifndef NO_SYSC
   template <unsigned int Size>

@@ -422,6 +422,37 @@ SC_MODULE(VectorOpUnit) {
 
             prevResult = result;
           }
+        } else if (inst.rOp == VectorInstructions::rmxscale) {
+          typedef ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, true>
+              exp_type_t;
+
+          exp_type_t prevExpResult;
+          for (int i = 0; i < inst.rCount; i++) {
+            Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op =
+                reductionOpInput.Pop();
+
+            Pack1D<exp_type_t, WIDTH> exponents;
+
+#pragma hls_unroll yes
+            for (int j = 0; j < WIDTH; j++) {
+              exponents[j] = op[j].unbiased_exponent();
+            }
+
+            exp_type_t result = treemax(exponents);
+
+            if (i != 0) {
+              result = result < prevExpResult ? prevExpResult : result;
+            }
+
+            prevExpResult = result;
+          }
+
+          prevExpResult =
+              prevExpResult -
+              VEC_DTYPE::AccumulationDatatype::ac_float_rep::exp_bias -
+              (IO_DTYPE::width - 2);
+
+          prevResult.setbits(prevExpResult);
         }
         if (!inst.rDuplicate) {
           res[index] = prevResult;
