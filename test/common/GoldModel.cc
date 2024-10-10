@@ -203,9 +203,19 @@ void run_operation(const codegen::AcceleratorParam param,
                   << std::endl;
         std::abort();
       } else {
-        // perform quantization operation
-        output_tensor = quantize<VECTOR_T, INPUT_T>(
-            output_tensor, args[arg_index++], get_size(vector_param.input()));
+        if (vector_param.other().dtype() == vector_param.input().dtype()) {
+          // perform quantization operation
+          output_tensor = quantize<VECTOR_T, INPUT_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()));
+        } else if (vector_param.other().dtype() == "e8m0") {
+          // perform microscaling quantization operation
+          output_tensor = quantizeMX<VECTOR_T, DataTypes::e8m0, INPUT_T>(
+              output_tensor, args[arg_index++], get_size(vector_param.input()),
+              get_size(vector_param.other()));
+        } else {
+          std::cerr << "No quantization operation for dtype: "
+                    << vector_param.other().dtype() << std::endl;
+        }
       }
     } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
       // perform dequantization operation

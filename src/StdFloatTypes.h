@@ -157,6 +157,9 @@ class StdFloat {
   template <int quantized_width, bool quantized_sign>
   Int<quantized_width, quantized_sign> quantize(StdFloat scale);
 
+  template <int quantized_width, bool quantized_sign, int scale_W>
+  Int<quantized_width, quantized_sign> quantize(Scale<scale_W> scale);
+
   StdFloat operator+(const StdFloat &rhs);
   StdFloat operator*(const StdFloat &rhs);
   StdFloat operator/(const StdFloat &rhs);
@@ -441,6 +444,21 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
           .to_ac_int();
 
   return quantizedValue;
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int quantized_width, bool quantized_sign, int scale_W>
+Int<quantized_width, quantized_sign>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
+    Scale<scale_W> scale) {
+  StdFloat scale_float;
+
+  ac_int<exponent_width, true> exponent_bits =
+      scale.bits_rep() + ac_float_rep::exp_bias;
+  scale_float.float_val.d.set_slc(mantissa_width, exponent_bits);
+
+  return quantize<quantized_width, quantized_sign>(scale_float);
 }
 
 /*
