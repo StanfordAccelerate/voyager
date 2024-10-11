@@ -499,6 +499,7 @@ struct VectorParams : BaseParams {
       addressGen1WeightLoopIndex[i] = 0;
     }
     DP_VEC1 = false;
+    BROADCAST_VEC1_SCALE = false;
 
     ADDRESS_GEN2_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
@@ -531,6 +532,7 @@ struct VectorParams : BaseParams {
 
     DP_OUTPUT = false;
     OUTPUT_QUANTIZE = false;
+    OUTPUT_QUANTIZE_MX = false;
 
     addressGen0Mode = 0;
     addressGen0Broadcast = false;
@@ -559,6 +561,8 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addressGen1WeightLoopIndex[2];
   bool DP_VEC1;
   ac_int<16, false> vec1DequantizeScale;
+  bool BROADCAST_VEC1_SCALE;
+  ac_int<8, false> vec1BroadcastCount;
 
   // Address Gen 2 (bias/op3src1)
   int ADDRESS_GEN2_OFFSET;
@@ -582,6 +586,7 @@ struct VectorParams : BaseParams {
   bool DP_OUTPUT;
   bool OUTPUT_QUANTIZE;
   ac_int<16, false> outputQuantizeScale;
+  bool OUTPUT_QUANTIZE_MX;
 
   // 1: 3d-tensor, 2: 2d-tensor, 3: 1d-tensor
   ac_int<2, false> addressGen0Mode;
@@ -594,8 +599,8 @@ struct VectorParams : BaseParams {
 
   static const unsigned int width =
       5 * 32 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
-      3 * 6 * 4 /* Loop indices */ + 10 * 1 /* Bools */ + 10 + 3 * 2 +
-      16 * 4 /* Dequantize scale */;
+      3 * 6 * 4 /* Loop indices */ + 12 * 1 /* Bools */ + 10 + 3 * 2 +
+      16 * 4 /* Dequantize scale */ + 8;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -634,6 +639,9 @@ struct VectorParams : BaseParams {
     }
     m & DP_VEC1;
     m & vec1DequantizeScale;
+    m & BROADCAST_VEC1_SCALE;
+    m & vec1BroadcastCount;
+
     m & ADDRESS_GEN2_OFFSET;
 
     for (int i = 0; i < 2; i++) {
@@ -673,6 +681,7 @@ struct VectorParams : BaseParams {
     m & DP_OUTPUT;
     m & OUTPUT_QUANTIZE;
     m & outputQuantizeScale;
+    m & OUTPUT_QUANTIZE_MX;
     m & addressGen0Mode;
     m & addressGen0Broadcast;
     m & addressGen0BroadcastCount;
@@ -828,6 +837,8 @@ struct VectorParams : BaseParams {
     }
     if (lhs.DP_VEC1 != rhs.DP_VEC1) return false;
     if (lhs.vec1DequantizeScale != rhs.vec1DequantizeScale) return false;
+    if (lhs.BROADCAST_VEC1_SCALE != rhs.BROADCAST_VEC1_SCALE) return false;
+    if (lhs.vec1BroadcastCount != rhs.vec1BroadcastCount) return false;
 
     // Compare Address Gen 2 members
     if (lhs.ADDRESS_GEN2_OFFSET != rhs.ADDRESS_GEN2_OFFSET) return false;
@@ -870,6 +881,7 @@ struct VectorParams : BaseParams {
     if (lhs.DP_OUTPUT != rhs.DP_OUTPUT) return false;
     if (lhs.OUTPUT_QUANTIZE != rhs.OUTPUT_QUANTIZE) return false;
     if (lhs.outputQuantizeScale != rhs.outputQuantizeScale) return false;
+    if (lhs.OUTPUT_QUANTIZE_MX != rhs.OUTPUT_QUANTIZE_MX) return false;
 
     // Compare address generation modes and pooling settings
     if (lhs.addressGen0Mode != rhs.addressGen0Mode) return false;

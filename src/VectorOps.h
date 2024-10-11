@@ -63,6 +63,19 @@ void vquantize(Pack1D<VEC_DTYPE, WIDTH>& op0,
 }
 
 #pragma hls_design ccore
+template <typename VEC_DTYPE, typename QUANTIZED_TYPE, typename SCALE_TYPE,
+          int WIDTH>
+void vmxquantize(Pack1D<VEC_DTYPE, WIDTH>& op0,
+                 Pack1D<QUANTIZED_TYPE, WIDTH>& res, SCALE_TYPE& scale) {
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    res[i] = op0[i]
+                 .template quantize<QUANTIZED_TYPE::ac_int_rep::width,
+                                    QUANTIZED_TYPE::ac_int_rep::sign>(scale);
+  }
+}
+
+#pragma hls_design ccore
 template <typename VEC_DTYPE, typename QUANTIZED_TYPE, int WIDTH>
 void vdequantize(Pack1D<QUANTIZED_TYPE, WIDTH>& op0,
                  Pack1D<VEC_DTYPE, WIDTH>& res,

@@ -42,7 +42,7 @@ SC_MODULE(Accelerator) {
   // clang-format on
 #else
   VectorUnit<INPUT_DATATYPE, VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE,
-             OC_DIMENSION>
+             MX_DATATYPE, OC_DIMENSION>
       CCS_INIT_S1(vectorUnit);
 #endif
   Connections::In<int> CCS_INIT_S1(serialVectorParamsIn);

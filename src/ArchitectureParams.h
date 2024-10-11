@@ -199,6 +199,7 @@ using BF16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define VECTOR_DATATYPE BF16
 
 #define MX true
+#define MX_DATATYPE Scale<8>
 
 #elif defined(CFLOAT)
 
@@ -217,6 +218,10 @@ using BF16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 // default datatype for the accumulation buffer
 #if !defined ACCUM_BUFFER_DATATYPE
 #define ACCUM_BUFFER_DATATYPE ACCUM_DATATYPE
+#endif
+
+#if !defined MX_DATATYPE
+#define MX_DATATYPE INPUT_DATATYPE
 #endif
 
 #if !defined(IC_DIMENSION)

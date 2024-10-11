@@ -64,7 +64,8 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   vector_params->addressGen1Mode = nonzero_dims == 1 ? 3 : 1;
   // TODO: double precision
   vector_params->DP_VEC1 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype();
+      (DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype()) &&
+      ((DataTypes::TypeName<MX_DATATYPE>::name() != tensor.dtype()));
 
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen1Loops[0][i] = 1;
@@ -212,15 +213,29 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
 
     if (opcode.rfind("dequantize", 0) == 0 ||
         opcode.rfind("quantize", 0) == 0) {
-      const int size = get_size(it->other());
-      // support only scalar scale factor
-      assert(size == 1);
-      VECTOR_DATATYPE immediate = read_constant_param(it->other());
-      if (opcode.rfind("dequantize", 0) == 0) {
-        vinst.immediate0 = immediate.bits_rep();
-      } else if (opcode.rfind("quantize", 0) == 0) {
-        vector_params->OUTPUT_QUANTIZE = true;
-        vector_params->outputQuantizeScale = immediate.bits_rep();
+      const auto tensor_to_load =
+          output_node == it->other().node() ? it->input() : it->other();
+      const int size = get_size(tensor_to_load);
+
+      if (size == 1) {  // scalar scale factor
+        VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
+
+        if (opcode.rfind("dequantize", 0) == 0) {
+          vinst.immediate0 = immediate.bits_rep();
+        } else if (opcode.rfind("quantize", 0) == 0) {
+          vector_params->OUTPUT_QUANTIZE = true;
+          vector_params->outputQuantizeScale = immediate.bits_rep();
+        }
+      } else {  // microscaling
+        auto other_shape = get_shape(it->other());
+        other_shape[other_shape.size() - 1] *= OC_DIMENSION;
+
+        set_vector_addr_gen1(tensor_to_load, other_shape,
+                             accelerator_memory_map, vector_params);
+
+        vector_params->BROADCAST_VEC1_SCALE = true;
+        vector_params->vec1BroadcastCount = dim / size / OC_DIMENSION;
+        vector_params->OUTPUT_QUANTIZE_MX = true;
       }
 
     } else {

@@ -513,7 +513,7 @@ SC_MODULE(VectorOpUnit) {
 };
 
 template <typename IO_DTYPE, typename VEC_DTYPE, typename MU_OUTPUT_DTYPE,
-          int WIDTH>
+          typename MX_DTYPE, int WIDTH>
 SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -534,6 +534,7 @@ SC_MODULE(VectorUnit) {
       vectorFetch1DataResponse);
   Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch1DataResponseConverted);
+  Connections::Combinational<MX_DTYPE> CCS_INIT_S1(vectorFetch1Scale);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
   Connections::In<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(
@@ -550,13 +551,14 @@ SC_MODULE(VectorUnit) {
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
 
-  VectorFetchUnit<IO_DTYPE, VEC_DTYPE, WIDTH> CCS_INIT_S1(vectorFetch);
+  VectorFetchUnit<IO_DTYPE, VEC_DTYPE, MX_DTYPE, WIDTH> CCS_INIT_S1(
+      vectorFetch);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vectorFetchParams);
 
   VectorOpUnit<IO_DTYPE, VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH> CCS_INIT_S1(
       vectorOpUnit);
 
-  MaxpoolUnit<VEC_DTYPE, IO_DTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
+  MaxpoolUnit<VEC_DTYPE, IO_DTYPE, MX_DTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
   Connections::Combinational<VectorParams> CCS_INIT_S1(maxpoolUnitParams);
 
   OutputAddressGenerator<WIDTH> CCS_INIT_S1(outputAddressGenerator);
@@ -596,6 +598,7 @@ SC_MODULE(VectorUnit) {
     vectorFetch.vectorFetch2DataResponse(vectorFetch2DataResponse);
     vectorFetch.vectorFetch2DataResponseConverted(
         vectorFetch2DataResponseConverted);
+    vectorFetch.vectorFetch1Scale(vectorFetch1Scale);
 
     vectorOpUnit.clk(clk);
     vectorOpUnit.rstn(rstn);
@@ -614,6 +617,7 @@ SC_MODULE(VectorUnit) {
     maxpoolUnit.tensorIn(vectorOpUnitOutput);
     maxpoolUnit.tensorOut(finalVectorOutput);
     maxpoolUnit.doneSignal(done);
+    maxpoolUnit.mxScaleIn(vectorFetch1Scale);
 
     outputAddressGenerator.clk(clk);
     outputAddressGenerator.rstn(rstn);
