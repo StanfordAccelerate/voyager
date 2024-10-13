@@ -144,7 +144,7 @@ $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.
 $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl
 
-release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v 
+release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 	cp $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v $@
 
 .PHONY: rtl InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
@@ -202,15 +202,15 @@ sim: $(CC_BUILD_DIR)/TestRunner network-proto
 	./$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim
-fast-sim: $(CC_BUILD_DIR)/TestRunner-fast
+fast-sim: $(CC_BUILD_DIR)/TestRunner-fast network-proto
 	./$(CC_BUILD_DIR)/TestRunner-fast
 
 .PHONY: fast-sim-check
-fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker
+fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
 	./$(CC_BUILD_DIR)/TestRunner-checker
 
 .PHONY: sim-debug
-sim-debug: $(CC_BUILD_DIR)/TestRunner
+sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: TestRunner
