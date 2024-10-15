@@ -521,6 +521,7 @@ struct VectorParams : BaseParams {
       outputWeightLoopIndex[i] = 0;
     }
     SPLIT_OUTPUT = false;
+    CONCAT_OUTPUT = false;
 
     DP_OUTPUT = false;
 
