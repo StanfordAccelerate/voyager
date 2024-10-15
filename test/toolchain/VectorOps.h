@@ -78,6 +78,9 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
     vector_params->addressGen1InputYLoopIndex[i] = 1;
     vector_params->addressGen1WeightLoopIndex[i] = 2;
   }
+
+  DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
+  vector_params->vec1DequantizeScale = scale.bits_rep();
 }
 
 void set_vector_addr_gen2(const codegen::Tensor &tensor,
@@ -115,6 +118,9 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
     vector_params->addressGen2InputYLoopIndex[i] = 1;
     vector_params->addressGen2WeightLoopIndex[i] = 2;
   }
+
+  DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
+  vector_params->vec2DequantizeScale = scale.bits_rep();
 }
 
 void MapVectorOperations(const codegen::AcceleratorParam &param,
@@ -206,14 +212,10 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
 
     if (opcode.rfind("dequantize", 0) == 0 ||
         opcode.rfind("quantize", 0) == 0) {
-      const auto tensor_to_load =
-          output_node == it->other().node() ? it->input() : it->other();
-      const int size = get_size(tensor_to_load);
+      const int size = get_size(it->other());
       // support only scalar scale factor
       assert(size == 1);
-
-      VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
-
+      VECTOR_DATATYPE immediate = read_constant_param(it->other());
       if (opcode.rfind("dequantize", 0) == 0) {
         vinst.immediate0 = immediate.bits_rep();
       } else if (opcode.rfind("quantize", 0) == 0) {
@@ -291,11 +293,9 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
       }
     }
 
+    output_node = it->name();
     ++it;
     has_vector_params = it != param.vector_params().end();
-    if (has_vector_params) {
-      output_node = it->name();
-    }
   }
 
   // check that no more vector instructions are present

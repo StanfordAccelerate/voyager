@@ -65,6 +65,9 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
       loop_index++;
     }
   }
+
+  DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
+  vector_params->vec1DequantizeScale = scale.bits_rep();
 }
 
 void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
@@ -109,6 +112,9 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
       loop_index++;
     }
   }
+
+  DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
+  vector_params->vec2DequantizeScale = scale.bits_rep();
 }
 
 void MapMatrixOperation(const codegen::AcceleratorParam &param,
@@ -171,7 +177,7 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   // set outer loop values
   const auto weight = matrix_param.weight();
   matrix_params->WEIGHT_TRANSPOSE =
-      weight.has_permutation() && weight.permutation().opcode() == "transpose";
+      weight.permutation().opcode() == "transpose";
   if (matrix_params->WEIGHT_TRANSPOSE) {
     // for tranpose, we need to enforce that the innermost loop is the
     // unrolled reduction loop
@@ -274,12 +280,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   // Permute input for transformer attention outputs
   const auto input = matrix_param.input();
   const auto permutation = input.permutation();
-  bool has_permutation = input.has_permutation();
-  matrix_params->CONCAT_INPUT =
-      has_permutation && permutation.opcode() == "permute";
+  matrix_params->CONCAT_INPUT = permutation.opcode() == "permute";
   // matrix_params->CONCAT_HEAD_WEIGHTS = false;
-  matrix_params->TRANPOSE_INPUTS =
-      has_permutation && permutation.opcode() == "transpose";
+  matrix_params->TRANPOSE_INPUTS = permutation.opcode() == "transpose";
 
   // bias
   const auto bias_memory = matrix_param.bias().memory();
@@ -345,12 +348,10 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
 
     if (opcode.rfind("dequantize", 0) == 0 ||
         opcode.rfind("quantize", 0) == 0) {
-      const auto tensor_to_load =
-          output_node == it->other().node() ? it->input() : it->other();
-      const int size = get_size(tensor_to_load);
+      const int size = get_size(it->other());
       // support only scalar scale factor
       assert(size == 1);
-      VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
+      VECTOR_DATATYPE immediate = read_constant_param(it->other());
       if (opcode.rfind("dequantize", 0) == 0) {
         vinst.vDequantizeScale = immediate.bits_rep();
       } else if (opcode.rfind("quantize", 0) == 0) {
@@ -424,11 +425,10 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
         }
       }
     }
+
+    output_node = it->name();
     ++it;
     has_vector_params = it != param.vector_params().end();
-    if (has_vector_params) {
-      output_node = it->name();
-    }
   }
 
   // check that no more vector instructions are present

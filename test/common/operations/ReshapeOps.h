@@ -82,8 +82,9 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeParam param) {
 }
 
 template <typename T>
-inline T* permute(std::any input_tensor, const codegen::Permutation& param) {
-  const std::vector<int> shape{param.shape().begin(), param.shape().end()};
+inline T* permute(std::any input_tensor, const codegen::Tensor& input) {
+  const codegen::Permutation& param = input.permutation();
+  const std::vector<int> shape{param.input_shape().begin(), param.input_shape().end()};
   const std::vector<int> dims{param.dims().begin(), param.dims().end()};
 
   T* inputs = std::any_cast<T*>(input_tensor);

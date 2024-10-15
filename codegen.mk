@@ -6,7 +6,7 @@
 ################################################################################
 $(CODEGEN_DIR)/networks/resnet18/INT8/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
-	python test/compiler/run_compiler.py resnet18 --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python test/compiler/run_compiler.py resnet18 --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/resnet18/E4M3/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
@@ -29,7 +29,7 @@ test/compiler/networks/resnet18/BF16/params.pb: test/compiler/run_compiler.py
 ################################################################################
 $(CODEGEN_DIR)/networks/resnet50/INT8/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
-	python test/compiler/run_compiler.py resnet50 --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python test/compiler/run_compiler.py resnet50 --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/resnet50/E4M3/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
@@ -52,7 +52,7 @@ test/compiler/networks/resnet50/BF16/params.pb: test/compiler/run_compiler.py
 ################################################################################
 $(CODEGEN_DIR)/networks/mobilebert/INT8/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
-	python test/compiler/run_compiler.py mobilebert --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python test/compiler/run_compiler.py mobilebert --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/mobilebert/E4M3/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
@@ -75,7 +75,7 @@ test/compiler/networks/mobilebert/BF16/params.pb: test/compiler/run_compiler.py
 ################################################################################
 $(CODEGEN_DIR)/networks/mobilebert_encoder/INT8/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
-	python test/compiler/run_compiler.py mobilebert_encoder --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python test/compiler/run_compiler.py mobilebert_encoder --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/mobilebert_encoder/E4M3/params.pb: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)

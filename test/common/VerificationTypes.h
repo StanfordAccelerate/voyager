@@ -770,9 +770,15 @@ inline void adjust_tiling_for_dimension(Tiling& tiling) {
 }
 
 inline Tiling get_linear_tiling(codegen::AcceleratorParam param) {
-  const auto matrix_param = param.matrix_param();
-  const auto input_shape = matrix_param.input().shape();
-  const auto weight_shape = matrix_param.weight().shape();
+  const auto& matrix_param = param.matrix_param();
+  const auto& input = matrix_param.input();
+  const auto& weight = matrix_param.weight();
+  const auto input_shape = input.has_permutation()
+                               ? input.permutation().output_shape()
+                               : input.shape();
+  const auto weight_shape = weight.has_permutation()
+                                ? weight.permutation().output_shape()
+                                : weight.shape();
 
   // TODO: we should use OC_DIMENSION and IC_DIMENSION instead
   const int oc_dim = 16;

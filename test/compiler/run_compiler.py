@@ -21,23 +21,20 @@ from transformers import (
 from tqdm import tqdm
 
 from quantized_training import (
-    add_qspec_args,
-    convert_pt2e,
-    get_default_quantizer,
-    prepare_pt2e,
-    propagate_fake_tensor,
-)
-from quantized_training.codegen import (
     MemoryManager,
     ShapeProp,
+    add_qspec_args,
     allocate_activations,
     allocate_weights,
+    convert_pt2e,
     fuse_operator,
     gen_code,
     gen_compute_graph,
+    get_default_quantizer,
+    prepare_pt2e,
     split_multi_head_attention,
 )
-from quantized_training.quantize_pt2e import _fuse_quantize_with_previous_nodes
+from quantized_training.quantize_pt2e import _fuse_quantize_dequantize_with_previous_op
 from quantized_training.quantizer.xnnpack_quantizer_utils import (
     _convert_scalars_to_attrs,
 )
@@ -156,7 +153,7 @@ def transform(
     split_multi_head_attention(gm)
     ShapeProp(gm).propagate(*uplifted_args)
 
-    _fuse_quantize_with_previous_nodes(gm)
+    _fuse_quantize_dequantize_with_previous_op(gm)
 
     pipeline = {
         0: ["gemm"],
@@ -205,7 +202,7 @@ def transform(
     with open(os.path.join(output_dir, "params.json"), "w") as f:
         f.write(MessageToJson(params))
 
-    layers = [p.name for p in params.params]
+    layers = [p.name for p in params.params if p.WhichOneof("param_type") != "nop"]
     with open(os.path.join(output_dir, "layers.txt"), "w") as f:
         f.write("\n".join(layers))
 
@@ -245,7 +242,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     quantizer = get_default_quantizer(
-        args.activation, args.output_activation, args.weight, args.bias
+        input_activation=args.activation,
+        output_activation=args.output_activation,
+        weight=args.weight,
+        bias=args.bias,
+        force_scale_power_of_two=args.force_scale_power_of_two,
     )
 
     if args.model in TORCHVISION_MODELS:

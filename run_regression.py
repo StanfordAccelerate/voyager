@@ -328,7 +328,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         output_data_dir = "data/imagenet"
         subprocess.run(
             [
-                "python3",
+                "python",
                 "test/script/dump_resnet_dataset.py",
                 "--data_dir",
                 imagenet_path,
@@ -342,7 +342,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         output_data_dir = "data/sst2"
         subprocess.run(
             [
-                "python3",
+                "python",
                 "test/script/dump_bert_dataset.py",
                 "--dataset",
                 "sst2",
@@ -356,7 +356,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         output_data_dir = "data/squad"
         subprocess.run(
             [
-                "python3",
+                "python",
                 "test/script/dump_bert_dataset.py",
                 "--dataset",
                 "squad",
@@ -395,6 +395,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "int8,qs=per_tensor_symmetric",
             "--weight",
             "int8,qs=per_tensor_symmetric",
+            "--bias",
+            "int24",
             "--bf16",
         ]
     elif os.environ["DATATYPE"] == "P8_1":
@@ -412,7 +414,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
 
     subprocess.run(
         [
-            "python3",
+            "python",
             "test/compiler/run_compiler.py",
             model,
             "--model_name_or_path",
