@@ -41,7 +41,7 @@ OUTPUT_T* calculate_mx_qparam(std::any input_tensor,
 
         ac_int<INPUT_T::exponent_width, true> scaled_exponent =
             max_exponent - INPUT_T::ac_float_rep::exp_bias -
-            static_cast<int>(log2(param.dim(0)));
+            (OUTPUT_T::width - 2);
 
         std::cout << "scaled_exponent: " << scaled_exponent << std::endl;
 
