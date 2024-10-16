@@ -17,9 +17,9 @@ SC_MODULE(InputController) {
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
 
   Connections::Out<BufferWriteRequest<DTYPE, NROWS> > writeRequest[2];
-  Connections::Out<int> writeControl[2];
-  Connections::Out<int> readAddress[2];
-  Connections::Out<int> readControl[2];
+  Connections::Out<ac_int<32, false> > writeControl[2];
+  Connections::Out<ac_int<16, false> > readAddress[2];
+  Connections::Out<ac_int<32, false> > readControl[2];
 
   Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferIn);
 
@@ -113,7 +113,7 @@ SC_MODULE(InputController) {
       }
 
       bool isDownsample = FX == 1 && FY == 1;
-        
+
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
@@ -262,38 +262,26 @@ SC_MODULE(InputController) {
                         ac_int<16, false> y = (y0 - y_min_offset) + y1 * Y0;
                         ac_int<16, false> Y = Y0 * Y1;
 
-                        int baseAddress = y * X * C + x * C + c;
+                        ac_int<32, false> baseAddress = y * X * C + x * C + c;
                         int burstSize = NROWS;
 
                         if (params.REPLICATION) {
-                          baseAddress =
-                              static_cast<ac_int<32, false> >(
-                                  y * (X / packingFactor) * IC_DIMENSION) +
-                              static_cast<ac_int<32, false> >(
-                                  (x / packingFactor) * IC_DIMENSION) +
-                              c;
+                          baseAddress = y * (X / packingFactor) * IC_DIMENSION +
+                                        (x / packingFactor) * IC_DIMENSION + c;
                         }
                         if (params.CONCAT_INPUT && params.TRANPOSE_INPUTS) {
                           baseAddress =
-                              static_cast<ac_int<32, false> >((c + (x % 16)) *
-                                                              32) +
-                              static_cast<ac_int<32, false> >(
-                                  (((x / 16) * IC_DIMENSION) / 32 * C * 32)) +
-                              static_cast<ac_int<32, false> >(
-                                  (((x / 16) * IC_DIMENSION) % 32));
+                              (c + (x % 16)) * 32 +
+                              (((x / 16) * IC_DIMENSION) / 32 * C * 32) +
+                              (((x / 16) * IC_DIMENSION) % 32);
                         } else {
                           if (params.CONCAT_INPUT) {
                             baseAddress =
-                                static_cast<ac_int<32, false> >(
-                                    ((c / 32) * X * 32)) +
-                                static_cast<ac_int<32, false> >((x * 32)) +
-                                static_cast<ac_int<32, false> >((c % 32));
+                                ((c / 32) * X * 32) + (x * 32) + (c % 32);
                           }
                           if (params.TRANPOSE_INPUTS) {
-                            baseAddress = static_cast<ac_int<32, false> >(
-                                              (c + (x % 16)) * X) +
-                                          static_cast<ac_int<32, false> >(
-                                              (x / 16) * IC_DIMENSION);
+                            baseAddress =
+                                (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
                           }
                         }
                         MemoryRequest memRequest;
@@ -444,19 +432,16 @@ SC_MODULE(InputController) {
                  loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
               // TODO: make this dynamic
-              int total_writes;
+              ac_int<32, false> total_writes;
               if (!params.REPLICATION) {
                 total_writes = (loop_bounds[1][1] * loop_bounds[1][2] *
                                 loop_bounds[1][3] * loop_bounds[1][4]) *
                                loop_bounds[1][5];
               } else {
-                total_writes =
-                    static_cast<ac_int<32, false> >(
-                        loop_bounds[1][1] * loop_bounds[1][2] *
-                        loop_bounds[1][3] * loop_bounds[1][4]) *
-                    static_cast<ac_int<32, false> >(
-                        (STRIDE)*X0 / packingFactor +
-                        2 * boundaryWords);  // 2 extra writes for padding
+                total_writes = loop_bounds[1][1] * loop_bounds[1][2] *
+                                   loop_bounds[1][3] * loop_bounds[1][4] *
+                                   ((STRIDE)*X0 / packingFactor +
+                               2 * boundaryWords);  // 2 extra writes for padding
               }
 
               writeControl[bankSel].Push(total_writes);
@@ -516,9 +501,8 @@ SC_MODULE(InputController) {
                           data = transposeOut.Pop();
                         }
 
-                        int address = static_cast<ac_int<16, false> >(
-                                          (y0) * (STRIDE * X0 + FX - 1)) +
-                                      (x0);
+                        ac_int<32, false> address =
+                            (y0) * (STRIDE * X0 + FX - 1) + (x0);
 
                         if (params.REPLICATION) {
                           address = y0 * (STRIDE * X0 / packingFactor +
@@ -652,9 +636,9 @@ SC_MODULE(InputController) {
             for (loop_counters[1][0] = 0;
                  loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
-              int total_reads = loop_bounds[1][1] * loop_bounds[1][2] *
-                                loop_bounds[1][3] * loop_bounds[1][4] *
-                                loop_bounds[1][5];
+              ac_int<32, false> total_reads =
+                  loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
+                  loop_bounds[1][4] * loop_bounds[1][5];
 
               readControl[bankSel].Push(total_reads);
               for (loop_counters[1][1] = 0;
@@ -680,12 +664,14 @@ SC_MODULE(InputController) {
                             loop_counters[1][params.inputYLoopIndex[1]];
                         ac_int<LOOP_WIDTH, false> Y0 =
                             params.loops[1][params.inputYLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> fx = loop_counters[1][params.fxIndex];
-                        ac_int<LOOP_WIDTH, false> fy = loop_counters[1][params.fyIndex];
+                        ac_int<LOOP_WIDTH, false> fx =
+                            loop_counters[1][params.fxIndex];
+                        ac_int<LOOP_WIDTH, false> fy =
+                            loop_counters[1][params.fyIndex];
 
                         ac_int<16, false> x = STRIDE * x0 + fx;
                         ac_int<16, false> y = STRIDE * y0 + fy;
-                        int address;
+                        ac_int<16, false> address;
                         if (params.REPLICATION && IC_DIMENSION >= 8) {
                           address = y * (((STRIDE * X0) / packingFactor) +
                                          2 * boundaryWords) +
