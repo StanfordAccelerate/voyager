@@ -24,7 +24,7 @@ inline void fused_multiply_add(T a, T b, T2 &c) {
 }
 
 template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
-          typename ACCUMULATION_BUFFER_T>
+          typename ACCUMULATION_BUFFER_T, typename SCALE_T>
 inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                                    std::any weight_tensor,
                                    std::any weight_scale, std::any bias_tensor,
@@ -34,15 +34,15 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
   bool is_mx = matrix_param.has_mx_input() && matrix_param.has_mx_weight();
 
   INPUT_T *inputs = std::any_cast<INPUT_T *>(input_tensor);
-  INPUT_T *input_scales;
+  SCALE_T *input_scales;
   if (matrix_param.has_mx_input()) {
-    input_scales = std::any_cast<INPUT_T *>(input_scale);
+    input_scales = std::any_cast<SCALE_T *>(input_scale);
   }
 
   INPUT_T *weights = std::any_cast<INPUT_T *>(weight_tensor);
-  INPUT_T *weight_scales;
+  SCALE_T *weight_scales;
   if (matrix_param.has_mx_weight()) {
-    weight_scales = std::any_cast<INPUT_T *>(weight_scale);
+    weight_scales = std::any_cast<SCALE_T *>(weight_scale);
   }
 
   // bias is assumed to be in ACCUMULATION_BUFFER_T
@@ -210,11 +210,12 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                                 channel_batch * K + k;
                             assert(weight_scale_addr >= 0);
 
-                            INPUT_T input_scale =
+                            SCALE_T input_scale =
                                 input_scales[input_scale_addr];
-                            INPUT_T weight_scale =
+                            SCALE_T weight_scale =
                                 weight_scales[weight_scale_addr];
-                            INPUT_T scale = input_scale + weight_scale;
+                            SCALE_T scale = input_scale + weight_scale;
+
                             ACCUMULATION_BUFFER_T scaled_psum =
                                 static_cast<ACCUMULATION_BUFFER_T>(psum);
                             scaled_psum.expScale(scale.int_val);

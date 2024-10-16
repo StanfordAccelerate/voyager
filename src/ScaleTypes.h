@@ -36,6 +36,12 @@ class Scale {
     // + exp_bias;
   }
 
+  Scale operator+(const Scale &rhs) const {
+    Scale result;
+    result.int_val = this->int_val + rhs.int_val;
+    return result;
+  }
+
 #ifndef __SYNTHESIS__
   operator float() const { return int_val; }
 #endif
