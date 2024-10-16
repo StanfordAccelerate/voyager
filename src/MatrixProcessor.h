@@ -41,6 +41,14 @@ SC_MODULE(MatrixProcessor) {
 
   MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
 
+  static constexpr int int_log2(unsigned int n) {
+    return (n <= 1) ? 0 : 1 + int_log2(n / 2);
+  }
+
+  static constexpr int LOOP_WIDTH =
+      (8 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
+                                                      : OC_DIMENSION)));
+
  public:
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -183,9 +191,9 @@ SC_MODULE(MatrixProcessor) {
       const MatrixParams params = paramsIn.Pop();
       startSignal.SyncPush();
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_counters_out[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters_out[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -364,6 +372,7 @@ SC_MODULE(MatrixProcessor) {
           // if (garbageCount < NUM_GARBAGE) {
           //   garbageCount++;
           // } else {
+        INCR_OUT_STEP:
           outputStep++;
           // DLOG("systolic array output: " << outputs);
           bool accumulationFinished =

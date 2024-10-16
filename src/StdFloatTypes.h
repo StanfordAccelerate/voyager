@@ -7,7 +7,7 @@
 #include <ac_math/ac_pow_pwl.h>
 #include <ac_math/ac_reciprocal_pwl.h>
 #include <ac_math/ac_sigmoid_pwl.h>
-#include <ccs_dw_lib.h>
+#include <ccs_dw_fp_lib.h>
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>

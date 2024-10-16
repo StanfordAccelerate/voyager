@@ -5,6 +5,10 @@
 
 #include "AccelTypes.h"
 
+#ifdef CHECK_PE
+#include "test/checker/PEChecker.h"
+#endif
+
 template <typename IDTYPE, typename WDTYPE, typename ODTYPE>
 SC_MODULE(ProcessingElement) {
  private:
@@ -163,8 +167,13 @@ SC_MODULE(ProcessingElement) {
   }
 
   ODTYPE pe_fma(IDTYPE input, WDTYPE weight, ODTYPE psum) {
-    // CCS_LOG(input << " * " << weight << " + " << psum << " = "
-    //               << input.fma(weight, psum));
+// CCS_LOG(input << " * " << weight << " + " << psum << " = "
+//               << input.fma(weight, psum));
+#ifdef CHECK_PE
+    std::string inst_name = name();
+    int pe_num = std::stoi(inst_name.substr(inst_name.find_last_of('_') + 1));
+    pe_checker.checkReference(pe_num, input, weight, psum);
+#endif
     return input.fma(weight, psum);
   }
 };
