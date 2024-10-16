@@ -108,14 +108,10 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
   // initialize to bias
   for (int i = 0; i < X * Y; i++) {
     for (int k = 0; k < K; k++) {
-      if (is_mx || is_mx_based_design) {
-        outputs[i * K + k] = ACCUMULATION_BUFFER_T(0.0);
+      if (matrix_param.has_bias()) {
+        outputs[i * K + k] = bias[k];
       } else {
-        if (matrix_param.has_bias()) {
-          outputs[i * K + k] = bias[k];
-        } else {
-          outputs[i * K + k] = ACCUMULATION_BUFFER_T(0.0);
-        }
+        outputs[i * K + k] = ACCUMULATION_BUFFER_T(0.0);
       }
     }
   }
@@ -270,15 +266,6 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
             }
           }
         }
-      }
-    }
-  }
-
-  if (is_mx && matrix_param.has_bias()) {
-    // apply bias
-    for (int i = 0; i < X * Y; i++) {
-      for (int k = 0; k < K; k++) {
-        outputs[i * K + k] += bias[k];
       }
     }
   }
