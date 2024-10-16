@@ -28,6 +28,7 @@ SC_MODULE(MaxpoolUnit) {
     tensorIn.Reset();
     tensorOut.Reset();
     doneSignal.Reset();
+    mxScaleIn.Reset();
 
     wait();
 
