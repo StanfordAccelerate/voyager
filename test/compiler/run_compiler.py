@@ -36,13 +36,18 @@ from quantized_training import (
     FusedAmaxObsFakeQuantize,
     QuantizationSpec,
     QuantizationConfig,
+    DerivedQuantizationSpec,
 )
-from quantized_training.quantize_pt2e import _fuse_quantize_dequantize_with_previous_op
+from quantized_training.quantize_pt2e import (
+    _fuse_quantize_dequantize_with_previous_op,
+    derive_bias_qparams_fn,
+)
 from quantized_training.quantizer.xnnpack_quantizer_utils import (
     _convert_scalars_to_attrs,
 )
 from quantized_training.quantizer import QScheme
 from quantized_training.pt2e_utils import print_node_scope_tabular
+
 
 task_to_keys = {
     "cola": ("sentence", None),
@@ -286,7 +291,14 @@ if __name__ == "__main__":
         if "microscaling" in args.activation and args.model in ["resnet18", "resnet50"]:
             qspec = QuantizationSpec.from_str("int8,qs=per_tensor_symmetric")
             qspec.observer_or_fake_quant_ctr = FusedAmaxObsFakeQuantize
-            qconfig = QuantizationConfig(qspec, None, qspec, None)
+
+            bias_qspec = DerivedQuantizationSpec(
+                derived_from=None,
+                derive_qparams_fn=derive_bias_qparams_fn,
+                dtype="int24",
+            )
+
+            qconfig = QuantizationConfig(qspec, None, qspec, bias_qspec)
             quantizer.set_module_name("conv1", qconfig)
 
         example_args = (torch.randn(1, 3, 224, 224, dtype=torch_dtype),)
