@@ -308,7 +308,8 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   matrix_params->BIAS_OFFSET = bias_memory.offset();
   accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
 
-  matrix_params->MX = matrix_param.opcode() == "conv2d_mx";
+  matrix_params->MX = matrix_param.opcode() == "conv2d_mx" ||
+                      matrix_param.opcode() == "linear_mx";
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
