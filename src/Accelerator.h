@@ -50,7 +50,7 @@ SC_MODULE(Accelerator) {
       vectorFetch2DataResponse);
   Connections::Out<Pack1D<OUTPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       vectorOutput);
-  Connections::Out<int> CCS_INIT_S1(vectorOutputAddress);
+  Connections::Out<ac_int<32, false> > CCS_INIT_S1(vectorOutputAddress);
 
   Connections::SyncOut CCS_INIT_S1(vectorUnitStartSignal);
   Connections::SyncOut CCS_INIT_S1(vectorUnitDoneSignal);

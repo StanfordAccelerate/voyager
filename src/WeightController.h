@@ -18,9 +18,9 @@ SC_MODULE(WeightController) {
   Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(dataResponse);
 
   Connections::Out<BufferWriteRequest<DTYPE, NCOLS> > writeRequest[2];
-  Connections::Out<int> writeControl[2];
-  Connections::Out<int> readAddress[2];
-  Connections::Out<int> readControl[2];
+  Connections::Out<ac_int<32, false> > writeControl[2];
+  Connections::Out<ac_int<16, false> > readAddress[2];
+  Connections::Out<ac_int<32, false> > readControl[2];
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(biasDataResponse);
@@ -171,17 +171,13 @@ SC_MODULE(WeightController) {
                           k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                       ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
 
-                      int baseAddress =
+                      ac_int<32, false> baseAddress =
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
                       if (params.WEIGHT_TRANSPOSE) {
                         C = C1 * NCOLS;
                         baseAddress = (k + c0) * C + c1 * OC_DIMENSION;
                       } else if (params.CONCAT_HEAD_WEIGHTS) {
-                        baseAddress =
-                            static_cast<ac_int<32, false> >(
-                                ((k / 32) * C * 32)) +
-                            static_cast<ac_int<16, false> >((c * 32)) +
-                            static_cast<ac_int<32, false> >((k % 32));
+                        baseAddress = ((k / 32) * C * 32) + (c * 32) + (k % 32);
                       }
                       int burstSize = NCOLS;
 
@@ -421,12 +417,9 @@ SC_MODULE(WeightController) {
                  loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
               readControl[bankSel].Push(
-                  static_cast<ac_int<16, false> >(loop_bounds[1][1] *
-                                                  loop_bounds[1][2]) *
-                  static_cast<ac_int<16, false> >(loop_bounds[1][3] *
-                                                  loop_bounds[1][4]) *
-                  static_cast<ac_int<16, false> >(loop_bounds[1][5] * NROWS *
-                                                  rep_bound));
+                  (loop_bounds[1][1] * loop_bounds[1][2]) *
+                  (loop_bounds[1][3] * loop_bounds[1][4]) *
+                  (loop_bounds[1][5] * NROWS * rep_bound));
               for (int rep = 0; rep < rep_bound; rep++) {
                 for (loop_counters[1][1] = 0;
                      loop_counters[1][1] < loop_bounds[1][1];
@@ -526,16 +519,12 @@ SC_MODULE(WeightController) {
                               }
                               FX = 7;
                               if (fx_repl < replicationBound) {
-                                int address =
-                                    static_cast<ac_int<16, false> >(
-                                        (fy * FX * C * K1)) +
-                                    static_cast<ac_int<16, false> >(
-                                        (fx * C * K1)) +
-                                    static_cast<ac_int<16, false> >(c * K1) +
-                                    k1;
+                                ac_int<16, false> address = (fy * FX * C * K1) +
+                                                            (fx * C * K1) +
+                                                            (c * K1) + k1;
                                 readAddress[bankSel].Push(address);
                               } else {
-                                readAddress[bankSel].Push(-1);
+                                readAddress[bankSel].Push(0xFFFF);
                               }
 
                               // keep track of which C and FX we are on
@@ -548,22 +537,14 @@ SC_MODULE(WeightController) {
                             } else {
                               c = row;
 
-                              int address =
-                                  static_cast<ac_int<16, false> >(
-                                      (fy * FX * C * K1)) +
-                                  static_cast<ac_int<16, false> >(
-                                      (fx * C * K1)) +
-                                  static_cast<ac_int<16, false> >(c * K1) + k1;
+                              ac_int<16, false> address = (fy * FX * C * K1) +
+                                                          (fx * C * K1) +
+                                                          (c * K1) + k1;
 
                               if (params.WEIGHT_TRANSPOSE &&
                                   OC_DIMENSION > IC_DIMENSION) {
-                                address = static_cast<ac_int<16, false> >(
-                                              (fy * FX * C * 2 * K1)) +
-                                          static_cast<ac_int<16, false> >(
-                                              (fx * C * 2 * K1)) +
-                                          static_cast<ac_int<16, false> >(
-                                              (c + rep * NROWS) * K1) +
-                                          k1;
+                                address = (fy * FX * C * 2 * K1) + (fx * C * 2 * K1) +
+                                    (c + rep * NROWS) * K1 + k1;
                               }
                               readAddress[bankSel].Push(address);
                             }

@@ -223,6 +223,19 @@ if { $DATATYPE == "P8_1" } {
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 24
+} elseif { $DATATYPE == "INT8_32" } {
+  set IO_DATATYPE "I8"
+  set ACCUM_DATATYPE "I32"
+  set INTERMEDIATE_DATATYPE "I32"
+  set VECTOR_DATATYPE "F16"
+  set PE_INPUT_DATATYPE "Int<8, true>::AccumulationDatatype"
+  set PE_WEIGHT_DATATYPE "Int<8, true>::AccumulationDatatype"
+  set PE_PSUM_DATATYPE "Int<32, true>::AccumulationDatatype"
+  set C_DATA_REP_NAME "int_val"
+  set ACC_BUF_C_DATA_REP_NAME "int_val"
+
+  set IO_DATATYPE_WIDTH 8
+  set ACCUM_DATATYPE_WIDTH 32
 } else {
     puts "Invalid DATATYPE"
     exit 1

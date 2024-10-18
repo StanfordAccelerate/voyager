@@ -133,7 +133,7 @@ SC_MODULE(VectorFetchUnit) {
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> Y = Y1 * Y0;
 
-                  int address;
+                  ac_int<32, false> address;
                   if (params.addressGen0Mode == 1) {
                     address = y * X * K + x * K + k;
                   } else if (params.addressGen0Mode == 2) {
@@ -299,7 +299,7 @@ SC_MODULE(VectorFetchUnit) {
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> Y = Y1 * Y0;
 
-                  int address;
+                  ac_int<32, false> address;
                   if (params.addressGen1Mode == 1) {
                     address = y * X * K + x * K + k;
                   } else if (params.addressGen1Mode == 2) {
@@ -482,7 +482,7 @@ SC_MODULE(VectorFetchUnit) {
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> Y = Y1 * Y0;
 
-                  int address;
+                  ac_int<32, false> address;
                   if (params.addressGen2Mode == 1) {
                     address = y * X * K + x * K + k;
                   } else if (params.addressGen2Mode == 2) {

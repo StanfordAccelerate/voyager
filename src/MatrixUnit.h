@@ -32,9 +32,9 @@ SC_MODULE(MatrixUnit) {
       inputDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, IC_DIMENSION> >
       inputBufferWriteReq[2];
-  Connections::Combinational<int> inputBufferWriteControl[2];
-  Connections::Combinational<int> inputBufferReadAddress[2];
-  Connections::Combinational<int> inputBufferReadControl[2];
+  Connections::Combinational<ac_int<32, false> > inputBufferWriteControl[2];
+  Connections::Combinational<ac_int<16, false> > inputBufferReadAddress[2];
+  Connections::Combinational<ac_int<32, false> > inputBufferReadControl[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, IC_DIMENSION> > CCS_INIT_S1(
       inputsToWindowBuffer);
 
@@ -57,9 +57,9 @@ SC_MODULE(MatrixUnit) {
       biasDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, OC_DIMENSION> >
       weightBufferWriteReq[2];
-  Connections::Combinational<int> weightBufferWriteControl[2];
-  Connections::Combinational<int> weightBufferReadAddress[2];
-  Connections::Combinational<int> weightBufferReadControl[2];
+  Connections::Combinational<ac_int<32, false> > weightBufferWriteControl[2];
+  Connections::Combinational<ac_int<16, false> > weightBufferReadAddress[2];
+  Connections::Combinational<ac_int<32, false> > weightBufferReadControl[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       weightsFromBuffer);
 

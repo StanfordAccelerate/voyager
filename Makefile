@@ -116,6 +116,7 @@ MaxpoolUnit: $(CATAPULT_BUILD_DIR)/MaxpoolUnit/MaxpoolUnit.v1/concat_rtl.v
 OutputAddressGenerator: $(CATAPULT_BUILD_DIR)/OutputAddressGenerator/OutputAddressGenerator.v1/concat_rtl.v
 VectorFetchUnit: $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v
 VectorOpUnit: $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
+Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 
 $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v: src/InputController.h
 	BLOCK=InputController catapult -shell -file scripts/main.tcl
@@ -144,10 +145,10 @@ $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.
 $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl
 
-release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
+release/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_clock_$(CLOCK_PERIOD)_$(TECHNOLOGY).v: Accelerator
 	cp $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v $@
 
-.PHONY: rtl InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
+.PHONY: rtl Accelerator InputController WeightController MatrixProcessor ProcessingElement VectorUnit MaxpoolUnit OutputAddressGenerator VectorFetchUnit VectorOpUnit
 
 ###########################################################
 # Cycle-accurate SystemC Simulations
@@ -212,6 +213,11 @@ fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner
+
+
+.PHONY: fast-sim-debug
+fast-sim-debug: $(CC_BUILD_DIR)/TestRunner-fast network-proto
+	gdb ./$(CC_BUILD_DIR)/TestRunner-fast
 
 .PHONY: TestRunner
 TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner

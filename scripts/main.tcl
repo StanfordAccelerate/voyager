@@ -31,8 +31,8 @@ solution options set ComponentLibs/SearchPath [file dirname $project_folder] -ap
 pre_libraries
 go libraries
 
-if { ([info exists use_slower_clock] && $use_slower_clock) } {
-  set CLOCK_PERIOD [expr $CLOCK_PERIOD * 2]
+if { [info exists clock_multiplier] } {
+  set CLOCK_PERIOD [expr $CLOCK_PERIOD * $clock_multiplier]
 }
 
 directive set -CLOCKS "clk \"-CLOCK_PERIOD $CLOCK_PERIOD -CLOCK_EDGE rising -CLOCK_HIGH_TIME [expr $CLOCK_PERIOD / 2.0] -CLOCK_OFFSET 0.000000 -CLOCK_UNCERTAINTY 0.0 -RESET_KIND async -RESET_SYNC_NAME rst -RESET_SYNC_ACTIVE high -RESET_ASYNC_NAME arst_n -RESET_ASYNC_ACTIVE low -ENABLE_NAME {} -ENABLE_ACTIVE high\" "

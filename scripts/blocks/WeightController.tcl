@@ -1,6 +1,6 @@
 set block "WeightController"
 set full_block_name "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
-set use_slower_clock 1
+set clock_multiplier 1.2
 
 proc pre_architect {} {
   global C_DATA_REP_NAME IC_DIMENSION OC_DIMENSION
