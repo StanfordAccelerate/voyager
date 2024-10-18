@@ -54,6 +54,9 @@ class StdFloat {
   template <int W, bool S>
   StdFloat(const ac_int<W, S> &rhs);
 
+  template <int W, bool S>
+  StdFloat(const Int<W, S> &rhs);
+
   template <int nbits, int es>
   StdFloat(const Posit<nbits, es> &input);
 
@@ -246,6 +249,14 @@ template <int W, bool S>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
     const ac_int<W, S> &rhs) {
   float_val = ac_float_rep(rhs);
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int W, bool S>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
+    const Int<W, S> &rhs) {
+  float_val = ac_float_rep(rhs.int_val);
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,

@@ -45,6 +45,13 @@ class Scale {
 #ifndef __SYNTHESIS__
   operator float() const { return int_val; }
 #endif
+
+#ifndef NO_SYSC
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m & int_val;
+  }
+#endif
 };
 
 template <int W>

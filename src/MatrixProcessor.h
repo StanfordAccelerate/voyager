@@ -68,11 +68,13 @@ SC_MODULE(MatrixProcessor) {
   // only used for MX
   Connections::ConditionalCombinational<MatrixParams, IS_MX> CCS_INIT_S1(
       accumulationBufferParams);
-  Connections::ConditionalCombinational<Pack1D<ODTYPE, NCOLS>, IS_MX > CCS_INIT_S1(
-      unscaledAccumulationChannel);
+  Connections::ConditionalCombinational<Pack1D<ODTYPE, NCOLS>, IS_MX>
+      CCS_INIT_S1(unscaledAccumulationChannel);
 
-  Connections::ConditionalIn<Pack1D<IDTYPE, 1>, IS_MX > CCS_INIT_S1(inputScaleChannel);
-  Connections::ConditionalIn<Pack1D<IDTYPE, NCOLS>, IS_MX > CCS_INIT_S1(weightScaleChannel);
+  Connections::ConditionalIn<Pack1D<IDTYPE, 1>, IS_MX> CCS_INIT_S1(
+      inputScaleChannel);
+  Connections::ConditionalIn<Pack1D<IDTYPE, NCOLS>, IS_MX> CCS_INIT_S1(
+      weightScaleChannel);
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
   Connections::SyncOut CCS_INIT_S1(doneSignal);
@@ -567,9 +569,9 @@ SC_MODULE(MatrixProcessor) {
         const MatrixParams params = accumulationBufferParams.Pop();
         ac_int<8, false> loop_counters[2][6];
         ac_int<8, false> loop_bounds[2][6];
-#pragma hls_unroll yes
+      UNROLL_0:
         for (int i = 0; i < 2; i++) {
-#pragma hls_unroll yes
+        UNROLL_1:
           for (int j = 0; j < 6; j++) {
             loop_counters[i][j] = 0;
             loop_bounds[i][j] = params.loops[i][j];
@@ -610,6 +612,7 @@ SC_MODULE(MatrixProcessor) {
 
           Pack1D<ACCUM_BUFFER_TYPE, NCOLS> previous_accumulation;
 
+// intentionally not labeled with UNROLL_2 as it gets optimized away
 #pragma hls_unroll yes
           for (int i = 0; i < NCOLS; i++) {
             previous_accumulation.value[i].setZero();
@@ -618,7 +621,7 @@ SC_MODULE(MatrixProcessor) {
           if (firstAccumulation) {
             if (params.BIAS) {
               bool readBias = true;
-#pragma hls_unroll yes
+            UNROLL_2:
               for (int i = 0; i < 4; i++) {
                 readBias =
                     readBias && (loop_counters[1][biasReuseIndices[i]] == 0);
@@ -641,6 +644,7 @@ SC_MODULE(MatrixProcessor) {
                                   params.loops[1][params.inputXLoopIndex[1]]) +
                               loop_counters[1][params.inputXLoopIndex[1]];
 
+          READ_ACC_BUFFER:
             previous_accumulation = accumulation_buffer[readAddress];
           }
 
@@ -672,7 +676,7 @@ SC_MODULE(MatrixProcessor) {
 
           Pack1D<ACCUM_BUFFER_TYPE, NCOLS> scaled_outputs;
 
-#pragma hls_unroll yes
+        UNROLL_3:
           for (int i = 0; i < NCOLS; i++) {
             IDTYPE scale = inputScale[0] + weightScales[i];
             // CCS_LOG("scale: " << scale);
@@ -720,14 +724,15 @@ SC_MODULE(MatrixProcessor) {
                                    params.loops[1][params.inputXLoopIndex[1]]) +
                                loop_counters[1][params.inputXLoopIndex[1]];
 
+          WRITE_ACC_BUFFER:
             accumulation_buffer[writeAddress] = previous_accumulation;
           }
 
           step++;
           loop_counters[1][5]++;
-#pragma hls_unroll yes
+        UNROLL_4:
           for (int i = 1; i >= 0; i--) {
-#pragma hls_unroll yes
+          UNROLL_5:
             for (int j = 5; j >= 0; j--) {
               if (loop_counters[i][j] == params.loops[i][j]) {
                 loop_counters[i][j] = 0;

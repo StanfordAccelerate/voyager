@@ -189,14 +189,14 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
 using I8 = Int<8, true>;
 using I32 = Int<32, true>;
-using BF16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
 #define INPUT_DATATYPE I8
 #define WEIGHT_DATATYPE I8
 #define ACCUM_DATATYPE I32
-#define ACCUM_BUFFER_DATATYPE BF16
+#define ACCUM_BUFFER_DATATYPE F16
 #define OUTPUT_DATATYPE I8
-#define VECTOR_DATATYPE BF16
+#define VECTOR_DATATYPE F16
 
 #define MX_DATATYPE Scale<8>
 

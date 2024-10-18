@@ -2,12 +2,12 @@ set block "Accelerator"
 set full_block_name "Accelerator"
 
 proc pre_compile {} {
-  global IO_DATATYPE ACCUM_DATATYPE VECTOR_DATATYPE IC_DIMENSION OC_DIMENSION DATATYPE
+  global IO_DATATYPE ACCUM_DATATYPE VECTOR_DATATYPE IC_DIMENSION OC_DIMENSION DATATYPE ACCUM_BUFFER_DATATYPE SUPPORT_MX MX_DATATYPE
   set MP_IO_DATATYPE $IO_DATATYPE
     if {$DATATYPE == "HYBRID_FP8"} {
       set MP_IO_DATATYPE "F9"
     }
-    foreach mapped_block [list "InputController<$IO_DATATYPE, $IC_DIMENSION>" "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, 1024>" "VectorUnit<$IO_DATATYPE, $VECTOR_DATATYPE, $ACCUM_DATATYPE, $OC_DIMENSION>" "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"] {
+    foreach mapped_block [list "InputController<$IO_DATATYPE, $IC_DIMENSION>" "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SUPPORT_MX, $IC_DIMENSION, $OC_DIMENSION, 1024>" "VectorUnit<$IO_DATATYPE, $VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $MX_DATATYPE, $OC_DIMENSION>" "WeightController<$IO_DATATYPE, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"] {
       solution design set $mapped_block -mapped
     }
 }
@@ -20,21 +20,21 @@ proc pre_libraries {} {
 }
 
 proc pre_assembly {} {
-  global IO_DATATYPE DATATYPE ACCUM_DATATYPE VECTOR_DATATYPE IC_DIMENSION OC_DIMENSION
+  global IO_DATATYPE DATATYPE ACCUM_DATATYPE VECTOR_DATATYPE IC_DIMENSION OC_DIMENSION ACCUM_BUFFER_DATATYPE SUPPORT_MX MX_DATATYPE
   set MP_IO_DATATYPE $IO_DATATYPE
   if {$DATATYPE == "HYBRID_FP8"} {
     set MP_IO_DATATYPE "F9"
   }
-  set MatrixProcessorBlock "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, 1024>"
+  set MatrixProcessorBlock "MatrixProcessor<$MP_IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SUPPORT_MX, $IC_DIMENSION, $OC_DIMENSION, 1024>"
   set MatrixProcessorBlock_stripped [string map {" " ""} $MatrixProcessorBlock]
 
   set InputControllerBlock "InputController<$IO_DATATYPE, $IC_DIMENSION>"
   set InputControllerBlock_stripped [string map {" " ""} $InputControllerBlock]
 
-  set WeightControllerBlock "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
+  set WeightControllerBlock "WeightController<$IO_DATATYPE, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
   set WeightControllerBlock_stripped [string map {" " ""} $WeightControllerBlock]
 
-  set VectorUnitBlock "VectorUnit<$IO_DATATYPE, $VECTOR_DATATYPE, $ACCUM_DATATYPE, $OC_DIMENSION>"
+  set VectorUnitBlock "VectorUnit<$IO_DATATYPE, $VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $MX_DATATYPE, $OC_DIMENSION>"
   set VectorUnitBlock_stripped [string map {" " ""} $VectorUnitBlock]
 
   directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
@@ -44,7 +44,7 @@ proc pre_assembly {} {
 }
 
 proc pre_architect {} {
-  global IO_DATATYPE IC_DIMENSION OC_DIMENSION C_DATA_REP_NAME IO_DATATYPE_WIDTH TECHNOLOGY memories
+  global IO_DATATYPE IC_DIMENSION OC_DIMENSION C_DATA_REP_NAME IO_DATATYPE_WIDTH TECHNOLOGY memories ACCUM_BUFFER_DATATYPE SUPPORT_MX
   set double_buffer "DoubleBuffer<$IO_DATATYPE,$IC_DIMENSION,1024>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
@@ -67,6 +67,10 @@ proc pre_architect {} {
       directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1rw)
       directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1rw)
     }
+  }
 
+  if {$SUPPORT_MX == true} {
+    set weight_scale_controller "WeightScaleController<$IO_DATATYPE,$ACCUM_BUFFER_DATATYPE,$IC_DIMENSION,$OC_DIMENSION>"
+    directive set /Accelerator/$weight_scale_controller/$weight_scale_controller:transposer/transposer/while:if:transposeBuffer.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE {[Register]}
   }
 }
