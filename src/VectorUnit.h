@@ -158,13 +158,13 @@ SC_MODULE(VectorOpUnit) {
             vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(
                 tmp, op0Src0, inst.vDequantizeScale);
           } else {
-          UNROLL:
+          UNROLL_0:
             for (int i = 0; i < WIDTH; i++) {
               op0Src0[i] = tmp[i];
             }
           }
         } else {
-        UNROLL:
+        UNROLL_1:
           for (int i = 0; i < WIDTH; i++) {
             op0Src0[i] = tmp[i];
           }
