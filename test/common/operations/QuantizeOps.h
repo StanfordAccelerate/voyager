@@ -51,7 +51,6 @@ QUANTIZED_TYPE* quantizeMX(std::any input, std::any scale, int tensor_size,
     // perform quantization operation
     for (int i = 0; i < scale_size; i++) {
       SCALE_TYPE scale = scale_val[i];
-      std::cout << "Scale: " << scale << std::endl;
       for (int j = 0; j < block_size; j++) {
         quantized_output[i * block_size + j] =
             input_tensor[i * block_size + j]

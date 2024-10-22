@@ -33,8 +33,6 @@ OUTPUT_T* calculate_mx_qparam(std::any input_tensor,
 
       int index = i * num_blocks + c;
 
-      // int index = h * W * num_blocks + w * num_blocks + c;
-
       for (int block = 0; block < block_size; block++) {
         int input_index = i * mx_axis_size + c * block_size + block;
 
@@ -42,19 +40,12 @@ OUTPUT_T* calculate_mx_qparam(std::any input_tensor,
             inputs[input_index].unbiased_exponent();
 
         max_exponent = std::max(max_exponent, exponent);
-
-        std::cout << inputs[input_index] << " ";
-        // std::cout << "input_index: " << input_index << " ";
       }
-      std::cout << std::endl;
 
       ac_int<INPUT_T::exponent_width, true> scaled_exponent =
           max_exponent - INPUT_T::ac_float_rep::exp_bias -
           (OUTPUT_T::width - 2);
 
-      std::cout << "scaled_exponent: " << scaled_exponent << std::endl;
-
-      // outputs[index].set_exponent(scaled_exponent);
       outputs[index].setbits(scaled_exponent);
     }
   }
