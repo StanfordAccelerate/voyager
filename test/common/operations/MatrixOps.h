@@ -105,6 +105,12 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
 
   ACCUMULATION_BUFFER_T *outputs = new ACCUMULATION_BUFFER_T[X * Y * K];
 
+  // only used for replication on MX-based designs
+  ACCUMULATE_T *accumulations = new ACCUMULATE_T[X * Y * K];
+  for (int i = 0; i < X * Y * K; i++) {
+    accumulations[i] = ACCUMULATE_T(0.0);
+  }
+
   // initialize to bias
   for (int i = 0; i < X * Y; i++) {
     for (int k = 0; k < K; k++) {
@@ -224,11 +230,50 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                               "point types");
                         }
                       } else if (is_mx_based_design) {
-                        // use a scale factor of 1 to directly convert the int
-                        // value into a float
-                        ACCUMULATION_BUFFER_T scaled_psum =
-                            static_cast<ACCUMULATION_BUFFER_T>(psum);
-                        outputs[output_addr] += scaled_psum;
+                        if (tiling.replication) {
+                          accumulations[output_addr] += psum;
+                          if (IC_DIMENSION == 4) {
+                            ACCUMULATION_BUFFER_T scaled_psum =
+                                static_cast<ACCUMULATION_BUFFER_T>(
+                                    accumulations[output_addr]);
+                            outputs[output_addr] += scaled_psum;
+                            accumulations[output_addr] = ACCUMULATE_T(0.0);
+                          } else if (IC_DIMENSION == 8) {
+                            if (counters[1][tiling.fx_index] == 1 ||
+                                counters[1][tiling.fx_index] == 3 ||
+                                counters[1][tiling.fx_index] == 5 ||
+                                counters[1][tiling.fx_index] == 6) {
+                              ACCUMULATION_BUFFER_T scaled_psum =
+                                  static_cast<ACCUMULATION_BUFFER_T>(
+                                      accumulations[output_addr]);
+                              outputs[output_addr] += scaled_psum;
+                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                            }
+                          } else if (IC_DIMENSION == 16) {
+                            if (counters[1][tiling.fx_index] == 3 ||
+                                counters[1][tiling.fx_index] == 6) {
+                              ACCUMULATION_BUFFER_T scaled_psum =
+                                  static_cast<ACCUMULATION_BUFFER_T>(
+                                      accumulations[output_addr]);
+                              outputs[output_addr] += scaled_psum;
+                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                            }
+                          } else if (IC_DIMENSION == 32) {
+                            if (counters[1][tiling.fx_index] == 6) {
+                              ACCUMULATION_BUFFER_T scaled_psum =
+                                  static_cast<ACCUMULATION_BUFFER_T>(
+                                      accumulations[output_addr]);
+                              outputs[output_addr] += scaled_psum;
+                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                            }
+                          }
+                        } else {
+                          // use a scale factor of 1 to directly convert the int
+                          // value into a float
+                          ACCUMULATION_BUFFER_T scaled_psum =
+                              static_cast<ACCUMULATION_BUFFER_T>(psum);
+                          outputs[output_addr] += scaled_psum;
+                        }
                       } else {
                         if constexpr (ACCUMULATE_T::is_floating_point ==
                                       ACCUMULATION_BUFFER_T::
