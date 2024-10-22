@@ -29,14 +29,14 @@ OUTPUT_T* calculate_mx_qparam(std::any input_tensor,
 
   for (int i = 0; i < outer_size; i++) {
     for (int c = 0; c < num_blocks; c++) {
-      ac_int<INPUT_T::exponent_width, true> max_exponent = 0;
+      ac_int<INPUT_T::exponent_width, false> max_exponent = 0;
 
       int index = i * num_blocks + c;
 
       for (int block = 0; block < block_size; block++) {
         int input_index = i * mx_axis_size + c * block_size + block;
 
-        ac_int<INPUT_T::exponent_width, true> exponent =
+        ac_int<INPUT_T::exponent_width, false> exponent =
             inputs[input_index].unbiased_exponent();
 
         max_exponent = std::max(max_exponent, exponent);

@@ -434,7 +434,7 @@ SC_MODULE(VectorOpUnit) {
             prevResult = result;
           }
         } else if (inst.rOp == VectorInstructions::rmxscale) {
-          typedef ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, true>
+          typedef ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, false>
               exp_type_t;
 
           exp_type_t prevExpResult;
@@ -458,12 +458,13 @@ SC_MODULE(VectorOpUnit) {
             prevExpResult = result;
           }
 
-          prevExpResult =
-              prevExpResult -
-              VEC_DTYPE::AccumulationDatatype::ac_float_rep::exp_bias -
-              (IO_DTYPE::width - 2);
+          ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, true>
+              scaledExp =
+                  prevExpResult -
+                  VEC_DTYPE::AccumulationDatatype::ac_float_rep::exp_bias -
+                  (IO_DTYPE::width - 2);
 
-          prevResult.setbits(prevExpResult);
+          prevResult.setbits(scaledExp);
         }
         if (!inst.rDuplicate) {
           res[index] = prevResult;
