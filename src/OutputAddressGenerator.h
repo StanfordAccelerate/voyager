@@ -6,7 +6,7 @@ SC_MODULE(OutputAddressGenerator) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::Out<int> CCS_INIT_S1(vectorOutputAddress);
+  Connections::Out<ac_int<32, false> > CCS_INIT_S1(vectorOutputAddress);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       vectorOutputAddressParams);
@@ -115,21 +115,16 @@ SC_MODULE(OutputAddressGenerator) {
                   ac_int<16, false> y = y0 + y1 * Y0;
                   ac_int<16, false> Y = Y0 * Y1;
 
-                  int baseAddress = y * X * K + x * K + k;
+                  ac_int<32, false> baseAddress = y * X * K + x * K + k;
                   if (params.SPLIT_OUTPUT) {
-                    baseAddress =
-                        static_cast<ac_int<32, false> >((k / 32) * X * 32) +
-                        static_cast<ac_int<32, false> >(x * 32) +
-                        static_cast<ac_int<32, false> >(k % 32);
+                    baseAddress = ((k / 32) * X * 32) + (x * 32) + (k % 32);
                   } else if (params.CONCAT_OUTPUT) {
-                    baseAddress =
-                        static_cast<ac_int<32, false> >((k / 32) * K) +
-                        static_cast<ac_int<32, false> >((y % 32) * K * 4) +
-                        static_cast<ac_int<32, false> >(k % 32) +
-                        static_cast<ac_int<32, false> >(y / 32 * K / 4);
+                    baseAddress = ((k / 32) * K) + ((y % 32) * K * 4) +
+                                  (k % 32) + (y / 32 * K / 4);
                   }
 
-                  int address = params.VECTOR_OUTPUT_OFFSET + baseAddress;
+                  ac_int<32, false> address =
+                      params.VECTOR_OUTPUT_OFFSET + baseAddress;
                   if (params.DP_OUTPUT) {
                     for (int precision = 0; precision < 2; precision++) {
                       vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +

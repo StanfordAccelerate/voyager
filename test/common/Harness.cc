@@ -226,7 +226,7 @@ void Harness::readMemoryRequest(
           bits.set_slc(
               byte * 8,
               static_cast<ac_int<8, false>>(
-                  memory[memRequest.address + b * DIMENSION * num_bytes +
+                  memory[int(memRequest.address) + b * DIMENSION * num_bytes +
                          i * num_bytes + byte]));
         }
         data[i].setbits(bits);
@@ -444,7 +444,7 @@ void Harness::storeVectorOutputs() {
 
   while (true) {
     Pack1D<OUTPUT_DATATYPE, OC_DIMENSION> data = vectorOutput.Pop();
-    int address = vectorOutputAddress.Pop();
+    ac_int<32, false> address = vectorOutputAddress.Pop();
     DLOG("address: " << address << " data: " << data);
     for (int i = 0; i < OC_DIMENSION; i++) {
       char *memory =

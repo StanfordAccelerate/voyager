@@ -19,8 +19,8 @@
 #endif
 
 struct MemoryRequest {
-  int address;
-  int burstSize;
+  ac_int<32, false> address;
+  ac_int<32, false> burstSize;
 
   static const unsigned int width = 32 + 32;
 
@@ -499,10 +499,10 @@ class Pack1D<PEWeight<Int<i_width, i_signed> >, SIZE> {
 
 template <typename TYPE, size_t SIZE>
 struct BufferWriteRequest {
-  int address;
+  ac_int<16, false> address;
   Pack1D<TYPE, SIZE> data;
 
-  static const unsigned int width = 32 + Pack1D<TYPE, SIZE>::width;
+  static const unsigned int width = 16 + Pack1D<TYPE, SIZE>::width;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {

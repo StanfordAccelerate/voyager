@@ -363,14 +363,13 @@ SC_MODULE(MatrixProcessor) {
 
           if ((!firstAccumulation || params.ACC_FROM_ACC) && step < totalOps &&
               !stallInputs) {
-            int readAddress = static_cast<ac_int<10, false> >(
-                                  loop_counters[1][params.weightLoopIndex[1]] *
-                                  params.loops[1][params.inputXLoopIndex[1]] *
-                                  params.loops[1][params.inputYLoopIndex[1]]) +
-                              static_cast<ac_int<10, false> >(
-                                  loop_counters[1][params.inputYLoopIndex[1]] *
-                                  params.loops[1][params.inputXLoopIndex[1]]) +
-                              loop_counters[1][params.inputXLoopIndex[1]];
+            ac_int<int_log2(BUFFER_SIZE), false> readAddress =
+                loop_counters[1][params.weightLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]] *
+                    params.loops[1][params.inputYLoopIndex[1]] +
+                loop_counters[1][params.inputYLoopIndex[1]] *
+                    params.loops[1][params.inputXLoopIndex[1]] +
+                loop_counters[1][params.inputXLoopIndex[1]];
 #ifdef __SYNTHESIS__
           READ_ACC_BUFFER:
 #endif
@@ -423,14 +422,12 @@ SC_MODULE(MatrixProcessor) {
               // DLOG("matrix processor output: " << outputs);
               // std::cout << "Output: " << outputs << std::endl;
             } else {
-              int writeAddress =
-                  static_cast<ac_int<10, false> >(
-                      loop_counters_out[1][params.weightLoopIndex[1]] *
+              ac_int<int_log2(BUFFER_SIZE), false> writeAddress =
+                  loop_counters_out[1][params.weightLoopIndex[1]] *
                       params.loops[1][params.inputXLoopIndex[1]] *
-                      params.loops[1][params.inputYLoopIndex[1]]) +
-                  static_cast<ac_int<10, false> >(
-                      loop_counters_out[1][params.inputYLoopIndex[1]] *
-                      params.loops[1][params.inputXLoopIndex[1]]) +
+                      params.loops[1][params.inputYLoopIndex[1]] +
+                  loop_counters_out[1][params.inputYLoopIndex[1]] *
+                      params.loops[1][params.inputXLoopIndex[1]] +
                   loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__
@@ -515,14 +512,12 @@ SC_MODULE(MatrixProcessor) {
               DLOG("matrix processor output: " << outputs);
               // std::cout << "Output: " << outputs << std::endl;
             } else {
-              int writeAddress =
-                  static_cast<ac_int<10, false> >(
-                      loop_counters_out[1][params.weightLoopIndex[1]] *
+              ac_int<int_log2(BUFFER_SIZE), false> writeAddress =
+                  loop_counters_out[1][params.weightLoopIndex[1]] *
                       params.loops[1][params.inputXLoopIndex[1]] *
-                      params.loops[1][params.inputYLoopIndex[1]]) +
-                  static_cast<ac_int<10, false> >(
-                      loop_counters_out[1][params.inputYLoopIndex[1]] *
-                      params.loops[1][params.inputXLoopIndex[1]]) +
+                      params.loops[1][params.inputYLoopIndex[1]] +
+                  loop_counters_out[1][params.inputYLoopIndex[1]] *
+                      params.loops[1][params.inputXLoopIndex[1]] +
                   loop_counters_out[1][params.inputXLoopIndex[1]];
 
 #ifdef __SYNTHESIS__

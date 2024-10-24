@@ -17,9 +17,9 @@ SC_MODULE(InputScaleController) {
   Connections::In<Pack1D<DTYPE, 1> > CCS_INIT_S1(dataResponse);
 
   Connections::Out<BufferWriteRequest<DTYPE, 1> > writeRequest[2];
-  Connections::Out<int> writeControl[2];
-  Connections::Out<int> readAddress[2];
-  Connections::Out<int> readControl[2];
+  Connections::Out<ac_int<32, false> > writeControl[2];
+  Connections::Out<ac_int<16, false> > readAddress[2];
+  Connections::Out<ac_int<32, false> > readControl[2];
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);

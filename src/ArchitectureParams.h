@@ -185,6 +185,18 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define OUTPUT_DATATYPE I8
 #define VECTOR_DATATYPE F16
 
+#elif defined(INT8_32)
+
+using I8 = Int<8, true>;
+using I32 = Int<32, true>;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE I8
+#define WEIGHT_DATATYPE I8
+#define ACCUM_DATATYPE I32
+#define OUTPUT_DATATYPE I8
+#define VECTOR_DATATYPE F16
+
 #elif defined(MXINT8)
 
 using I8 = Int<8, true>;
@@ -240,7 +252,6 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #error "No OC dimension specified!"
 
 #endif
-
 
 #if !defined(INPUT_BUFFER_SIZE)
 #define INPUT_BUFFER_SIZE 1024

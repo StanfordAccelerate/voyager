@@ -15,12 +15,12 @@ SC_MODULE(WeightScaleController) {
   Connections::In<int> serialParamsIn;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(dataResponse);
+  Connections::In<Pack1D<DTYPE, NCOLS>> CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<DTYPE, NCOLS> > writeRequest[2];
-  Connections::Out<int> writeControl[2];
-  Connections::Out<int> readAddress[2];
-  Connections::Out<int> readControl[2];
+  Connections::Out<BufferWriteRequest<DTYPE, NCOLS>> writeRequest[2];
+  Connections::Out<ac_int<32, false>> writeControl[2];
+  Connections::Out<ac_int<16, false>> readAddress[2];
+  Connections::Out<ac_int<32, false>> readControl[2];
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
@@ -28,7 +28,7 @@ SC_MODULE(WeightScaleController) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
 
-  Connections::Combinational<Pack1D<DTYPE, NCOLS> > transposeOut;
+  Connections::Combinational<Pack1D<DTYPE, NCOLS>> transposeOut;
 
   MatrixParamsDeserializer<4> CCS_INIT_S1(paramsDeserializer);
 
@@ -151,11 +151,10 @@ SC_MODULE(WeightScaleController) {
                         C = C1 * NCOLS;
                         baseAddress = (k + c0) * C + c1 * OC_DIMENSION;
                       } else if (params.CONCAT_HEAD_WEIGHTS) {
-                        baseAddress =
-                            static_cast<ac_int<32, false> >(
-                                ((k / 32) * C * 32)) +
-                            static_cast<ac_int<16, false> >((c * 32)) +
-                            static_cast<ac_int<32, false> >((k % 32));
+                        baseAddress = static_cast<ac_int<32, false>>(
+                                          ((k / 32) * C * 32)) +
+                                      static_cast<ac_int<16, false>>((c * 32)) +
+                                      static_cast<ac_int<32, false>>((k % 32));
                       }
                       int burstSize = NCOLS;
 
@@ -407,12 +406,12 @@ SC_MODULE(WeightScaleController) {
                  loop_counters[1][0] < loop_bounds[1][0];
                  loop_counters[1][0]++) {
               readControl[bankSel].Push(
-                  static_cast<ac_int<16, false> >(loop_bounds[1][1] *
-                                                  loop_bounds[1][2]) *
-                  static_cast<ac_int<16, false> >(loop_bounds[1][3] *
-                                                  loop_bounds[1][4]) *
-                  static_cast<ac_int<16, false> >(
-                      loop_bounds[1][5] * rep_bound * microscalingReuse));
+                  static_cast<ac_int<16, false>>(loop_bounds[1][1] *
+                                                 loop_bounds[1][2]) *
+                  static_cast<ac_int<16, false>>(loop_bounds[1][3] *
+                                                 loop_bounds[1][4]) *
+                  static_cast<ac_int<16, false>>(loop_bounds[1][5] * rep_bound *
+                                                 microscalingReuse));
               for (int reuse = 0; reuse < microscalingReuse; reuse++) {
                 for (int rep = 0; rep < rep_bound; rep++) {
                   for (loop_counters[1][1] = 0;
@@ -479,17 +478,16 @@ SC_MODULE(WeightScaleController) {
                                 k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                             ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
                             int address =
-                                static_cast<ac_int<16, false> >(
-                                    (fy * FX * K1)) +
-                                static_cast<ac_int<16, false> >((fx * K1)) + k1;
+                                static_cast<ac_int<16, false>>((fy * FX * K1)) +
+                                static_cast<ac_int<16, false>>((fx * K1)) + k1;
 
                             if (params.WEIGHT_TRANSPOSE &&
                                 OC_DIMENSION > IC_DIMENSION) {
-                              address = static_cast<ac_int<16, false> >(
+                              address = static_cast<ac_int<16, false>>(
                                             (fy * FX * 2 * K1)) +
-                                        static_cast<ac_int<16, false> >(
+                                        static_cast<ac_int<16, false>>(
                                             (fx * 2 * K1)) +
-                                        static_cast<ac_int<16, false> >(
+                                        static_cast<ac_int<16, false>>(
                                             (rep * NROWS) * K1) +
                                         k1;
                             }

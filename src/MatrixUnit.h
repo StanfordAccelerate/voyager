@@ -36,9 +36,9 @@ SC_MODULE(MatrixUnit) {
       inputDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, IC_DIMENSION> >
       inputBufferWriteReq[2];
-  Connections::Combinational<int> inputBufferWriteControl[2];
-  Connections::Combinational<int> inputBufferReadAddress[2];
-  Connections::Combinational<int> inputBufferReadControl[2];
+  Connections::Combinational<ac_int<32, false> > inputBufferWriteControl[2];
+  Connections::Combinational<ac_int<16, false> > inputBufferReadAddress[2];
+  Connections::Combinational<ac_int<32, false> > inputBufferReadControl[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, IC_DIMENSION> > CCS_INIT_S1(
       inputsToWindowBuffer);
 
@@ -56,11 +56,11 @@ SC_MODULE(MatrixUnit) {
   Connections::ConditionalCombinational<BufferWriteRequest<INPUT_DATATYPE, 1>,
                                         SUPPORT_MX>
       inputScaleWriteRequest[2];
-  Connections::ConditionalCombinational<int, SUPPORT_MX>
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       inputScaleWriteControl[2];
-  Connections::ConditionalCombinational<int, SUPPORT_MX>
+  Connections::ConditionalCombinational<ac_int<16, false>, SUPPORT_MX>
       inputScaleReadAddress[2];
-  Connections::ConditionalCombinational<int, SUPPORT_MX>
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       inputScaleReadControl[2];
   Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX>
       CCS_INIT_S1(inputScaleFromBuffer);
@@ -85,9 +85,9 @@ SC_MODULE(MatrixUnit) {
       biasDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, OC_DIMENSION> >
       weightBufferWriteReq[2];
-  Connections::Combinational<int> weightBufferWriteControl[2];
-  Connections::Combinational<int> weightBufferReadAddress[2];
-  Connections::Combinational<int> weightBufferReadControl[2];
+  Connections::Combinational<ac_int<32, false> > weightBufferWriteControl[2];
+  Connections::Combinational<ac_int<16, false> > weightBufferReadAddress[2];
+  Connections::Combinational<ac_int<32, false> > weightBufferReadControl[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       weightsFromBuffer);
 
@@ -107,11 +107,11 @@ SC_MODULE(MatrixUnit) {
   Connections::ConditionalCombinational<
       BufferWriteRequest<INPUT_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
       weightScaleWriteRequest[2];
-  Connections::ConditionalCombinational<int, SUPPORT_MX>
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       weightScaleWriteControl[2];
-  Connections::ConditionalCombinational<int, SUPPORT_MX>
+  Connections::ConditionalCombinational<ac_int<16, false>, SUPPORT_MX>
       weightScaleReadAddress[2];
-  Connections::ConditionalCombinational<int, SUPPORT_MX>
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       weightScaleReadControl[2];
   Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION>,
                                         SUPPORT_MX>

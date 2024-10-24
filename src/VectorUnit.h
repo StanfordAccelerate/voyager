@@ -554,7 +554,7 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
 
-  Connections::Out<int> CCS_INIT_S1(vectorOutputAddress);
+  Connections::Out<ac_int<32, false> > CCS_INIT_S1(vectorOutputAddress);
   Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(finalVectorOutput);
   Connections::Combinational<
       Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
