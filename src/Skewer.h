@@ -6,6 +6,10 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 
+#ifndef PE_LATENCY
+#define PE_LATENCY 1
+#endif
+
 #define REPEAT_IC(x) BOOST_PP_REPEAT(IC_DIMENSION, x, 0)
 #define REPEAT_OC(x) BOOST_PP_REPEAT(OC_DIMENSION, x, 0)
 
@@ -130,7 +134,7 @@ SC_MODULE(MultiInputSerializedSkewer) {
   Connections::In<Pack1D<PEInput<IDTYPE>, SIZE> > CCS_INIT_S1(din);
   Connections::Out<PEInput<ODTYPE> > dout[SIZE];
 
-#define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 3 + 1),
+#define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * PE_LATENCY + 1),
 
   SC_CTOR(MultiInputSerializedSkewer) : REPEAT_IC(FIFO_SIZE_INIT) dummy(0) {
 #undef FIFO_SIZE_INIT
