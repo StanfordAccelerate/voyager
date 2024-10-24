@@ -40,9 +40,9 @@ int validateMapping(Tiling tiling) {
   }
 
   // Accumulation buffer
-  if (x0 * y0 * k0 > ACCUMULATION_BUFFER_SIZE) {
+  if (x0 * y0 * k0 > ACCUM_BUFFER_SIZE) {
     std::cerr << "ERROR: Accumulation buffer tile size violation." << std::endl
-              << "Constraint " << ACCUMULATION_BUFFER_SIZE << " but is " << x0
+              << "Constraint " << ACCUM_BUFFER_SIZE << " but is " << x0
               << " * " << y0 << " * " << k0 << " = " << x0 * y0 * k0
               << std::endl;
     return -1;

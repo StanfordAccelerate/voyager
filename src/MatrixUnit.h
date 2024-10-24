@@ -119,17 +119,16 @@ SC_MODULE(MatrixUnit) {
 
 #ifdef SIM_MatrixProcessor
   // clang-format off
-  CCS_DESIGN( (MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION, ACCUMULATION_BUFFER_SIZE>) ) CCS_INIT_S1(matrixProcessor);
+  CCS_DESIGN( (MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>) ) CCS_INIT_S1(matrixProcessor);
 // clang-format on
 #else
 #ifdef HYBRID_FP8
   MatrixProcessor<HYBRID_TYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION,
-                  ACCUMULATION_BUFFER_SIZE>
+                  ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 #else
   MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                  SUPPORT_MX, IC_DIMENSION, OC_DIMENSION,
-                  ACCUMULATION_BUFFER_SIZE>
+                  SUPPORT_MX, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 #endif
 #endif

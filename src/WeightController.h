@@ -25,6 +25,14 @@ SC_MODULE(WeightController) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(biasDataResponse);
 
+  static constexpr int int_log2(unsigned int n) {
+    return (n <= 1) ? 0 : 1 + int_log2(n / 2);
+  }
+
+  static constexpr int LOOP_WIDTH =
+      (8 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
+                                                      : OC_DIMENSION)));
+
 #ifdef HYBRID_FP8
   Connections::Out<Pack1D<HYBRID_TYPE, NCOLS> > CCS_INIT_S1(
       weightsToSystolicArray);
@@ -92,8 +100,8 @@ SC_MODULE(WeightController) {
     while (true) {
       const MatrixParams params = fetcherParams.Pop();
 
-      ac_int<8, false> loop_counters[2][5];
-      ac_int<8, false> loop_bounds[2][5];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][5];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -132,29 +140,29 @@ SC_MODULE(WeightController) {
                     for (loop_counters[1][4] = 0;
                          loop_counters[1][4] < loop_bounds[1][4];
                          loop_counters[1][4]++) {
-                      ac_int<8, false> k2 = loop_counters
+                      ac_int<LOOP_WIDTH, false> k2 = loop_counters
                           [0][params.weightAddressGenWeightLoopIndex[0]];
-                      ac_int<8, false> K2 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> K2 = loop_bounds
                           [0][params.weightAddressGenWeightLoopIndex[0]];
-                      ac_int<8, false> k1 = loop_counters
+                      ac_int<LOOP_WIDTH, false> k1 = loop_counters
                           [1][params.weightAddressGenWeightLoopIndex[1]];
-                      ac_int<8, false> K1 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> K1 = loop_bounds
                           [1][params.weightAddressGenWeightLoopIndex[1]];
-                      ac_int<8, false> C1 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> C1 = loop_bounds
                           [1][params.weightAddressGenReductionLoopIndex[0]];
-                      ac_int<8, false> c1 = loop_counters
+                      ac_int<LOOP_WIDTH, false> c1 = loop_counters
                           [1][params.weightAddressGenReductionLoopIndex[0]];
-                      ac_int<8, false> fx =
+                      ac_int<LOOP_WIDTH, false> fx =
                           loop_counters[1][params.weightAddressGenFxIndex];
-                      ac_int<8, false> FX =
+                      ac_int<LOOP_WIDTH, false> FX =
                           loop_bounds[1][params.weightAddressGenFxIndex];
-                      ac_int<8, false> fy =
+                      ac_int<LOOP_WIDTH, false> fy =
                           loop_counters[1][params.weightAddressGenFyIndex];
-                      ac_int<8, false> FY =
+                      ac_int<LOOP_WIDTH, false> FY =
                           loop_bounds[1][params.weightAddressGenFyIndex];
-                      ac_int<8, false> c0 = loop_counters
+                      ac_int<LOOP_WIDTH, false> c0 = loop_counters
                           [1][params.weightAddressGenReductionLoopIndex[1]];
-                      ac_int<8, false> C0 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> C0 = loop_bounds
                           [1][params.weightAddressGenReductionLoopIndex[1]];
 
                       ac_int<16, false> c = c1 * C0 + c0;
@@ -232,8 +240,8 @@ SC_MODULE(WeightController) {
     while (true) {
       const MatrixParams params = writerParams.Pop();
 
-      ac_int<8, false> loop_counters[2][5];
-      ac_int<8, false> loop_bounds[2][5];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][5];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -274,29 +282,29 @@ SC_MODULE(WeightController) {
                     for (loop_counters[1][4] = 0;
                          loop_counters[1][4] < loop_bounds[1][4];
                          loop_counters[1][4]++) {
-                      ac_int<8, false> k2 = loop_counters
+                      ac_int<LOOP_WIDTH, false> k2 = loop_counters
                           [0][params.weightAddressGenWeightLoopIndex[0]];
-                      ac_int<8, false> K2 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> K2 = loop_bounds
                           [0][params.weightAddressGenWeightLoopIndex[0]];
-                      ac_int<8, false> k1 = loop_counters
+                      ac_int<LOOP_WIDTH, false> k1 = loop_counters
                           [1][params.weightAddressGenWeightLoopIndex[1]];
-                      ac_int<8, false> K1 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> K1 = loop_bounds
                           [1][params.weightAddressGenWeightLoopIndex[1]];
-                      ac_int<8, false> C1 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> C1 = loop_bounds
                           [1][params.weightAddressGenReductionLoopIndex[0]];
-                      ac_int<8, false> c1 = loop_counters
+                      ac_int<LOOP_WIDTH, false> c1 = loop_counters
                           [1][params.weightAddressGenReductionLoopIndex[0]];
-                      ac_int<8, false> fx =
+                      ac_int<LOOP_WIDTH, false> fx =
                           loop_counters[1][params.weightAddressGenFxIndex];
-                      ac_int<8, false> FX =
+                      ac_int<LOOP_WIDTH, false> FX =
                           loop_bounds[1][params.weightAddressGenFxIndex];
-                      ac_int<8, false> fy =
+                      ac_int<LOOP_WIDTH, false> fy =
                           loop_counters[1][params.weightAddressGenFyIndex];
-                      ac_int<8, false> FY =
+                      ac_int<LOOP_WIDTH, false> FY =
                           loop_bounds[1][params.weightAddressGenFyIndex];
-                      ac_int<8, false> c0 = loop_counters
+                      ac_int<LOOP_WIDTH, false> c0 = loop_counters
                           [1][params.weightAddressGenReductionLoopIndex[1]];
-                      ac_int<8, false> C0 = loop_bounds
+                      ac_int<LOOP_WIDTH, false> C0 = loop_bounds
                           [1][params.weightAddressGenReductionLoopIndex[1]];
 
                       ac_int<16, false> C = C0;
@@ -376,8 +384,8 @@ SC_MODULE(WeightController) {
     while (true) {
       const MatrixParams params = readerParams.Pop();
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -447,7 +455,19 @@ SC_MODULE(WeightController) {
                           if (params.REPLICATION) {
                             startingC = 3 - 1;
                             endingC = 3;
-                            if (IC_DIMENSION == 16) {
+                            if (IC_DIMENSION == 4) {
+                              numPadding = NROWS - 3;
+                              replicationBound = 1;
+                            } else if (IC_DIMENSION == 8) {
+                              if (loop_counters[1][params.fxIndex] ==
+                                  3) {  // last iteration only unrolls 1 fx
+                                numPadding = NROWS - 3;
+                                replicationBound = 1;
+                              } else {
+                                numPadding = NROWS - 6;
+                                replicationBound = 2;
+                              }
+                            } else if (IC_DIMENSION == 16) {
                               if (loop_counters[1][params.fxIndex] == 0) {
                                 numPadding = NROWS - 12;
                                 replicationBound = 4;
@@ -461,47 +481,73 @@ SC_MODULE(WeightController) {
                             }
                           }
 
-                          for (ac_int<4, false> fx_repl = 0;
-                               fx_repl < replicationBound; fx_repl++) {
-                            for (ac_int<8, false> c = 0; c < endingC;
-                                 c++) {  // reverse order
-                              ac_int<8, false> k2 =
-                                  loop_counters[0][params.weightLoopIndex[0]];
-                              ac_int<8, false> K2 =
-                                  params.loops[0][params.weightLoopIndex[0]];
-                              ac_int<8, false> k1 =
-                                  loop_counters[1][params.weightLoopIndex[1]];
-                              ac_int<8, false> K1 =
-                                  params.loops[1][params.weightLoopIndex[1]];
-                              ac_int<8, false> C1 =
-                                  params.loops[1][params.reductionLoopIndex[1]];
-                              ac_int<8, false> c1 =
-                                  loop_counters[1]
-                                               [params.reductionLoopIndex[1]];
-                              ac_int<8, false> fx =
-                                  loop_counters[1][params.fxIndex];
-                              ac_int<8, false> FX =
-                                  params.loops[1][params.fxIndex];
-                              ac_int<8, false> fy =
-                                  loop_counters[1][params.fyIndex];
-                              ac_int<8, false> FY =
-                                  params.loops[1][params.fyIndex];
+                          ac_int<LOOP_WIDTH, false> fx_repl = 0;
+                          ac_int<LOOP_WIDTH, false> c = 0;
+                          for (int row = 0; row < NROWS; row++) {
+                            ac_int<LOOP_WIDTH, false> k2 =
+                                loop_counters[0][params.weightLoopIndex[0]];
+                            ac_int<LOOP_WIDTH, false> K2 =
+                                params.loops[0][params.weightLoopIndex[0]];
+                            ac_int<LOOP_WIDTH, false> k1 =
+                                loop_counters[1][params.weightLoopIndex[1]];
+                            ac_int<LOOP_WIDTH, false> K1 =
+                                params.loops[1][params.weightLoopIndex[1]];
+                            ac_int<LOOP_WIDTH, false> C1 =
+                                params.loops[1][params.reductionLoopIndex[1]];
+                            ac_int<LOOP_WIDTH, false> c1 =
+                                loop_counters[1][params.reductionLoopIndex[1]];
+                            ac_int<LOOP_WIDTH, false> fx =
+                                loop_counters[1][params.fxIndex];
+                            ac_int<LOOP_WIDTH, false> FX =
+                                params.loops[1][params.fxIndex];
+                            ac_int<LOOP_WIDTH, false> fy =
+                                loop_counters[1][params.fyIndex];
+                            ac_int<LOOP_WIDTH, false> FY =
+                                params.loops[1][params.fyIndex];
 
-                              ac_int<8, false> C = IC_DIMENSION;
-                              if (params.REPLICATION) {
-                                C = 3;
-                                if (IC_DIMENSION == 16) {
-                                  fx = loop_counters[1][params.fxIndex] * 4 +
-                                       fx_repl;
-                                } else if (IC_DIMENSION == 32) {
-                                  fx = fx_repl;
-                                }
-                                FX = 7;
+                            ac_int<16, false> k =
+                                k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
+                            ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
+
+                            ac_int<LOOP_WIDTH, false> C = IC_DIMENSION;
+
+                            if (params.REPLICATION) {
+                              C = 3;
+                              if (IC_DIMENSION == 4) {
+                                fx = loop_counters[1][params.fxIndex];
+                              } else if (IC_DIMENSION == 8) {
+                                fx = loop_counters[1][params.fxIndex] * 2 +
+                                     fx_repl;
+                              } else if (IC_DIMENSION == 16) {
+                                fx = loop_counters[1][params.fxIndex] * 4 +
+                                     fx_repl;
+                              } else if (IC_DIMENSION == 32) {
+                                fx = fx_repl;
+                              }
+                              FX = 7;
+                              if (fx_repl < replicationBound) {
+                                int address =
+                                    static_cast<ac_int<16, false> >(
+                                        (fy * FX * C * K1)) +
+                                    static_cast<ac_int<16, false> >(
+                                        (fx * C * K1)) +
+                                    static_cast<ac_int<16, false> >(c * K1) +
+                                    k1;
+                                readAddress[bankSel].Push(address);
+                              } else {
+                                readAddress[bankSel].Push(-1);
                               }
 
-                              ac_int<16, false> k =
-                                  k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
-                              ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
+                              // keep track of which C and FX we are on
+                              if (c < endingC - 1) {
+                                c++;
+                              } else {
+                                c = 0;
+                                fx_repl++;
+                              }
+                            } else {
+                              c = row;
+
                               int address =
                                   static_cast<ac_int<16, false> >(
                                       (fy * FX * C * K1)) +
@@ -519,39 +565,7 @@ SC_MODULE(WeightController) {
                                               (c + rep * NROWS) * K1) +
                                           k1;
                               }
-
-                              int swapBank = (loop_counters[1][1] ==
-                                              loop_bounds[1][1] - 1) &&
-                                             (loop_counters[1][2] ==
-                                              loop_bounds[1][2] - 1) &&
-                                             (loop_counters[1][3] ==
-                                              loop_bounds[1][3] - 1) &&
-                                             (loop_counters[1][4] ==
-                                              loop_bounds[1][4] - 1) &&
-                                             (loop_counters[1][5] ==
-                                              loop_bounds[1][5] - 1) &&
-                                             (c == 0) && (fx_repl == 0);
-
-                              // readControl[bankSel].Push(!swapBank);
                               readAddress[bankSel].Push(address);
-
-                              if (c >= endingC - 1) {
-                                break;
-                              }
-                            }
-                            if (fx_repl == replicationBound - 1) {
-                              break;
-                            }
-                          }
-                          if (params.REPLICATION) {
-                            // zero_padding
-                            for (ac_int<8, false> i = 0; i < numPadding; i++) {
-                              // readControl[bankSel].Push(1);
-                              readAddress[bankSel].Push(-1);
-
-                              if (i >= numPadding - 1) {
-                                break;
-                              }
                             }
                           }
 
@@ -607,8 +621,8 @@ SC_MODULE(WeightController) {
     while (true) {
       const MatrixParams params = transposerParams.Pop();
 
-      ac_int<8, false> loop_counters[2][5];
-      ac_int<8, false> loop_bounds[2][5];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][5];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -705,10 +719,10 @@ SC_MODULE(WeightController) {
           }
         }
       } else {  // passthrough
-        int total_values = loop_bounds[0][0] * loop_bounds[0][1] *
-                           loop_bounds[0][2] * loop_bounds[1][0] *
-                           loop_bounds[1][1] * loop_bounds[1][2] *
-                           loop_bounds[1][3] * loop_bounds[1][4];
+        ac_int<32, false> total_values = loop_bounds[0][0] * loop_bounds[0][1] *
+                                         loop_bounds[0][2] * loop_bounds[1][0] *
+                                         loop_bounds[1][1] * loop_bounds[1][2] *
+                                         loop_bounds[1][3] * loop_bounds[1][4];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -728,8 +742,8 @@ SC_MODULE(WeightController) {
     while (true) {
       const MatrixParams params = biasFetcherParams.Pop();
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -771,13 +785,13 @@ SC_MODULE(WeightController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        ac_int<8, false> k2 =
+                        ac_int<LOOP_WIDTH, false> k2 =
                             loop_counters[0][params.weightLoopIndex[0]];
-                        ac_int<8, false> K2 =
+                        ac_int<LOOP_WIDTH, false> K2 =
                             loop_bounds[0][params.weightLoopIndex[0]];
-                        ac_int<8, false> k1 =
+                        ac_int<LOOP_WIDTH, false> k1 =
                             loop_counters[1][params.weightLoopIndex[1]];
-                        ac_int<8, false> K1 =
+                        ac_int<LOOP_WIDTH, false> K1 =
                             loop_bounds[1][params.weightLoopIndex[1]];
 
                         ac_int<16, false> k =
@@ -842,8 +856,8 @@ SC_MODULE(WeightController) {
     while (true) {
       const MatrixParams params = biasCombinerParams.Pop();
 
-      ac_int<8, false> loop_counters[2][6];
-      ac_int<8, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
