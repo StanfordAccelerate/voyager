@@ -7,9 +7,6 @@ if { [file exists $project_folder] } {
 project new -dir $project_folder
 project save
 
-# Set log file
-logfile move "$ROOT/$CATAPULT_BUILD_DIR/$BLOCK.log"
-
 # Configure options
 solution options set Project/SolutionName $BLOCK
 solution options set Message/ErrorOverride ASSERT-1 -remove
