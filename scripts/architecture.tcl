@@ -223,8 +223,7 @@ if { $DATATYPE == "P8_1" } {
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 24
-}
-elseif { $DATATYPE == "INT8_32" } {
+} elseif { $DATATYPE == "INT8_32" } {
   set IO_DATATYPE "I8"
   set ACCUM_DATATYPE "I32"
   set INTERMEDIATE_DATATYPE "I32"
