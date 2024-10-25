@@ -1,6 +1,6 @@
 set block "InputController"
 set full_block_name "InputController<$IO_DATATYPE, $IC_DIMENSION>"
-set clock_multiplier 1.1
+set clock_multiplier 1.2
 
 proc pre_architect {} {
   global C_DATA_REP_NAME
