@@ -33,6 +33,8 @@ bool run_sample(std::string model_name, std::string data_dir,
   codegen::Tensor input;
   if (params.front().has_matrix_param()) {
     input = params.front().matrix_param().input();
+  } else if (params.front().has_reduce_param()) {
+    input = params.front().reduce_param().input();
   } else {
     input = params.front().vector_params(0).input();
   }

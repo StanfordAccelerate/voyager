@@ -1,6 +1,6 @@
 #pragma once
 
-template <typename IO_DTYPE, typename VEC_DTYPE, int WIDTH>
+template <typename IO_DTYPE, typename VEC_DTYPE, typename MX_DTYPE, int WIDTH>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -24,6 +24,8 @@ SC_MODULE(VectorFetchUnit) {
       vectorFetch2DataResponse);
   Connections::Out<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
+
+  Connections::Out<MX_DTYPE> CCS_INIT_S1(vectorFetch1Scale);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(addressGen0Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse0Params);
@@ -334,6 +336,7 @@ SC_MODULE(VectorFetchUnit) {
     dataResponse1Params.ResetRead();
     vectorFetch1DataResponse.Reset();
     vectorFetch1DataResponseConverted.Reset();
+    vectorFetch1Scale.Reset();
 
     wait();
 
@@ -393,6 +396,13 @@ SC_MODULE(VectorFetchUnit) {
                         fullPrecisionDataResponse[dim] =
                             static_cast<VEC_DTYPE>(response[dim]);
                       }
+                    } else if constexpr (!std::is_same<IO_DTYPE,
+                                                       MX_DTYPE>::value) {
+#pragma hls_unroll yes
+                      for (int i = 0; i < WIDTH; i++) {
+                        fullPrecisionDataResponse[i].setbits(
+                            response[i].bits_rep());
+                      }
                     } else {
                       // dequantize IO_DTYPE to VEC_DTYPE
                       vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
@@ -400,8 +410,19 @@ SC_MODULE(VectorFetchUnit) {
                           params.vec1DequantizeScale);
                     }
                   }
-                  vectorFetch1DataResponseConverted.Push(
-                      fullPrecisionDataResponse);
+
+                  if (params.BROADCAST_VEC1_SCALE) {
+                    for (int i = 0; i < WIDTH; i++) {
+                      for (int count = 0; count < params.vec1BroadcastCount;
+                           count++) {
+                        vectorFetch1Scale.Push(
+                            fullPrecisionDataResponse[i].bits_rep());
+                      }
+                    }
+                  } else {
+                    vectorFetch1DataResponseConverted.Push(
+                        fullPrecisionDataResponse);
+                  }
                 }
               }
             }

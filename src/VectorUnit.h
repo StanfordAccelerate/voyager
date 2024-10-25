@@ -152,8 +152,19 @@ SC_MODULE(VectorOpUnit) {
                       VEC_DTYPE::is_floating_point) {
           vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(tmp, op0Src0,
                                                          inst.vDequantizeScale);
+        } else if constexpr (std::is_same_v<MU_OUTPUT_DTYPE, VEC_DTYPE>) {
+          // with MX types, we might need to perform a dequantize operation
+          if (inst.vDequantize) {
+            vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(
+                tmp, op0Src0, inst.vDequantizeScale);
+          } else {
+          UNROLL_0:
+            for (int i = 0; i < WIDTH; i++) {
+              op0Src0[i] = tmp[i];
+            }
+          }
         } else {
-        UNROLL:
+        UNROLL_1:
           for (int i = 0; i < WIDTH; i++) {
             op0Src0[i] = tmp[i];
           }
@@ -422,6 +433,38 @@ SC_MODULE(VectorOpUnit) {
 
             prevResult = result;
           }
+        } else if (inst.rOp == VectorInstructions::rmxscale) {
+          typedef ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, false>
+              exp_type_t;
+
+          exp_type_t prevExpResult;
+          for (int i = 0; i < inst.rCount; i++) {
+            Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op =
+                reductionOpInput.Pop();
+
+            Pack1D<exp_type_t, WIDTH> exponents;
+
+#pragma hls_unroll yes
+            for (int j = 0; j < WIDTH; j++) {
+              exponents[j] = op[j].unbiased_exponent();
+            }
+
+            exp_type_t result = treemax(exponents);
+
+            if (i != 0) {
+              result = result < prevExpResult ? prevExpResult : result;
+            }
+
+            prevExpResult = result;
+          }
+
+          ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, true>
+              scaledExp =
+                  prevExpResult -
+                  VEC_DTYPE::AccumulationDatatype::ac_float_rep::exp_bias -
+                  (IO_DTYPE::width - 2);
+
+          prevResult.setbits(scaledExp);
         }
         if (!inst.rDuplicate) {
           res[index] = prevResult;
@@ -482,7 +525,7 @@ SC_MODULE(VectorOpUnit) {
 };
 
 template <typename IO_DTYPE, typename VEC_DTYPE, typename MU_OUTPUT_DTYPE,
-          int WIDTH>
+          typename MX_DTYPE, int WIDTH>
 SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -503,6 +546,7 @@ SC_MODULE(VectorUnit) {
       vectorFetch1DataResponse);
   Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch1DataResponseConverted);
+  Connections::Combinational<MX_DTYPE> CCS_INIT_S1(vectorFetch1Scale);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
   Connections::In<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(
@@ -519,13 +563,14 @@ SC_MODULE(VectorUnit) {
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
 
-  VectorFetchUnit<IO_DTYPE, VEC_DTYPE, WIDTH> CCS_INIT_S1(vectorFetch);
+  VectorFetchUnit<IO_DTYPE, VEC_DTYPE, MX_DTYPE, WIDTH> CCS_INIT_S1(
+      vectorFetch);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vectorFetchParams);
 
   VectorOpUnit<IO_DTYPE, VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH> CCS_INIT_S1(
       vectorOpUnit);
 
-  MaxpoolUnit<VEC_DTYPE, IO_DTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
+  MaxpoolUnit<VEC_DTYPE, IO_DTYPE, MX_DTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
   Connections::Combinational<VectorParams> CCS_INIT_S1(maxpoolUnitParams);
 
   OutputAddressGenerator<WIDTH> CCS_INIT_S1(outputAddressGenerator);
@@ -565,6 +610,7 @@ SC_MODULE(VectorUnit) {
     vectorFetch.vectorFetch2DataResponse(vectorFetch2DataResponse);
     vectorFetch.vectorFetch2DataResponseConverted(
         vectorFetch2DataResponseConverted);
+    vectorFetch.vectorFetch1Scale(vectorFetch1Scale);
 
     vectorOpUnit.clk(clk);
     vectorOpUnit.rstn(rstn);
@@ -583,6 +629,7 @@ SC_MODULE(VectorUnit) {
     maxpoolUnit.tensorIn(vectorOpUnitOutput);
     maxpoolUnit.tensorOut(finalVectorOutput);
     maxpoolUnit.doneSignal(done);
+    maxpoolUnit.mxScaleIn(vectorFetch1Scale);
 
     outputAddressGenerator.clk(clk);
     outputAddressGenerator.rstn(rstn);

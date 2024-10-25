@@ -78,6 +78,13 @@ Harness::Harness(sc_module_name name,
   accelerator.vectorUnitStartSignal(vectorUnitStartSignal);
   accelerator.vectorUnitDoneSignal(vectorUnitDoneSignal);
 
+#if SUPPORT_MX
+  accelerator.inputScaleAddressRequest(inputScaleAddressRequest);
+  accelerator.inputScaleDataResponse(inputScaleDataResponse);
+  accelerator.weightScaleAddressRequest(weightScaleAddressRequest);
+  accelerator.weightScaleDataResponse(weightScaleDataResponse);
+#endif
+
 #ifdef SOC_COSIM
   init_checkers();
   register_interface(
@@ -103,6 +110,16 @@ Harness::Harness(sc_module_name name,
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
+#if SUPPORT_MX
+  SC_THREAD(readRequestInputScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseInputScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+#endif
+
   SC_THREAD(readRequestWeights);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
@@ -110,6 +127,16 @@ Harness::Harness(sc_module_name name,
   SC_THREAD(sendResponseWeights);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
+
+#if SUPPORT_MX
+  SC_THREAD(readRequestWeightScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseWeightScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+#endif
 
   SC_THREAD(readRequestVector0);
   sensitive << clk.posedge_event();
@@ -231,11 +258,35 @@ void Harness::sendResponseInputs() {
   sendMemoryResponse(&inputDataResponse_fifo, &inputDataResponse);
 }
 
+void Harness::readRequestInputScale() {
+#if SUPPORT_MX
+  readMemoryRequest(&inputScaleAddressRequest, &inputScaleDataResponse_fifo,
+                    "inputs");
+#endif
+}
+void Harness::sendResponseInputScale() {
+#if SUPPORT_MX
+  sendMemoryResponse(&inputScaleDataResponse_fifo, &inputScaleDataResponse);
+#endif
+}
+
 void Harness::readRequestWeights() {
   readMemoryRequest(&weightAddressRequest, &weightDataResponse_fifo, "weights");
 }
 void Harness::sendResponseWeights() {
   sendMemoryResponse(&weightDataResponse_fifo, &weightDataResponse);
+}
+
+void Harness::readRequestWeightScale() {
+#if SUPPORT_MX
+  readMemoryRequest(&weightScaleAddressRequest, &weightScaleDataResponse_fifo,
+                    "weights");
+#endif
+}
+void Harness::sendResponseWeightScale() {
+#if SUPPORT_MX
+  sendMemoryResponse(&weightScaleDataResponse_fifo, &weightScaleDataResponse);
+#endif
 }
 
 void Harness::readRequestVector0() {
@@ -349,6 +400,9 @@ void Harness::sendParams() {
             *vectorInstructionConfig, &serialVectorParamsIn);
         vectorUnitStartSignal.SyncPop();
       }
+
+      CCS_LOG("----- Accelerator Layer '" << currentParams.name()
+                                          << "' Started. -----");
 
       if (matrixParamsValid) {
         matrixUnitDoneSignal.SyncPop();

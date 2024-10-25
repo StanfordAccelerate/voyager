@@ -8,6 +8,7 @@
 #include <ccs_types.h>
 #include <mc_connections.h>
 
+#include "ConditionalConnections.h"
 #include "DataTypes.h"
 #include "Params.h"
 

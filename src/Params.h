@@ -58,7 +58,9 @@ struct MatrixParams : BaseParams {
 #endif
 
   int INPUT_OFFSET;
+  int INPUT_SCALE_OFFSET;
   int WEIGHT_OFFSET;
+  int WEIGHT_SCALE_OFFSET;
 
   // systolic array loop
   ac_int<10, false> loops[2][6];
@@ -94,15 +96,19 @@ struct MatrixParams : BaseParams {
   bool BIAS;
   int BIAS_OFFSET;
 
+  bool MX;
+
   static const unsigned int width =
-      3 * 32 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
-      (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 2;
+      5 * 32 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
+      (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 3;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & INPUT_OFFSET;
+    m & INPUT_SCALE_OFFSET;
     m & WEIGHT_OFFSET;
+    m & WEIGHT_SCALE_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
         m& loops[i][j];
@@ -148,6 +154,7 @@ struct MatrixParams : BaseParams {
     m & TRANPOSE_INPUTS;
     m & BIAS;
     m & BIAS_OFFSET;
+    m & MX;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,
@@ -159,6 +166,7 @@ struct MatrixParams : BaseParams {
   inline friend std::ostream& operator<<(ostream& os,
                                          const MatrixParams& params) {
     os << "INPUT_OFFSET: " << params.INPUT_OFFSET << std::endl;
+    os << "INPUT_SCALE_OFFSET: " << params.INPUT_SCALE_OFFSET << std::endl;
     os << "WEIGHT_OFFSET: " << params.WEIGHT_OFFSET << std::endl;
     os << "WEIGHT_TRANSPOSE: " << params.WEIGHT_TRANSPOSE << std::endl;
     for (int i = 0; i < 2; i++) {
@@ -257,6 +265,8 @@ struct MatrixParams : BaseParams {
 
     if (lhs.BIAS != rhs.BIAS || lhs.BIAS_OFFSET != rhs.BIAS_OFFSET)
       return false;
+
+    if (lhs.MX != rhs.MX) return false;
 
     // If all members are equal, return true
     return true;
@@ -367,9 +377,10 @@ struct VectorInstructions {
   static const unsigned int vWriteOut = 1;
 
   ac_int<10, false> rCount;
-  ac_int<2, false> rOp;
+  ac_int<3, false> rOp;
   static const unsigned int radd = 1;
   static const unsigned int rmax = 2;
+  static const unsigned int rmxscale = 3;
 
   ac_int<1, false> rSqrt;
   ac_int<1, false> rReciprocal;
@@ -388,7 +399,7 @@ struct VectorInstructions {
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
 
-  static const unsigned int width = 94;
+  static const unsigned int width = 95;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -493,6 +504,7 @@ struct VectorParams : BaseParams {
       addressGen1WeightLoopIndex[i] = 0;
     }
     DP_VEC1 = false;
+    BROADCAST_VEC1_SCALE = false;
 
     ADDRESS_GEN2_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
@@ -524,6 +536,8 @@ struct VectorParams : BaseParams {
     CONCAT_OUTPUT = false;
 
     DP_OUTPUT = false;
+    OUTPUT_QUANTIZE = false;
+    OUTPUT_QUANTIZE_MX = false;
 
     addressGen0Mode = 0;
     addressGen0Broadcast = false;
@@ -552,6 +566,8 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addressGen1WeightLoopIndex[2];
   bool DP_VEC1;
   ac_int<16, false> vec1DequantizeScale;
+  bool BROADCAST_VEC1_SCALE;
+  ac_int<8, false> vec1BroadcastCount;
 
   // Address Gen 2 (bias/op3src1)
   int ADDRESS_GEN2_OFFSET;
@@ -573,7 +589,9 @@ struct VectorParams : BaseParams {
   bool CONCAT_OUTPUT;
 
   bool DP_OUTPUT;
+  bool OUTPUT_QUANTIZE;
   ac_int<16, false> outputQuantizeScale;
+  bool OUTPUT_QUANTIZE_MX;
 
   // 1: 3d-tensor, 2: 2d-tensor, 3: 1d-tensor
   ac_int<2, false> addressGen0Mode;
@@ -586,8 +604,8 @@ struct VectorParams : BaseParams {
 
   static const unsigned int width =
       5 * 32 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
-      3 * 6 * 4 /* Loop indices */ + 9 * 1 /* Bools */ + 10 + 3 * 2 +
-      16 * 4 /* Dequantize scale */;
+      3 * 6 * 4 /* Loop indices */ + 12 * 1 /* Bools */ + 10 + 3 * 2 +
+      16 * 4 /* Dequantize scale */ + 8;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -626,6 +644,9 @@ struct VectorParams : BaseParams {
     }
     m & DP_VEC1;
     m & vec1DequantizeScale;
+    m & BROADCAST_VEC1_SCALE;
+    m & vec1BroadcastCount;
+
     m & ADDRESS_GEN2_OFFSET;
 
     for (int i = 0; i < 2; i++) {
@@ -663,7 +684,9 @@ struct VectorParams : BaseParams {
     m & SPLIT_OUTPUT;
     m & CONCAT_OUTPUT;
     m & DP_OUTPUT;
+    m & OUTPUT_QUANTIZE;
     m & outputQuantizeScale;
+    m & OUTPUT_QUANTIZE_MX;
     m & addressGen0Mode;
     m & addressGen0Broadcast;
     m & addressGen0BroadcastCount;
@@ -819,6 +842,8 @@ struct VectorParams : BaseParams {
     }
     if (lhs.DP_VEC1 != rhs.DP_VEC1) return false;
     if (lhs.vec1DequantizeScale != rhs.vec1DequantizeScale) return false;
+    if (lhs.BROADCAST_VEC1_SCALE != rhs.BROADCAST_VEC1_SCALE) return false;
+    if (lhs.vec1BroadcastCount != rhs.vec1BroadcastCount) return false;
 
     // Compare Address Gen 2 members
     if (lhs.ADDRESS_GEN2_OFFSET != rhs.ADDRESS_GEN2_OFFSET) return false;
@@ -859,7 +884,9 @@ struct VectorParams : BaseParams {
     if (lhs.SPLIT_OUTPUT != rhs.SPLIT_OUTPUT) return false;
     if (lhs.CONCAT_OUTPUT != rhs.CONCAT_OUTPUT) return false;
     if (lhs.DP_OUTPUT != rhs.DP_OUTPUT) return false;
+    if (lhs.OUTPUT_QUANTIZE != rhs.OUTPUT_QUANTIZE) return false;
     if (lhs.outputQuantizeScale != rhs.outputQuantizeScale) return false;
+    if (lhs.OUTPUT_QUANTIZE_MX != rhs.OUTPUT_QUANTIZE_MX) return false;
 
     // Compare address generation modes and pooling settings
     if (lhs.addressGen0Mode != rhs.addressGen0Mode) return false;

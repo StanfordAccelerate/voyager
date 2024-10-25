@@ -1,5 +1,5 @@
 set block "WeightController"
-set full_block_name "WeightController<$IO_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
+set full_block_name "WeightController<$IO_DATATYPE, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
 set clock_multiplier 1.2
 
 proc pre_architect {} {

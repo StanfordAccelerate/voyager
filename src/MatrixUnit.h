@@ -5,17 +5,21 @@
 
 #include "DoubleBuffer.h"
 #include "InputController.h"
+#include "InputScaleController.h"
 #include "MatrixProcessor.h"
 #include "WeightController.h"
+#include "WeightScaleController.h"
 #include "mc_scverify.h"
 
 SC_MODULE(MatrixUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  MatrixParamsRouter CCS_INIT_S1(paramsRouter);
+  static const int PARAMS_MODULE_COUNT = SUPPORT_MX ? 5 : 3;
+
+  MatrixParamsRouter<PARAMS_MODULE_COUNT> CCS_INIT_S1(paramsRouter);
   Connections::In<int> CCS_INIT_S1(serialMatrixParamsIn);
-  Connections::Combinational<int> serialMatrixParams[3];
+  Connections::Combinational<int> serialMatrixParams[PARAMS_MODULE_COUNT];
 
   // clang-format off
   #ifdef SIM_InputController
@@ -38,12 +42,36 @@ SC_MODULE(MatrixUnit) {
   Connections::Combinational<Pack1D<INPUT_DATATYPE, IC_DIMENSION> > CCS_INIT_S1(
       inputsToWindowBuffer);
 
+  // Only instantiate if MX is supported
+  ConditionalModule<InputScaleController<INPUT_DATATYPE, IC_DIMENSION>,
+                    SUPPORT_MX>
+      CCS_INIT_S1(inputScaleController);
+  ConditionalModule<DoubleBuffer<INPUT_DATATYPE, 1, INPUT_BUFFER_SIZE>,
+                    SUPPORT_MX>
+      CCS_INIT_S1(inputScaleBuffer);
+  Connections::ConditionalOut<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
+      inputScaleAddressRequest);
+  Connections::ConditionalIn<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX> CCS_INIT_S1(
+      inputScaleDataResponse);
+  Connections::ConditionalCombinational<BufferWriteRequest<INPUT_DATATYPE, 1>,
+                                        SUPPORT_MX>
+      inputScaleWriteRequest[2];
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
+      inputScaleWriteControl[2];
+  Connections::ConditionalCombinational<ac_int<16, false>, SUPPORT_MX>
+      inputScaleReadAddress[2];
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
+      inputScaleReadControl[2];
+  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX>
+      CCS_INIT_S1(inputScaleFromBuffer);
+
 #ifdef SIM_WeightController
   // clang-format off
   CCS_DESIGN( (WeightController<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION>) ) CCS_INIT_S1(weightController);
 // clang-format on
 #else
-  WeightController<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION>
+  WeightController<INPUT_DATATYPE, ACCUM_BUFFER_DATATYPE, IC_DIMENSION,
+                   OC_DIMENSION>
       CCS_INIT_S1(weightController);
 #endif
 
@@ -63,6 +91,32 @@ SC_MODULE(MatrixUnit) {
   Connections::Combinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       weightsFromBuffer);
 
+  // TODO: conditional initialization
+  ConditionalModule<WeightScaleController<INPUT_DATATYPE, ACCUM_BUFFER_DATATYPE,
+                                          IC_DIMENSION, OC_DIMENSION>,
+                    SUPPORT_MX>
+      CCS_INIT_S1(weightScaleController);
+  ConditionalModule<
+      DoubleBuffer<INPUT_DATATYPE, OC_DIMENSION, WEIGHT_BUFFER_SIZE>,
+      SUPPORT_MX>
+      CCS_INIT_S1(weightScaleBuffer);
+  Connections::ConditionalOut<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
+      weightScaleAddressRequest);
+  Connections::ConditionalIn<Pack1D<INPUT_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
+      CCS_INIT_S1(weightScaleDataResponse);
+  Connections::ConditionalCombinational<
+      BufferWriteRequest<INPUT_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
+      weightScaleWriteRequest[2];
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
+      weightScaleWriteControl[2];
+  Connections::ConditionalCombinational<ac_int<16, false>, SUPPORT_MX>
+      weightScaleReadAddress[2];
+  Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
+      weightScaleReadControl[2];
+  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION>,
+                                        SUPPORT_MX>
+      CCS_INIT_S1(weightScaleFromBuffer);
+
 #ifdef SIM_MatrixProcessor
   // clang-format off
   CCS_DESIGN( (MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>) ) CCS_INIT_S1(matrixProcessor);
@@ -73,8 +127,8 @@ SC_MODULE(MatrixUnit) {
                   ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 #else
-  MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION,
-                  ACCUM_BUFFER_SIZE>
+  MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
+                  SUPPORT_MX, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 #endif
 #endif
@@ -91,10 +145,10 @@ SC_MODULE(MatrixUnit) {
   Connections::Combinational<
       Pack1D<INPUT_DATATYPE::AccumulationDatatype, OC_DIMENSION> >
       CCS_INIT_S1(weightsToSystolicArray);
-  Connections::Combinational<Pack1D<ACCUM_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
-      biasToSystolicArray);
+  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION> >
+      CCS_INIT_S1(biasToSystolicArray);
 #endif
-  Connections::Out<Pack1D<ACCUM_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
+  Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       outputsFromSystolicArray);
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
@@ -104,7 +158,7 @@ SC_MODULE(MatrixUnit) {
     paramsRouter.clk(clk);
     paramsRouter.rstn(rstn);
     paramsRouter.serialParamsIn(serialMatrixParamsIn);
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < PARAMS_MODULE_COUNT; i++) {
       paramsRouter.serialMatrixParams[i](serialMatrixParams[i]);
     }
 
@@ -131,6 +185,29 @@ SC_MODULE(MatrixUnit) {
     }
     inputBuffer.output(inputsToWindowBuffer);
 
+#if SUPPORT_MX
+    inputScaleController.clk(clk);
+    inputScaleController.rstn(rstn);
+    inputScaleController.addressRequest(inputScaleAddressRequest);
+    inputScaleController.dataResponse(inputScaleDataResponse);
+    inputScaleController.serialParamsIn(serialMatrixParams[3]);
+
+    inputScaleBuffer.clk(clk);
+    inputScaleBuffer.rstn(rstn);
+    for (int i = 0; i < 2; i++) {
+      inputScaleController.writeRequest[i](inputScaleWriteRequest[i]);
+      inputScaleController.writeControl[i](inputScaleWriteControl[i]);
+      inputScaleController.readAddress[i](inputScaleReadAddress[i]);
+      inputScaleController.readControl[i](inputScaleReadControl[i]);
+
+      inputScaleBuffer.writeRequest[i](inputScaleWriteRequest[i]);
+      inputScaleBuffer.writeControl[i](inputScaleWriteControl[i]);
+      inputScaleBuffer.readAddress[i](inputScaleReadAddress[i]);
+      inputScaleBuffer.readControl[i](inputScaleReadControl[i]);
+    }
+    inputScaleBuffer.output(inputScaleFromBuffer);
+#endif
+
     weightController.clk(clk);
     weightController.rstn(rstn);
     weightController.addressRequest(weightAddressRequest);
@@ -156,6 +233,29 @@ SC_MODULE(MatrixUnit) {
     }
     weightBuffer.output(weightsFromBuffer);
 
+#if SUPPORT_MX
+    weightScaleController.clk(clk);
+    weightScaleController.rstn(rstn);
+    weightScaleController.addressRequest(weightScaleAddressRequest);
+    weightScaleController.dataResponse(weightScaleDataResponse);
+    weightScaleController.serialParamsIn(serialMatrixParams[4]);
+
+    weightScaleBuffer.clk(clk);
+    weightScaleBuffer.rstn(rstn);
+    for (int i = 0; i < 2; i++) {
+      weightScaleController.writeRequest[i](weightScaleWriteRequest[i]);
+      weightScaleController.writeControl[i](weightScaleWriteControl[i]);
+      weightScaleController.readAddress[i](weightScaleReadAddress[i]);
+      weightScaleController.readControl[i](weightScaleReadControl[i]);
+
+      weightScaleBuffer.writeRequest[i](weightScaleWriteRequest[i]);
+      weightScaleBuffer.writeControl[i](weightScaleWriteControl[i]);
+      weightScaleBuffer.readAddress[i](weightScaleReadAddress[i]);
+      weightScaleBuffer.readControl[i](weightScaleReadControl[i]);
+    }
+    weightScaleBuffer.output(weightScaleFromBuffer);
+#endif
+
     matrixProcessor.clk(clk);
     matrixProcessor.rstn(rstn);
     matrixProcessor.inputsChannel(inputsToSystolicArray);
@@ -165,5 +265,10 @@ SC_MODULE(MatrixUnit) {
     matrixProcessor.serialParamsIn(serialMatrixParams[2]);
     matrixProcessor.startSignal(startSignal);
     matrixProcessor.doneSignal(doneSignal);
+
+#if SUPPORT_MX
+    matrixProcessor.inputScaleChannel(inputScaleFromBuffer);
+    matrixProcessor.weightScaleChannel(weightScaleFromBuffer);
+#endif
   }
 };

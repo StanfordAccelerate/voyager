@@ -236,7 +236,36 @@ if { $DATATYPE == "P8_1" } {
 
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 32
+} elseif {$DATATYPE == "MXINT8"} {
+  set IO_DATATYPE "I8"
+  set ACCUM_DATATYPE "I32"
+  set VECTOR_DATATYPE "F16"
+  set PE_INPUT_DATATYPE "Int<8, true>::AccumulationDatatype"
+  set PE_WEIGHT_DATATYPE "Int<8, true>::AccumulationDatatype"
+  set PE_PSUM_DATATYPE "Int<32, true>::AccumulationDatatype"
+  set ACCUM_BUFFER_DATATYPE "F16"
+  set C_DATA_REP_NAME "int_val"
+  set ACC_BUF_C_DATA_REP_NAME "float_val.d"
+  set MX_DATATYPE "Scale<8>"
+
+  set SUPPORT_MX true
+  set IO_DATATYPE_WIDTH 8
+  set ACCUM_DATATYPE_WIDTH 16
 } else {
     puts "Invalid DATATYPE"
     exit 1
+}
+
+
+if {![info exists ACCUM_BUFFER_DATATYPE]} {
+  set ACCUM_BUFFER_DATATYPE $ACCUM_DATATYPE
+}
+
+if {![info exists MX_DATATYPE]} {
+  set MX_DATATYPE $IO_DATATYPE
+}
+
+# if SUPPORT_MX is not defined, set it to 0
+if {![info exists SUPPORT_MX]} {
+  set SUPPORT_MX false
 }

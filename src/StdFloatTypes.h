@@ -15,6 +15,8 @@ class StdFloat {
  public:
   typedef ac_std_float<mantissa + exp + 1, exp> ac_float_rep;
   static constexpr unsigned int width = ac_float_rep::width;
+  static constexpr unsigned int exponent_width = ac_float_rep::e_width;
+  static constexpr unsigned int mantissa_width = ac_float_rep::mant_bits;
 
   static constexpr bool is_floating_point = true;
 
@@ -51,6 +53,9 @@ class StdFloat {
 
   template <int W, bool S>
   StdFloat(const ac_int<W, S> &rhs);
+
+  template <int W, bool S>
+  StdFloat(const Int<W, S> &rhs);
 
   template <int nbits, int es>
   StdFloat(const Posit<nbits, es> &input);
@@ -122,9 +127,25 @@ class StdFloat {
     float_val = static_cast<ac_float_rep>(sigmoid_in_fixed);
   }
 
-  void expScale(ac_int<8, false> offset) {
-    // TODO: fix this to be scale the exponent
-    float_val.d += offset;
+  template <int width, bool sign>
+  void expScale(ac_int<width, sign> offset) {
+    if (float_val == float_val.zero()) return;
+    // TODO: handle subnormal numbers
+    ac_int<exponent_width, true> exp_bits =
+        float_val.d.template slc<exponent_width>(mantissa_width);
+    exp_bits += offset;
+    float_val.d.set_slc(mantissa_width, exp_bits);
+  }
+
+  ac_int<exponent_width, false> unbiased_exponent() {
+    return float_val.d.template slc<exponent_width>(mantissa_width);
+  }
+
+  ac_int<exponent_width, true> exponent() {
+    ac_int<exponent_width, true> exp_bits =
+        float_val.d.template slc<exponent_width>(mantissa_width);
+
+    return exp_bits - ac_int<exponent_width, true>(ac_float_rep::exp_bias);
   }
 
   template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,
@@ -133,11 +154,14 @@ class StdFloat {
       StdFloat &b,
       StdFloat<mantissa2, exp2, useDWImpl2, ieee_compliance2, Q2> &c);
 
-  template <int quantized_width, int quantized_sign>
+  template <int quantized_width, bool quantized_sign>
   Int<quantized_width, quantized_sign> quantize(ac_int<width, false> scale);
 
-  template <int quantized_width, int quantized_sign>
+  template <int quantized_width, bool quantized_sign>
   Int<quantized_width, quantized_sign> quantize(StdFloat scale);
+
+  template <int quantized_width, bool quantized_sign, int scale_W>
+  Int<quantized_width, quantized_sign> quantize(Scale<scale_W> scale);
 
   StdFloat operator+(const StdFloat &rhs);
   StdFloat operator*(const StdFloat &rhs);
@@ -225,6 +249,14 @@ template <int W, bool S>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
     const ac_int<W, S> &rhs) {
   float_val = ac_float_rep(rhs);
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int W, bool S>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
+    const Int<W, S> &rhs) {
+  float_val = ac_float_rep(rhs.int_val);
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
@@ -396,7 +428,7 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::fma(
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>
-template <int quantized_width, int quantized_sign>
+template <int quantized_width, bool quantized_sign>
 Int<quantized_width, quantized_sign>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
     ac_int<width, false> scale) {
@@ -407,7 +439,7 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
           ac_q_mode Q>
-template <int quantized_width, int quantized_sign>
+template <int quantized_width, bool quantized_sign>
 Int<quantized_width, quantized_sign>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
     StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> scale) {
@@ -423,6 +455,21 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
           .to_ac_int();
 
   return quantizedValue;
+}
+
+template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+          ac_q_mode Q>
+template <int quantized_width, bool quantized_sign, int scale_W>
+Int<quantized_width, quantized_sign>
+StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::quantize(
+    Scale<scale_W> scale) {
+  StdFloat scale_float;
+
+  ac_int<exponent_width, true> exponent_bits =
+      scale.bits_rep() + ac_float_rep::exp_bias;
+  scale_float.float_val.d.set_slc(mantissa_width, exponent_bits);
+
+  return quantize<quantized_width, quantized_sign>(scale_float);
 }
 
 /*

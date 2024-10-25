@@ -122,7 +122,8 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   Tiling tiling;
   const auto matrix_param = param.matrix_param();
-  if (matrix_param.opcode() == "conv2d") {
+  if (matrix_param.opcode() == "conv2d" ||
+      matrix_param.opcode() == "conv2d_mx") {
     tiling = get_conv2d_tiling(param);
   } else {
     tiling = get_linear_tiling(param);
@@ -145,11 +146,26 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   AcceleratorMemoryMap accelerator_memory_map;
 
   // matrix tiling
-  const auto input_memory = matrix_param.input().memory();
+  const auto input_memory = matrix_param.has_mx_input()
+                                ? matrix_param.mx_input().input().memory()
+                                : matrix_param.input().memory();
   accelerator_memory_map["inputs"] = get_partition(input_memory.partition());
   matrix_params->INPUT_OFFSET = input_memory.offset();
-  const auto weight_memory = matrix_param.weight().memory();
+
+  if (matrix_param.has_mx_input()) {
+    matrix_params->INPUT_SCALE_OFFSET =
+        matrix_param.mx_input().scale().memory().offset();
+  }
+  const auto weight_memory = matrix_param.has_mx_weight()
+                                 ? matrix_param.mx_weight().input().memory()
+                                 : matrix_param.weight().memory();
   accelerator_memory_map["weights"] = get_partition(weight_memory.partition());
+
+  if (matrix_param.has_mx_weight()) {
+    matrix_params->WEIGHT_SCALE_OFFSET =
+        matrix_param.mx_weight().scale().memory().offset();
+  }
+
   matrix_params->WEIGHT_OFFSET = weight_memory.offset();
 
   for (int i = 0; i < 2; i++) {
@@ -278,7 +294,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   matrix_params->ACC_FROM_ACC = false;
 
   // Permute input for transformer attention outputs
-  const auto input = matrix_param.input();
+  const auto input = matrix_param.has_mx_input()
+                         ? matrix_param.mx_input().input()
+                         : matrix_param.input();
   const auto permutation = input.permutation();
   matrix_params->CONCAT_INPUT = permutation.opcode() == "permute";
   // matrix_params->CONCAT_HEAD_WEIGHTS = false;
@@ -289,6 +307,9 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
   matrix_params->BIAS = matrix_param.has_bias();
   matrix_params->BIAS_OFFSET = bias_memory.offset();
   accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
+
+  matrix_params->MX = matrix_param.opcode() == "conv2d_mx" ||
+                      matrix_param.opcode() == "linear_mx";
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
@@ -354,7 +375,14 @@ void MapMatrixOperation(const codegen::AcceleratorParam &param,
       VECTOR_DATATYPE immediate = read_constant_param(it->other());
       if (opcode.rfind("dequantize", 0) == 0) {
         vinst.vDequantizeScale = immediate.bits_rep();
+
+        bool is_mx_based_design = ACCUM_DATATYPE::is_floating_point !=
+                                  ACCUM_BUFFER_DATATYPE::is_floating_point;
+        if (is_mx_based_design && !matrix_param.has_mx_input()) {
+          vinst.vDequantize = true;
+        }
       } else if (opcode.rfind("quantize", 0) == 0) {
+        vector_params->OUTPUT_QUANTIZE = true;
         vector_params->outputQuantizeScale = immediate.bits_rep();
       }
     } else {

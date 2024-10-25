@@ -1,0 +1,973 @@
+#pragma once
+
+#include <mc_connections.h>
+#include <systemc.h>
+
+#include "AccelTypes.h"
+#include "ParamsDeserializer.h"
+
+template <typename DTYPE, int NROWS>
+SC_MODULE(InputScaleController) {
+  sc_in<bool> CCS_INIT_S1(clk);
+  sc_in<bool> CCS_INIT_S1(rstn);
+
+  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+
+  Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
+  Connections::In<Pack1D<DTYPE, 1> > CCS_INIT_S1(dataResponse);
+
+  Connections::Out<BufferWriteRequest<DTYPE, 1> > writeRequest[2];
+  Connections::Out<ac_int<32, false> > writeControl[2];
+  Connections::Out<ac_int<16, false> > readAddress[2];
+  Connections::Out<ac_int<32, false> > readControl[2];
+
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
+
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
+
+  Connections::Combinational<Pack1D<DTYPE, 1> > transposeOut;
+
+  MatrixParamsDeserializer<3> CCS_INIT_S1(paramsDeserializer);
+
+  SC_CTOR(InputScaleController) {
+    paramsDeserializer.clk(clk);
+    paramsDeserializer.rstn(rstn);
+    paramsDeserializer.serialParamsIn(serialParamsIn);
+    paramsDeserializer.paramsOut(paramsIn);
+
+    SC_THREAD(read_params);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(fetcher);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(reader);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(writer);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(transposer);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+  }
+
+  void fetcher() {
+    addressRequest.Reset();
+    fetcherParams.ResetRead();
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = fetcherParams.Pop();
+
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      if (params.REPLICATION) {
+        FX = 7;
+      }
+      ac_int<4, false> FY = params.loops[1][params.fyIndex];
+      ac_int<2, false> STRIDE = params.STRIDE;
+
+      // replication packing factor
+      int packingFactor;
+      if (IC_DIMENSION == 16) {
+        packingFactor = 4;
+      } else if (IC_DIMENSION == 32) {
+        packingFactor = 8;
+      }
+
+      bool isDownsample = FX == 1 && FY == 1;
+
+      ac_int<8, false> loop_counters[2][6];
+      ac_int<8, false> loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.weightLoopIndex[1]] = 1;
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex] = 1;
+
+      // microscaling batch size of 32 along C dimension
+      loop_bounds[1][params.reductionLoopIndex[1]] =
+          loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+           loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+             loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
+               loop_counters[0][2]++) {
+            // fetching border pixels is a little tricky
+            // for the outer tiles, we don't fetch borders (they are known to be
+            // 0)
+
+            // reset loop bounds
+            if (isDownsample) {
+              // don't include STRIDE for downsample
+              loop_bounds[1][params.inputXLoopIndex[1]] =
+                  params.loops[1][params.inputXLoopIndex[1]];
+              loop_bounds[1][params.inputYLoopIndex[1]] =
+                  params.loops[1][params.inputYLoopIndex[1]];
+            } else {
+              loop_bounds[1][params.inputXLoopIndex[1]] =
+                  params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
+              loop_bounds[1][params.inputYLoopIndex[1]] =
+                  params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
+            }
+
+            if (params.REPLICATION) {
+              loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
+            }
+
+            ac_int<4, false> x_min_offset = 0;
+            ac_int<4, false> x_max_offset = 0;
+            ac_int<4, false> y_min_offset = 0;
+            ac_int<4, false> y_max_offset = 0;
+
+            if (params.REPLICATION) {
+              if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                x_min_offset = (FX - 1) / 2;
+                loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+              }
+              if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                  loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                x_max_offset = (FX - 1) / 2;
+                loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+              }
+            } else {
+              if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                x_min_offset = (FX - 1) / 2;
+                loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+              }
+
+              if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                  loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                x_max_offset = (FX - 1) / 2;
+                loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+              }
+            }
+
+            if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
+              y_min_offset = (FY - 1) / 2;
+              loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+            }
+
+            if (loop_counters[0][params.inputYLoopIndex[0]] !=
+                loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
+              y_max_offset = (FY - 1) / 2;
+              loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+            }
+
+// inner memory
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+            for (loop_counters[1][0] = 0;
+                 loop_counters[1][0] < loop_bounds[1][0];
+                 loop_counters[1][0]++) {
+              for (loop_counters[1][1] = 0;
+                   loop_counters[1][1] < loop_bounds[1][1];
+                   loop_counters[1][1]++) {
+                for (loop_counters[1][2] = 0;
+                     loop_counters[1][2] < loop_bounds[1][2];
+                     loop_counters[1][2]++) {
+                  for (loop_counters[1][3] = 0;
+                       loop_counters[1][3] < loop_bounds[1][3];
+                       loop_counters[1][3]++) {
+                    for (loop_counters[1][4] = 0;
+                         loop_counters[1][4] < loop_bounds[1][4];
+                         loop_counters[1][4]++) {
+                      for (loop_counters[1][5] = 0;
+                           loop_counters[1][5] < loop_bounds[1][5];
+                           loop_counters[1][5]++) {
+                        ac_int<8, false> x0 =
+                            loop_counters[1][params.inputXLoopIndex[1]];
+                        ac_int<8, false> x1 =
+                            loop_counters[0][params.inputXLoopIndex[0]];
+                        ac_int<16, false> X0 =
+                            STRIDE * params.loops[1][params.inputXLoopIndex[1]];
+                        ac_int<8, false> X1 =
+                            params.loops[0][params.inputXLoopIndex[0]];
+                        ac_int<8, false> y0 =
+                            loop_counters[1][params.inputYLoopIndex[1]];
+                        ac_int<8, false> y1 =
+                            loop_counters[0][params.inputYLoopIndex[0]];
+                        ac_int<16, false> Y0 =
+                            STRIDE * params.loops[1][params.inputYLoopIndex[1]];
+                        ac_int<8, false> Y1 =
+                            params.loops[0][params.inputYLoopIndex[0]];
+                        ac_int<8, false> c1 =
+                            loop_counters[1][params.reductionLoopIndex[1]];
+                        ac_int<8, false> C1 =
+                            loop_bounds[1][params.reductionLoopIndex[1]];
+
+                        ac_int<16, false> c = c1;
+                        ac_int<16, false> C = C1;
+
+                        if (isDownsample) {
+                          // adjust address for stride
+                          x0 = x0 * STRIDE;
+                          y0 = y0 * STRIDE;
+                        }
+
+                        if (params.REPLICATION) {
+                          if (x0 != 0 && x_min_offset == 3) {
+                            x0 = x_min_offset + (x0 - 1) * packingFactor;
+                          } else {
+                            x0 = x0 * packingFactor;
+                          }
+                        }
+
+                        ac_int<16, false> x = (x0 - x_min_offset) + x1 * X0;
+                        ac_int<16, false> X = X0 * X1;
+
+                        ac_int<16, false> y = (y0 - y_min_offset) + y1 * Y0;
+                        ac_int<16, false> Y = Y0 * Y1;
+
+                        int baseAddress = y * X * C + x * C + c;
+                        int burstSize = 1;
+
+                        if (params.REPLICATION) {
+                          baseAddress =
+                              static_cast<ac_int<32, false> >(
+                                  y * (X / packingFactor) * IC_DIMENSION) +
+                              static_cast<ac_int<32, false> >(
+                                  (x / packingFactor) * IC_DIMENSION) +
+                              c;
+                        }
+                        if (params.CONCAT_INPUT && params.TRANPOSE_INPUTS) {
+                          baseAddress =
+                              static_cast<ac_int<32, false> >((c + (x % 16)) *
+                                                              32) +
+                              static_cast<ac_int<32, false> >(
+                                  (((x / 16) * IC_DIMENSION) / 32 * C * 32)) +
+                              static_cast<ac_int<32, false> >(
+                                  (((x / 16) * IC_DIMENSION) % 32));
+                        } else {
+                          if (params.CONCAT_INPUT) {
+                            baseAddress =
+                                static_cast<ac_int<32, false> >(
+                                    ((c / 32) * X * 32)) +
+                                static_cast<ac_int<32, false> >((x * 32)) +
+                                static_cast<ac_int<32, false> >((c % 32));
+                          }
+                          if (params.TRANPOSE_INPUTS) {
+                            baseAddress = static_cast<ac_int<32, false> >(
+                                              (c + (x % 16)) * X) +
+                                          static_cast<ac_int<32, false> >(
+                                              (x / 16) * IC_DIMENSION);
+                          }
+                        }
+                        MemoryRequest memRequest;
+                        memRequest = {params.INPUT_SCALE_OFFSET + baseAddress,
+                                      burstSize};
+
+                        // CCS_LOG("Fetching input scale: " << baseAddress);
+
+                        addressRequest.Push(memRequest);
+
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
+        }
+      }
+    }
+  }
+
+  void writer() {
+    writerParams.ResetRead();
+    transposeOut.ResetRead();
+
+    writeControl[0].Reset();
+    writeControl[1].Reset();
+    writeRequest[0].Reset();
+    writeRequest[1].Reset();
+
+    bool bankSel = 0;
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = writerParams.Pop();
+
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      if (params.REPLICATION) {
+        FX = 7;
+      }
+
+      // replication packing factor
+      int packingFactor;
+      if (IC_DIMENSION == 16) {
+        packingFactor = 4;
+      } else if (IC_DIMENSION == 32) {
+        packingFactor = 8;
+      }
+
+      ac_int<4, false> FY = params.loops[1][params.fyIndex];
+      ac_int<2, false> STRIDE = params.STRIDE;
+
+      bool isDownsample = FX == 1 && FY == 1;
+
+      ac_int<4, false> fx_bound = (FX - 1) / 2;
+      ac_int<4, false> fy_bound = (FY - 1) / 2;
+
+      ac_int<8, false> loop_counters[2][6];
+      ac_int<8, false> loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.weightLoopIndex[1]] = 1;
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex] = 1;
+      // microscaling batch size of 32 along C dimension
+      loop_bounds[1][params.reductionLoopIndex[1]] =
+          loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+
+      ac_int<8, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
+      ac_int<8, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+
+      ac_int<8, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<8, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
+
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+           loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+             loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
+               loop_counters[0][2]++) {
+            if (isDownsample) {
+              // don't include STRIDE for downsample
+              STRIDE = 1;
+            }
+
+            // reset loop bounds
+            loop_bounds[1][params.inputXLoopIndex[1]] =
+                params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
+            loop_bounds[1][params.inputYLoopIndex[1]] =
+                params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
+
+            ac_int<4, false> x_min_offset = fx_bound;
+            ac_int<4, false> y_min_offset = fy_bound;
+            if (params.REPLICATION) {
+              // make sure to grab border pixels
+              loop_bounds[1][params.inputXLoopIndex[1]] =
+                  STRIDE * X0 / packingFactor + 2;
+              loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
+            } else {
+              loop_bounds[1][params.inputXLoopIndex[1]] += FX - 1;
+              loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
+            }
+
+// inner memory
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+            for (loop_counters[1][0] = 0;
+                 loop_counters[1][0] < loop_bounds[1][0];
+                 loop_counters[1][0]++) {
+              // TODO: make this dynamic
+              int total_writes;
+              if (!params.REPLICATION) {
+                total_writes = (loop_bounds[1][1] * loop_bounds[1][2] *
+                                loop_bounds[1][3] * loop_bounds[1][4]) *
+                               loop_bounds[1][5];
+              } else {
+                total_writes = static_cast<ac_int<32, false> >(
+                                   loop_bounds[1][1] * loop_bounds[1][2] *
+                                   loop_bounds[1][3] * loop_bounds[1][4]) *
+                               static_cast<ac_int<32, false> >(
+                                   (STRIDE)*X0 / packingFactor +
+                                   2);  // 2 extra writes for padding
+              }
+              // CCS_LOG("total_writes: " << total_writes);
+              writeControl[bankSel].Push(total_writes);
+              for (loop_counters[1][1] = 0;
+                   loop_counters[1][1] < loop_bounds[1][1];
+                   loop_counters[1][1]++) {
+                for (loop_counters[1][2] = 0;
+                     loop_counters[1][2] < loop_bounds[1][2];
+                     loop_counters[1][2]++) {
+                  for (loop_counters[1][3] = 0;
+                       loop_counters[1][3] < loop_bounds[1][3];
+                       loop_counters[1][3]++) {
+                    for (loop_counters[1][4] = 0;
+                         loop_counters[1][4] < loop_bounds[1][4];
+                         loop_counters[1][4]++) {
+                      for (loop_counters[1][5] = 0;
+                           loop_counters[1][5] < loop_bounds[1][5];
+                           loop_counters[1][5]++) {
+                        ac_int<8, true> x0 =
+                            loop_counters[1][params.inputXLoopIndex[1]];
+                        ac_int<8, true> x1 =
+                            loop_counters[0][params.inputXLoopIndex[0]];
+
+                        ac_int<8, true> y0 =
+                            loop_counters[1][params.inputYLoopIndex[1]];
+                        ac_int<8, true> y1 =
+                            loop_counters[0][params.inputYLoopIndex[0]];
+
+                        if (params.REPLICATION) {
+                          if (x0 != 0) {
+                            x0 = x_min_offset + (x0 - 1) * packingFactor;
+                          }
+                        }
+
+                        ac_int<16, true> full_x, full_y;
+                        if (isDownsample) {
+                          full_x =
+                              (x0 * STRIDE - x_min_offset) + x1 * STRIDE * X0;
+                          full_y =
+                              (y0 * STRIDE - y_min_offset) + y1 * STRIDE * Y0;
+                        } else {
+                          full_x = (x0 - x_min_offset) + x1 * STRIDE * X0;
+                          full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
+                        }
+
+                        Pack1D<DTYPE, 1> data;
+
+                        if ((full_x < 0) || (full_y < 0) ||
+                            (full_x >= STRIDE * X0 * X1) ||
+                            (full_y >= STRIDE * Y0 * Y1)) {
+#pragma hls_unroll yes
+                          for (int dims = 0; dims < 1; dims++) {
+                            data[dims].setZero();
+                          }
+                        } else {
+                          data = transposeOut.Pop();
+                        }
+
+                        int address = static_cast<ac_int<16, false> >(
+                                          (y0) * (STRIDE * X0 + FX - 1)) +
+                                      (x0);
+
+                        if (params.REPLICATION) {
+                          address = y0 * (STRIDE * X0 / packingFactor + 2) +
+                                    loop_counters[1][params.inputXLoopIndex[1]];
+                        }
+
+                        BufferWriteRequest<DTYPE, 1> req;
+                        req.address = address;
+                        req.data = data;
+                        writeRequest[bankSel].Push(req);
+                        // CCS_LOG("pushing write request: " << address);
+
+                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  break;
+                }
+              }
+              // writeControl[bankSel].Push(0);
+              // CCS_LOG("writer bank switching");
+              bankSel = !bankSel;
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
+        }
+      }
+    }
+  }
+
+  void reader() {
+    readerParams.ResetRead();
+
+    readControl[0].Reset();
+    readControl[1].Reset();
+    readAddress[0].Reset();
+    readAddress[1].Reset();
+
+    bool bankSel = 0;
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = readerParams.Pop();
+
+      // replication packing factor
+      int packingFactor;
+      if (IC_DIMENSION == 16) {
+        packingFactor = 4;
+      } else if (IC_DIMENSION == 32) {
+        packingFactor = 8;
+      }
+
+      ac_int<8, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      ac_int<4, false> FY = params.loops[1][params.fyIndex];
+      bool isDownsample = FX == 1 && FY == 1;
+
+      ac_int<8, false> loop_counters[2][6];
+      ac_int<8, false> loop_bounds[2][6];
+      ac_int<2, false> STRIDE = params.STRIDE;
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      if (params.REPLICATION) {
+        loop_bounds[1][params.inputXLoopIndex[1]] =
+            (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
+             packingFactor) +
+            2;
+      }
+
+      // microscaling batch size of 32 along C dimension
+      loop_bounds[1][params.reductionLoopIndex[1]] =
+          loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+      ac_int<8, false> microscalingReuse = (32 / NROWS);
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+           loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+             loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
+               loop_counters[0][2]++) {
+            // inner memory
+            for (loop_counters[1][0] = 0;
+                 loop_counters[1][0] < loop_bounds[1][0];
+                 loop_counters[1][0]++) {
+              int total_reads = loop_bounds[1][1] * loop_bounds[1][2] *
+                                loop_bounds[1][3] * loop_bounds[1][4] *
+                                loop_bounds[1][5] * microscalingReuse;
+              // CCS_LOG("total_reads: " << total_reads);
+
+              readControl[bankSel].Push(total_reads);
+              for (int reuse = 0; reuse < microscalingReuse; reuse++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          ac_int<8, false> x0 =
+                              loop_counters[1][params.inputXLoopIndex[1]];
+                          ac_int<8, false> X0 =
+                              params.loops[1][params.inputXLoopIndex[1]];
+                          ac_int<8, false> y0 =
+                              loop_counters[1][params.inputYLoopIndex[1]];
+                          ac_int<8, false> Y0 =
+                              params.loops[1][params.inputYLoopIndex[1]];
+                          ac_int<8, false> fx =
+                              loop_counters[1][params.fxIndex];
+                          ac_int<8, false> fy =
+                              loop_counters[1][params.fyIndex];
+
+                          ac_int<16, false> x = STRIDE * x0 + fx;
+                          ac_int<16, false> y = STRIDE * y0 + fy;
+                          int address;
+                          if (params.REPLICATION) {
+                            address =
+                                y * (((STRIDE * X0) / packingFactor) + 2) + x0 +
+                                fx;
+                          } else {
+                            if (isDownsample) {
+                              address = y0 * X0 + x0;
+                            } else {
+                              address = y * (STRIDE * X0 + FX - 1) + x;
+                            }
+                          }
+
+                          readAddress[bankSel].Push(address);
+                          // CCS_LOG("pushing read address: " << address);
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
+                        }
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                    break;
+                  }
+                }
+              }
+              bankSel = !bankSel;
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
+        }
+      }
+    }
+  }
+
+  void transposer() {
+    transposerParams.ResetRead();
+    dataResponse.Reset();
+    transposeOut.ResetWrite();
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = transposerParams.Pop();
+
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      if (params.REPLICATION) {
+        FX = 7;
+      }
+
+      // replication packing factor
+      int packingFactor;
+      if (IC_DIMENSION == 16) {
+        packingFactor = 4;
+      } else if (IC_DIMENSION == 32) {
+        packingFactor = 8;
+      }
+
+      ac_int<4, false> FY = params.loops[1][params.fyIndex];
+
+      bool isDownsample = FX == 1 && FY == 1;
+
+      ac_int<8, false> loop_counters[2][6];
+      ac_int<8, false> loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.weightLoopIndex[1]] = 1;
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex] = 1;
+
+      // microscaling batch size of 32 along C dimension
+      loop_bounds[1][params.reductionLoopIndex[1]] =
+          loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+
+      if (params.TRANPOSE_INPUTS) {
+        INPUT_DATATYPE transposeBuffer[NROWS][NROWS];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              // inner memory
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        // innermost loop must be X0, and must be a multiple
+                        // of NROWS
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5] / NROWS;
+                             loop_counters[1][5]++) {
+                          // TODO: figure out transpose logic
+                          //                           for (int c0 = 0; c0 <
+                          //                           NROWS; c0++) {
+
+                          //                             Pack1D<DTYPE, 1>
+                          //                             originalValue =
+                          //                             dataResponse.Pop();
+                          // #pragma hls_unroll yes
+                          //                             for (int dim = 0; dim <
+                          //                             NROWS; dim++) {
+                          //                               transposeBuffer[dim][c0]
+                          //                               = originalValue[dim];
+                          //                             }
+                          //                           }
+
+                          //                           // Write out from
+                          //                           tranposeBuffer for (int
+                          //                           c0 = 0; c0 < NROWS; c0++)
+                          //                           {
+                          //                             Pack1D<DTYPE, 1>
+                          //                             transposedValue;
+
+                          // #pragma hls_unroll yes
+                          //                             for (int dim = 0; dim <
+                          //                             NROWS; dim++) {
+                          //                               transposedValue[dim]
+                          //                               =
+                          //                               transposeBuffer[c0][dim];
+                          //                             }
+                          //                             transposeOut.Push(transposedValue);
+                          //                           }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {  // passthrough
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;
+                 loop_counters[0][2] < loop_bounds[0][2];
+                 loop_counters[0][2]++) {
+              // fetching border pixels is a little tricky
+              // for the outer tiles, we don't fetch borders (they are known
+              // to be 0)
+
+              // reset loop bounds
+              if (isDownsample) {
+                // don't include STRIDE for downsample
+                loop_bounds[1][params.inputXLoopIndex[1]] =
+                    params.loops[1][params.inputXLoopIndex[1]];
+                loop_bounds[1][params.inputYLoopIndex[1]] =
+                    params.loops[1][params.inputYLoopIndex[1]];
+              } else {
+                loop_bounds[1][params.inputXLoopIndex[1]] =
+                    params.loops[1][params.inputXLoopIndex[1]] * params.STRIDE;
+                loop_bounds[1][params.inputYLoopIndex[1]] =
+                    params.loops[1][params.inputYLoopIndex[1]] * params.STRIDE;
+              }
+
+              if (params.REPLICATION) {
+                loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
+              }
+
+              ac_int<4, false> x_min_offset = 0;
+              ac_int<4, false> x_max_offset = 0;
+              ac_int<4, false> y_min_offset = 0;
+              ac_int<4, false> y_max_offset = 0;
+
+              if (params.REPLICATION) {
+                if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                  x_min_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+                }
+                if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                    loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                  x_max_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += 1;
+                }
+              } else {
+                if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                  x_min_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                }
+
+                if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                    loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                  x_max_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                }
+              }
+
+              if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
+                y_min_offset = (FY - 1) / 2;
+                loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+              }
+
+              if (loop_counters[0][params.inputYLoopIndex[0]] !=
+                  loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
+                y_max_offset = (FY - 1) / 2;
+                loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+              }
+
+// inner memory
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          transposeOut.Push(dataResponse.Pop());
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
+                        }
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                          break;
+                        }
+                      }
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                        break;
+                      }
+                    }
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+                break;
+              }
+            }
+            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  void read_params() {
+    paramsIn.ResetRead();
+    fetcherParams.ResetWrite();
+    writerParams.ResetWrite();
+    readerParams.ResetWrite();
+    transposerParams.ResetWrite();
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = paramsIn.Pop();
+
+      if (params.MX) {
+        fetcherParams.Push(params);
+        writerParams.Push(params);
+        readerParams.Push(params);
+        transposerParams.Push(params);
+      }
+    }
+  }
+};

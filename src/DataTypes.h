@@ -14,6 +14,7 @@ class Int;
 // #include "FloatTypes.h"
 #include "IntTypes.h"
 #include "PositTypes.h"
+#include "ScaleTypes.h"
 #include "StdFloatTypes.h"
 
 #ifndef __SYNTHESIS__
@@ -32,6 +33,7 @@ typedef StdFloat<7, 8, false, true, AC_RND_CONV> bfloat16;
 typedef StdFloat<23, 8, false, true, AC_RND_CONV> fp32;
 
 typedef Posit<8, 1> posit8;
+typedef Scale<8> e8m0;
 
 template <typename T>
 struct TypeName {
@@ -71,6 +73,11 @@ struct TypeName<e5m2> {
 template <>
 struct TypeName<bfloat16> {
   static std::string name() { return "bfloat16"; }
+};
+
+template <>
+struct TypeName<e8m0> {
+  static std::string name() { return "e8m0"; }
 };
 
 template <>

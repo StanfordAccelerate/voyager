@@ -409,6 +409,15 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         ]
     elif os.environ["DATATYPE"] == "CFLOAT":
         quantization_args = []
+    elif os.environ["DATATYPE"] == "MXINT8":
+        quantization_args = [
+            "--force_scale_power_of_two",
+            "--activation",
+            "int8,qs=microscaling,bs=32",
+            "--weight",
+            "int8,qs=microscaling,bs=32",
+            "--bf16",
+        ]
     else:
         raise ValueError("Invalid datatype")
 

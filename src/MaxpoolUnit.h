@@ -3,7 +3,7 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename VEC_DTYPE, typename IO_DTYPE, int WIDTH>
+template <typename VEC_DTYPE, typename IO_DTYPE, typename MX_DTYPE, int WIDTH>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -12,6 +12,8 @@ SC_MODULE(MaxpoolUnit) {
   Connections::In<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(tensorIn);
   Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
+
+  Connections::In<MX_DTYPE> CCS_INIT_S1(mxScaleIn);
 
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
@@ -26,6 +28,7 @@ SC_MODULE(MaxpoolUnit) {
     tensorIn.Reset();
     tensorOut.Reset();
     doneSignal.Reset();
+    mxScaleIn.Reset();
 
     wait();
 
@@ -204,10 +207,39 @@ SC_MODULE(MaxpoolUnit) {
                       }
 
                     } else {
-                      // quantize VEC_DTYPE to IO_DTYPE
-                      vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                          uncastedOutputPixel, outputPixel,
-                          params.outputQuantizeScale);
+                      if constexpr (!std::is_same<MX_DTYPE, IO_DTYPE>::value) {
+                        // supports microscaling
+                        if (params.OUTPUT_QUANTIZE_MX) {
+                          MX_DTYPE scale = mxScaleIn.Pop();
+                          // quantize VEC_DTYPE to IO_DTYPE using microscale
+                          vmxquantize<VEC_DTYPE, IO_DTYPE, MX_DTYPE, WIDTH>(
+                              uncastedOutputPixel, outputPixel, scale);
+                        } else if (params.OUTPUT_QUANTIZE) {
+                          // quantize VEC_DTYPE to IO_DTYPE
+                          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                              uncastedOutputPixel, outputPixel,
+                              params.outputQuantizeScale);
+                        } else {
+#pragma hls_unroll yes
+                          for (int i = 0; i < WIDTH; i++) {
+                            outputPixel[i].setbits(
+                                uncastedOutputPixel[i].bits_rep());
+                          }
+                        }
+                      } else {
+                        if (params.OUTPUT_QUANTIZE) {
+                          // quantize VEC_DTYPE to IO_DTYPE
+                          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+                              uncastedOutputPixel, outputPixel,
+                              params.outputQuantizeScale);
+                        } else {
+#pragma hls_unroll yes
+                          for (int i = 0; i < WIDTH; i++) {
+                            outputPixel[i].setbits(
+                                uncastedOutputPixel[i].bits_rep());
+                          }
+                        }
+                      }
                     }
 
                     tensorOut.Push(outputPixel);

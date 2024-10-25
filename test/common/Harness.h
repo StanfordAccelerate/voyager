@@ -69,10 +69,28 @@ SC_MODULE(Harness) {
   CombinationalInterface<Pack1D<INPUT_DATATYPE, IC_DIMENSION> > CCS_INIT_S1(
       inputDataResponse);
 
+#if SUPPORT_MX
+  Connections::ConditionalCombinational<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
+      inputScaleAddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, 1> > inputScaleDataResponse_fifo;
+  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX>
+      CCS_INIT_S1(inputScaleDataResponse);
+#endif
+
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   sc_fifo<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > weightDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       weightDataResponse);
+
+#if SUPPORT_MX
+  Connections::ConditionalCombinational<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
+      weightScaleAddressRequest);
+  sc_fifo<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > weightScaleDataResponse_fifo;
+  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION>,
+                                        SUPPORT_MX>
+      CCS_INIT_S1(weightScaleDataResponse);
+#endif
+
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   sc_fifo<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > biasDataResponse_fifo;
   CombinationalInterface<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
@@ -130,8 +148,14 @@ SC_MODULE(Harness) {
   void readRequestInputs();
   void sendResponseInputs();
 
+  void readRequestInputScale();
+  void sendResponseInputScale();
+
   void readRequestWeights();
   void sendResponseWeights();
+
+  void readRequestWeightScale();
+  void sendResponseWeightScale();
 
   void readRequestVector0();
   void sendResponseVector0();

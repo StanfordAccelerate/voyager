@@ -235,6 +235,10 @@ int Simulation::check_outputs() {
       rel_err += compare_arrays<DataTypes::int8, DataTypes::int8>(
           output_tensor, output_tensor_names[0], reference_output_tensor,
           output_tensor_names[1], size, filename, false);
+    } else if (param.output().dtype() == "e8m0") {
+      rel_err += compare_arrays<DataTypes::e8m0, DataTypes::e8m0>(
+          output_tensor, output_tensor_names[0], reference_output_tensor,
+          output_tensor_names[1], size, filename, false);
     } else if (param.output().dtype() == "bfloat16") {
       rel_err += compare_arrays<DataTypes::bfloat16, DataTypes::bfloat16>(
           output_tensor, output_tensor_names[0], reference_output_tensor,
