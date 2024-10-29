@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "AccelTypes.h"
-#include "Accelerator.h"
 #include "ArchitectureParams.h"
 #include "test/common/VerificationTypes.h"
+
+#ifndef CFLOAT
+#include "Accelerator.h"
 
 #ifdef SOC_COSIM
 #define CombinationalInterface LoggingCombinational
@@ -174,3 +176,4 @@ SC_MODULE(Harness) {
   void storeScalarOutputs();
   void sendParams();
 };
+#endif

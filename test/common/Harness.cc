@@ -7,6 +7,8 @@
 
 #include "AccelTypes.h"
 #include "sysc/kernel/sc_time.h"
+
+#ifndef CFLOAT
 #include "test/toolchain/MapOperation.h"
 
 #ifdef SOC_COSIM
@@ -458,9 +460,18 @@ void Harness::storeVectorOutputs() {
     }
   }
 }
+#endif
 
 void run_accelerator(std::vector<codegen::AcceleratorParam> params,
                      char *sramMemory, char *rramMemory) {
+#ifdef CFLOAT
+  std::cerr
+      << "The SystemC model does not support the CFloat datatype. Only the "
+         "gold model should be used for CFloat."
+      << std::endl;
+  std::abort();
+#else
   Harness harness("harness", params, sramMemory, rramMemory);
   sc_start();
+#endif
 }
