@@ -113,7 +113,7 @@ void Simulation::load_data() {
   std::cout << "Data loaded successfully" << std::endl;
 }
 
-int Simulation::get_ideal_runtime(const codegen::Operator& param) {
+void Simulation::print_ideal_runtime(const codegen::Operator& param) {
   long cycles;
   if (param.has_matrix_op()) {
     // the total number of operations is X*Y*C*FX*FY*K.
@@ -127,23 +127,24 @@ int Simulation::get_ideal_runtime(const codegen::Operator& param) {
     }
 
     cycles = num_ops / (IC_DIMENSION * OC_DIMENSION);
+    std::cout << "Matrix unit, " << param.name() << ", ideal runtime: ";
   } else {
     long num_ops = 1;
     for (const auto& dim : param.output().shape()) num_ops *= dim;
 
     cycles = num_ops / OC_DIMENSION;
+    std::cout << "Vector unit, " << param.name() << ", ideal runtime: ";
   }
   // read CLOCK_PERIOD from environment
   int clock_period =
       std::getenv("CLOCK_PERIOD") ? std::stoi(std::getenv("CLOCK_PERIOD")) : 1;
-  return cycles * clock_period;
+  std::cout << cycles * clock_period << " ns" << std::endl;
 }
 
 void Simulation::run() {
   // Run gold models
   for (const auto& param : params) {
-    std::cout << param.name() << " ideal runtime: " << get_ideal_runtime(param)
-              << std::endl;
+    print_ideal_runtime(param);
 
     if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
       auto memory = (ArrayMemory*)(memories["gold"]);
