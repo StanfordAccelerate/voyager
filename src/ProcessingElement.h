@@ -123,12 +123,12 @@ SC_MODULE(ProcessingElement) {
 
       PEInput<IDTYPE> inputStruct = inputIn.Pop();
       // CCS_LOG("PE: " << inputStruct.data << " " << inputStruct.swapWeights);
+      ODTYPE psum = psumIn.Pop();
 
       if (inputStruct.swapWeights) {
         weight_reg = storedWeight.Pop();
       }
 
-      ODTYPE psum = psumIn.Pop();
       inputOut.Push(inputStruct);
       // #ifdef HYBRID_FP8
       //       ODTYPE output;
