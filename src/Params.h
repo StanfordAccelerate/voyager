@@ -57,10 +57,10 @@ struct MatrixParams : BaseParams {
   }
 #endif
 
-  int INPUT_OFFSET;
-  int INPUT_SCALE_OFFSET;
-  int WEIGHT_OFFSET;
-  int WEIGHT_SCALE_OFFSET;
+  unsigned long long INPUT_OFFSET;
+  unsigned long long INPUT_SCALE_OFFSET;
+  unsigned long long WEIGHT_OFFSET;
+  unsigned long long WEIGHT_SCALE_OFFSET;
 
   // systolic array loop
   ac_int<10, false> loops[2][6];
@@ -94,12 +94,12 @@ struct MatrixParams : BaseParams {
   bool TRANPOSE_INPUTS;
 
   bool BIAS;
-  int BIAS_OFFSET;
+  unsigned long long BIAS_OFFSET;
 
   bool MX;
 
   static const unsigned int width =
-      5 * 32 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
+      5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
       (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 3;
 
 #ifndef NO_SYSC
@@ -550,7 +550,7 @@ struct VectorParams : BaseParams {
 #endif
 
   // Address Gen 0 (vector input)
-  int VECTOR_OFFSET;
+  unsigned long long VECTOR_OFFSET;
   ac_int<11, false> addressGen0Loop[2][3];  // tiled 2d tensor
   ac_int<3, false> addressGen0InputXLoopIndex[2];
   ac_int<3, false> addressGen0InputYLoopIndex[2];
@@ -559,7 +559,7 @@ struct VectorParams : BaseParams {
   ac_int<16, false> vec0DequantizeScale;
 
   // Address Gen 1 (residual/op0src1)
-  int ADDRESS_GEN1_OFFSET;
+  unsigned long long ADDRESS_GEN1_OFFSET;
   ac_int<11, false> addressGen1Loops[2][3];
   ac_int<3, false> addressGen1InputXLoopIndex[2];
   ac_int<3, false> addressGen1InputYLoopIndex[2];
@@ -570,7 +570,7 @@ struct VectorParams : BaseParams {
   ac_int<8, false> vec1BroadcastCount;
 
   // Address Gen 2 (bias/op3src1)
-  int ADDRESS_GEN2_OFFSET;
+  unsigned long long ADDRESS_GEN2_OFFSET;
   ac_int<11, false> addressGen2Loops[2][3];
   ac_int<3, false> addressGen2InputXLoopIndex[2];
   ac_int<3, false> addressGen2InputYLoopIndex[2];
@@ -578,8 +578,8 @@ struct VectorParams : BaseParams {
   bool DP_VEC2;
   ac_int<16, false> vec2DequantizeScale;
 
-  int VECTOR_OUTPUT_OFFSET;
-  int SCALAR_OUTPUT_OFFSET;
+  unsigned long long VECTOR_OUTPUT_OFFSET;
+  unsigned long long SCALAR_OUTPUT_OFFSET;
 
   ac_int<11, false> outputLoops[2][3];
   ac_int<3, false> outputXLoopIndex[2];
@@ -603,7 +603,7 @@ struct VectorParams : BaseParams {
   bool AVGPOOL;
 
   static const unsigned int width =
-      5 * 32 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
+      5 * 64 /* OFFSETS */ + 4 * 6 * 11 /* Loops */ +
       3 * 6 * 4 /* Loop indices */ + 12 * 1 /* Bools */ + 10 + 3 * 2 +
       16 * 4 /* Dequantize scale */ + 8;
 

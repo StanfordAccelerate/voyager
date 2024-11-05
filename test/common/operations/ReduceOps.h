@@ -13,41 +13,44 @@ inline T exponent(const T &x) {
 }
 
 template <typename T>
-inline T * sum(std::any input_tensor, const std::vector<int> shape, const std::vector<int> dims) {
-    T * output = std::any_cast<T *>(input_tensor);
-    std::vector<int> current(shape);
-    
-    // Iterate over the summation dims
-    for (int dim : dims) {
-	if (dim < 0) {
-	    dim = current.size() + dim;
-	}
+inline T *sum(std::any input_tensor, const std::vector<int> shape,
+              const std::vector<int> dims) {
+  T *output = std::any_cast<T *>(input_tensor);
+  std::vector<int> current(shape);
 
-	std::vector<int> updated(current);
-	updated[dim] = 1;
-	T * reduced = new T[get_size(updated)];
-
-	for (int i = 0; i < updated[0]; ++i) {
-	    for (int j = 0; j < updated[1]; ++j) {
-		for (int k = 0; k < updated[2]; ++k) {
-		    reduced[i * updated[1] * updated[2] + j * updated[2] + k] = 0.0;
-		}
-	    }
-	}
-
-	for (int i = 0; i < current[0]; ++i) {
-	    for (int j = 0; j < current[1]; ++j) {
-		for (int k = 0; k < current[2]; ++k) {
-		    reduced[i * updated[1] * updated[2] * (dim != 0) + j * updated[2] * (dim != 1) + k * (dim != 2)] += output[i * current[1] * current[2] + j * current[2] + k];
-		}
-	    }
-	}
-
-	current = updated;
-	delete[] output;
-	output = reduced;
+  // Iterate over the summation dims
+  for (int dim : dims) {
+    if (dim < 0) {
+      dim = current.size() + dim;
     }
-    return output;
+
+    std::vector<int> updated(current);
+    updated[dim] = 1;
+    T *reduced = new T[get_size(updated)];
+
+    for (int i = 0; i < updated[0]; ++i) {
+      for (int j = 0; j < updated[1]; ++j) {
+        for (int k = 0; k < updated[2]; ++k) {
+          reduced[i * updated[1] * updated[2] + j * updated[2] + k] = 0.0;
+        }
+      }
+    }
+
+    for (int i = 0; i < current[0]; ++i) {
+      for (int j = 0; j < current[1]; ++j) {
+        for (int k = 0; k < current[2]; ++k) {
+          reduced[i * updated[1] * updated[2] * (dim != 0) +
+                  j * updated[2] * (dim != 1) + k * (dim != 2)] +=
+              output[i * current[1] * current[2] + j * current[2] + k];
+        }
+      }
+    }
+
+    current = updated;
+    delete[] output;
+    output = reduced;
+  }
+  return output;
 }
 
 template <typename T>

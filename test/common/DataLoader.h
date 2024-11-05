@@ -25,13 +25,10 @@ class DataLoader {
   void load_outputs(const codegen::AcceleratorParam param,
                     std::string data_dir);
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
-                   bool transpose = false, bool replication = false,
-                   bool double_precision_ow = false, bool is_output = false,
-                   bool random_data = false);
+                   bool transpose = false, bool replication = false);
 
   bool is_double_precision(const codegen::Tensor& tensor);
-  float* read_tensor_from_file(const std::string& filename, int size,
-                               bool random_data);
+  float* read_tensor_from_file(const std::string& filename, int size);
 
  private:
   MemoryInterface* memory_interface;

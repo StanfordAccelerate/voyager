@@ -9,7 +9,7 @@
 
 class ArrayMemory : public MemoryInterface {
  public:
-  ArrayMemory(std::vector<int>);
+  ArrayMemory(std::vector<long long>);
   ~ArrayMemory();
 
   std::vector<char*> memories;
@@ -21,9 +21,9 @@ class ArrayMemory : public MemoryInterface {
   std::any get_reference_output(const codegen::AcceleratorParam& param);
 
   template <typename T>
-  void read_tensor_from_memory(const int address, const int partition,
+  void read_tensor_from_memory(const long long address, const int partition,
                                const int size, T* tensor);
 
-  void write_bytes_to_memory(const int address, const int partition,
+  void write_bytes_to_memory(const long long address, const int partition,
                              const int size, const char* bytes) override;
 };

@@ -6,7 +6,7 @@ SC_MODULE(OutputAddressGenerator) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::Out<ac_int<32, false> > CCS_INIT_S1(vectorOutputAddress);
+  Connections::Out<ac_int<64, false> > CCS_INIT_S1(vectorOutputAddress);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       vectorOutputAddressParams);
@@ -123,8 +123,6 @@ SC_MODULE(OutputAddressGenerator) {
                                   (k % 32) + (y / 32 * K / 4);
                   }
 
-                  ac_int<32, false> address =
-                      params.VECTOR_OUTPUT_OFFSET + baseAddress;
                   if (params.DP_OUTPUT) {
                     for (int precision = 0; precision < 2; precision++) {
                       vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
@@ -132,7 +130,8 @@ SC_MODULE(OutputAddressGenerator) {
                                                precision * WIDTH);
                     }
                   } else {
-                    vectorOutputAddress.Push(address);
+                    vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
+                                             baseAddress);
                   }
 
                   if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {

@@ -20,9 +20,9 @@
 // #endif
 // #define SRAM_MEMORY_SIZE (NUM_SRAM_BANKS * 256 * 1024)
 #ifndef NUM_SRAM_BANKS
-#define NUM_SRAM_BANKS 256
+#define NUM_SRAM_BANKS 4096
 #endif
-#define SRAM_MEMORY_SIZE (NUM_SRAM_BANKS * 1024 * 1024)
+#define SRAM_MEMORY_SIZE (NUM_SRAM_BANKS * 1024LL * 1024LL)
 
 // By default we have 12MB of RRAM per MINOTAUR SoC
 // organized as 12x 1MB Banks with 4x 256KB Macros each

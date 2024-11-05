@@ -57,9 +57,11 @@ SC_MODULE(Accelerator) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
   Connections::In<Pack1D<OUTPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       vectorFetch2DataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
+  Connections::In<OUTPUT_DATATYPE> CCS_INIT_S1(vectorFetch3DataResponse);
   Connections::Out<Pack1D<OUTPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       vectorOutput);
-  Connections::Out<ac_int<32, false> > CCS_INIT_S1(vectorOutputAddress);
+  Connections::Out<ac_int<64, false> > CCS_INIT_S1(vectorOutputAddress);
 
   Connections::SyncOut CCS_INIT_S1(vectorUnitStartSignal);
   Connections::SyncOut CCS_INIT_S1(vectorUnitDoneSignal);
@@ -95,6 +97,8 @@ SC_MODULE(Accelerator) {
     vectorUnit.vectorFetch1DataResponse(vectorFetch1DataResponse);
     vectorUnit.vectorFetch2AddressRequest(vectorFetch2AddressRequest);
     vectorUnit.vectorFetch2DataResponse(vectorFetch2DataResponse);
+    vectorUnit.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
+    vectorUnit.vectorFetch3DataResponse(vectorFetch3DataResponse);
     vectorUnit.vectorOutputAddress(vectorOutputAddress);
     vectorUnit.finalVectorOutput(vectorOutput);
     vectorUnit.start(vectorUnitStartSignal);

@@ -15,7 +15,7 @@
 #include "test/compiler/proto/param.pb.h"
 
 void run_accelerator(std::vector<codegen::AcceleratorParam> params,
-                     char *sramMemory, char *rramMemory);
+                     char *memory);
 
 class Simulation {
  public:

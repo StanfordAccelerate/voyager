@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "test/common/VerificationTypes.h"
+#include "test/common/operations/LayerNorm.h"
 #include "test/common/operations/MatrixOps.h"
 #include "test/common/operations/MxOps.h"
 #include "test/common/operations/Pooling.h"
@@ -82,7 +83,11 @@ void run_operation(const codegen::AcceleratorParam param,
     output_tensor = permute<INPUT_T>(args[arg_index++], reshape_param);
   }
 
-  if (param.has_matrix_param()) {
+  if (param.matrix_param().opcode() == "layer_norm") {
+    const auto &matrix_param = param.matrix_param();
+    output_tensor =
+        layer_norm<VECTOR_T>(args[0], args[1], args[2], matrix_param);
+  } else if (param.has_matrix_param()) {
     const auto &matrix_param = param.matrix_param();
 
     if (matrix_param.opcode() == "conv2d" && matrix_param.groups() != 1) {
@@ -255,6 +260,22 @@ void run_operation(const codegen::AcceleratorParam param,
                     << vector_param.input().dtype() << std::endl;
         }
       }
+    } else if (vector_param.opcode().rfind("vmap", 0) == 0) {
+      const auto &input = vector_param.input();
+      const int size = get_size(input);
+
+      VECTOR_T *input_tensor = std::any_cast<VECTOR_T *>(output_tensor);
+
+      DataTypes::bfloat16 *value_map =
+          std::any_cast<DataTypes::bfloat16 *>(args[arg_index++]);
+
+      for (int i = 0; i < size; i++) {
+        DataTypes::bfloat16 value = input_tensor[i];
+        unsigned int index = value.bits_rep().to_uint();
+        input_tensor[i] = static_cast<VECTOR_T>(value_map[index]);
+      }
+
+      output_tensor = input_tensor;
     } else {
       std::cerr << "Unsupported vector instruction: " << vector_param.opcode()
                 << std::endl;
@@ -269,8 +290,7 @@ void run_operation(const codegen::AcceleratorParam param,
           std::any_cast<DataTypes::bfloat16 *>(output_tensor), param.output());
     } else {
       // assume INPUT_T if the output tensor is not bfloat16
-      output_tensor = permute<INPUT_T>(std::any_cast<INPUT_T *>(output_tensor),
-                                       param.output());
+      output_tensor = permute<INPUT_T>(output_tensor, param.output());
     }
   }
 

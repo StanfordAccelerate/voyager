@@ -19,10 +19,10 @@
 #endif
 
 struct MemoryRequest {
-  ac_int<32, false> address;
+  ac_int<64, false> address;
   ac_int<32, false> burstSize;
 
-  static const unsigned int width = 32 + 32;
+  static const unsigned int width = 64 + 32;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {

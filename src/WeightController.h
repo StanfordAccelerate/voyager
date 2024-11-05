@@ -543,8 +543,9 @@ SC_MODULE(WeightController) {
 
                               if (params.WEIGHT_TRANSPOSE &&
                                   OC_DIMENSION > IC_DIMENSION) {
-                                address = (fy * FX * C * 2 * K1) + (fx * C * 2 * K1) +
-                                    (c + rep * NROWS) * K1 + k1;
+                                address = (fy * FX * C * 2 * K1) +
+                                          (fx * C * 2 * K1) +
+                                          (c + rep * NROWS) * K1 + k1;
                               }
                               readAddress[bankSel].Push(address);
                             }
@@ -782,8 +783,8 @@ SC_MODULE(WeightController) {
                         constexpr int num_words =
                             ACC_DTYPE::width / DTYPE::width;
 
-                        int baseAddress = params.BIAS_OFFSET + k * num_words;
-                        MemoryRequest memRequest = {baseAddress,
+                        unsigned long long baseAddress = params.BIAS_OFFSET;
+                        MemoryRequest memRequest = {baseAddress + k * num_words,
                                                     OC_DIMENSION * num_words};
 
                         biasAddressRequest.Push(memRequest);

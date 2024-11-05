@@ -8,10 +8,10 @@
 
 #include "src/ArchitectureParams.h"
 
-ArrayMemory::ArrayMemory(std::vector<int> sizes) : MemoryInterface() {
+ArrayMemory::ArrayMemory(std::vector<long long> sizes) : MemoryInterface() {
   memories.reserve(sizes.size());
   try {
-    for (int size : sizes) {
+    for (const auto size : sizes) {
       char* memory = new char[size];
       std::fill(memory, memory + size, 0);
       memories.push_back(memory);
@@ -126,7 +126,7 @@ std::any ArrayMemory::get_output(const codegen::AcceleratorParam& param) {
 }
 
 template <typename T>
-void ArrayMemory::read_tensor_from_memory(const int address,
+void ArrayMemory::read_tensor_from_memory(const long long address,
                                           const int partition, const int size,
                                           T* tensor) {
   char* memory = get_memory(partition) + address;
@@ -221,8 +221,9 @@ std::any ArrayMemory::get_tensor(const codegen::Tensor& tensor) {
   }
 }
 
-void ArrayMemory::write_bytes_to_memory(const int address, const int partition,
-                                        const int size, const char* bytes) {
+void ArrayMemory::write_bytes_to_memory(const long long address,
+                                        const int partition, const int size,
+                                        const char* bytes) {
   auto memory = get_memory(partition);
   for (int i = 0; i < size; i++) {
     memory[address + i] = bytes[i];

@@ -30,6 +30,9 @@ SC_MODULE(VectorOpUnit) {
   Connections::In<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(vectorFetch1Output);
   Connections::In<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(vectorFetch2Output);
 
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
+  Connections::In<IO_DTYPE> CCS_INIT_S1(vectorFetch3DataResponse);
+
   Connections::Out<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
       CCS_INIT_S1(vectorOpUnitOutput);
 
@@ -554,7 +557,10 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
 
-  Connections::Out<ac_int<32, false> > CCS_INIT_S1(vectorOutputAddress);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
+  Connections::In<IO_DTYPE> CCS_INIT_S1(vectorFetch3DataResponse);
+
+  Connections::Out<ac_int<64, false> > CCS_INIT_S1(vectorOutputAddress);
   Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(finalVectorOutput);
   Connections::Combinational<
       Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
@@ -622,6 +628,8 @@ SC_MODULE(VectorUnit) {
     vectorOpUnit.vectorFetch1Output(vectorFetch1DataResponseConverted);
     vectorOpUnit.vectorFetch2Output(vectorFetch2DataResponseConverted);
     vectorOpUnit.vectorOpUnitOutput(vectorOpUnitOutput);
+    vectorOpUnit.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
+    vectorOpUnit.vectorFetch3DataResponse(vectorFetch3DataResponse);
 
     maxpoolUnit.clk(clk);
     maxpoolUnit.rstn(rstn);

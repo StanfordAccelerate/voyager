@@ -8,29 +8,28 @@ DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut)
 
 void DataLoader::load_tensor(const codegen::Tensor& tensor,
                              std::string data_dir, bool transpose,
-                             bool replication, bool double_precision_ow,
-                             bool is_output, bool random_data) {
+                             bool replication) {
   auto repeated_field = tensor.shape();
   std::vector<size_t> shape(repeated_field.begin(), repeated_field.end());
   int size = 1;
   for (int dim : shape) size *= dim;
 
   std::string filename = data_dir + "/" + tensor.node() + ".bin";
-  auto array_ptr = read_tensor_from_file(filename, size, random_data);
+  auto array_ptr = read_tensor_from_file(filename, size);
   auto array = xt::adapt(array_ptr, size, xt::no_ownership(), shape);
 
   // Accelerator expect the data to be layed out in a different order
-  if (shape.size() == 4) {
-    array = xt::transpose(array, {2, 3, 1, 0});
-  } else if (transpose && shape.size() == 2) {
-    array = xt::transpose(array, {1, 0});
+  if (transpose) {
+    if (shape.size() == 4) {
+      array = xt::transpose(array, {2, 3, 1, 0});
+    } else if (shape.size() == 2) {
+      array = xt::transpose(array, {1, 0});
+    }
   }
 
   auto memory = tensor.memory();
   int partition = memory.partition();
-  int offset = memory.offset();
-  bool double_precision = double_precision_ow || is_double_precision(tensor);
-  int address_multiplier = double_precision ? 2 : 1;
+  long long offset = memory.offset();
 
   // if size is 1, then it is a scalar, so it should not be
   // written to memory
@@ -85,15 +84,18 @@ void DataLoader::load_inputs(const codegen::AcceleratorParam param,
   // convolution layer inputs/outputs need to be permuted. If the matrix
   // operation is a convolution, the following fused vector operations will
   // need to be permuted as well. This logic should be refined in the future.
-  bool is_conv2d = param.matrix_param().opcode() == "conv2d" ||
-                   param.matrix_param().opcode() == "conv2d_mx";
   std::string output_node = "";
   if (param.has_matrix_param()) {
-    const codegen::MatrixParam& matrix_param = param.matrix_param();
+    const auto& matrix_param = param.matrix_param();
+    const auto& input = matrix_param.has_mx_input()
+                            ? matrix_param.mx_input().input()
+                            : matrix_param.input();
 
-    auto input = matrix_param.has_mx_input() ? matrix_param.mx_input().input()
-                                             : matrix_param.input();
+    bool is_conv2d = matrix_param.opcode() == "conv2d" ||
+                     matrix_param.opcode() == "conv2d_mx";
+
     bool replication = input.shape(1) == 3 && is_dut;
+
     load_tensor(input, data_dir, is_conv2d, replication);
 
     if (matrix_param.has_mx_input()) {
@@ -101,9 +103,9 @@ void DataLoader::load_inputs(const codegen::AcceleratorParam param,
     }
 
     if (matrix_param.opcode() == "matmul") {
-      auto weight = matrix_param.has_mx_weight()
-                        ? matrix_param.mx_weight().input()
-                        : matrix_param.weight();
+      const auto& weight = matrix_param.has_mx_weight()
+                               ? matrix_param.mx_weight().input()
+                               : matrix_param.weight();
       load_tensor(weight, data_dir);
 
       if (matrix_param.has_mx_weight()) {
@@ -133,7 +135,7 @@ void DataLoader::load_inputs(const codegen::AcceleratorParam param,
       const auto other = vector_param.other();
       const auto tensor_to_load = other.node() == output_node ? input : other;
       if (tensor_to_load.node().find("constant") == std::string::npos) {
-        load_tensor(tensor_to_load, data_dir, is_conv2d);
+        load_tensor(tensor_to_load, data_dir);
       }
     }
     output_node = vector_param.name();
@@ -165,7 +167,7 @@ void DataLoader::load_weights(const codegen::AcceleratorParam param,
 
     if (matrix_param.has_bias()) {
       // bias is hardcoded to double precision right now
-      load_tensor(matrix_param.bias(), data_dir, false, false, true);
+      load_tensor(matrix_param.bias(), data_dir);
     }
   }
 
@@ -195,7 +197,7 @@ void DataLoader::load_outputs(const codegen::AcceleratorParam param,
   bool transpose = param.matrix_param().opcode() == "conv2d" ||
                    param.matrix_param().opcode() == "conv2d_mx" ||
                    param.has_pooling_param();
-  load_tensor(output_tensor, data_dir, transpose, false, false, true);
+  load_tensor(output_tensor, data_dir, transpose);
 }
 
 bool DataLoader::is_double_precision(const codegen::Tensor& tensor) {
@@ -203,28 +205,17 @@ bool DataLoader::is_double_precision(const codegen::Tensor& tensor) {
   return false;
 }
 
-float* DataLoader::read_tensor_from_file(const std::string& filename, int size,
-                                         bool random_data) {
+float* DataLoader::read_tensor_from_file(const std::string& filename,
+                                         int size) {
   float* value_ptr = new float[size];
-
-  if (!random_data) {
-    std::ifstream input_stream(filename, std::ios::binary);
-    if (!input_stream.good()) {
-      throw std::runtime_error("File \"" + filename + "\" does not exist");
-    }
-    input_stream.read(reinterpret_cast<char*>(value_ptr), size * sizeof(float));
-    if (!input_stream) {
-      throw std::runtime_error(
-          "Failed to read the expected amount of data from the file");
-    }
-  } else {
-    static std::default_random_engine engine;
-    static std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
-
-    for (int i = 0; i < size; i++) {
-      value_ptr[i] = distribution(engine);
-    }
+  std::ifstream input_stream(filename, std::ios::binary);
+  if (!input_stream.good()) {
+    throw std::runtime_error("File \"" + filename + "\" does not exist");
   }
-
+  input_stream.read(reinterpret_cast<char*>(value_ptr), size * sizeof(float));
+  if (!input_stream) {
+    throw std::runtime_error(
+        "Failed to read the expected amount of data from the file");
+  }
   return value_ptr;
 }

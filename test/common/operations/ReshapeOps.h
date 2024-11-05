@@ -35,10 +35,10 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeParam param) {
   if (param.opcode() == "permute") {
     order.insert(order.end(), param.dims().begin(), param.dims().end());
   } else if (param.opcode() == "transpose") {
-    const int size = input.shape_size();
-    const int dim1 = param.dims(0) < 0 ? param.dims(0) + size : param.dims(0);
-    const int dim2 = param.dims(1) < 0 ? param.dims(1) + size : param.dims(1);
-    for (int i = 0; i < size; ++i) {
+    const int ndim = input.shape_size();
+    const int dim1 = param.dims(0) < 0 ? param.dims(0) + ndim : param.dims(0);
+    const int dim2 = param.dims(1) < 0 ? param.dims(1) + ndim : param.dims(1);
+    for (int i = 0; i < ndim; ++i) {
       order.push_back(i);
     }
     std::swap(order[dim1], order[dim2]);
@@ -84,7 +84,8 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeParam param) {
 template <typename T>
 inline T* permute(std::any input_tensor, const codegen::Tensor& input) {
   const codegen::Permutation& param = input.permutation();
-  const std::vector<int> shape{param.input_shape().begin(), param.input_shape().end()};
+  const std::vector<int> shape{param.input_shape().begin(),
+                               param.input_shape().end()};
   const std::vector<int> dims{param.dims().begin(), param.dims().end()};
 
   T* inputs = std::any_cast<T*>(input_tensor);
@@ -93,10 +94,10 @@ inline T* permute(std::any input_tensor, const codegen::Tensor& input) {
   if (param.opcode() == "permute") {
     order.insert(order.end(), dims.begin(), dims.end());
   } else if (param.opcode() == "transpose") {
-    const int size = shape.size();
-    const int dim1 = dims[0] < 0 ? dims[0] + size : dims[0];
-    const int dim2 = dims[1] < 0 ? dims[1] + size : dims[1];
-    for (int i = 0; i < size; ++i) {
+    const int ndim = shape.size();
+    const int dim1 = dims[0] < 0 ? dims[0] + ndim : dims[0];
+    const int dim2 = dims[1] < 0 ? dims[1] + ndim : dims[1];
+    for (int i = 0; i < ndim; ++i) {
       order.push_back(i);
     }
     std::swap(order[dim1], order[dim2]);
@@ -114,7 +115,9 @@ inline T* permute(std::any input_tensor, const codegen::Tensor& input) {
 
   const int size = get_size(shape);
   T* outputs = new T[size];
+
   std::vector<int> indices(shape.size(), 0);
+
   for (int i = 0; i < size; ++i) {
     std::vector<int> permuted_indices(order.size());
     for (size_t j = 0; j < order.size(); ++j) {
