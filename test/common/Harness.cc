@@ -193,6 +193,8 @@ Harness::Harness(sc_module_name name, std::vector<codegen::Operator> params,
   SC_THREAD(sendParams);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
+
+  accessCounter = new AccessCounter();
 }
 
 void Harness::reset() {
@@ -212,6 +214,11 @@ void Harness::readMemoryRequest(
 
   while (true) {
     MemoryRequest memRequest = addressRequest->Pop();
+
+    accessCounter->increment(std::string(name()) + "_" + memSourceType,
+                             memRequest.burstSize);
+
+    MemorySource memSource;
 
     int total_num_bytes = memRequest.burstSize;
 
@@ -490,6 +497,8 @@ void Harness::storeVectorOutputs() {
     Pack1D<OUTPUT_DATATYPE, OC_DIMENSION> data = vectorOutput.Pop();
     unsigned long long base_address = vectorOutputAddress.Pop();
     DLOG("write address: " << base_address << " data: " << data);
+    accessCounter->increment(std::string(name()) + "_" + "outputs",
+                             OC_DIMENSION);
     for (int i = 0; i < OC_DIMENSION; i++) {
       ac_int<OUTPUT_DATATYPE::width, false> bits = data[i].bits_rep();
       for (int byte = 0; byte < OUTPUT_DATATYPE::width / 8; byte++) {
@@ -501,6 +510,8 @@ void Harness::storeVectorOutputs() {
   }
 }
 #endif
+
+void Harness::end_of_simulation() { accessCounter->print_summary(); }
 
 void run_accelerator(std::vector<codegen::Operator> params, char *memory) {
 #ifdef CFLOAT

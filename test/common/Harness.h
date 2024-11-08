@@ -10,6 +10,7 @@
 
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
+#include "test/common/AccessCounter.h"
 #include "test/common/VerificationTypes.h"
 
 #ifndef CFLOAT
@@ -132,6 +133,7 @@ SC_MODULE(Harness) {
   codegen::Operator currentParams;
   char *memory;
   AcceleratorMemoryMap currentMemoryMap;
+  AccessCounter *accessCounter;
 
 #ifdef SIM_Accelerator
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
@@ -187,5 +189,7 @@ SC_MODULE(Harness) {
   void storeVectorOutputs();
   void storeScalarOutputs();
   void sendParams();
+
+  virtual void end_of_simulation();
 };
 #endif
