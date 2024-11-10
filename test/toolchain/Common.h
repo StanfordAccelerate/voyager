@@ -97,3 +97,21 @@ inline int get_size(const codegen::Tensor &tensor) {
   const auto shape = get_shape(tensor);
   return get_size(shape);
 }
+
+int find_largest_divisor(int num, int limit) {
+  limit = std::min(limit, num);
+  for (int i = limit; i > 0; --i) {
+    if (num % i == 0) {
+      return i;
+    }
+  }
+  return 1;  // If no divisor found, return 1
+}
+
+std::vector<int> decompose_loops(int N, int max_value) {
+  int k = find_largest_divisor(N, max_value);
+  int j = find_largest_divisor(N / k, max_value);
+  int i = N / (j * k);
+
+  return {i, j, k};
+}

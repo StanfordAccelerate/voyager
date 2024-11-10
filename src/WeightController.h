@@ -30,7 +30,7 @@ SC_MODULE(WeightController) {
   }
 
   static constexpr int LOOP_WIDTH =
-      (8 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
+      (10 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
                                                       : OC_DIMENSION)));
 
 #ifdef HYBRID_FP8

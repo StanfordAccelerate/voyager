@@ -56,6 +56,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
     if (dim != 1) nonzero_dims++;
   }
 
+  // TODO: this logic needs to be updated
   const int total_dims = output_shape.size();
   const int broadcast_dims = total_dims - nonzero_dims;
   if (broadcast_dims == 0) {
@@ -178,29 +179,15 @@ void MapVectorOperations(const codegen::AcceleratorParam &param,
     vector_params->outputLoops[0][i] = 1;
   }
 
-  const auto input_shape = squeeze_shape(get_shape(vector_input));
-  const int input_dims = input_shape.size();
-  if (input_dims == 1) {
-    vector_params->addressGen0Loop[1][0] = 1;
-    vector_params->addressGen0Loop[1][1] = 1;
-    vector_params->outputLoops[1][0] = 1;
-    vector_params->outputLoops[1][1] = 1;
-  } else if (input_dims == 2) {
-    vector_params->addressGen0Loop[1][0] = 1;
-    vector_params->addressGen0Loop[1][1] = input_shape[0];
-    vector_params->outputLoops[1][0] = 1;
-    vector_params->outputLoops[1][1] = input_shape[0];
-  } else if (input_dims == 3) {
-    vector_params->addressGen0Loop[1][0] = input_shape[0];
-    vector_params->addressGen0Loop[1][1] = input_shape[1];
-    vector_params->outputLoops[1][0] = input_shape[0];
-    vector_params->outputLoops[1][1] = input_shape[1];
-  } else {
-    throw std::invalid_argument(
-        "Unsupported number of dimensions for vector operations!");
-  }
-  vector_params->addressGen0Loop[1][2] = input_shape.back() / OC_DIMENSION;
-  vector_params->outputLoops[1][2] = input_shape.back() / OC_DIMENSION;
+  const auto factorized_shape = decompose_loops(numel / OC_DIMENSION, 1024);
+
+  vector_params->addressGen0Loop[1][0] = factorized_shape[0];
+  vector_params->addressGen0Loop[1][1] = factorized_shape[1];
+  vector_params->addressGen0Loop[1][2] = factorized_shape[2];
+
+  vector_params->outputLoops[1][0] = factorized_shape[0];
+  vector_params->outputLoops[1][1] = factorized_shape[1];
+  vector_params->outputLoops[1][2] = factorized_shape[2];
 
   for (int i = 0; i < 2; i++) {
     vector_params->addressGen0InputYLoopIndex[i] = 0;

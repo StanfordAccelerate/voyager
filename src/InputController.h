@@ -45,8 +45,8 @@ SC_MODULE(InputController) {
   }
 
   static constexpr int LOOP_WIDTH =
-      (8 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
-                                                      : OC_DIMENSION)));
+      (11 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
+                                                       : OC_DIMENSION)));
 
   SC_CTOR(InputController) {
     paramsDeserializer.clk(clk);
@@ -438,10 +438,11 @@ SC_MODULE(InputController) {
                                 loop_bounds[1][3] * loop_bounds[1][4]) *
                                loop_bounds[1][5];
               } else {
-                total_writes = loop_bounds[1][1] * loop_bounds[1][2] *
-                                   loop_bounds[1][3] * loop_bounds[1][4] *
-                                   ((STRIDE)*X0 / packingFactor +
-                               2 * boundaryWords);  // 2 extra writes for padding
+                total_writes =
+                    loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
+                    loop_bounds[1][4] *
+                    ((STRIDE)*X0 / packingFactor +
+                     2 * boundaryWords);  // 2 extra writes for padding
               }
 
               writeControl[bankSel].Push(total_writes);
@@ -953,6 +954,7 @@ SC_MODULE(InputController) {
             loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
             loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
             loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
+        std::cerr << "window buffer total count: " << total_count << std::endl;
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (int i = 0; i < total_count; i++) {
