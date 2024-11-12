@@ -17,7 +17,7 @@ proc pre_assembly {} {
   set maxpool_name_stripped [string map {" " ""} $maxpool_name]
   set vector_fetch_name "VectorFetchUnit<$IO_DATATYPE,$VECTOR_DATATYPE,$MX_DATATYPE,$OC_DIMENSION>"
   set vector_fetch_name_stripped [string map {" " ""} $vector_fetch_name]
-  set output_address_name "OutputAddressGenerator<$OC_DIMENSION>"
+  set output_address_name "OutputAddressGenerator<$IO_DATATYPE,$OC_DIMENSION>"
   set output_address_name_stripped [string map {" " ""} $output_address_name]
   set vector_op_name "VectorOpUnit<$IO_DATATYPE,$VECTOR_DATATYPE,$ACCUM_BUFFER_DATATYPE,$OC_DIMENSION>"
   set vector_op_name_stripped [string map {" " ""} $vector_op_name]
