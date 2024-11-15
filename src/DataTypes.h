@@ -82,7 +82,7 @@ struct TypeName<e8m0> {
 
 template <>
 struct TypeName<fp32> {
-  static std::string name() { return "fp32"; }
+  static std::string name() { return "float32"; }
 };
 
 template <>

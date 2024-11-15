@@ -217,7 +217,10 @@ void Harness::readMemoryRequest(
       memory = sramMemory;
     }
 
-    for (int b = 0; b < memRequest.burstSize / DIMENSION; b++) {
+    int total_num_bytes = memRequest.burstSize;
+
+    for (int b = 0;
+         b < total_num_bytes / DIMENSION / (INPUT_DATATYPE::width / 8); b++) {
       Pack1D<INPUT_DATATYPE, DIMENSION> data;
       for (int i = 0; i < DIMENSION; i++) {
         ac_int<INPUT_DATATYPE::width, false> bits;

@@ -182,7 +182,9 @@ SC_MODULE(WeightController) {
                       int burstSize = NCOLS;
 
                       MemoryRequest memRequest = {
-                          params.WEIGHT_OFFSET + baseAddress, burstSize};
+                          params.WEIGHT_OFFSET +
+                              baseAddress * (DTYPE::width / 8),
+                          burstSize * (DTYPE::width / 8)};
                       addressRequest.Push(memRequest);
 
                       if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
@@ -779,12 +781,9 @@ SC_MODULE(WeightController) {
                             k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                         ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
 
-                        constexpr int num_words =
-                            ACC_DTYPE::width / DTYPE::width;
-
-                        int baseAddress = params.BIAS_OFFSET + k * num_words;
-                        MemoryRequest memRequest = {baseAddress,
-                                                    OC_DIMENSION * num_words};
+                        MemoryRequest memRequest = {
+                            params.BIAS_OFFSET + k * (ACC_DTYPE::width / 8),
+                            OC_DIMENSION * (ACC_DTYPE::width / 8)};
 
                         biasAddressRequest.Push(memRequest);
 

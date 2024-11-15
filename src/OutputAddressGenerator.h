@@ -1,6 +1,6 @@
 #pragma once
 
-template <int WIDTH>
+template <typename DTYPE, int WIDTH>
 SC_MODULE(OutputAddressGenerator) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -123,13 +123,15 @@ SC_MODULE(OutputAddressGenerator) {
                                   (k % 32) + (y / 32 * K / 4);
                   }
 
-                  ac_int<32, false> address =
-                      params.VECTOR_OUTPUT_OFFSET + baseAddress;
+                  ac_int<32, false> address = params.VECTOR_OUTPUT_OFFSET +
+                                              baseAddress * (DTYPE::width / 8);
+
                   if (params.DP_OUTPUT) {
                     for (int precision = 0; precision < 2; precision++) {
-                      vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
-                                               baseAddress * 2 +
-                                               precision * WIDTH);
+                      vectorOutputAddress.Push(
+                          params.VECTOR_OUTPUT_OFFSET +
+                          baseAddress * (DTYPE::width / 8) * 2 +
+                          precision * (DTYPE::width / 8) * WIDTH);
                     }
                   } else {
                     vectorOutputAddress.Push(address);

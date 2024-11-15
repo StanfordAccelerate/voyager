@@ -573,7 +573,7 @@ SC_MODULE(VectorUnit) {
   MaxpoolUnit<VEC_DTYPE, IO_DTYPE, MX_DTYPE, WIDTH> CCS_INIT_S1(maxpoolUnit);
   Connections::Combinational<VectorParams> CCS_INIT_S1(maxpoolUnitParams);
 
-  OutputAddressGenerator<WIDTH> CCS_INIT_S1(outputAddressGenerator);
+  OutputAddressGenerator<IO_DTYPE, WIDTH> CCS_INIT_S1(outputAddressGenerator);
   Connections::Combinational<VectorParams> CCS_INIT_S1(outputAddressGenParams);
 
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(

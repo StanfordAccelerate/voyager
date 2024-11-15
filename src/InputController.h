@@ -285,8 +285,9 @@ SC_MODULE(InputController) {
                           }
                         }
                         MemoryRequest memRequest;
-                        memRequest = {params.INPUT_OFFSET + baseAddress,
-                                      burstSize};
+                        memRequest = {params.INPUT_OFFSET +
+                                          baseAddress * (DTYPE::width / 8),
+                                      burstSize * (DTYPE::width / 8)};
 
                         addressRequest.Push(memRequest);
 
@@ -438,10 +439,11 @@ SC_MODULE(InputController) {
                                 loop_bounds[1][3] * loop_bounds[1][4]) *
                                loop_bounds[1][5];
               } else {
-                total_writes = loop_bounds[1][1] * loop_bounds[1][2] *
-                                   loop_bounds[1][3] * loop_bounds[1][4] *
-                                   ((STRIDE)*X0 / packingFactor +
-                               2 * boundaryWords);  // 2 extra writes for padding
+                total_writes =
+                    loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
+                    loop_bounds[1][4] *
+                    ((STRIDE)*X0 / packingFactor +
+                     2 * boundaryWords);  // 2 extra writes for padding
               }
 
               writeControl[bankSel].Push(total_writes);

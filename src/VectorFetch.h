@@ -146,13 +146,13 @@ SC_MODULE(VectorFetchUnit) {
 
                   if (params.DP_VEC0) {
                     MemoryRequest memRequest = {
-                        params.VECTOR_OFFSET +
-                            address * (VEC_DTYPE::width / IO_DTYPE::width),
-                        WIDTH * (VEC_DTYPE::width / IO_DTYPE::width)};
+                        params.VECTOR_OFFSET + address * (VEC_DTYPE::width / 8),
+                        WIDTH * (VEC_DTYPE::width / 8)};
                     vectorFetch0AddressRequest.Push(memRequest);
                   } else {
-                    MemoryRequest memRequest = {params.VECTOR_OFFSET + address,
-                                                WIDTH};
+                    MemoryRequest memRequest = {
+                        params.VECTOR_OFFSET + address * (IO_DTYPE::width / 8),
+                        WIDTH * (IO_DTYPE::width / 8)};
                     vectorFetch0AddressRequest.Push(memRequest);
                   }
                 }
@@ -311,16 +311,16 @@ SC_MODULE(VectorFetchUnit) {
                   }
 
                   if (params.DP_VEC1) {
-                    constexpr int num_words =
-                        VEC_DTYPE::width / IO_DTYPE::width;
-
                     MemoryRequest memRequest = {
-                        params.ADDRESS_GEN1_OFFSET + num_words * address,
-                        WIDTH * num_words};
+                        params.ADDRESS_GEN1_OFFSET +
+                            address * (VEC_DTYPE::width / 8),
+                        WIDTH * (VEC_DTYPE::width / 8)};
                     vectorFetch1AddressRequest.Push(memRequest);
                   } else {
                     MemoryRequest memRequest = {
-                        params.ADDRESS_GEN1_OFFSET + address, WIDTH};
+                        params.ADDRESS_GEN1_OFFSET +
+                            address * (IO_DTYPE::width / 8),
+                        WIDTH * (IO_DTYPE::width / 8)};
                     vectorFetch1AddressRequest.Push(memRequest);
                   }
                 }
@@ -513,16 +513,16 @@ SC_MODULE(VectorFetchUnit) {
                   }
 
                   if (params.DP_VEC2) {
-                    constexpr int num_words =
-                        VEC_DTYPE::width / IO_DTYPE::width;
-
                     MemoryRequest memRequest = {
-                        params.ADDRESS_GEN2_OFFSET + num_words * address,
-                        WIDTH * num_words};
+                        params.ADDRESS_GEN2_OFFSET +
+                            address * (VEC_DTYPE::width / 8),
+                        WIDTH * (VEC_DTYPE::width / 8)};
                     vectorFetch2AddressRequest.Push(memRequest);
                   } else {
                     MemoryRequest memRequest = {
-                        params.ADDRESS_GEN2_OFFSET + address, WIDTH};
+                        params.ADDRESS_GEN2_OFFSET +
+                            address * (IO_DTYPE::width / 8),
+                        WIDTH * (IO_DTYPE::width / 8)};
                     vectorFetch2AddressRequest.Push(memRequest);
                   }
                 }
