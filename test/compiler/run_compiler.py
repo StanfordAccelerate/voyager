@@ -1,14 +1,7 @@
 import argparse
-import copy
-import operator
-import os
 
 import torch
 from datasets import load_dataset
-from google.protobuf import text_format
-from google.protobuf.json_format import MessageToJson
-from torch._export import capture_pre_autograd_graph
-import torch.ao.quantization
 from torch.utils.data import DataLoader
 from torchvision import models
 from transformers import (
@@ -21,32 +14,17 @@ from transformers import (
 from tqdm import tqdm
 
 from quantized_training import (
-    MemoryManager,
-    ShapeProp,
-    add_qspec_args,
-    allocate_activations,
-    allocate_weights,
-    convert_pt2e,
-    fuse_operator,
-    gen_code,
-    gen_compute_graph,
-    get_default_quantizer,
-    prepare_pt2e,
-    split_multi_head_attention,
+    DerivedQuantizationSpec,
     FusedAmaxObsFakeQuantize,
     QuantizationSpec,
     QuantizationConfig,
-    DerivedQuantizationSpec,
+    add_qspec_args,
+    convert_pt2e,
+    get_default_quantizer,
+    prepare_pt2e,
+    transform,
 )
-from quantized_training.quantize_pt2e import (
-    _fuse_quantize_dequantize_with_previous_op,
-    derive_bias_qparams_fn,
-)
-from quantized_training.quantizer.xnnpack_quantizer_utils import (
-    _convert_scalars_to_attrs,
-)
-from quantized_training.quantizer import QScheme
-from quantized_training.pt2e_utils import print_node_scope_tabular
+from quantized_training.quantize_pt2e import derive_bias_qparams_fn
 
 
 task_to_keys = {
@@ -59,26 +37,6 @@ task_to_keys = {
     "sst2": ("sentence", None),
     "stsb": ("sentence1", "sentence2"),
     "wnli": ("sentence1", "sentence2"),
-}
-
-OPERATOR_MAPPINGS = {
-    "add": ["add", "add_", operator.add, torch.add, operator.iadd],
-    "sub": ["sub", "sub_", operator.sub, torch.sub, operator.isub],
-    "mul": ["mul", "mul_", operator.mul, torch.mul, operator.imul],
-    "div": ["div", "div_", operator.truediv, torch.div, operator.itruediv],
-    "exp": [torch.exp],
-    "relu": [torch.nn.ReLU, torch.nn.functional.relu, torch.nn.functional.relu_],
-    "gelu": [torch.nn.GELU, torch.nn.functional.gelu],
-    "gemm": [
-        torch.nn.Conv2d,
-        torch.nn.Linear,
-        torch.matmul,
-        torch.ops.quantized_ops.conv2d_mx.default,
-        torch.ops.quantized_ops.linear_mx.default,
-        torch.ops.quantized_ops.matmul_mx.default,
-    ],
-    "quantize": [torch.ops.quantized_ops.quantize],
-    "dequantize": [torch.ops.quantized_ops.dequantize],
 }
 
 
@@ -104,123 +62,18 @@ def replace_interpolate():
     torch.nn.functional.interpolate = torch.ops.custom.interpolate
 
 
-def _pair_conv_bn(layers):
-    pairs = []
-    layer_dict = {}
-
-    # Organize layers by prefix
-    for layer in layers:
-        prefix = ".".join(layer.split(".")[:-1])
-        if prefix not in layer_dict:
-            layer_dict[prefix] = []
-        layer_dict[prefix].append(layer)
-
-    # Find pairs of conv and bn
-    for prefix, layer_list in layer_dict.items():
-        if "downsample" in prefix:
-            pairs.append([f"{prefix}.0", f"{prefix}.1"])
+def get_conv_bn_layers(model):
+    layers = []
+    module_names = list(model._modules)
+    for k, name in enumerate(module_names):
+        if len(list(model._modules[name]._modules)) > 0:
+            conv_bn_pairs = get_conv_bn_layers(model._modules[name])
+            layers.extend([[f'{name}.{conv}', f'{name}.{bn}'] for conv, bn in conv_bn_pairs])
         else:
-            conv_layers = sorted([l for l in layer_list if "conv" in l])
-            bn_layers = sorted([l for l in layer_list if "bn" in l])
-
-            # Pair each conv with its corresponding bn
-            for conv, bn in zip(conv_layers, bn_layers):
-                pairs.append([conv, bn])
-
-    return pairs
-
-
-def flatten_args(mixed_list):
-    flattened_list = []
-    for element in mixed_list:
-        if isinstance(element, list):
-            flattened_list.extend(flatten_args(element))
-        else:
-            flattened_list.append(element)
-    return flattened_list
-
-
-def transform(
-    compiler_args,
-    model: torch.fx.GraphModule,
-    example_args,
-    example_kwargs=None,
-    *,
-    output_file="compute_graph",
-    output_dir=None,
-):
-    if example_kwargs is None:
-        example_kwargs = {}
-
-    if isinstance(model, torch.fx.GraphModule):
-        gm = copy.deepcopy(model)
-    else:
-        gm = capture_pre_autograd_graph(model, example_args, example_kwargs)
-        _convert_scalars_to_attrs(gm)
-
-    uplifted_args = flatten_args(list(example_args)) + list(example_kwargs.values())
-
-    ShapeProp(gm).propagate(*uplifted_args)
-    split_multi_head_attention(gm)
-
-    ShapeProp(gm).propagate(*uplifted_args)
-
-    _fuse_quantize_dequantize_with_previous_op(gm)
-
-    pipeline = {
-        0: ["gemm"],
-        1: ["dequantize"],
-        2: ["add", "sub", "mul", "div"],
-        3: ["exp"],
-        4: ["add", "mul", "div"],
-        5: ["relu"],
-        6: ["quantize"],
-    }
-
-    # If there is no corresponding mapping, we directly append the op string
-    pipeline = {
-        stage: [item for op in ops for item in OPERATOR_MAPPINGS.get(op, [op])]
-        for stage, ops in pipeline.items()
-    }
-
-    fuse_operator(gm, pipeline)
-    gm.graph.print_tabular()
-
-    pt_out = model(*example_args, **example_kwargs)
-    gm_out = gm(*example_args, *list(example_kwargs.values()))
-
-    ShapeProp(gm).propagate(*uplifted_args)
-
-    manager = MemoryManager(1024**4)
-    allocate_weights(gm, manager)
-    allocate_activations(gm, manager)
-
-    manager.print_partitions()
-    print("\nMemory allocated to tensors:")
-    for node in gm.graph.nodes:
-        if (partition := node.meta.get("memory", None)) is None:
-            print(f"Node {node.name} does not have memory allocated")
-            continue
-        print(f"{node.name}: {partition.start}, {partition.end}")
-
-    params = gen_code(gm, uplifted_args, os.path.join(output_dir, "tensor_files"))
-
-    with open(os.path.join(output_dir, "params.pb"), "wb") as f:
-        f.write(params.SerializeToString())
-
-    with open(os.path.join(output_dir, "params.txt"), "w") as f:
-        f.write(text_format.MessageToString(params))
-
-    with open(os.path.join(output_dir, "params.json"), "w") as f:
-        f.write(MessageToJson(params))
-
-    layers = [p.name for p in params.params if p.WhichOneof("param_type") != "nop"]
-    with open(os.path.join(output_dir, "layers.txt"), "w") as f:
-        f.write("\n".join(layers))
-
-    gen_compute_graph(gm, os.path.join(output_dir, output_file))
-
-    return pt_out, gm_out
+            if isinstance(model._modules[name], torch.nn.BatchNorm2d):
+                if isinstance(model._modules[module_names[k-1]], torch.nn.Conv2d):
+                    layers.append([module_names[k-1], name])
+    return layers
 
 
 TORCHVISION_MODELS = {
@@ -272,8 +125,7 @@ if __name__ == "__main__":
             model.bfloat16()
         torch_dtype = torch.bfloat16 if args.bf16 else torch.float32
 
-        module_names = [name for name, _ in model.named_modules()]
-        modules_to_fuse = _pair_conv_bn(module_names)
+        modules_to_fuse = get_conv_bn_layers(model)
         if len(modules_to_fuse) > 0:
             model = torch.ao.quantization.fuse_modules(
                 model, modules_to_fuse, inplace=True
@@ -321,7 +173,6 @@ if __name__ == "__main__":
         convert_pt2e(model, args.bias)
 
         pt_out, gm_out = transform(
-            args,
             model,
             example_args,
             output_file=args.model,
@@ -346,7 +197,6 @@ if __name__ == "__main__":
         convert_pt2e(model, args.bias)
 
         pt_out, gm_out = transform(
-            args,
             model,
             example_args,
             output_file="segformer",
@@ -472,7 +322,6 @@ if __name__ == "__main__":
         convert_pt2e(gm, args.bias)
 
         pt_out, gm_out = transform(
-            args,
             gm,
             example_args,
             output_file="mobilebert",
@@ -534,7 +383,6 @@ if __name__ == "__main__":
         convert_pt2e(gm, args.bias)
 
         pt_out, gm_out = transform(
-            args,
             gm,
             example_args,
             output_file="mobilebert",
@@ -593,7 +441,6 @@ if __name__ == "__main__":
         convert_pt2e(gm, args.bias)
 
         pt_out, gm_out = transform(
-            args,
             gm,
             example_args,
             output_file="bert",
@@ -629,7 +476,6 @@ if __name__ == "__main__":
         convert_pt2e(model, args.bias)
 
         pt_out, gm_out = transform(
-            args,
             model,
             example_args,
             output_file=args.model,
@@ -661,7 +507,6 @@ if __name__ == "__main__":
         convert_pt2e(model)
 
         pt_out, gm_out = transform(
-            args,
             model,
             example_args,
             output_file=args.model,
