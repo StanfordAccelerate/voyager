@@ -156,10 +156,16 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .weight_reuse_index = {4, 5},
               .stride = matrix_op.stride(0),
               .replication = true};
+  }
+  if (IH == 224 && IW == 224 && IC == 3 && KH == 7 && KW == 7 &&
+      OC == 64) {  // conv1
 
-  } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
-             OC == 64) {  // layer1
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
+    tiling = {.loops = {{7, 7, 2, 1, 1, 1},
+                        {1, 2, 7,
+                         (IC_DIMENSION == 16   ? 2
+                          : IC_DIMENSION == 32 ? 1
+                                               : 7),
+                         16, 16}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -167,12 +173,24 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
+              .replication = true};
+  } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
+             OC == 64) {  // layer1
+    tiling = {.loops = {{2, 2, 4, 4, 1, 1}, {1, 1, 3, 3, 28, 28}},
+              .x_loop_index = {0, 5},
+              .y_loop_index = {1, 4},
+              .reduction_loop_index = {3, 0},
+              .weight_loop_index = {2, 1},
+              .fx_index = 3,
+              .fy_index = 2,
+              .weight_reuse_index = {4, 5},
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
              OC == 64) {  // layer1_0_conv1
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 1, 1, 28, 28}},
+    tiling = {.loops = {{2, 2, 4, 4, 1, 1}, {1, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -180,11 +198,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
              OC == 256) {  // layer1_x_conv3
-    tiling = {.loops = {{2, 2, 16, 1, 1, 1}, {4, 1, 1, 1, 28, 28}},
+    tiling = {.loops = {{2, 2, 16, 4, 1, 1}, {1, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -192,13 +210,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 256 && KH == 1 && KW == 1 &&
              OC == 64) {  // layer1_x_conv1
 
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {16, 1, 1, 1, 28, 28}},
+    tiling = {.loops = {{2, 2, 4, 16, 1, 1}, {1, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -206,12 +224,12 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
              OC == 128) {  // layer2_0_downsample (resnet18)
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {4, 2, 1, 1, 14, 14}},
+    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {1, 2, 1, 1, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -219,11 +237,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
   } else if (IH == 56 && IW == 56 && IC == 256 && KH == 1 && KW == 1 &&
              OC == 512) {  // layer2_0_downsample (resnet50)
-    tiling = {.loops = {{2, 2, 16, 1, 1, 1}, {16, 2, 1, 1, 14, 14}},
+    tiling = {.loops = {{2, 2, 16, 16, 1, 1}, {1, 2, 1, 1, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -231,13 +249,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
-             OC == 128 && matrix_op.stride(0) == 2) {  // layer2_0_conv1
+             OC == 128 && matrix_param.stride(0) == 2) {  // layer2_0_conv1
 
-    tiling = {.loops = {{4, 4, 4, 1, 1, 1}, {4, 3, 3, 2, 7, 7}},
+    tiling = {.loops = {{4, 4, 4, 4, 1, 1}, {1, 3, 3, 2, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -245,13 +263,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 &&
              OC == 128) {  // layer2
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {8, 1, 3, 3, 28, 28}},
+    tiling = {.loops = {{1, 1, 8, 8, 1, 1}, {1, 1, 3, 3, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -259,13 +277,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 256 && KH == 1 && KW == 1 &&
-             OC == 128 && matrix_op.stride(0) == 1) {  // layer2_0_conv1
+             OC == 128 && matrix_param.stride(0) == 1) {  // layer2_0_conv1
 
-    tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {16, 1, 1, 1, 28, 28}},
+    tiling = {.loops = {{2, 2, 8, 16, 1, 1}, {1, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -273,13 +291,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 512 && KH == 1 && KW == 1 &&
              OC == 128) {  // layer2_x_conv1
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {32, 1, 1, 1, 28, 28}},
+    tiling = {.loops = {{1, 1, 8, 32, 1, 1}, {1, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -287,13 +305,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 128 && KH == 3 && KW == 3 &&
              OC == 128) {  // layer2_x_conv2
 
-    tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {8, 1, 3, 3, 14, 14}},
+    tiling = {.loops = {{2, 2, 8, 8, 1, 1}, {1, 1, 3, 3, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -301,13 +319,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 1 && KW == 1 &&
              OC == 512) {  // layer2_x_conv3
 
-    tiling = {.loops = {{1, 1, 32, 1, 1, 1}, {8, 1, 1, 1, 28, 28}},
+    tiling = {.loops = {{1, 1, 32, 8, 1, 1}, {1, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -315,13 +333,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 1 && KW == 1 &&
              OC == 256) {  // layer3_0_downsample (resnet18)
 
-    tiling = {.loops = {{2, 2, 2, 1, 1, 1}, {8, 1, 1, 8, 7, 7}},
+    tiling = {.loops = {{2, 2, 2, 8, 1, 1}, {1, 1, 1, 8, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -329,14 +347,14 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 512 && KH == 1 && KW == 1 &&
              OC == 1024 &&
-             matrix_op.stride(0) == 2) {  // layer3_0_downsample (resnet50)
+             matrix_param.stride(0) == 2) {  // layer3_0_downsample (resnet50)
 
-    tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {32, 1, 1, 8, 7, 7}},
+    tiling = {.loops = {{2, 2, 8, 32, 1, 1}, {1, 1, 1, 8, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -344,13 +362,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 &&
-             OC == 256 && matrix_op.stride(0) == 2) {  // layer3_0_conv1
+             OC == 256 && matrix_param.stride(0) == 2) {  // layer3_0_conv1
 
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {8, 3, 3, 4, 7, 7}},
+    tiling = {.loops = {{2, 2, 4, 8, 1, 1}, {1, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -358,13 +376,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 3 && KW == 3 &&
              OC == 256) {  // layer3_0_conv2
 
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {16, 3, 3, 4, 7, 7}},
+    tiling = {.loops = {{2, 2, 4, 16, 1, 1}, {1, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -372,13 +390,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 512 && KH == 1 && KW == 1 &&
              OC == 256) {  // layer3_0_conv1
 
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {32, 1, 1, 4, 14, 14}},
+    tiling = {.loops = {{2, 2, 4, 32, 1, 1}, {1, 1, 1, 4, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -386,13 +404,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 1024 && KH == 1 && KW == 1 &&
              OC == 256) {  // layer3_x_conv1
 
-    tiling = {.loops = {{1, 1, 4, 1, 1, 1}, {64, 1, 1, 4, 14, 14}},
+    tiling = {.loops = {{1, 1, 4, 64, 1, 1}, {1, 1, 1, 4, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -400,13 +418,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 256 && KH == 3 && KW == 3 &&
              OC == 256) {  // layer3_x_conv2
 
-    tiling = {.loops = {{1, 1, 4, 1, 1, 1}, {16, 3, 3, 4, 14, 14}},
+    tiling = {.loops = {{1, 1, 4, 16, 1, 1}, {1, 3, 3, 4, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -414,13 +432,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 1 && KW == 1 &&
              OC == 1024) {  // layer3_x_conv3
 
-    tiling = {.loops = {{2, 2, 16, 1, 1, 1}, {16, 1, 1, 4, 7, 7}},
+    tiling = {.loops = {{2, 2, 16, 16, 1, 1}, {1, 1, 1, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -428,13 +446,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 64 && KH == 3 && KW == 3 &&
              OC == 128) {  // layer3
 
-    tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {8, 3, 3, 4, 7, 7}},
+    tiling = {.loops = {{2, 2, 4, 8, 1, 1}, {1, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -442,14 +460,14 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 1 && KW == 1 &&
              OC == 512 &&
-             matrix_op.stride(0) == 2) {  // layer4_0_downsample (resnet18)
+             matrix_param.stride(0) == 2) {  // layer4_0_downsample (resnet18)
 
-    tiling = {.loops = {{1, 1, 2, 1, 1, 1}, {16, 1, 1, 16, 7, 7}},
+    tiling = {.loops = {{1, 1, 2, 16, 1, 1}, {1, 1, 1, 16, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -457,14 +475,14 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 1024 && KH == 1 && KW == 1 &&
              OC == 2048 &&
-             matrix_op.stride(0) == 2) {  // layer4_0_downsample (resnet50)
+             matrix_param.stride(0) == 2) {  // layer4_0_downsample (resnet50)
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {64, 1, 1, 16, 7, 7}},
+    tiling = {.loops = {{1, 1, 8, 64, 1, 1}, {1, 1, 1, 16, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -472,13 +490,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 3 && KW == 3 &&
-             OC == 512 && matrix_op.stride(0) == 2) {  // layer4_0_conv1
+             OC == 512 && matrix_param.stride(0) == 2) {  // layer4_0_conv1
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {16, 3, 3, 4, 7, 7}},
+    tiling = {.loops = {{1, 1, 8, 16, 1, 1}, {1, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -486,13 +504,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 1024 && KH == 1 && KW == 1 &&
-             OC == 512 && matrix_op.stride(0) == 1) {  // layer4_0_conv1
+             OC == 512 && matrix_param.stride(0) == 1) {  // layer4_0_conv1
 
-    tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {64, 1, 1, 4, 7, 7}},
+    tiling = {.loops = {{2, 2, 8, 64, 1, 1}, {1, 1, 1, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -500,13 +518,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 7 && IW == 7 && IC == 2048 && KH == 1 && KW == 1 &&
-             OC == 512 && matrix_op.stride(0) == 1) {  // layer4_x_conv1
+             OC == 512 && matrix_param.stride(0) == 1) {  // layer4_x_conv1
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {128, 1, 1, 4, 7, 7}},
+    tiling = {.loops = {{1, 1, 8, 128, 1, 1}, {1, 1, 1, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -514,13 +532,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 512 && KH == 3 && KW == 3 &&
-             OC == 512 && matrix_op.stride(0) == 2) {  // layer4_x_conv2
+             OC == 512 && matrix_param.stride(0) == 2) {  // layer4_x_conv2
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {32, 3, 3, 4, 7, 7}},
+    tiling = {.loops = {{1, 1, 8, 32, 1, 1}, {1, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -528,13 +546,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 7 && IW == 7 && IC == 512 && KH == 1 && KW == 1 &&
              OC == 2048) {  // layer4_x_conv3
 
-    tiling = {.loops = {{1, 1, 32, 1, 1, 1}, {32, 1, 1, 4, 7, 7}},
+    tiling = {.loops = {{1, 1, 32, 32, 1, 1}, {1, 1, 1, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -542,13 +560,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else if (IH == 7 && IW == 7 && IC == 512 && KH == 3 && KW == 3 &&
              OC == 512) {  // layer4
 
-    tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {32, 3, 3, 4, 7, 7}},
+    tiling = {.loops = {{1, 1, 8, 32, 1, 1}, {1, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -556,7 +574,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = matrix_param.stride(0),
               .replication = false};
 
   } else {
@@ -625,7 +643,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
     }
 
     tiling = {
-        .loops = {{x1, y1, k1, 1, 1, 1}, {c0, k0, fy, fx, y0, x0}},
+        .loops = {{x1, y1, k1, c0, 1, 1}, {1, k0, fy, fx, y0, x0}},
         .x_loop_index = {0, 5},
         .y_loop_index = {1, 4},
         .reduction_loop_index = {3, 0},
@@ -644,9 +662,9 @@ inline void adjust_tiling_for_dimension(Tiling& tiling) {
   // adjust loop counters for dimension != 16
   if (!tiling.replication) {
     if (IC_DIMENSION < 16) {
-      tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
+      tiling.loops[0][tiling.reduction_loop_index[0]] *= (16 / IC_DIMENSION);
     } else if (IC_DIMENSION > 16) {
-      tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
+      tiling.loops[0][tiling.reduction_loop_index[0]] /= (IC_DIMENSION / 16);
     }
 
     // adjust loop counters for weight buffer constraint
@@ -745,7 +763,7 @@ inline Tiling get_linear_tiling(codegen::Operator param) {
   }
 
   Tiling tiling = {
-      .loops = {{x1, 1, k1, 1, 1, 1}, {c0, k0, 1, 1, 1, x0}},
+      .loops = {{x1, 1, k1, c0, 1, 1}, {1, k0, 1, 1, 1, x0}},
       .x_loop_index = {0, 5},
       .y_loop_index = {1, 4},
       .reduction_loop_index = {3, 0},

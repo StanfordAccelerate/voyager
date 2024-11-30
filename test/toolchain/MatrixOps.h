@@ -227,7 +227,8 @@ void MapMatrixOperation(const Operation &operation,
           tiling.loops[1][tiling.x_loop_index[1]];
   int Y = tiling.loops[0][tiling.y_loop_index[0]] *
           tiling.loops[1][tiling.y_loop_index[1]];
-  int C = tiling.loops[1][tiling.reduction_loop_index[1]] * (16);
+  int C = tiling.loops[0][tiling.reduction_loop_index[0]] *
+          tiling.loops[1][tiling.reduction_loop_index[1]] * (16);
   int K = tiling.loops[0][tiling.weight_loop_index[0]] *
           tiling.loops[1][tiling.weight_loop_index[1]] * (16);
   int FX = tiling.loops[1][tiling.fx_index];
@@ -287,6 +288,8 @@ void MapMatrixOperation(const Operation &operation,
   // matrix_params->weightAddressGenInputYLoopIndex = tiling.y_loop_index[0];
   matrix_params->weightAddressGenWeightLoopIndex[0] =
       tiling.weight_loop_index[0];
+  matrix_params->weightAddressGenReductionLoopIndex[0] =
+      tiling.reduction_loop_index[0];
 
   // set outer loop values
   const auto weight = matrix_op.weight();
@@ -297,7 +300,7 @@ void MapMatrixOperation(const Operation &operation,
     // we can just use the following loop nest:
     // C1, K, FY, FX, C0
     matrix_params->weightAddressGenLoops[1][4] = OC_DIMENSION;
-    matrix_params->weightAddressGenReductionLoopIndex[1] = 4;
+    matrix_params->weightAddressGenReductionLoopIndex[2] = 4;
     matrix_params->weightAddressGenLoops[1][3] =
         tiling.loops[1][tiling.fx_index];
     matrix_params->weightAddressGenFxIndex = 3;
@@ -306,12 +309,6 @@ void MapMatrixOperation(const Operation &operation,
     matrix_params->weightAddressGenFyIndex = 2;
     matrix_params->weightAddressGenLoops[1][1] =
         tiling.loops[1][tiling.weight_loop_index[1]];
-
-    if (OC_DIMENSION > IC_DIMENSION) {
-      // matrix_params->weightAddressGenLoops[1][1] =
-      //     tiling.loops[1][tiling.weight_loop_index[1]] /
-      //     (OC_DIMENSION / IC_DIMENSION);
-    }
 
     matrix_params->weightAddressGenWeightLoopIndex[1] = 1;
     matrix_params->weightAddressGenLoops[1][0] =
@@ -324,39 +321,8 @@ void MapMatrixOperation(const Operation &operation,
           tiling.loops[1][tiling.reduction_loop_index[1]] /
           (OC_DIMENSION / IC_DIMENSION);
     }
-    matrix_params->weightAddressGenReductionLoopIndex[0] = 0;
+    matrix_params->weightAddressGenReductionLoopIndex[1] = 0;
   } else {  // if not tranpose, then we have freedom to pick any loop order
-    // for efficient memory accesses, addresses should be consecutive
-    // or least, not multiples of 4, due to interleaving.
-    // given that weights are arranged as: FY,FX,C,K
-    // the following loop nest should work:
-    // C1, C0, FX, FY, K
-    // int index = 0;
-    // for (int j = 0; j < 6; j++) {
-    //   if (j == matrix_params->inputXLoopIndex[1] ||
-    //       j == matrix_params->inputYLoopIndex[1]) {
-    //     continue;
-    //   }
-    //   matrix_params->weightAddressGenLoops[1][index] = tiling.loops[1][j];
-
-    //   if (j == matrix_params->reductionLoopIndex[1]) {
-    //     matrix_params->weightAddressGenReductionLoopIndex[0] = index;
-    //   }
-    //   if (j == matrix_params->fxIndex) {
-    //     matrix_params->weightAddressGenFxIndex = index;
-    //   }
-    //   if (j == matrix_params->fyIndex) {
-    //     matrix_params->weightAddressGenFyIndex = index;
-    //   }
-    //   if (j == matrix_params->weightLoopIndex[1]) {
-    //     matrix_params->weightAddressGenWeightLoopIndex[1] = index;
-    //   }
-
-    //   index++;
-    // }
-    // matrix_params->weightAddressGenLoops[1][4] = DIMENSION;
-    // matrix_params->weightAddressGenReductionLoopIndex[1] = 4;
-
     matrix_params->weightAddressGenLoops[1][4] =
         tiling.loops[1][tiling.weight_loop_index[1]];
     matrix_params->weightAddressGenWeightLoopIndex[1] = 4;
@@ -374,14 +340,14 @@ void MapMatrixOperation(const Operation &operation,
 
     if (tiling.replication) {
       matrix_params->weightAddressGenLoops[1][1] = 3;
-      matrix_params->weightAddressGenReductionLoopIndex[1] = 1;
+      matrix_params->weightAddressGenReductionLoopIndex[2] = 1;
     } else {
       matrix_params->weightAddressGenLoops[1][1] = IC_DIMENSION;
-      matrix_params->weightAddressGenReductionLoopIndex[1] = 1;
+      matrix_params->weightAddressGenReductionLoopIndex[2] = 1;
     }
     matrix_params->weightAddressGenLoops[1][0] =
         tiling.loops[1][tiling.reduction_loop_index[1]];
-    matrix_params->weightAddressGenReductionLoopIndex[0] = 0;
+    matrix_params->weightAddressGenReductionLoopIndex[1] = 0;
   }
 
   matrix_params->STRIDE = tiling.stride;

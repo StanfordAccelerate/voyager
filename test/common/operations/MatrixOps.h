@@ -62,8 +62,29 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
     tiling = get_linear_tiling(param);
   }
 
+  int X = tiling.loops[0][tiling.x_loop_index[0]] *
+          tiling.loops[1][tiling.x_loop_index[1]];
+  int Y = tiling.loops[0][tiling.y_loop_index[0]] *
+          tiling.loops[1][tiling.y_loop_index[1]];
+  int C = tiling.loops[0][tiling.reduction_loop_index[0]] *
+          tiling.loops[1][tiling.reduction_loop_index[1]] * 16;
+  int K = tiling.loops[0][tiling.weight_loop_index[0]] *
+          tiling.loops[1][tiling.weight_loop_index[1]] * 16;
+  int FX = tiling.loops[1][tiling.fx_index];
+  int FY = tiling.loops[1][tiling.fy_index];
+  int STRIDE = tiling.stride;
+
+  if (tiling.replication) {
+    FX = 7;
+    C = 3;
+  }
+
   adjust_tiling_for_dimension(tiling);
 
+  int X0 = tiling.loops[1][tiling.x_loop_index[1]];
+  int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
+  int K0 = tiling.loops[1][tiling.weight_loop_index[1]];
+  int C1 = tiling.loops[1][tiling.reduction_loop_index[1]];
   int IC_unroll = IC_DIMENSION;
   int FX_UNROLL = 1;
 
@@ -92,16 +113,7 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
     assert(tiling.loops[1][j] != 0);
   }
 
-  int X = tiling.loops[0][tiling.x_loop_index[0]] *
-          tiling.loops[1][tiling.x_loop_index[1]];
-  int Y = tiling.loops[0][tiling.y_loop_index[0]] *
-          tiling.loops[1][tiling.y_loop_index[1]];
-  int C = tiling.loops[1][tiling.reduction_loop_index[1]] * IC_DIMENSION;
-  int K = tiling.loops[0][tiling.weight_loop_index[0]] *
-          tiling.loops[1][tiling.weight_loop_index[1]] * OC_DIMENSION;
-  int FX = tiling.loops[1][tiling.fx_index];
-  int FY = tiling.loops[1][tiling.fy_index];
-  int STRIDE = tiling.stride;
+  std::cout << "Using tiling: " << std::endl << tiling << std::endl;
 
   int X0 = tiling.loops[1][tiling.x_loop_index[1]];
   int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
@@ -145,88 +157,93 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
          counters[0][1]++) {
       for (counters[0][2] = 0; counters[0][2] < tiling.loops[0][2];
            counters[0][2]++) {
-        int x1 = counters[0][tiling.x_loop_index[0]];
-        int y1 = counters[0][tiling.y_loop_index[0]];
-        int k1 = counters[0][tiling.weight_loop_index[0]];
-        for (counters[1][0] = 0; counters[1][0] < tiling.loops[1][0];
-             counters[1][0]++) {
-          for (counters[1][1] = 0; counters[1][1] < tiling.loops[1][1];
-               counters[1][1]++) {
-            for (counters[1][2] = 0; counters[1][2] < tiling.loops[1][2];
-                 counters[1][2]++) {
-              for (counters[1][3] = 0; counters[1][3] < tiling.loops[1][3];
-                   counters[1][3]++) {
-                for (counters[1][4] = 0; counters[1][4] < tiling.loops[1][4];
-                     counters[1][4]++) {
-                  for (counters[1][5] = 0; counters[1][5] < tiling.loops[1][5];
-                       counters[1][5]++) {
-                    int x0 = counters[1][tiling.x_loop_index[1]];
-                    int y0 = counters[1][tiling.y_loop_index[1]];
-                    int c0 = counters[1][tiling.reduction_loop_index[1]];
-                    int k0 = counters[1][tiling.weight_loop_index[1]];
-                    int fx = counters[1][tiling.fx_index] - (FX - 1) / 2;
-                    int fy = counters[1][tiling.fy_index] - (FY - 1) / 2;
+        for (counters[0][3] = 0; counters[0][3] < tiling.loops[0][3];
+             counters[0][3]++) {
+          int x1 = counters[0][tiling.x_loop_index[0]];
+          int y1 = counters[0][tiling.y_loop_index[0]];
+          int k1 = counters[0][tiling.weight_loop_index[0]];
+          int c2 = counters[0][tiling.reduction_loop_index[0]];
+          for (counters[1][0] = 0; counters[1][0] < tiling.loops[1][0];
+               counters[1][0]++) {
+            for (counters[1][1] = 0; counters[1][1] < tiling.loops[1][1];
+                 counters[1][1]++) {
+              for (counters[1][2] = 0; counters[1][2] < tiling.loops[1][2];
+                   counters[1][2]++) {
+                for (counters[1][3] = 0; counters[1][3] < tiling.loops[1][3];
+                     counters[1][3]++) {
+                  for (counters[1][4] = 0; counters[1][4] < tiling.loops[1][4];
+                       counters[1][4]++) {
+                    for (counters[1][5] = 0;
+                         counters[1][5] < tiling.loops[1][5];
+                         counters[1][5]++) {
+                      int x0 = counters[1][tiling.x_loop_index[1]];
+                      int y0 = counters[1][tiling.y_loop_index[1]];
+                      int c1 = counters[1][tiling.reduction_loop_index[1]];
+                      int k0 = counters[1][tiling.weight_loop_index[1]];
+                      int fx = counters[1][tiling.fx_index] - (FX - 1) / 2;
+                      int fy = counters[1][tiling.fy_index] - (FY - 1) / 2;
 
-                    int x = x1 * X0 + x0;
-                    int y = y1 * Y0 + y0;
+                      int x = x1 * X0 + x0;
+                      int y = y1 * Y0 + y0;
 
-                    for (int oc0 = 0; oc0 < OC_DIMENSION; oc0++) {
-                      int k = (k1 * K0 + k0) * OC_DIMENSION + oc0;
-                      int output_addr = y * X * K + x * K + k;
+                      for (int oc0 = 0; oc0 < OC_DIMENSION; oc0++) {
+                        int k = (k1 * K0 + k0) * OC_DIMENSION + oc0;
+                        int output_addr = y * X * K + x * K + k;
 
-                      ACCUMULATE_T psum;
-                      if (is_mx || is_mx_based_design) {
-                        psum = ACCUMULATE_T(0.0);
-                      } else {
-                        if constexpr (ACCUMULATE_T::is_floating_point ==
-                                      ACCUMULATION_BUFFER_T::
-                                          is_floating_point) {
-                          psum = outputs[output_addr];
-                        }
-                      }
-
-                      for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
-                        int c = c0 * IC_unroll + ic0;
-                        int input_addr = (STRIDE * y + fy) * STRIDE * X * C +
-                                         (STRIDE * x + fx) * C + c;
-                        int weight_addr = (fy + (FY - 1) / 2) * FX * C * K +
-                                          (fx + (FX - 1) / 2) * C * K + c * K +
-                                          k;
-                        if (STRIDE * x + fx >= 0 &&
-                            STRIDE * x + fx < STRIDE * X &&
-                            STRIDE * y + fy >= 0 &&
-                            STRIDE * y + fy < STRIDE * Y) {
-                          INTERMEDIATE_T input = inputs[input_addr];
-                          INTERMEDIATE_T weight = weights[weight_addr];
-#ifdef CHECK_PE
-                          int pe_num = ic0 * OC_DIMENSION + oc0;
-                          if (tiling.replication) {
-                            pe_num =
-                                ic0 * OC_DIMENSION +
-                                (counters[1][tiling.fx_index] % FX_UNROLL) *
-                                    IC_unroll * OC_DIMENSION +
-                                oc0;
-                          }
-                          pe_checker.addReference(pe_num, input, weight,
-                                                  outputs[output_addr]);
-#endif
-                          fused_multiply_add(input, weight, psum);
+                        ACCUMULATE_T psum;
+                        if (is_mx || is_mx_based_design) {
+                          psum = ACCUMULATE_T(0.0);
                         } else {
-#ifdef CHECK_PE
-                          int pe_num = ic0 * OC_DIMENSION + oc0;
-                          if (tiling.replication) {
-                            pe_num =
-                                ic0 * OC_DIMENSION +
-                                (counters[1][tiling.fx_index] % FX_UNROLL) *
-                                    IC_unroll * OC_DIMENSION +
-                                oc0;
+                          if constexpr (ACCUMULATE_T::is_floating_point ==
+                                        ACCUMULATION_BUFFER_T::
+                                            is_floating_point) {
+                            psum = outputs[output_addr];
                           }
-                          INTERMEDIATE_T input;
-                          input.setZero();
-                          INTERMEDIATE_T weight = weights[weight_addr];
-                          pe_checker.addReference(pe_num, input, weight,
-                                                  outputs[output_addr]);
+                        }
+
+                        for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
+                          int c = c0 * IC_unroll + ic0;
+                          int input_addr = (STRIDE * y + fy) * STRIDE * X * C +
+                                           (STRIDE * x + fx) * C + c;
+                          int weight_addr = (fy + (FY - 1) / 2) * FX * C * K +
+                                            (fx + (FX - 1) / 2) * C * K +
+                                            c * K + k;
+                          if (STRIDE * x + fx >= 0 &&
+                              STRIDE * x + fx < STRIDE * X &&
+                              STRIDE * y + fy >= 0 &&
+                              STRIDE * y + fy < STRIDE * Y) {
+                            INTERMEDIATE_T input = inputs[input_addr];
+                            INTERMEDIATE_T weight = weights[weight_addr];
+#ifdef CHECK_PE
+                            int pe_num = ic0 * OC_DIMENSION + oc0;
+                            if (tiling.replication) {
+                              pe_num =
+                                  ic0 * OC_DIMENSION +
+                                  (counters[1][tiling.fx_index] % FX_UNROLL) *
+                                      IC_unroll * OC_DIMENSION +
+                                  oc0;
+                            }
+                            pe_checker.addReference(pe_num, input, weight,
+                                                    outputs[output_addr]);
 #endif
+                            fused_multiply_add(input, weight, psum);
+                          } else {
+#ifdef CHECK_PE
+                            int pe_num = ic0 * OC_DIMENSION + oc0;
+                            if (tiling.replication) {
+                              pe_num =
+                                  ic0 * OC_DIMENSION +
+                                  (counters[1][tiling.fx_index] % FX_UNROLL) *
+                                      IC_unroll * OC_DIMENSION +
+                                  oc0;
+                            }
+                            INTERMEDIATE_T input;
+                            input.setZero();
+                            INTERMEDIATE_T weight = weights[weight_addr];
+                            pe_checker.addReference(pe_num, input, weight,
+                                                    outputs[output_addr]);
+#endif
+                          }
                         }
                       }
 

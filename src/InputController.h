@@ -135,181 +135,199 @@ SC_MODULE(InputController) {
              loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
                loop_counters[0][2]++) {
-            // fetching border pixels is a little tricky
-            // for the outer tiles, we don't fetch borders (they are known to be
-            // 0)
+            for (loop_counters[0][3] = 0;
+                 loop_counters[0][3] < loop_bounds[0][3];
+                 loop_counters[0][3]++) {
+              // fetching border pixels is a little tricky
+              // for the outer tiles, we don't fetch borders (they are known to
+              // be 0)
 
-            // reset loop bounds
-            if (isDownsample) {
-              // don't include STRIDE for downsample
-              loop_bounds[1][params.inputXLoopIndex[1]] =
-                  params.loops[1][params.inputXLoopIndex[1]];
-              loop_bounds[1][params.inputYLoopIndex[1]] =
-                  params.loops[1][params.inputYLoopIndex[1]];
-            } else {
-              loop_bounds[1][params.inputXLoopIndex[1]] =
-                  params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
-              loop_bounds[1][params.inputYLoopIndex[1]] =
-                  params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-            }
-
-            if (params.REPLICATION) {
-              loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
-            }
-
-            ac_int<4, false> x_min_offset = 0;
-            ac_int<4, false> x_max_offset = 0;
-            ac_int<4, false> y_min_offset = 0;
-            ac_int<4, false> y_max_offset = 0;
-
-            if (params.REPLICATION) {
-              if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                x_min_offset = (FX - 1) / 2;
-                loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
-              }
-              if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                  loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                x_max_offset = (FX - 1) / 2;
-                loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
-              }
-            } else {
-              if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                x_min_offset = (FX - 1) / 2;
-                loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+              // reset loop bounds
+              if (isDownsample) {
+                // don't include STRIDE for downsample
+                loop_bounds[1][params.inputXLoopIndex[1]] =
+                    params.loops[1][params.inputXLoopIndex[1]];
+                loop_bounds[1][params.inputYLoopIndex[1]] =
+                    params.loops[1][params.inputYLoopIndex[1]];
+              } else {
+                loop_bounds[1][params.inputXLoopIndex[1]] =
+                    params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
+                loop_bounds[1][params.inputYLoopIndex[1]] =
+                    params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
               }
 
-              if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                  loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                x_max_offset = (FX - 1) / 2;
-                loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+              if (params.REPLICATION) {
+                loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
               }
-            }
 
-            if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
-              y_min_offset = (FY - 1) / 2;
-              loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
-            }
+              ac_int<4, false> x_min_offset = 0;
+              ac_int<4, false> x_max_offset = 0;
+              ac_int<4, false> y_min_offset = 0;
+              ac_int<4, false> y_max_offset = 0;
 
-            if (loop_counters[0][params.inputYLoopIndex[0]] !=
-                loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
-              y_max_offset = (FY - 1) / 2;
-              loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
-            }
+              if (params.REPLICATION) {
+                if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                  x_min_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
+                }
+                if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                    loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                  x_max_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
+                }
+              } else {
+                if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                  x_min_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                }
+
+                if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                    loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                  x_max_offset = (FX - 1) / 2;
+                  loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                }
+              }
+
+              if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
+                y_min_offset = (FY - 1) / 2;
+                loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+              }
+
+              if (loop_counters[0][params.inputYLoopIndex[0]] !=
+                  loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
+                y_max_offset = (FY - 1) / 2;
+                loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+              }
 
 // inner memory
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-            for (loop_counters[1][0] = 0;
-                 loop_counters[1][0] < loop_bounds[1][0];
-                 loop_counters[1][0]++) {
-              for (loop_counters[1][1] = 0;
-                   loop_counters[1][1] < loop_bounds[1][1];
-                   loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;
-                     loop_counters[1][2] < loop_bounds[1][2];
-                     loop_counters[1][2]++) {
-                  for (loop_counters[1][3] = 0;
-                       loop_counters[1][3] < loop_bounds[1][3];
-                       loop_counters[1][3]++) {
-                    for (loop_counters[1][4] = 0;
-                         loop_counters[1][4] < loop_bounds[1][4];
-                         loop_counters[1][4]++) {
-                      for (loop_counters[1][5] = 0;
-                           loop_counters[1][5] < loop_bounds[1][5];
-                           loop_counters[1][5]++) {
-                        ac_int<LOOP_WIDTH, false> x0 =
-                            loop_counters[1][params.inputXLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> x1 =
-                            loop_counters[0][params.inputXLoopIndex[0]];
-                        ac_int<16, false> X0 =
-                            STRIDE * params.loops[1][params.inputXLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> X1 =
-                            params.loops[0][params.inputXLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> y0 =
-                            loop_counters[1][params.inputYLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> y1 =
-                            loop_counters[0][params.inputYLoopIndex[0]];
-                        ac_int<16, false> Y0 =
-                            STRIDE * params.loops[1][params.inputYLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> Y1 =
-                            params.loops[0][params.inputYLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> c1 =
-                            loop_counters[1][params.reductionLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> C1 =
-                            params.loops[1][params.reductionLoopIndex[1]];
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          ac_int<LOOP_WIDTH, false> x0 =
+                              loop_counters[1][params.inputXLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> x1 =
+                              loop_counters[0][params.inputXLoopIndex[0]];
+                          ac_int<16, false> X0 =
+                              STRIDE *
+                              params.loops[1][params.inputXLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> X1 =
+                              params.loops[0][params.inputXLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> y0 =
+                              loop_counters[1][params.inputYLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> y1 =
+                              loop_counters[0][params.inputYLoopIndex[0]];
+                          ac_int<16, false> Y0 =
+                              STRIDE *
+                              params.loops[1][params.inputYLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> Y1 =
+                              params.loops[0][params.inputYLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> c1 =
+                              loop_counters[1][params.reductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> C1 =
+                              params.loops[1][params.reductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> c2 =
+                              loop_counters[0][params.reductionLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> C2 =
+                              params.loops[0][params.reductionLoopIndex[0]];
 
-                        ac_int<16, false> c = c1 * NROWS;
-                        ac_int<16, false> C = C1 * NROWS;
+                          ac_int<16, false> c = c2 * C1 * NROWS + c1 * NROWS;
+                          ac_int<16, false> C = C2 * C1 * NROWS;
 
-                        if (isDownsample) {
-                          // adjust address for stride
-                          x0 = x0 * STRIDE;
-                          y0 = y0 * STRIDE;
-                        }
+                          ac_int<16, false> c = c1 * NROWS;
+                          ac_int<16, false> C = C1 * NROWS;
 
-                        if (params.REPLICATION) {
-                          if (x0 != 0 && x_min_offset == 3) {
-                            x0 = x_min_offset +
-                                 (x0 - boundaryWords) * packingFactor;
-                          } else {
-                            x0 = x0 * packingFactor;
+                          if (isDownsample) {
+                            // adjust address for stride
+                            x0 = x0 * STRIDE;
+                            y0 = y0 * STRIDE;
+                          }
+
+                          if (params.REPLICATION) {
+                            if (x0 != 0 && x_min_offset == 3) {
+                              x0 = x_min_offset +
+                                   (x0 - boundaryWords) * packingFactor;
+                            } else {
+                              x0 = x0 * packingFactor;
+                            }
+                          }
+
+                          ac_int<16, false> x = (x0 - x_min_offset) + x1 * X0;
+                          ac_int<16, false> X = X0 * X1;
+
+                          ac_int<16, false> y = (y0 - y_min_offset) + y1 * Y0;
+                          ac_int<16, false> Y = Y0 * Y1;
+
+                          ac_int<32, false> baseAddress = y * X * C + x * C + c;
+                          int burstSize = NROWS;
+
+                          if (params.REPLICATION) {
+                            baseAddress =
+                                y * (X / packingFactor) * IC_DIMENSION +
+                                (x / packingFactor) * IC_DIMENSION + c;
+                          }
+
+                          ac_int<8, false> headSize =
+                              params.headSizeInPowerOfTwo;
+                          if (params.CONCAT_INPUT) {
+                            ac_int<16, false> mask = (1 << headSize) - 1;
+                            baseAddress = (((c >> headSize) * X) << headSize) +
+                                          (x << headSize) + (c & mask);
+                          }
+
+                          if (params.TRANPOSE_INPUTS) {
+                            baseAddress =
+                                (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
+                          }
+
+                          MemoryRequest memRequest;
+                          memRequest = {params.INPUT_OFFSET +
+                                            baseAddress * (DTYPE::width / 8),
+                                        burstSize * (DTYPE::width / 8)};
+
+                          addressRequest.Push(memRequest);
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
                           }
                         }
-
-                        ac_int<16, false> x = (x0 - x_min_offset) + x1 * X0;
-                        ac_int<16, false> X = X0 * X1;
-
-                        ac_int<16, false> y = (y0 - y_min_offset) + y1 * Y0;
-                        ac_int<16, false> Y = Y0 * Y1;
-
-                        ac_int<32, false> baseAddress = y * X * C + x * C + c;
-                        int burstSize = NROWS;
-
-                        if (params.REPLICATION) {
-                          baseAddress = y * (X / packingFactor) * IC_DIMENSION +
-                                        (x / packingFactor) * IC_DIMENSION + c;
-                        }
-
-                        ac_int<8, false> headSize = params.headSizeInPowerOfTwo;
-                        if (params.CONCAT_INPUT) {
-                          ac_int<16, false> mask = (1 << headSize) - 1;
-                          baseAddress = (((c >> headSize) * X) << headSize) +
-                                        (x << headSize) + (c & mask);
-                        }
-
-                        if (params.TRANPOSE_INPUTS) {
-                          baseAddress =
-                              (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
-                        }
-
-                        MemoryRequest memRequest;
-                        memRequest = {params.INPUT_OFFSET +
-                                          baseAddress * (DTYPE::width / 8),
-                                      burstSize * (DTYPE::width / 8)};
-
-                        addressRequest.Push(memRequest);
-
-                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                   break;
                 }
               }
-              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+              if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
                 break;
               }
             }
@@ -427,124 +445,144 @@ SC_MODULE(InputController) {
 // inner memory
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-            for (loop_counters[1][0] = 0;
-                 loop_counters[1][0] < loop_bounds[1][0];
-                 loop_counters[1][0]++) {
+            for (loop_counters[0][3] = 0;
+                 loop_counters[0][3] < loop_bounds[0][3];
+                 loop_counters[0][3]++) {
               // TODO: make this dynamic
               ac_int<32, false> total_writes;
               if (!params.REPLICATION) {
-                total_writes = (loop_bounds[1][1] * loop_bounds[1][2] *
-                                loop_bounds[1][3] * loop_bounds[1][4]) *
-                               loop_bounds[1][5];
+                total_writes =
+                    (loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
+                     loop_bounds[1][3] * loop_bounds[1][4]) *
+                    loop_bounds[1][5];
               } else {
                 total_writes =
-                    loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
-                    loop_bounds[1][4] *
+                    loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
+                    loop_bounds[1][3] * loop_bounds[1][4] *
                     ((STRIDE)*X0 / packingFactor +
                      2 * boundaryWords);  // 2 extra writes for padding
               }
 
               writeControl[bankSel].Push(total_writes);
-              for (loop_counters[1][1] = 0;
-                   loop_counters[1][1] < loop_bounds[1][1];
-                   loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;
-                     loop_counters[1][2] < loop_bounds[1][2];
-                     loop_counters[1][2]++) {
-                  for (loop_counters[1][3] = 0;
-                       loop_counters[1][3] < loop_bounds[1][3];
-                       loop_counters[1][3]++) {
-                    for (loop_counters[1][4] = 0;
-                         loop_counters[1][4] < loop_bounds[1][4];
-                         loop_counters[1][4]++) {
-                      for (loop_counters[1][5] = 0;
-                           loop_counters[1][5] < loop_bounds[1][5];
-                           loop_counters[1][5]++) {
-                        ac_int<LOOP_WIDTH, true> x0 =
-                            loop_counters[1][params.inputXLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, true> x1 =
-                            loop_counters[0][params.inputXLoopIndex[0]];
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          ac_int<LOOP_WIDTH, true> x0 =
+                              loop_counters[1][params.inputXLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, true> x1 =
+                              loop_counters[0][params.inputXLoopIndex[0]];
 
-                        ac_int<LOOP_WIDTH, true> y0 =
-                            loop_counters[1][params.inputYLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, true> y1 =
-                            loop_counters[0][params.inputYLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, true> y0 =
+                              loop_counters[1][params.inputYLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, true> y1 =
+                              loop_counters[0][params.inputYLoopIndex[0]];
 
-                        if (params.REPLICATION) {
-                          if (x0 != 0) {
-                            x0 = x_min_offset +
-                                 (x0 - boundaryWords) * packingFactor;
+                          ac_int<LOOP_WIDTH, true> c1 =
+                              loop_counters[1][params.reductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, true> C1 =
+                              loop_bounds[1][params.reductionLoopIndex[1]];
+
+                          if (params.REPLICATION) {
+                            if (x0 != 0) {
+                              x0 = x_min_offset +
+                                   (x0 - boundaryWords) * packingFactor;
+                            }
                           }
-                        }
 
-                        ac_int<16, true> full_x, full_y;
-                        if (isDownsample) {
-                          full_x =
-                              (x0 * STRIDE - x_min_offset) + x1 * STRIDE * X0;
-                          full_y =
-                              (y0 * STRIDE - y_min_offset) + y1 * STRIDE * Y0;
-                        } else {
-                          full_x = (x0 - x_min_offset) + x1 * STRIDE * X0;
-                          full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
-                        }
+                          ac_int<16, true> full_x, full_y;
+                          if (isDownsample) {
+                            full_x =
+                                (x0 * STRIDE - x_min_offset) + x1 * STRIDE * X0;
+                            full_y =
+                                (y0 * STRIDE - y_min_offset) + y1 * STRIDE * Y0;
+                          } else {
+                            full_x = (x0 - x_min_offset) + x1 * STRIDE * X0;
+                            full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
+                          }
 
-                        Pack1D<DTYPE, NROWS> data;
+                          Pack1D<DTYPE, NROWS> data;
 
-                        if ((full_x < 0) || (full_y < 0) ||
-                            (full_x >= STRIDE * X0 * X1) ||
-                            (full_y >= STRIDE * Y0 * Y1)) {
+                          if ((full_x < 0) || (full_y < 0) ||
+                              (full_x >= STRIDE * X0 * X1) ||
+                              (full_y >= STRIDE * Y0 * Y1)) {
 #pragma hls_unroll yes
-                          for (int dims = 0; dims < NROWS; dims++) {
-                            data[dims].setZero();
+                            for (int dims = 0; dims < NROWS; dims++) {
+                              data[dims].setZero();
+                            }
+                          } else {
+                            data = transposeOut.Pop();
                           }
-                        } else {
-                          data = transposeOut.Pop();
+
+                          ac_int<32, false> address =
+                              static_cast<ac_int<16, false> >(
+                                  (y0) * (STRIDE * X0 + FX - 1) * C1) +
+                              x0 * C1 + c1;
+
+                          if (params.REPLICATION) {
+                            address =
+                                y0 *
+                                    (STRIDE * X0 / packingFactor +
+                                     2 * boundaryWords) *
+                                    C1 +
+                                loop_counters[1][params.inputXLoopIndex[1]] *
+                                    C1 +
+                                c1;
+                          }
+
+                          int swapBank =
+                              (loop_counters[1][1] == loop_bounds[1][1] - 1) &&
+                              (loop_counters[1][2] == loop_bounds[1][2] - 1) &&
+                              (loop_counters[1][3] == loop_bounds[1][3] - 1) &&
+                              (loop_counters[1][4] == loop_bounds[1][4] - 1) &&
+                              (loop_counters[1][5] == loop_bounds[1][5] - 1);
+                          // writeControl[bankSel].Push(!swapBank);
+                          BufferWriteRequest<DTYPE, NROWS> req;
+                          req.address = address;
+                          req.data = data;
+                          writeRequest[bankSel].Push(req);
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
+                          }
                         }
-
-                        ac_int<32, false> address =
-                            (y0) * (STRIDE * X0 + FX - 1) + (x0);
-
-                        if (params.REPLICATION) {
-                          address = y0 * (STRIDE * X0 / packingFactor +
-                                          2 * boundaryWords) +
-                                    loop_counters[1][params.inputXLoopIndex[1]];
-                        }
-
-                        int swapBank =
-                            (loop_counters[1][1] == loop_bounds[1][1] - 1) &&
-                            (loop_counters[1][2] == loop_bounds[1][2] - 1) &&
-                            (loop_counters[1][3] == loop_bounds[1][3] - 1) &&
-                            (loop_counters[1][4] == loop_bounds[1][4] - 1) &&
-                            (loop_counters[1][5] == loop_bounds[1][5] - 1);
-                        // writeControl[bankSel].Push(!swapBank);
-                        BufferWriteRequest<DTYPE, NROWS> req;
-                        req.address = address;
-                        req.data = data;
-                        writeRequest[bankSel].Push(req);
-
-                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                // writeControl[bankSel].Push(0);
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                   break;
                 }
               }
-              // writeControl[bankSel].Push(0);
               bankSel = !bankSel;
-              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+              if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
                 break;
               }
             }
@@ -632,93 +670,107 @@ SC_MODULE(InputController) {
              loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
                loop_counters[0][2]++) {
-            // inner memory
-            for (loop_counters[1][0] = 0;
-                 loop_counters[1][0] < loop_bounds[1][0];
-                 loop_counters[1][0]++) {
+            for (loop_counters[0][3] = 0;
+                 loop_counters[0][3] < loop_bounds[0][3];
+                 loop_counters[0][3]++) {
+              // inner memory
               ac_int<32, false> total_reads =
-                  loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
-                  loop_bounds[1][4] * loop_bounds[1][5];
+                  loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
+                  loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
 
               readControl[bankSel].Push(total_reads);
-              for (loop_counters[1][1] = 0;
-                   loop_counters[1][1] < loop_bounds[1][1];
-                   loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;
-                     loop_counters[1][2] < loop_bounds[1][2];
-                     loop_counters[1][2]++) {
-                  for (loop_counters[1][3] = 0;
-                       loop_counters[1][3] < loop_bounds[1][3];
-                       loop_counters[1][3]++) {
-                    for (loop_counters[1][4] = 0;
-                         loop_counters[1][4] < loop_bounds[1][4];
-                         loop_counters[1][4]++) {
-                      for (loop_counters[1][5] = 0;
-                           loop_counters[1][5] < loop_bounds[1][5];
-                           loop_counters[1][5]++) {
-                        ac_int<LOOP_WIDTH, false> x0 =
-                            loop_counters[1][params.inputXLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> X0 =
-                            params.loops[1][params.inputXLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> y0 =
-                            loop_counters[1][params.inputYLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> Y0 =
-                            params.loops[1][params.inputYLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> fx =
-                            loop_counters[1][params.fxIndex];
-                        ac_int<LOOP_WIDTH, false> fy =
-                            loop_counters[1][params.fyIndex];
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_bounds[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_bounds[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_bounds[1][2];
+                       loop_counters[1][2]++) {
+                    for (loop_counters[1][3] = 0;
+                         loop_counters[1][3] < loop_bounds[1][3];
+                         loop_counters[1][3]++) {
+                      for (loop_counters[1][4] = 0;
+                           loop_counters[1][4] < loop_bounds[1][4];
+                           loop_counters[1][4]++) {
+                        for (loop_counters[1][5] = 0;
+                             loop_counters[1][5] < loop_bounds[1][5];
+                             loop_counters[1][5]++) {
+                          ac_int<LOOP_WIDTH, false> x0 =
+                              loop_counters[1][params.inputXLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> X0 =
+                              params.loops[1][params.inputXLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> y0 =
+                              loop_counters[1][params.inputYLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> Y0 =
+                              params.loops[1][params.inputYLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> fx =
+                              loop_counters[1][params.fxIndex];
+                          ac_int<LOOP_WIDTH, false> fy =
+                              loop_counters[1][params.fyIndex];
+                          ac_int<LOOP_WIDTH, false> c1 =
+                              loop_counters[1][params.reductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> C1 =
+                              loop_bounds[1][params.reductionLoopIndex[1]];
 
-                        ac_int<16, false> x = STRIDE * x0 + fx;
-                        ac_int<16, false> y = STRIDE * y0 + fy;
-                        ac_int<16, false> address;
-                        if (params.REPLICATION && IC_DIMENSION >= 8) {
-                          address = y * (((STRIDE * X0) / packingFactor) +
-                                         2 * boundaryWords) +
-                                    x0 + fx;
-                        } else {
-                          if (isDownsample) {
-                            address = y0 * X0 + x0;
+                          ac_int<16, false> x = STRIDE * x0 + fx;
+                          ac_int<16, false> y = STRIDE * y0 + fy;
+                          ac_int<16, false> address;
+                          if (params.REPLICATION && IC_DIMENSION >= 8) {
+                            address = y *
+                                          (((STRIDE * X0) / packingFactor) +
+                                           2 * boundaryWords) *
+                                          C1 +
+                                      (x0 + fx) * C1 + c1;
                           } else {
-                            address = y * (STRIDE * X0 + FX - 1) + x;
+                            if (isDownsample) {
+                              address = y0 * X0 * C1 + x0 * C1 + c1;
+                            } else {
+                              address =
+                                  y * (STRIDE * X0 + FX - 1) * C1 + x * C1 + c1;
+                            }
+                          }
+                          // int swapBank =
+                          //     (loop_counters[1][1] == loop_bounds[1][1] -
+                          //     1)
+                          //     && (loop_counters[1][2] == loop_bounds[1][2]
+                          //     - 1) && (loop_counters[1][3] ==
+                          //     loop_bounds[1][3]
+                          //     - 1) && (loop_counters[1][4] ==
+                          //     loop_bounds[1][4] - 1) &&
+                          //     (loop_counters[1][5]
+                          //     == loop_bounds[1][5] - 1);
+                          // readControl[bankSel].Push(!swapBank);
+                          readAddress[bankSel].Push(address);
+                          // CCS_LOG("Reading from address " << address);
+
+                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            break;
                           }
                         }
-                        // int swapBank =
-                        //     (loop_counters[1][1] == loop_bounds[1][1] -
-                        //     1)
-                        //     && (loop_counters[1][2] == loop_bounds[1][2]
-                        //     - 1) && (loop_counters[1][3] ==
-                        //     loop_bounds[1][3]
-                        //     - 1) && (loop_counters[1][4] ==
-                        //     loop_bounds[1][4] - 1) &&
-                        //     (loop_counters[1][5]
-                        //     == loop_bounds[1][5] - 1);
-                        // readControl[bankSel].Push(!swapBank);
-                        readAddress[bankSel].Push(address);
-                        // CCS_LOG("Reading from address " << address);
-
-                        if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                   break;
                 }
               }
               bankSel = !bankSel;
-              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+              if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
                 break;
               }
             }
@@ -800,89 +852,95 @@ SC_MODULE(InputController) {
             for (loop_counters[0][2] = 0;
                  loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        Pack1D<DTYPE, NROWS> data;
+              for (loop_counters[0][3] = 0;
+                   loop_counters[0][3] < loop_bounds[0][3];
+                   loop_counters[0][3]++) {
+                // inner memory
+                for (loop_counters[1][0] = 0;
+                     loop_counters[1][0] < loop_bounds[1][0];
+                     loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;
+                       loop_counters[1][1] < loop_bounds[1][1];
+                       loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;
+                         loop_counters[1][2] < loop_bounds[1][2];
+                         loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;
+                           loop_counters[1][3] < loop_bounds[1][3];
+                           loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;
+                             loop_counters[1][4] < loop_bounds[1][4];
+                             loop_counters[1][4]++) {
+                          Pack1D<DTYPE, NROWS> data;
 
-                        Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
+                          Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
 #pragma hls_unroll yes
-                        for (int x = 0; x < 3; x++) {
-#pragma hls_unroll yes
-                          for (int dim = 0; dim < 3; dim++) {
-                            // grab last 3 x values from buffer
-                            data.value[x * 3 + dim] =
-                                buffer[(packingFactor - 3 + x) * 3 + dim];
-                          }
-                        }
-
-                        buffer = windowBufferIn.Pop();
-#pragma hls_unroll yes
-                        for (int x = 3;
-                             x < unrollingFactor + additionalUnrollingFactor;
-                             x++) {
-#pragma hls_unroll yes
-                          for (int dim = 0; dim < 3; dim++) {
-                            data[x * 3 + dim] = buffer[(x - 3) * 3 + dim];
-                          }
-                        }
-
-                        windowBufferOut.Push(data);
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-                        for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < loop_bounds[1][5] * 2 - 2;
-                             loop_counters[1][5] += 2) {
-                          // shift two pixels over
-#pragma hls_unroll yes
-                          for (int x = 0; x < packingFactor +
-                                                  additionalUnrollingFactor - 2;
-                               x++) {
+                          for (int x = 0; x < 3; x++) {
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
-                              data[x * 3 + dim] = data[(x + 2) * 3 + dim];
+                              // grab last 3 x values from buffer
+                              data.value[x * 3 + dim] =
+                                  buffer[(packingFactor - 3 + x) * 3 + dim];
                             }
                           }
 
-                          // grab 2 new pixels from buffer
-                          int bufferPosition =
-                              (loop_counters[1][5] + unrollingFactor +
-                               additionalUnrollingFactor - 3) %
-                              packingFactor;
+                          buffer = windowBufferIn.Pop();
 #pragma hls_unroll yes
-                          for (int x = unrollingFactor +
-                                       additionalUnrollingFactor - 2;
+                          for (int x = 3;
                                x < unrollingFactor + additionalUnrollingFactor;
                                x++) {
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
-                              data[x * 3 + dim] =
-                                  buffer[(bufferPosition + x -
-                                          (unrollingFactor +
-                                           additionalUnrollingFactor - 2)) *
-                                             3 +
-                                         dim];
+                              data[x * 3 + dim] = buffer[(x - 3) * 3 + dim];
                             }
                           }
 
                           windowBufferOut.Push(data);
 
-                          if (bufferPosition == packingFactor - 2) {
-                            buffer = windowBufferIn.Pop();
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+                          for (loop_counters[1][5] = 0;
+                               loop_counters[1][5] < loop_bounds[1][5] * 2 - 2;
+                               loop_counters[1][5] += 2) {
+                            // shift two pixels over
+#pragma hls_unroll yes
+                            for (int x = 0;
+                                 x <
+                                 packingFactor + additionalUnrollingFactor - 2;
+                                 x++) {
+#pragma hls_unroll yes
+                              for (int dim = 0; dim < 3; dim++) {
+                                data[x * 3 + dim] = data[(x + 2) * 3 + dim];
+                              }
+                            }
+
+                            // grab 2 new pixels from buffer
+                            int bufferPosition =
+                                (loop_counters[1][5] + unrollingFactor +
+                                 additionalUnrollingFactor - 3) %
+                                packingFactor;
+#pragma hls_unroll yes
+                            for (int x = unrollingFactor +
+                                         additionalUnrollingFactor - 2;
+                                 x <
+                                 unrollingFactor + additionalUnrollingFactor;
+                                 x++) {
+#pragma hls_unroll yes
+                              for (int dim = 0; dim < 3; dim++) {
+                                data[x * 3 + dim] =
+                                    buffer[(bufferPosition + x -
+                                            (unrollingFactor +
+                                             additionalUnrollingFactor - 2)) *
+                                               3 +
+                                           dim];
+                              }
+                            }
+
+                            windowBufferOut.Push(data);
+
+                            if (bufferPosition == packingFactor - 2) {
+                              buffer = windowBufferIn.Pop();
+                            }
                           }
                         }
                       }
@@ -902,42 +960,46 @@ SC_MODULE(InputController) {
             for (loop_counters[0][2] = 0;
                  loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
+              for (loop_counters[0][3] = 0;
+                   loop_counters[0][3] < loop_bounds[0][3];
+                   loop_counters[0][3]++) {
+                // inner memory
+                for (loop_counters[1][0] = 0;
+                     loop_counters[1][0] < loop_bounds[1][0];
+                     loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;
+                       loop_counters[1][1] < loop_bounds[1][1];
+                       loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;
+                         loop_counters[1][2] < loop_bounds[1][2];
+                         loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;
+                           loop_counters[1][3] < loop_bounds[1][3];
+                           loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;
+                             loop_counters[1][4] < loop_bounds[1][4];
+                             loop_counters[1][4]++) {
+                          Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-                        for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < loop_bounds[1][5];
-                             loop_counters[1][5]++) {
-                          Pack1D<DTYPE, NROWS> data;
+                          for (loop_counters[1][5] = 0;
+                               loop_counters[1][5] < loop_bounds[1][5];
+                               loop_counters[1][5]++) {
+                            Pack1D<DTYPE, NROWS> data;
 #pragma hls_unroll yes
-                          for (int dim = 0; dim < 3; dim++) {
-                            data[dim] = buffer[3 + dim];
-                          }
+                            for (int dim = 0; dim < 3; dim++) {
+                              data[dim] = buffer[3 + dim];
+                            }
 
-                          buffer = windowBufferIn.Pop();
+                            buffer = windowBufferIn.Pop();
 
 #pragma hls_unroll yes
-                          for (int dim = 0; dim < 3; dim++) {
-                            data[3 + dim] = buffer[dim];
+                            for (int dim = 0; dim < 3; dim++) {
+                              data[3 + dim] = buffer[dim];
+                            }
+                            windowBufferOut.Push(data);
                           }
-                          windowBufferOut.Push(data);
                         }
                       }
                     }
@@ -949,10 +1011,11 @@ SC_MODULE(InputController) {
         }
       } else {  // bypass
 
-        ac_int<32, false> total_count =
-            loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
-            loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-            loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
+        ac_int<32, false> total_count = loop_bounds[0][0] * loop_bounds[0][1] *
+                                        loop_bounds[0][2] * loop_bounds[0][3] *
+                                        loop_bounds[1][0] * loop_bounds[1][1] *
+                                        loop_bounds[1][2] * loop_bounds[1][3] *
+                                        loop_bounds[1][4] * loop_bounds[1][5];
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (int i = 0; i < total_count; i++) {
@@ -1025,45 +1088,49 @@ SC_MODULE(InputController) {
             for (loop_counters[0][2] = 0;
                  loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        // innermost loop must be X0, and must be a multiple
-                        // of NROWS
-                        for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < loop_bounds[1][5] / NROWS;
-                             loop_counters[1][5]++) {
-                          for (int c0 = 0; c0 < NROWS; c0++) {
-                            Pack1D<DTYPE, NROWS> originalValue =
-                                dataResponse.Pop();
+              for (loop_counters[0][3] = 0;
+                   loop_counters[0][3] < loop_bounds[0][3];
+                   loop_counters[0][3]++) {
+                // inner memory
+                for (loop_counters[1][0] = 0;
+                     loop_counters[1][0] < loop_bounds[1][0];
+                     loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;
+                       loop_counters[1][1] < loop_bounds[1][1];
+                       loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;
+                         loop_counters[1][2] < loop_bounds[1][2];
+                         loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;
+                           loop_counters[1][3] < loop_bounds[1][3];
+                           loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;
+                             loop_counters[1][4] < loop_bounds[1][4];
+                             loop_counters[1][4]++) {
+                          // innermost loop must be X0, and must be a multiple
+                          // of NROWS
+                          for (loop_counters[1][5] = 0;
+                               loop_counters[1][5] < loop_bounds[1][5] / NROWS;
+                               loop_counters[1][5]++) {
+                            for (int c0 = 0; c0 < NROWS; c0++) {
+                              Pack1D<DTYPE, NROWS> originalValue =
+                                  dataResponse.Pop();
 #pragma hls_unroll yes
-                            for (int dim = 0; dim < NROWS; dim++) {
-                              transposeBuffer[dim][c0] = originalValue[dim];
+                              for (int dim = 0; dim < NROWS; dim++) {
+                                transposeBuffer[dim][c0] = originalValue[dim];
+                              }
                             }
-                          }
 
-                          // Write out from tranposeBuffer
-                          for (int c0 = 0; c0 < NROWS; c0++) {
-                            Pack1D<DTYPE, NROWS> transposedValue;
+                            // Write out from tranposeBuffer
+                            for (int c0 = 0; c0 < NROWS; c0++) {
+                              Pack1D<DTYPE, NROWS> transposedValue;
 
 #pragma hls_unroll yes
-                            for (int dim = 0; dim < NROWS; dim++) {
-                              transposedValue[dim] = transposeBuffer[c0][dim];
+                              for (int dim = 0; dim < NROWS; dim++) {
+                                transposedValue[dim] = transposeBuffer[c0][dim];
+                              }
+                              transposeOut.Push(transposedValue);
                             }
-                            transposeOut.Push(transposedValue);
                           }
                         }
                       }
@@ -1082,111 +1149,120 @@ SC_MODULE(InputController) {
             for (loop_counters[0][2] = 0;
                  loop_counters[0][2] < loop_bounds[0][2];
                  loop_counters[0][2]++) {
-              // fetching border pixels is a little tricky
-              // for the outer tiles, we don't fetch borders (they are known
-              // to be 0)
+              for (loop_counters[0][3] = 0;
+                   loop_counters[0][3] < loop_bounds[0][3];
+                   loop_counters[0][3]++) {
+                // fetching border pixels is a little tricky
+                // for the outer tiles, we don't fetch borders (they are known
+                // to be 0)
 
-              // reset loop bounds
-              if (isDownsample) {
-                // don't include STRIDE for downsample
-                loop_bounds[1][params.inputXLoopIndex[1]] =
-                    params.loops[1][params.inputXLoopIndex[1]];
-                loop_bounds[1][params.inputYLoopIndex[1]] =
-                    params.loops[1][params.inputYLoopIndex[1]];
-              } else {
-                loop_bounds[1][params.inputXLoopIndex[1]] =
-                    params.loops[1][params.inputXLoopIndex[1]] * params.STRIDE;
-                loop_bounds[1][params.inputYLoopIndex[1]] =
-                    params.loops[1][params.inputYLoopIndex[1]] * params.STRIDE;
-              }
-
-              if (params.REPLICATION) {
-                loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
-              }
-
-              ac_int<4, false> x_min_offset = 0;
-              ac_int<4, false> x_max_offset = 0;
-              ac_int<4, false> y_min_offset = 0;
-              ac_int<4, false> y_max_offset = 0;
-
-              if (params.REPLICATION) {
-                if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                  x_min_offset = (FX - 1) / 2;
-                  loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
-                }
-                if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                    loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                  x_max_offset = (FX - 1) / 2;
-                  loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
-                }
-              } else {
-                if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                  x_min_offset = (FX - 1) / 2;
-                  loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                // reset loop bounds
+                if (isDownsample) {
+                  // don't include STRIDE for downsample
+                  loop_bounds[1][params.inputXLoopIndex[1]] =
+                      params.loops[1][params.inputXLoopIndex[1]];
+                  loop_bounds[1][params.inputYLoopIndex[1]] =
+                      params.loops[1][params.inputYLoopIndex[1]];
+                } else {
+                  loop_bounds[1][params.inputXLoopIndex[1]] =
+                      params.loops[1][params.inputXLoopIndex[1]] *
+                      params.STRIDE;
+                  loop_bounds[1][params.inputYLoopIndex[1]] =
+                      params.loops[1][params.inputYLoopIndex[1]] *
+                      params.STRIDE;
                 }
 
-                if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                    loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                  x_max_offset = (FX - 1) / 2;
-                  loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                if (params.REPLICATION) {
+                  loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
                 }
-              }
 
-              if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
-                y_min_offset = (FY - 1) / 2;
-                loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
-              }
+                ac_int<4, false> x_min_offset = 0;
+                ac_int<4, false> x_max_offset = 0;
+                ac_int<4, false> y_min_offset = 0;
+                ac_int<4, false> y_max_offset = 0;
 
-              if (loop_counters[0][params.inputYLoopIndex[0]] !=
-                  loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
-                y_max_offset = (FY - 1) / 2;
-                loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
-              }
+                if (params.REPLICATION) {
+                  if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                    x_min_offset = (FX - 1) / 2;
+                    loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
+                  }
+                  if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                      loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                    x_max_offset = (FX - 1) / 2;
+                    loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
+                  }
+                } else {
+                  if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
+                    x_min_offset = (FX - 1) / 2;
+                    loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                  }
+
+                  if (loop_counters[0][params.inputXLoopIndex[0]] !=
+                      loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
+                    x_max_offset = (FX - 1) / 2;
+                    loop_bounds[1][params.inputXLoopIndex[1]] += (FX - 1) / 2;
+                  }
+                }
+
+                if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
+                  y_min_offset = (FY - 1) / 2;
+                  loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+                }
+
+                if (loop_counters[0][params.inputYLoopIndex[0]] !=
+                    loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
+                  y_max_offset = (FY - 1) / 2;
+                  loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
+                }
 
 // inner memory
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        for (loop_counters[1][5] = 0;
-                             loop_counters[1][5] < loop_bounds[1][5];
-                             loop_counters[1][5]++) {
-                          transposeOut.Push(dataResponse.Pop());
+                for (loop_counters[1][0] = 0;
+                     loop_counters[1][0] < loop_bounds[1][0];
+                     loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;
+                       loop_counters[1][1] < loop_bounds[1][1];
+                       loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;
+                         loop_counters[1][2] < loop_bounds[1][2];
+                         loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;
+                           loop_counters[1][3] < loop_bounds[1][3];
+                           loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;
+                             loop_counters[1][4] < loop_bounds[1][4];
+                             loop_counters[1][4]++) {
+                          for (loop_counters[1][5] = 0;
+                               loop_counters[1][5] < loop_bounds[1][5];
+                               loop_counters[1][5]++) {
+                            transposeOut.Push(dataResponse.Pop());
 
-                          if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
+                              break;
+                            }
+                          }
+                          if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
                             break;
                           }
                         }
-                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
                   break;
                 }
               }
