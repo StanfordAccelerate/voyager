@@ -270,7 +270,7 @@ def main():
                 print(f"Skipping input with {input_channels} channels")
                 continue
 
-            stride = param.matrix_param.stride(0)
+            stride = param.matrix_param.stride[0]
 
             layer = interstellar.Layer(
                 nifm=input_channels,
