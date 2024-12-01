@@ -9,7 +9,7 @@ import re
 
 
 def print_test_results(test_results, layers, output_folder):
-    columns = ["Model", "Layer", "Status", "Runtime", "Ideal"]
+    columns = ["Model", "Layer", "Status", "Runtime", "Ideal", "RuntimeType"]
     if len(test_results[0]) == 3:
         columns = columns[:3]
 
@@ -43,7 +43,13 @@ def print_test_results(test_results, layers, output_folder):
         # if runtime column exists, print runtime of each layer
         if "Runtime" in model_df.columns:
             print("Runtime:")
-            print(model_df[["Layer", "Runtime"]].to_string(index=False), flush=True)
+            print(model_df[["Layer", "Runtime", "Ideal", "RuntimeType"]].to_string(index=False), flush=True)
+            utilization = model_df["Ideal"].sum() / model_df["Runtime"].sum()
+            matrix_runtime = model_df[model_df["RuntimeType"] == "matrix"]["Runtime"].sum()
+            matrix_ideal = model_df[model_df["RuntimeType"] == "matrix"]["Ideal"].sum()
+            matri_utilization = matrix_ideal / matrix_runtime
+            print(f"Utilization: {utilization:.3f}")
+            print(f"Matrix Utilization: {matri_utilization:.3f}")
 
     # concatentate all sorted model DataFrames into a single DataFrame and save to pickle
     pd.concat(sorted_df).to_pickle(f"{output_folder}/test_results.pkl")
@@ -234,22 +240,44 @@ def run_rtl_test(model, layer, output_folder):
         )
         runtime = int(p.communicate()[0].decode("utf-8").strip())
 
-        # capture number after "Ideal runtime: " in the log file
+        # capture ideal runtime number in the log file
+        # can either be "Matrix unit ideal runtime: " or "Vector unit ideal runtime: "
         p = subprocess.Popen(
             [
                 "grep",
                 "-oP",
-                "(?<=ideal runtime: ).\d+",
+                "(?<=Matrix unit.+ideal runtime: ).\d+",
                 f"{output_folder}/{model}_{layer}.log",
             ],
             stdout=subprocess.PIPE,
         )
-        ideal = int(p.communicate()[0].decode("utf-8").strip())
+
+        match = p.communicate()[0]
+
+        if match:
+            runtime_type = "matrix"
+        else:
+            p = subprocess.Popen(
+                [
+                    "grep",
+                    "-oP",
+                    "(?<=Vector unit.+ideal runtime: ).\d+",
+                    f"{output_folder}/{model}_{layer}.log",
+                ],
+                stdout=subprocess.PIPE,
+            )
+            match, error = p.communicate()
+            assert not error
+
+            runtime_type = "vector"
+
+        ideal = int(match.decode("utf-8").strip())
     else:
         runtime = 0
         ideal = 0
+        runtime_type = ""
 
-    return (model, layer, success, runtime, ideal)
+    return (model, layer, success, runtime, ideal, runtime_type)
 
 
 def run_rtl_tests(layers, num_processes, results_folder, keep_build=False):
