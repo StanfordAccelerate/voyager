@@ -124,34 +124,44 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   }
 
   // L2 level
+  int offset = 0;
+  if (tiling.level_tilings(1).loop_bounds(0).loop() != voyager::Loop::IC) {
+    // if the first loop is not IC, then we need to manually set the IC loop to
+    // 1
+    accelerator_tiling.loops[0][3] = 1;
+    accelerator_tiling.reduction_loop_index[0] = 3;
+    offset = 1;
+  }
+
   for (int i = 0; i < tiling.level_tilings(1).loop_bounds_size(); i++) {
-    accelerator_tiling.loops[0][3 - i] =
+    accelerator_tiling.loops[0][3 - offset - i] =
         tiling.level_tilings(1).loop_bounds(i).bound();
     if (tiling.level_tilings(1).loop_bounds(i).loop() == voyager::Loop::OC) {
-      accelerator_tiling.weight_loop_index[0] = 3 - i;
+      accelerator_tiling.weight_loop_index[0] = 3 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
                voyager::Loop::OX) {
-      accelerator_tiling.x_loop_index[0] = 3 - i;
+      accelerator_tiling.x_loop_index[0] = 3 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
                voyager::Loop::OY) {
-      accelerator_tiling.y_loop_index[0] = 3 - i;
+      accelerator_tiling.y_loop_index[0] = 3 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
                voyager::Loop::IC) {
-      accelerator_tiling.reduction_loop_index[0] = 3 - i;
+      accelerator_tiling.reduction_loop_index[0] = 3 - offset - i;
     }
   }
 
   // set any unset loop indices
-  for (int i = tiling.level_tilings(1).loop_bounds_size() - 1; i < 3; i++) {
-    accelerator_tiling.loops[0][2 - i] = 1;
+  for (int i = tiling.level_tilings(1).loop_bounds_size() - 1; i < 3 - offset;
+       i++) {
+    accelerator_tiling.loops[0][2 - i - offset] = 1;
     if (accelerator_tiling.weight_loop_index[0] == -1) {
-      accelerator_tiling.weight_loop_index[0] = 2 - i;
+      accelerator_tiling.weight_loop_index[0] = 2 - i - offset;
     } else if (accelerator_tiling.x_loop_index[0] == -1) {
-      accelerator_tiling.x_loop_index[0] = 2 - i;
+      accelerator_tiling.x_loop_index[0] = 2 - i - offset;
     } else if (accelerator_tiling.y_loop_index[0] == -1) {
-      accelerator_tiling.y_loop_index[0] = 2 - i;
+      accelerator_tiling.y_loop_index[0] = 2 - i - offset;
     } else if (accelerator_tiling.reduction_loop_index[0] == -1) {
-      accelerator_tiling.reduction_loop_index[0] = 2 - i;
+      accelerator_tiling.reduction_loop_index[0] = 2 - i - offset;
     }
   }
 
