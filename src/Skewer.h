@@ -55,7 +55,8 @@ SC_MODULE(SerializedSkewer) {
   Connections::In<Pack1D<IDTYPE, SIZE> > CCS_INIT_S1(din);
   Connections::Out<ODTYPE> dout[SIZE];
 
-#define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1),
+// Need to add the latency of input conversion after read from fifo, needed for posit 8
+#define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1 + 1),
 
   SC_CTOR(SerializedSkewer) : REPEAT_OC(FIFO_SIZE_INIT) dummy(0) {
 #undef FIFO_SIZE_INIT
