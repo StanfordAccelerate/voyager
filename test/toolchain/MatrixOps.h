@@ -187,6 +187,17 @@ void MapMatrixOperation(const Operation &operation,
   matrix_params->weightAddressGenReductionLoopIndex[0] =
       tiling.reduction_loop_index[0];
 
+  // if OX and OY loops are the innermost L2 loops, they are irrelevant for
+  // weight address generation
+  if (tiling.loops[0][tiling.reduction_loop_index[0]] == 1) {
+    if (tiling.weight_loop_index[0] < tiling.x_loop_index[0]) {
+      matrix_params->weightAddressGenLoops[0][tiling.x_loop_index[0]] = 1;
+    }
+    if (tiling.weight_loop_index[0] < tiling.y_loop_index[0]) {
+      matrix_params->weightAddressGenLoops[0][tiling.y_loop_index[0]] = 1;
+    }
+  }
+
   // set outer loop values
   const auto weight = matrix_op.weight();
   matrix_params->WEIGHT_TRANSPOSE = weight.reshape().opcode() == "transpose";
