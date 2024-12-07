@@ -29,6 +29,10 @@ Network::Network(std::string& model) : model(model) {
   }
 }
 
+std::vector<codegen::AcceleratorParam> Network::get_all_params() {
+  return {model_params.params().begin(), model_params.params().end()};
+}
+
 std::vector<codegen::AcceleratorParam> Network::get_params() {
   std::vector<codegen::AcceleratorParam> params;
   for (const auto& param : model_params.params()) {

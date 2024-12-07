@@ -60,12 +60,8 @@ Simulation::Simulation() {
     out_dir = "./test_outputs/";
   }
 
-  // Get list of params to run
-  auto network = new Network(model);
-  all_params = network->get_params(tests_list);
-
-  std::copy_if(all_params.begin(), all_params.end(), std::back_inserter(params),
-               [](const auto& param) { return !param.has_nop_param(); });
+  network = new Network(model);
+  params = network->get_params();
 
   std::cout << "Starting new simulation with config:";
   std::cout << "\n> Model: " << model;
@@ -104,6 +100,8 @@ void Simulation::load_data() {
   std::string data_dir = project_root + "/" +
                          std::string(getenv("CODEGEN_DIR")) + "/networks/" +
                          model + "/" + datatype + "/tensor_files";
+
+  const auto all_params = network->get_all_params();
 
   for (const auto& [key, dataLoader] : dataLoaders) {
     dataLoader->load_inputs(all_params.front(), data_dir);

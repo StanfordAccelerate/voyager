@@ -36,8 +36,8 @@ class Simulation {
   std::string out_dir;
   float tolerance = 0.1;
 
+  Network *network;
   std::vector<codegen::AcceleratorParam> params;
-  std::vector<codegen::AcceleratorParam> all_params;
   std::map<std::string, MemoryInterface *> memories;
   std::map<std::string, DataLoader *> dataLoaders;
 
