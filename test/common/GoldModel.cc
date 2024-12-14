@@ -84,7 +84,12 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
 
   if (param.has_slicing_op()) {
     const auto &slicing_op = param.slicing_op();
-    output_tensor = slice<VECTOR_T>(args[arg_index++], slicing_op);
+    if (DataTypes::TypeName<INPUT_DATATYPE>::name() ==
+        slicing_op.input().dtype()) {
+      output_tensor = slice<INPUT_DATATYPE>(args[arg_index++], slicing_op);
+    } else {
+      output_tensor = slice<VECTOR_T>(args[arg_index++], slicing_op);
+    }
   }
 
   if (param.matrix_op().opcode() == "layer_norm") {

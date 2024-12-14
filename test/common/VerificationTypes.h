@@ -97,93 +97,53 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
   const int oc_dim = 16;
   const int ic_dim = 16;
 
-  int x1, y1, k1, x0, y0, k0, c0, fx, fy;
-  bool replication = weight_shape[1] < 16;
-  if (replication) {
-    x1 = 7, y1 = 7, k1 = 2;
-    c0 = 1, k0 = 2, fy = 7, y0 = 16, x0 = 16;
-    if (IC_DIMENSION == 16) {
-      fx = 2;
-    } else if (IC_DIMENSION == 32) {
-      fx = 1;
-    } else {
-      fx = 7;
-    }
-  } else {
-    x1 = 1, y1 = 1, k1 = 1;
-    x0 = output_shape[2];
-    y0 = output_shape[3];
-    k0 = weight_shape[0] / oc_dim;
-    c0 = weight_shape[1] / ic_dim;
-    fx = weight_shape[2];
-    fy = weight_shape[3];
-
-    // Reduce OC0 to meet weight buffer constraint
-    while (fx * fy * k0 * ic_dim > WEIGHT_BUFFER_SIZE) {
-      if (k0 % 2 == 0) {
-        k0 /= 2;
-        k1 *= 2;
-      } else {
-        std::cerr << "Weight buffer is too small" << std::endl;
-        exit(1);
-      }
-    }
-
-    // Reduce X0 and Y0 to meet input buffer constraint. We are not counting
-    // stride here because of the hardware implementation
-    const int stride = matrix_op.stride(0);
-    while (true) {
-      int ix = x0 * stride + fx - 1;
-      int iy = y0 * stride + fy - 1;
-      if (ix * iy <= INPUT_BUFFER_SIZE) {
-        break;
-      }
-      if (x0 % 2 == 0 && y0 % 2 == 0) {
-        x0 /= 2;
-        x1 *= 2;
-        y0 /= 2;
-        y1 *= 2;
-      } else {
-        std::cerr << "Input buffer is too small" << std::endl;
-        exit(1);
-      }
-    }
-
-    // Reduce either OC0, or OX0 and OY0, to meet accumulation buffer constraint
-    const int max_k0 = k0;
-    while (x0 * y0 * k0 > ACCUM_BUFFER_SIZE) {
-      if (k0 % 2 == 0) {
-        k0 /= 2;
-        k1 *= 2;
-      } else if (x0 % 2 == 0 && y0 % 2 == 0) {
-        x0 /= 2;
-        x1 *= 2;
-        y0 /= 2;
-        y1 *= 2;
-        // Since we are reducing both x0 and y0, there is a chance we can
-        // increase k0
-        if (k0 * 2 <= max_k0) {
-          k0 *= 2;
-          k1 /= 2;
-        }
-      } else {
-        std::cerr << "Accumulation buffer is too small" << std::endl;
-        exit(1);
-      }
-    }
-  }
-
   Tiling tiling;
 
   if (IH == 224 && IW == 224 && IC == 3 && KH == 7 && KW == 7 &&
       OC == 64) {  // conv1
 
-    tiling = {.loops = {{7, 7, 2, 1, 1, 1},
-                        {1, 2, 7,
-                         (IC_DIMENSION == 16   ? 2
-                          : IC_DIMENSION == 32 ? 1
-                                               : 7),
-                         16, 16}},
+    int fx;
+    if (IC_DIMENSION == 4) {
+      fx = 16;
+    } else if (IC_DIMENSION == 8) {
+      fx = 8;
+    } else if (IC_DIMENSION == 16) {
+      fx = 4;
+    } else if (IC_DIMENSION == 32) {
+      fx = 2;
+    } else {
+      throw std::runtime_error("replication not supported for IC_DIMENSION=" +
+                               std::to_string(IC_DIMENSION));
+    }
+
+    tiling = {.loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, fx, 16, 16}},
+              .x_loop_index = {0, 5},
+              .y_loop_index = {1, 4},
+              .reduction_loop_index = {3, 0},
+              .weight_loop_index = {2, 1},
+              .fx_index = 3,
+              .fy_index = 2,
+              .weight_reuse_index = {4, 5},
+              .stride = matrix_op.stride(0),
+              .replication = true};
+  } else if (IH == 224 && IW == 224 && IC == 3 && KH == 16 && KW == 16 &&
+             OC == 768) {  // ViT embeddings
+
+    int fx;
+    if (IC_DIMENSION == 4) {
+      fx = 7;
+    } else if (IC_DIMENSION == 8) {
+      fx = 4;
+    } else if (IC_DIMENSION == 16) {
+      fx = 2;
+    } else if (IC_DIMENSION == 32) {
+      fx = 1;
+    } else {
+      throw std::runtime_error("replication not supported for IC_DIMENSION=" +
+                               std::to_string(IC_DIMENSION));
+    }
+
+    tiling = {.loops = {{1, 1, 6, 1, 1, 1}, {1, 8, 16, fx, 14, 14}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -194,18 +154,6 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .stride = matrix_op.stride(0),
               .replication = true};
 
-    if (IC_DIMENSION == 4) {
-      tiling.loops[1][tiling.fx_index] = 7;
-    } else if (IC_DIMENSION == 8) {
-      tiling.loops[1][tiling.fx_index] = 4;
-    } else if (IC_DIMENSION == 16) {
-      tiling.loops[1][tiling.fx_index] = 2;
-    } else if (IC_DIMENSION == 32) {
-      tiling.loops[1][tiling.fx_index] = 1;
-    } else {
-      throw std::runtime_error("replication not supported for IC_DIMENSION=" +
-                               std::to_string(IC_DIMENSION));
-    }
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
              OC == 64) {  // layer1
     tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {4, 1, 3, 3, 28, 28}},
@@ -610,6 +558,69 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
 
   } else {
     std::cout << "Using generated tiling" << std::endl;
+
+    int x1 = 1, y1 = 1, k1 = 1;
+    int x0 = output_shape[2];
+    int y0 = output_shape[3];
+    int k0 = weight_shape[0] / oc_dim;
+    int c0 = weight_shape[1] / ic_dim;
+    int fx = weight_shape[2];
+    int fy = weight_shape[3];
+
+    // Reduce OC0 to meet weight buffer constraint
+    while (fx * fy * k0 * ic_dim > WEIGHT_BUFFER_SIZE) {
+      if (k0 % 2 == 0) {
+        k0 /= 2;
+        k1 *= 2;
+      } else {
+        std::cerr << "Weight buffer is too small" << std::endl;
+        exit(1);
+      }
+    }
+
+    // Reduce X0 and Y0 to meet input buffer constraint. We are not counting
+    // stride here because of the hardware implementation
+    const int stride = matrix_op.stride(0);
+    while (true) {
+      int ix = x0 * stride + fx - 1;
+      int iy = y0 * stride + fy - 1;
+      if (ix * iy <= INPUT_BUFFER_SIZE) {
+        break;
+      }
+      if (x0 % 2 == 0 && y0 % 2 == 0) {
+        x0 /= 2;
+        x1 *= 2;
+        y0 /= 2;
+        y1 *= 2;
+      } else {
+        std::cerr << "Input buffer is too small" << std::endl;
+        exit(1);
+      }
+    }
+
+    // Reduce either OC0, or OX0 and OY0, to meet accumulation buffer constraint
+    const int max_k0 = k0;
+    while (x0 * y0 * k0 > ACCUM_BUFFER_SIZE) {
+      if (k0 % 2 == 0) {
+        k0 /= 2;
+        k1 *= 2;
+      } else if (x0 % 2 == 0 && y0 % 2 == 0) {
+        x0 /= 2;
+        x1 *= 2;
+        y0 /= 2;
+        y1 *= 2;
+        // Since we are reducing both x0 and y0, there is a chance we can
+        // increase k0
+        if (k0 * 2 <= max_k0) {
+          k0 *= 2;
+          k1 /= 2;
+        }
+      } else {
+        std::cerr << "Accumulation buffer is too small" << std::endl;
+        exit(1);
+      }
+    }
+
     tiling = {
         .loops = {{x1, y1, k1, 1, 1, 1}, {c0, k0, fy, fx, y0, x0}},
         .x_loop_index = {0, 5},
@@ -620,7 +631,6 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
         .fy_index = 2,
         .weight_reuse_index = {4, 5},
         .stride = matrix_op.stride(0),
-        .replication = replication,
     };
   }
   return tiling;

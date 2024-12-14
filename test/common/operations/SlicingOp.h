@@ -9,7 +9,7 @@ inline T* slice(std::any input_tensor, const codegen::SlicingOp param,
   const std::vector<int> shape(repeated_field.begin(), repeated_field.end());
   const auto strides = compute_strides(shape);
 
-  const int dim = param.dim();
+  const int dim = param.dim() < 0 ? param.dim() + shape.size() : param.dim();
   const int start = param.start();
   const int end = param.end();
   const int step = param.step();

@@ -62,32 +62,14 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
     tiling = get_linear_tiling(param);
   }
 
-  int X = tiling.loops[0][tiling.x_loop_index[0]] *
-          tiling.loops[1][tiling.x_loop_index[1]];
-  int Y = tiling.loops[0][tiling.y_loop_index[0]] *
-          tiling.loops[1][tiling.y_loop_index[1]];
-  int C = tiling.loops[1][tiling.reduction_loop_index[1]] * 16;
-  int K = tiling.loops[0][tiling.weight_loop_index[0]] *
-          tiling.loops[1][tiling.weight_loop_index[1]] * 16;
-  int FX = tiling.loops[1][tiling.fx_index];
-  int FY = tiling.loops[1][tiling.fy_index];
-  int STRIDE = tiling.stride;
-
-  if (tiling.replication) {
-    FX = 7;
-    C = 3;
-  }
-
   adjust_tiling_for_dimension(tiling);
 
-  int X0 = tiling.loops[1][tiling.x_loop_index[1]];
-  int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
-  int K0 = tiling.loops[1][tiling.weight_loop_index[1]];
   int IC_unroll = IC_DIMENSION;
   int FX_UNROLL = 1;
 
   if (tiling.replication) {
-    tiling.loops[1][tiling.fx_index] = 7;
+    // tiling.loops[1][tiling.fx_index] = 7;
+    tiling.loops[1][tiling.fx_index] = tiling.loops[1][tiling.fy_index];
     IC_unroll = 3;
     tiling.loops[1][tiling.reduction_loop_index[1]] = 1;
 
@@ -108,6 +90,26 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
   }
   for (int j = 0; j < 6; j++) {
     assert(tiling.loops[1][j] != 0);
+  }
+
+  int X = tiling.loops[0][tiling.x_loop_index[0]] *
+          tiling.loops[1][tiling.x_loop_index[1]];
+  int Y = tiling.loops[0][tiling.y_loop_index[0]] *
+          tiling.loops[1][tiling.y_loop_index[1]];
+  int C = tiling.loops[1][tiling.reduction_loop_index[1]] * IC_DIMENSION;
+  int K = tiling.loops[0][tiling.weight_loop_index[0]] *
+          tiling.loops[1][tiling.weight_loop_index[1]] * OC_DIMENSION;
+  int FX = tiling.loops[1][tiling.fx_index];
+  int FY = tiling.loops[1][tiling.fy_index];
+  int STRIDE = tiling.stride;
+
+  int X0 = tiling.loops[1][tiling.x_loop_index[1]];
+  int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
+  int K0 = tiling.loops[1][tiling.weight_loop_index[1]];
+
+  if (tiling.replication) {
+    FX = 7;
+    C = 3;
   }
 
   bool input_double_precision = is_double_precision(matrix_op.input());

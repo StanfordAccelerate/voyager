@@ -23,7 +23,7 @@ void MapMatrixVectorMultiply(const codegen::Operator &param,
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.offset();
   vector_params->addressGen0Mode = 2;
-  vector_params->addressGen0Broadcast = 0x111110;
+  vector_params->addressGen0Broadcast = 0b010000;
 
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen0Loop[0][i] = 1;
@@ -43,17 +43,16 @@ void MapMatrixVectorMultiply(const codegen::Operator &param,
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen1Loops[0][i] = 1;
   }
-  vector_params->addressGen1Loops[1][0] = output_dim;
-  vector_params->addressGen1Loops[1][1] = 1;
+  vector_params->addressGen1Loops[1][0] = 1;
+  vector_params->addressGen1Loops[1][1] = output_dim;
   vector_params->addressGen1Loops[1][2] = reduction_dim / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addressGen1InputXLoopIndex[i] = 0;
-    vector_params->addressGen1InputYLoopIndex[i] = 1;
+    vector_params->addressGen1InputYLoopIndex[i] = 0;
+    vector_params->addressGen1InputXLoopIndex[i] = 1;
     vector_params->addressGen1WeightLoopIndex[i] = 2;
   }
 
-  // TODO: double precision
   vector_params->DP_VEC1 =
       DataTypes::TypeName<INPUT_DATATYPE>::name() != matrix_op.weight().dtype();
 
@@ -70,8 +69,8 @@ void MapMatrixVectorMultiply(const codegen::Operator &param,
   vector_params->addressGen2Loops[1][2] = output_dim / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addressGen2InputXLoopIndex[i] = 0;
-    vector_params->addressGen2InputYLoopIndex[i] = 1;
+    vector_params->addressGen2InputYLoopIndex[i] = 0;
+    vector_params->addressGen2InputXLoopIndex[i] = 1;
     vector_params->addressGen2WeightLoopIndex[i] = 2;
   }
 
@@ -90,17 +89,13 @@ void MapMatrixVectorMultiply(const codegen::Operator &param,
   vector_params->outputLoops[1][2] = output_dim / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->outputXLoopIndex[i] = 0;
-    vector_params->outputYLoopIndex[i] = 1;
+    vector_params->outputYLoopIndex[i] = 0;
+    vector_params->outputXLoopIndex[i] = 1;
     vector_params->outputWeightLoopIndex[i] = 2;
   }
 
-  vector_params->SPLIT_OUTPUT = false;
   vector_params->DP_OUTPUT =
       DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
-
-  vector_params->MAXPOOL = false;
-  vector_params->AVGPOOL = false;
 
   // inst0 - start reduction engine
   VectorInstructions vinst0;
@@ -129,8 +124,7 @@ void MapMatrixVectorMultiply(const codegen::Operator &param,
 
   // reduction_dim/DIMENSION to do the complete reduction
   // DIMENSION to fill up the entire vector (this is now output_dim dimension)
-  vector_instruction_config->instCount[1] =
-      OC_DIMENSION * reduction_dim / OC_DIMENSION;
+  vector_instruction_config->instCount[1] = reduction_dim;
 
   // inst2 - add bias, write out
   VectorInstructions vinst2;

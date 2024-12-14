@@ -469,10 +469,19 @@ struct VectorInstructions {
     os << "vOp3: " << params.vOp3 << std::endl;
     os << "vOp4: " << params.vOp4 << std::endl;
     os << "vmapOffset: " << params.vmapOffset << std::endl;
+    os << "vOp5: " << params.vOp5 << std::endl;
+    os << "vAccumulatePush: " << params.vAccumulatePush << std::endl;
     os << "vDest: " << params.vDest << std::endl;
     os << "rCount: " << params.rCount << std::endl;
     os << "rOp: " << params.rOp << std::endl;
+    os << "rSqrt: " << params.rSqrt << std::endl;
+    os << "rReciprocal: " << params.rReciprocal << std::endl;
+    os << "rMax1: " << params.rMax1 << std::endl;
+    os << "rDuplicate: " << params.rDuplicate << std::endl;
     os << "rDest: " << params.rDest << std::endl;
+    os << "rBroadcast: " << params.rBroadcast << std::endl;
+    os << "immediate0: " << params.immediate0 << std::endl;
+    os << "immediate1: " << params.immediate1 << std::endl;
     return os;
   }
 

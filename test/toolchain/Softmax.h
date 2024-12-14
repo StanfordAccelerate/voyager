@@ -32,7 +32,7 @@ void MapSoftmax(const codegen::Operator &param,
   vector_params->addressGen0Loop[1][1] = 3;
   vector_params->addressGen0Loop[1][2] = output_dim / OC_DIMENSION;
 
-  vector_params->addressGen0Broadcast = 0x000010;
+  vector_params->addressGen0Broadcast = 0b010000;
 
   vector_params->DP_VEC0 =
       DataTypes::TypeName<INPUT_DATATYPE>::name() != vector_input.dtype();
@@ -99,7 +99,6 @@ void MapSoftmax(const codegen::Operator &param,
   vinst2.rBroadcast = 1;
   // broadcast max over entire array
   vinst2.immediate0 = output_dim / OC_DIMENSION;
-  vinst2.rSqrt = false;
   vinst2.rReciprocal = true;
   vector_instruction_config->inst[2] = vinst2;
   vector_instruction_config->instCount[2] = 1;

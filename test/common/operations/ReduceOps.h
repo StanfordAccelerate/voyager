@@ -83,7 +83,7 @@ inline T *softmax(std::any input_tensor, const std::vector<int> shape) {
     for (int j = 0; j < num_cols; j += OC_DIMENSION) {
       T buffer[OC_DIMENSION];
       for (int k = 0; k < OC_DIMENSION; k++) {
-        buffer[k] = outputs[offset + j + k];
+        buffer[k] = j + k < num_cols ? outputs[offset + j + k] : T(0.0);
       }
 
       int depth = OC_DIMENSION;
