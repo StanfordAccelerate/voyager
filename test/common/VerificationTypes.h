@@ -104,13 +104,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
 
     int fx;
     if (IC_DIMENSION == 4) {
-      fx = 16;
+      fx = 7;
     } else if (IC_DIMENSION == 8) {
-      fx = 8;
-    } else if (IC_DIMENSION == 16) {
       fx = 4;
-    } else if (IC_DIMENSION == 32) {
+    } else if (IC_DIMENSION == 16) {
       fx = 2;
+    } else if (IC_DIMENSION == 32) {
+      fx = 1;
     } else {
       throw std::runtime_error("replication not supported for IC_DIMENSION=" +
                                std::to_string(IC_DIMENSION));
@@ -131,13 +131,13 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
 
     int fx;
     if (IC_DIMENSION == 4) {
-      fx = 7;
+      fx = 16;
     } else if (IC_DIMENSION == 8) {
-      fx = 4;
+      fx = 8;
     } else if (IC_DIMENSION == 16) {
-      fx = 2;
+      fx = 4;
     } else if (IC_DIMENSION == 32) {
-      fx = 1;
+      fx = 2;
     } else {
       throw std::runtime_error("replication not supported for IC_DIMENSION=" +
                                std::to_string(IC_DIMENSION));
