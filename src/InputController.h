@@ -265,27 +265,23 @@ SC_MODULE(InputController) {
                         ac_int<32, false> baseAddress = y * X * C + x * C + c;
                         int burstSize = NROWS;
 
-                        ac_int<8, false> headSize = params.headSize;
-
                         if (params.REPLICATION) {
                           baseAddress = y * (X / packingFactor) * IC_DIMENSION +
                                         (x / packingFactor) * IC_DIMENSION + c;
                         }
-                        if (params.CONCAT_INPUT && params.TRANPOSE_INPUTS) {
-                          baseAddress = (c + (x % 16)) * headSize +
-                                        (((x / 16) * IC_DIMENSION) / headSize *
-                                         C * headSize) +
-                                        (((x / 16) * IC_DIMENSION) % headSize);
-                        } else {
-                          if (params.CONCAT_INPUT) {
-                            baseAddress = ((c / headSize) * X * headSize) +
-                                          (x * headSize) + (c % headSize);
-                          }
-                          if (params.TRANPOSE_INPUTS) {
-                            baseAddress =
-                                (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
-                          }
+
+                        ac_int<8, false> headSize = params.headSizeInPowerOfTwo;
+                        if (params.CONCAT_INPUT) {
+                          ac_int<16, false> mask = (1 << headSize) - 1;
+                          baseAddress = (((c >> headSize) * X) << headSize) +
+                                        (x << headSize) + (c & mask);
                         }
+
+                        if (params.TRANPOSE_INPUTS) {
+                          baseAddress =
+                              (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
+                        }
+
                         MemoryRequest memRequest;
                         memRequest = {params.INPUT_OFFSET +
                                           baseAddress * (DTYPE::width / 8),

@@ -286,7 +286,11 @@ void MapMatrixOperation(const codegen::Operator &param,
 
     if (matrix_params->CONCAT_INPUT) {
       const auto input_shape = input.shape();
-      matrix_params->headSize = input_shape[input_shape.size() - 1];
+      double result = std::log2(input_shape[input_shape.size() - 1]);
+      if (std::fmod(result, 1.0) != 0.0) {
+        throw std::runtime_error("Result is not an integer!");
+      }
+      matrix_params->headSizeInPowerOfTwo = result;
     }
   }
 
@@ -340,7 +344,11 @@ void MapMatrixOperation(const codegen::Operator &param,
   if (param.output().has_reshape()) {
     vector_params->SPLIT_OUTPUT = true;
     const auto permuted_shape = param.output().reshape().output_sizes();
-    vector_params->headSize = permuted_shape[permuted_shape.size() - 1];
+    double result = std::log2(permuted_shape[permuted_shape.size() - 1]);
+    if (std::fmod(result, 1.0) != 0.0) {
+      throw std::runtime_error("Result is not an integer!");
+    }
+    vector_params->headSizeInPowerOfTwo = result;
   }
 
   VectorInstructions vinst;

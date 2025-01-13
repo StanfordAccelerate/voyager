@@ -119,14 +119,16 @@ SC_MODULE(OutputAddressGenerator) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    ac_int<8, false> headSize = params.headSize;
+                    ac_int<8, false> headSize = params.headSizeInPowerOfTwo;
+                    ac_int<16, false> mask = (1 << headSize) - 1;
+
                     if (params.SPLIT_OUTPUT) {
-                      baseAddress = ((k / headSize) * X * headSize) +
-                                    (x * headSize) + (k % headSize);
+                      baseAddress = (((k >> headSize) * X) << headSize) +
+                                    (x << headSize) + (k & mask);
                     } else if (params.CONCAT_OUTPUT) {
-                      baseAddress = ((k / headSize) * K) +
-                                    ((y % headSize) * K * 4) + (k % headSize) +
-                                    (y / headSize * K / 4);
+                      baseAddress = ((k >> headSize) * K) +
+                                    ((y & mask) * K * 4) + (k & mask) +
+                                    (y >> headSize * K / 4);
                     } else {
                       baseAddress = y * X * K + x * K + k;
                     }

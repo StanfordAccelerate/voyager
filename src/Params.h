@@ -55,7 +55,7 @@ struct MatrixParams : BaseParams {
     CONCAT_HEAD_WEIGHTS = false;
     TRANPOSE_INPUTS = false;
 
-    headSize = 32;
+    headSizeInPowerOfTwo = 32;
   }
 #endif
 
@@ -85,7 +85,7 @@ struct MatrixParams : BaseParams {
   ac_int<3, false> weightAddressGenFyIndex;
 
   ac_int<2, false> STRIDE;
-  ac_int<8, false> headSize;
+  ac_int<8, false> headSizeInPowerOfTwo;
 
   bool WEIGHT_TRANSPOSE;
   bool REPLICATION;
@@ -148,7 +148,7 @@ struct MatrixParams : BaseParams {
     m & weightAddressGenFxIndex;
     m & weightAddressGenFyIndex;
     m & STRIDE;
-    m & headSize;
+    m & headSizeInPowerOfTwo;
     m & WEIGHT_TRANSPOSE;
     m & REPLICATION;
     m & STORE_IN_ACC;
@@ -229,7 +229,7 @@ struct MatrixParams : BaseParams {
     os << "BIAS: " << params.BIAS << std::endl;
     os << "BIAS_OFFSET: " << params.BIAS_OFFSET << std::endl;
     os << "MX: " << params.MX << std::endl;
-    os << "headSize: " << params.headSize << std::endl;
+    os << "headSizeInPowerOfTwo: " << params.headSizeInPowerOfTwo << std::endl;
     return os;
   }
 
@@ -281,7 +281,7 @@ struct MatrixParams : BaseParams {
 
     if (lhs.MX != rhs.MX) return false;
 
-    if (lhs.headSize != rhs.headSize) return false;
+    if (lhs.headSizeInPowerOfTwo != rhs.headSizeInPowerOfTwo) return false;
 
     // If all members are equal, return true
     return true;
@@ -587,7 +587,7 @@ struct VectorParams : BaseParams {
     addressGen2Mode = 0;
     outputAddressMode = 1;
 
-    headSize = 32;
+    headSizeInPowerOfTwo = 32;
     SPLIT_OUTPUT = false;
     CONCAT_OUTPUT = false;
 
@@ -656,7 +656,7 @@ struct VectorParams : BaseParams {
   ac_int<2, false> outputAddressMode;
 
   // Transformer head permutation
-  ac_int<8, false> headSize;
+  ac_int<4, false> headSizeInPowerOfTwo;
   bool SPLIT_OUTPUT;
   bool CONCAT_OUTPUT;
 
@@ -675,7 +675,7 @@ struct VectorParams : BaseParams {
   // head size + 8-bit broadcast count + addr generator 0 start, end, stride,
   // and misc values
   static const unsigned int width =
-      4 * address_gen_width + 4 * 2 + 7 + 2 * 8 + 62;
+      4 * address_gen_width + 4 * 2 + 7 + 4 + 8 + 62;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -773,7 +773,7 @@ struct VectorParams : BaseParams {
     m & addressGen2Mode;
     m & outputAddressMode;
 
-    m & headSize;
+    m & headSizeInPowerOfTwo;
     m & SPLIT_OUTPUT;
     m & CONCAT_OUTPUT;
 
@@ -905,7 +905,7 @@ struct VectorParams : BaseParams {
     os << "DP_OUTPUT: " << params.DP_OUTPUT << std::endl;
     os << "outputAddressMode: " << params.outputAddressMode << std::endl;
 
-    os << "headSize: " << params.headSize << std::endl;
+    os << "headSizeInPowerOfTwo: " << params.headSizeInPowerOfTwo << std::endl;
     os << "SPLIT_OUTPUT: " << params.SPLIT_OUTPUT << std::endl;
     os << "CONCAT_OUTPUT: " << params.CONCAT_OUTPUT << std::endl;
 
