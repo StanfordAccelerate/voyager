@@ -176,18 +176,11 @@ void MapVectorOperations(const codegen::Operator &param,
   // TODO: how to handle reshape operation loop bound adjustment?
   if (!vector_input.has_reshape()) {
     loop_bounds = split_loops(loop_bounds, 1024);
-    if (loop_bounds.size() > 6) {
-      throw std::invalid_argument("Too many dimensions for vector operations!");
-    }
-
     loop_bounds = adjust_loop_indices(loop_bounds, OC_DIMENSION);
   }
 
   // Pad the shape to 6 dimensions with 1s
-  const int num_extra_dims = 6 - loop_bounds.size();
-  for (int i = 0; i < num_extra_dims; i++) {
-    loop_bounds.insert(loop_bounds.begin(), 1);
-  }
+  const int num_extra_dims = pad_shape_to_ndim(loop_bounds, 6);
 
   vector_params->addressGen0Loop[0][0] = loop_bounds[0];
   vector_params->addressGen0Loop[0][1] = loop_bounds[1];
@@ -214,9 +207,13 @@ void MapVectorOperations(const codegen::Operator &param,
     const auto &reshape =
         param.has_reshape_op() ? param.reshape_op() : vector_input.reshape();
     vector_params->VECTOR_INPUT0_RESHAPE = true;
-    for (int i = 0; i < reshape.dims_size(); i++) {
-      vector_params->addressGen0AxisOrder[i + num_extra_dims] =
-          reshape.dims(i) + num_extra_dims;
+    if (reshape.opcode() == "permute") {
+      for (int i = 0; i < reshape.dims_size(); i++) {
+        vector_params->addressGen0AxisOrder[i + num_extra_dims] =
+            reshape.dims(i) + num_extra_dims;
+      }
+    } else {
+      throw std::invalid_argument("Unsupported reshape operation!");
     }
   }
 

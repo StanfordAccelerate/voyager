@@ -75,9 +75,12 @@ inline std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
 
 inline Tiling get_conv2d_tiling(codegen::Operator param) {
   const auto matrix_op = param.matrix_op();
-  const auto input_shape = matrix_op.has_mx_input()
-                               ? matrix_op.mx_input().input().shape()
-                               : matrix_op.input().shape();
+
+  const auto input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
+                                              : matrix_op.input();
+  const auto input_shape =
+      input.has_reshape() ? input.reshape().output_sizes() : input.shape();
+
   const auto weight_shape = matrix_op.has_mx_weight()
                                 ? matrix_op.mx_weight().input().shape()
                                 : matrix_op.weight().shape();
@@ -633,26 +636,25 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
         .stride = matrix_op.stride(0),
     };
   }
+
   return tiling;
 }
 
 inline void adjust_tiling_for_dimension(Tiling& tiling) {
   // adjust loop counters for dimension != 16
-  if (IC_DIMENSION < 16) {
-    if (!tiling.replication) {
+  if (!tiling.replication) {
+    if (IC_DIMENSION < 16) {
       tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
-    }
-  } else if (IC_DIMENSION > 16) {
-    if (!tiling.replication) {
+    } else if (IC_DIMENSION > 16) {
       tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
     }
-  }
 
-  if (!tiling.replication) {
     // adjust loop counters for weight buffer constraint
-    while (tiling.loops[1][tiling.fx_index] * tiling.loops[1][tiling.fy_index] *
-               tiling.loops[1][tiling.weight_loop_index[1]] * IC_DIMENSION >
-           WEIGHT_BUFFER_SIZE) {
+    const int buffer_depth = tiling.loops[1][tiling.fx_index] *
+                             tiling.loops[1][tiling.fy_index] * IC_DIMENSION;
+    while (buffer_depth * tiling.loops[1][tiling.weight_loop_index[1]] >
+               WEIGHT_BUFFER_SIZE &&
+           tiling.loops[1][tiling.weight_loop_index[1]] > 1) {
       tiling.loops[1][tiling.weight_loop_index[1]] /= 2;
       tiling.loops[0][tiling.weight_loop_index[0]] *= 2;
     }
@@ -672,101 +674,6 @@ inline void adjust_tiling_for_dimension(Tiling& tiling) {
       div_factor /= 2;
     }
   }
-
-  // if (OC_DIMENSION < 16) {
-  //   tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
-  // } else if (OC_DIMENSION > 16) {
-  //   // if the inner weight loop is >=4, we should reduce the inner loop
-  //   // (otherwise, we violate the weight buffer constraint) otherwise, we
-  //   // reduce the outer loop
-  //   if ((tiling.loops[1][tiling.weight_loop_index[1]] >= 4 &&
-  //        tiling.loops[1][tiling.fx_index] > 1 &&
-  //        tiling.loops[1][tiling.fy_index] > 1)) {
-  //     tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-  //   } else if (tiling.loops[0][tiling.weight_loop_index[0]] <
-  //                  (OC_DIMENSION / 16) &&
-  //              tiling.loops[0][tiling.weight_loop_index[0]] != 1) {
-  //     const int reduction_factor =
-  //         OC_DIMENSION / 16 / tiling.loops[0][tiling.weight_loop_index[0]];
-  //     tiling.loops[0][tiling.weight_loop_index[0]] = 1;
-  //     tiling.loops[1][tiling.weight_loop_index[1]] /= reduction_factor;
-  //   } else if (tiling.loops[0][tiling.weight_loop_index[0]] == 1) {
-  //     tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-  //   } else {
-  //     tiling.loops[0][tiling.weight_loop_index[0]] /= (OC_DIMENSION / 16);
-  //   }
-  // }
-
-  // if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 && OC == 256 &&
-  //     matrix_op.stride(0) == 2 && IC_DIMENSION == 32 && OC_DIMENSION ==
-  //     64) {
-  //   tiling = {.loops = {{2, 2, 2, 1, 1, 1}, {4, 3, 3, 2, 7, 7}},
-  //             .x_loop_index = {0, 5},
-  //             .y_loop_index = {1, 4},
-  //             .reduction_loop_index = {3, 0},
-  //             .weight_loop_index = {2, 3},
-  //             .fx_index = 2,
-  //             .fy_index = 1,
-  //             .weight_reuse_index = {4, 5},
-  //             .stride = matrix_op.stride(0),
-  //             .replication = false};
-
-  // } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
-  //            OC == 128 && IC_DIMENSION == 32 && OC_DIMENSION == 64) {
-  //   tiling = {.loops = {{2, 2, 1, 1, 1, 1}, {2, 2, 1, 1, 14, 14}},
-  //             .x_loop_index = {0, 5},
-  //             .y_loop_index = {1, 4},
-  //             .reduction_loop_index = {3, 0},
-  //             .weight_loop_index = {2, 1},
-  //             .fx_index = 3,
-  //             .fy_index = 2,
-  //             .weight_reuse_index = {4, 5},
-  //             .stride = matrix_op.stride(0),
-  //             .replication = false};
-  // } else if (IH == 14 && IW == 14 && IC == 256 && KH == 3 && KW == 3 &&
-  //            OC == 256 && IC_DIMENSION == 32 && OC_DIMENSION == 64) {
-  //   tiling = {.loops = {{2, 2, 1, 1, 1, 1}, {8, 3, 3, 4, 7, 7}},
-  //             .x_loop_index = {0, 5},
-  //             .y_loop_index = {1, 4},
-  //             .reduction_loop_index = {3, 0},
-  //             .weight_loop_index = {2, 3},
-  //             .fx_index = 2,
-  //             .fy_index = 1,
-  //             .weight_reuse_index = {4, 5},
-  //             .stride = matrix_op.stride(0),
-  //             .replication = false};
-  // } else {
-  //   // adjust loop counters for dimension != 16
-  //   if (IC_DIMENSION < 16) {
-  //     tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
-  //   } else if (IC_DIMENSION > 16) {
-  //     tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
-  //   }
-
-  //   if (OC_DIMENSION < 16) {
-  //     tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
-  //   } else if (OC_DIMENSION > 16) {
-  //     // if the inner weight loop is >=4, we should reduce the inner loop
-  //     // (otherwise, we violate the weight buffer constraint) otherwise, we
-  //     // reduce the outer loop
-  //     if ((tiling.loops[1][tiling.weight_loop_index[1]] >= 4 &&
-  //          tiling.loops[1][tiling.fx_index] > 1 &&
-  //          tiling.loops[1][tiling.fy_index] > 1)) {
-  //       tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-  //     } else if (tiling.loops[0][tiling.weight_loop_index[0]] <
-  //                    (OC_DIMENSION / 16) &&
-  //                tiling.loops[0][tiling.weight_loop_index[0]] != 1) {
-  //       const int reduction_factor =
-  //           OC_DIMENSION / 16 / tiling.loops[0][tiling.weight_loop_index[0]];
-  //       tiling.loops[0][tiling.weight_loop_index[0]] = 1;
-  //       tiling.loops[1][tiling.weight_loop_index[1]] /= reduction_factor;
-  //     } else if (tiling.loops[0][tiling.weight_loop_index[0]] == 1) {
-  //       tiling.loops[1][tiling.weight_loop_index[1]] /= (OC_DIMENSION / 16);
-  //     } else {
-  //       tiling.loops[0][tiling.weight_loop_index[0]] /= (OC_DIMENSION / 16);
-  //     }
-  //   }
-  // }
 }
 
 inline Tiling get_linear_tiling(codegen::Operator param) {
@@ -801,6 +708,17 @@ inline Tiling get_linear_tiling(codegen::Operator param) {
     int size = weight_shape.size();
     c0 = weight_shape[size - 2] / ic_dim;
     k0 = weight_shape[size - 1] / oc_dim;
+  }
+
+  // Loop indices cannot exceed 1024 (10b)
+  while (x0 >= 1024) {
+    if (x0 % 2 == 0) {
+      x0 /= 2;
+      x1 *= 2;
+    } else {
+      std::cerr << "Input size is not divisible by 2" << std::endl;
+      exit(1);
+    }
   }
 
   while (k0 * ic_dim > WEIGHT_BUFFER_SIZE) {
@@ -838,6 +756,9 @@ inline Tiling get_linear_tiling(codegen::Operator param) {
       .stride = 1,
       .replication = false,
   };
+
+  std::cerr << "Tiling: " << tiling << std::endl;
+
   return tiling;
 }
 
