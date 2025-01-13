@@ -1,10 +1,6 @@
 set block "Accelerator"
 set full_block_name "Accelerator"
 
-if {$SUPPORT_MX == true} {
-  set clock_multiplier 1.1
-}
-
 proc pre_compile {} {
   global IO_DATATYPE ACCUM_DATATYPE VECTOR_DATATYPE IC_DIMENSION OC_DIMENSION DATATYPE ACCUM_BUFFER_DATATYPE SUPPORT_MX MX_DATATYPE ACCUM_BUFFER_SIZE
   set MP_IO_DATATYPE $IO_DATATYPE
