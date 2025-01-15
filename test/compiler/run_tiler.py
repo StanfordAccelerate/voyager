@@ -336,10 +336,17 @@ def main():
         if param.HasField("matrix_param"):
             weights_shape = param.matrix_param.weight.shape
             if len(weights_shape) == 4:
+                # convolution
                 output_channels = weights_shape[0]
                 input_channels = weights_shape[1]
                 kernel_height = weights_shape[2]
                 kernel_width = weights_shape[3]
+            elif len(weights_shape) == 2:
+                # matrix multiplication
+                output_channels = weights_shape[0]
+                input_channels = weights_shape[1]
+                kernel_height = 1
+                kernel_width = 1
             else:
                 print(f"Unsupported weights shape: {weights_shape}, skipping")
                 continue
@@ -352,11 +359,21 @@ def main():
             if len(output_shape) == 4:
                 height = output_shape[2]
                 width = output_shape[3]
+            elif len(output_shape) == 3:
+                assert output_shape[0] == 1
+                height = output_shape[1]
+                width = 1
+            elif len(output_shape) == 2:
+                height = output_shape[0]
+                width = 1
             else:
                 print(f"Unsupported output shape: {output_shape}, skipping")
                 continue
 
-            stride = param.matrix_param.stride[0]
+            if len(param.matrix_param.stride) == 0:
+                stride = 1
+            else:
+                stride = param.matrix_param.stride[0]
 
             layer = interstellar.Layer(
                 nifm=input_channels,
