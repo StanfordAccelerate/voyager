@@ -103,7 +103,7 @@ struct MatrixParams : BaseParams {
 
   static const unsigned int width =
       5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
-      ((6 + 3) * 2 + 2) * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 3 + 8;
+      ((6 + 3) * 2 + 1) * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 3 + 8;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -123,7 +123,7 @@ struct MatrixParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& inputYLoopIndex[i];
     }
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
       m& reductionLoopIndex[i];
     }
     for (int i = 0; i < 2; i++) {
@@ -246,7 +246,7 @@ struct MatrixParams : BaseParams {
       }
     }
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 2; i++) {
       if (lhs.reductionLoopIndex[i] != rhs.reductionLoopIndex[i]) return false;
     }
 

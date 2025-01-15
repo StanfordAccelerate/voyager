@@ -7,6 +7,92 @@ from quantized_training.codegen import param_pb2
 from proto import tiling_pb2
 
 
+def calculate_runtime(architecture, layer, mapping):
+    # time for 1 tile = max(weight loading time, tile size)
+    # time for N non-accumulating tiles:
+    # - time for 1 tile * N non-accumulating tiles
+    # time for N accumulating tiles:
+    # - max(tile latency, tile size) * N accumulating tiles
+    # L1 time = max(L1 computation time, input buffer loading time, weight buffer loading time)
+    # total time = L2 blocks * L1 time
+
+    # time for 1 tile = max(weight loading time, tile size)
+
+    # tile_size = innermost loops that use OX and/or OY
+
+    # index of first loop that isn't OX or OY
+    first_non_ox_oy_index = 6
+    for i in range(interstellar.le.NUM):
+        if i == interstellar.le.OX or i == interstellar.le.OY:
+            continue
+        if mapping.loop_orders[i][1] < first_non_ox_oy_index:
+            first_non_ox_oy_index = mapping.loop_orders[i][1]
+
+    tile_size = 1
+    tile_count = 1
+    for i in range(interstellar.le.NUM):
+        if mapping.loop_orders[i][1] < first_non_ox_oy_index:
+            tile_size *= mapping.loop_blockings[i][1]
+        else:
+            tile_count *= mapping.loop_blockings[i][1]
+
+    # assume IC is unrolled vertically
+    # does not handle replication
+    weight_loading_time = mapping.loop_partitionings[interstellar.le.IC][0]
+
+    # assume that IC is the outermost loop, from the schedule hint
+    is_accumulating_tile = (
+        mapping.loop_orders[interstellar.le.FX][1]
+        < mapping.loop_orders[interstellar.le.OC][1]
+        or mapping.loop_orders[interstellar.le.FY][1]
+        < mapping.loop_orders[interstellar.le.OC][1]
+    )
+
+    systolic_array_latency = (
+        mapping.loop_partitionings[interstellar.le.IC][0] * 3
+        + mapping.loop_partitionings[interstellar.le.OC][0]
+    )
+
+    if is_accumulating_tile:
+        time_per_tile = max(systolic_array_latency, weight_loading_time, tile_size)
+    else:
+        time_per_tile = max(weight_loading_time, tile_size)
+
+    computation_l1_time = tile_count * time_per_tile
+
+    input_relevant_loops = [interstellar.le.IC, interstellar.le.OY, interstellar.le.OX]
+    input_buffer_loading_size = 1
+    for loop in input_relevant_loops:
+        input_buffer_loading_size *= mapping.loop_blockings[loop][1]
+    # currently assume that the input buffer is loaded in one cycle
+    input_buffer_loading_time = 1
+
+    weight_relevant_loops = [
+        interstellar.le.IC,
+        interstellar.le.OC,
+        interstellar.le.FY,
+        interstellar.le.FX,
+    ]
+    weight_buffer_loading_size = 1
+    for loop in weight_relevant_loops:
+        weight_buffer_loading_size *= mapping.loop_blockings[loop][1]
+    # currently assume that the weight buffer is loaded in one cycle
+    weight_buffer_loading_time = 1
+
+    # assume that writing out from accumulation buffer will not stall the system
+    l1_time = max(
+        computation_l1_time, input_buffer_loading_time, weight_buffer_loading_time
+    )
+
+    l2_blocks = 1
+    for i in range(interstellar.le.NUM):
+        l2_blocks *= mapping.loop_blockings[i][2]
+
+    # assumes 3 level memory hierarchy
+    total_time = l2_blocks * l1_time
+    return total_time
+
+
 def calculate_cost(architecture, layer, mapping):
     """
     Calculate the cost of a given mapping. Print the schedule and loop nest, as well as the number of accesses per level and total energy.
@@ -283,8 +369,8 @@ def main():
                 hstd=stride,
             )
 
-            cost, mapping, perf = interstellar.optimizer.opt_optimizer(
-                architecture, layer, schedule, True
+            cost, runtime, mapping, perf = interstellar.optimizer.opt_optimizer(
+                architecture, layer, schedule, calculate_runtime, True
             )
 
             total_cost, total_access_cost, access_list = (
@@ -292,6 +378,7 @@ def main():
             )
 
             interstellar.utils.print_tiling(mapping)
+            print(f"Runtime: {runtime}")
 
             tiling = tiling_pb2.Tiling()
             tiling.name = param.name

@@ -195,8 +195,11 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   async_reset_signal_is(rstn, false);
 
   accessCounter = new AccessCounter();
+// do not set access counters for an RTL simulation
+#ifndef CCS_DUT_RTL
   accelerator.matrixUnit.inputBuffer.accessCounter = accessCounter;
   accelerator.matrixUnit.weightBuffer.accessCounter = accessCounter;
+#endif
 }
 
 void Harness::reset() {

@@ -43,8 +43,6 @@ Network::Network(std::string& model_name) {
     std::cerr << "Failed to parse text file." << std::endl;
   }
 
-  std::cout << "Content: " << std::endl << content << std::endl;
-
   std::map<std::string, voyager::Tiling> tiling_map;
   for (const auto& tiling : model_tiling.tilings()) {
     tiling_map[tiling.name()] = tiling;

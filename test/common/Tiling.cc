@@ -55,6 +55,9 @@ Tiling get_tiling(const Operation& operation) {
 Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   Tiling accelerator_tiling;
 
+  // Interstellar does not emit tilings with replication
+  accelerator_tiling.replication = false;
+
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 6; j++) {
       accelerator_tiling.loops[i][j] = 1;
