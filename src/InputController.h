@@ -250,9 +250,6 @@ SC_MODULE(InputController) {
                           ac_int<16, false> c = c2 * C1 * NROWS + c1 * NROWS;
                           ac_int<16, false> C = C2 * C1 * NROWS;
 
-                          ac_int<16, false> c = c1 * NROWS;
-                          ac_int<16, false> C = C1 * NROWS;
-
                           if (isDownsample) {
                             // adjust address for stride
                             x0 = x0 * STRIDE;

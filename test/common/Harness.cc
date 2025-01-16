@@ -518,8 +518,6 @@ void Harness::storeVectorOutputs() {
 }
 #endif
 
-void Harness::end_of_simulation() { accessCounter->print_summary(); }
-
 void run_accelerator(std::vector<Operation> operations, char *memory) {
 #ifdef CFLOAT
   std::cerr

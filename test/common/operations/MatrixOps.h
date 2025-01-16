@@ -107,21 +107,6 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
     assert(tiling.loops[1][j] != 0);
   }
 
-  std::cout << "Using tiling: " << std::endl << tiling << std::endl;
-
-  int X0 = tiling.loops[1][tiling.x_loop_index[1]];
-  int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
-  int K0 = tiling.loops[1][tiling.weight_loop_index[1]];
-
-  if (tiling.replication) {
-    FX = 7;
-    C = 3;
-  }
-
-  bool input_double_precision = is_double_precision(matrix_op.input());
-  bool weight_double_precision = is_double_precision(matrix_op.weight());
-  bool bias_double_precision = is_double_precision(matrix_op.bias());
-
   constexpr bool is_mx_based_design = ACCUMULATE_T::is_floating_point !=
                                       ACCUMULATION_BUFFER_T::is_floating_point;
 
@@ -196,7 +181,8 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                         }
 
                         for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
-                          int c = c0 * IC_unroll + ic0;
+                          int c = c2 * C1 * IC_unroll + c1 * IC_unroll + ic0;
+
                           int input_addr = (STRIDE * y + fy) * STRIDE * X * C +
                                            (STRIDE * x + fx) * C + c;
                           int weight_addr = (fy + (FY - 1) / 2) * FX * C * K +
@@ -239,123 +225,125 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
 #endif
                           }
                         }
-                      }
 
-                      if (is_mx) {
-                        if constexpr (!INPUT_T::is_floating_point &&
-                                      ACCUMULATION_BUFFER_T::
-                                          is_floating_point) {
-                          // only perform scaling if within bounds
-                          if (STRIDE * x + fx >= 0 &&
-                              STRIDE * x + fx < STRIDE * X &&
-                              STRIDE * y + fy >= 0 &&
-                              STRIDE * y + fy < STRIDE * Y) {
-                            int channel_batch = c0 / (32 / IC_DIMENSION);
-                            int num_channel_batches = C / 32;
+                        if (is_mx) {
+                          if constexpr (!INPUT_T::is_floating_point &&
+                                        ACCUMULATION_BUFFER_T::
+                                            is_floating_point) {
+                            // only perform scaling if within bounds
+                            if (STRIDE * x + fx >= 0 &&
+                                STRIDE * x + fx < STRIDE * X &&
+                                STRIDE * y + fy >= 0 &&
+                                STRIDE * y + fy < STRIDE * Y) {
+                              int channel_batch =
+                                  (c2 * C1 + c1) / (32 / IC_DIMENSION);
+                              int num_channel_batches = C / 32;
 
-                            int input_scale_addr =
-                                (STRIDE * y + fy) * STRIDE * X *
-                                    num_channel_batches +
-                                (STRIDE * x + fx) * num_channel_batches +
-                                channel_batch;
-                            assert(input_scale_addr >= 0);
-                            int weight_scale_addr =
-                                (fy + (FY - 1) / 2) * FX * num_channel_batches *
-                                    K +
-                                (fx + (FX - 1) / 2) * num_channel_batches * K +
-                                channel_batch * K + k;
-                            assert(weight_scale_addr >= 0);
+                              int input_scale_addr =
+                                  (STRIDE * y + fy) * STRIDE * X *
+                                      num_channel_batches +
+                                  (STRIDE * x + fx) * num_channel_batches +
+                                  channel_batch;
+                              assert(input_scale_addr >= 0);
+                              int weight_scale_addr =
+                                  (fy + (FY - 1) / 2) * FX *
+                                      num_channel_batches * K +
+                                  (fx + (FX - 1) / 2) * num_channel_batches *
+                                      K +
+                                  channel_batch * K + k;
+                              assert(weight_scale_addr >= 0);
 
-                            SCALE_T input_scale =
-                                input_scales[input_scale_addr];
-                            SCALE_T weight_scale =
-                                weight_scales[weight_scale_addr];
-                            SCALE_T scale = input_scale + weight_scale;
+                              SCALE_T input_scale =
+                                  input_scales[input_scale_addr];
+                              SCALE_T weight_scale =
+                                  weight_scales[weight_scale_addr];
+                              SCALE_T scale = input_scale + weight_scale;
 
-                            ACCUMULATION_BUFFER_T scaled_psum =
-                                static_cast<ACCUMULATION_BUFFER_T>(psum);
-                            scaled_psum.expScale(scale.int_val);
+                              ACCUMULATION_BUFFER_T scaled_psum =
+                                  static_cast<ACCUMULATION_BUFFER_T>(psum);
+                              scaled_psum.expScale(scale.int_val);
 
-                            outputs[output_addr] += scaled_psum;
+                              outputs[output_addr] += scaled_psum;
+                            }
+                          } else {
+                            throw std::runtime_error(
+                                "MX operations are not supported for floating "
+                                "point types");
                           }
-                        } else {
-                          throw std::runtime_error(
-                              "MX operations are not supported for floating "
-                              "point types");
-                        }
-                      } else if (is_mx_based_design) {
-                        if (tiling.replication) {
-                          accumulations[output_addr] += psum;
-                          if (IC_DIMENSION == 4) {
-                            ACCUMULATION_BUFFER_T scaled_psum =
-                                static_cast<ACCUMULATION_BUFFER_T>(
-                                    accumulations[output_addr]);
-                            outputs[output_addr] += scaled_psum;
-                            accumulations[output_addr] = ACCUMULATE_T(0.0);
-                          } else if (IC_DIMENSION == 8) {
-                            if (counters[1][tiling.fx_index] == 1 ||
-                                counters[1][tiling.fx_index] == 3 ||
-                                counters[1][tiling.fx_index] == 5 ||
-                                counters[1][tiling.fx_index] == 6) {
-                              ACCUMULATION_BUFFER_T scaled_psum =
-                                  static_cast<ACCUMULATION_BUFFER_T>(
-                                      accumulations[output_addr]);
-                              outputs[output_addr] += scaled_psum;
-                              accumulations[output_addr] = ACCUMULATE_T(0.0);
-                            }
-                          } else if (IC_DIMENSION == 16) {
-                            if (counters[1][tiling.fx_index] == 3 ||
-                                counters[1][tiling.fx_index] == 6) {
-                              ACCUMULATION_BUFFER_T scaled_psum =
-                                  static_cast<ACCUMULATION_BUFFER_T>(
-                                      accumulations[output_addr]);
-                              outputs[output_addr] += scaled_psum;
-                              accumulations[output_addr] = ACCUMULATE_T(0.0);
-                            }
-                          } else if (IC_DIMENSION == 32) {
-                            if (counters[1][tiling.fx_index] == 6) {
-                              ACCUMULATION_BUFFER_T scaled_psum =
-                                  static_cast<ACCUMULATION_BUFFER_T>(
-                                      accumulations[output_addr]);
-                              outputs[output_addr] += scaled_psum;
-                              accumulations[output_addr] = ACCUMULATE_T(0.0);
-                            }
-                          }
-                        } else {
-                          // use a scale factor of 1 to directly convert the int
-                          // value into a float
-                          ACCUMULATION_BUFFER_T scaled_psum =
-                              static_cast<ACCUMULATION_BUFFER_T>(psum);
-                          outputs[output_addr] += scaled_psum;
-                        }
-                      } else {
-                        if constexpr (ACCUMULATE_T::is_floating_point ==
-                                      ACCUMULATION_BUFFER_T::
-                                          is_floating_point) {
-                          outputs[output_addr] =
-                              static_cast<ACCUMULATE_T>(psum);
-
+                        } else if (is_mx_based_design) {
                           if (tiling.replication) {
-                            if (IC_DIMENSION == 16) {
+                            accumulations[output_addr] += psum;
+                            if (IC_DIMENSION == 4) {
+                              ACCUMULATION_BUFFER_T scaled_psum =
+                                  static_cast<ACCUMULATION_BUFFER_T>(
+                                      accumulations[output_addr]);
+                              outputs[output_addr] += scaled_psum;
+                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                            } else if (IC_DIMENSION == 8) {
+                              if (counters[1][tiling.fx_index] == 1 ||
+                                  counters[1][tiling.fx_index] == 3 ||
+                                  counters[1][tiling.fx_index] == 5 ||
+                                  counters[1][tiling.fx_index] == 6) {
+                                ACCUMULATION_BUFFER_T scaled_psum =
+                                    static_cast<ACCUMULATION_BUFFER_T>(
+                                        accumulations[output_addr]);
+                                outputs[output_addr] += scaled_psum;
+                                accumulations[output_addr] = ACCUMULATE_T(0.0);
+                              }
+                            } else if (IC_DIMENSION == 16) {
                               if (counters[1][tiling.fx_index] == 3 ||
                                   counters[1][tiling.fx_index] == 6) {
-                                outputs[output_addr] =
-                                    static_cast<INTERMEDIATE_T>(psum);
+                                ACCUMULATION_BUFFER_T scaled_psum =
+                                    static_cast<ACCUMULATION_BUFFER_T>(
+                                        accumulations[output_addr]);
+                                outputs[output_addr] += scaled_psum;
+                                accumulations[output_addr] = ACCUMULATE_T(0.0);
                               }
                             } else if (IC_DIMENSION == 32) {
                               if (counters[1][tiling.fx_index] == 6) {
-                                outputs[output_addr] =
-                                    static_cast<INTERMEDIATE_T>(psum);
+                                ACCUMULATION_BUFFER_T scaled_psum =
+                                    static_cast<ACCUMULATION_BUFFER_T>(
+                                        accumulations[output_addr]);
+                                outputs[output_addr] += scaled_psum;
+                                accumulations[output_addr] = ACCUMULATE_T(0.0);
                               }
                             }
                           } else {
-                            outputs[output_addr] =
-                                static_cast<INTERMEDIATE_T>(psum);
+                            // use a scale factor of 1 to directly convert the
+                            // int value into a float
+                            ACCUMULATION_BUFFER_T scaled_psum =
+                                static_cast<ACCUMULATION_BUFFER_T>(psum);
+                            outputs[output_addr] += scaled_psum;
                           }
                         } else {
-                          throw std::runtime_error(
-                              "ACCUMULATE_T and ACCUMULATION_BUFFER_T must "
-                              "have the same floating point type");
+                          if constexpr (ACCUMULATE_T::is_floating_point ==
+                                        ACCUMULATION_BUFFER_T::
+                                            is_floating_point) {
+                            outputs[output_addr] =
+                                static_cast<ACCUMULATE_T>(psum);
+
+                            if (tiling.replication) {
+                              if (IC_DIMENSION == 16) {
+                                if (counters[1][tiling.fx_index] == 3 ||
+                                    counters[1][tiling.fx_index] == 6) {
+                                  outputs[output_addr] =
+                                      static_cast<INTERMEDIATE_T>(psum);
+                                }
+                              } else if (IC_DIMENSION == 32) {
+                                if (counters[1][tiling.fx_index] == 6) {
+                                  outputs[output_addr] =
+                                      static_cast<INTERMEDIATE_T>(psum);
+                                }
+                              }
+                            } else {
+                              outputs[output_addr] =
+                                  static_cast<INTERMEDIATE_T>(psum);
+                            }
+                          } else {
+                            throw std::runtime_error(
+                                "ACCUMULATE_T and ACCUMULATION_BUFFER_T must "
+                                "have the same floating point type");
+                          }
                         }
                       }
                     }

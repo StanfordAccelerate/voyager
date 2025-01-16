@@ -105,23 +105,9 @@ void MapMatrixOperation(const Operation &operation,
                         std::deque<BaseParams *> &mappedParams,
                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   codegen::Operator param = operation.param;
-
-  // get environment variable
-  const char *env_var = std::getenv("MANUAL_TILING");
-  bool manual_tiling = env_var ? std::stoi(env_var) : false;
-
-  Tiling tiling;
   const auto matrix_op = param.matrix_op();
-  if (manual_tiling || !operation.has_valid_tiling) {
-    if (matrix_op.opcode() == "conv2d" || matrix_op.opcode() == "conv2d_mx") {
-      tiling = get_conv2d_tiling(param);
-    } else {
-      tiling = get_linear_tiling(param);
-    }
-  } else {
-    tiling = GetTiling(operation.tiling);
-    tiling.stride = matrix_op.stride(0);
-  }
+
+  Tiling tiling = get_tiling(operation);
 
   int X = tiling.loops[0][tiling.x_loop_index[0]] *
           tiling.loops[1][tiling.x_loop_index[1]];
