@@ -378,10 +378,12 @@ struct VectorInstructions {
   static const unsigned int vsquare = 3;
 
   // Stage 4: relu
-  ac_int<2, false> vOp4;
+  ac_int<3, false> vOp4;
   static const unsigned int vrelu = 1;
   static const unsigned int vrelumask = 2;
   static const unsigned int vmap = 3;
+  static const unsigned int vgelu = 4;
+  static const unsigned int vsilu = 5;
   ac_int<64, false> vmapOffset;
 
   // Stage 5: quantize
@@ -417,7 +419,7 @@ struct VectorInstructions {
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
 
-  static const unsigned int width = 159;
+  static const unsigned int width = 160;
 
 #ifndef NO_SYSC
   template <unsigned int Size>

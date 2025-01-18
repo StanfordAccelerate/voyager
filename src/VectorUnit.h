@@ -327,6 +327,10 @@ SC_MODULE(VectorOpUnit) {
         bool useMask = inst.vOp4 == VectorInstructions::vrelumask;
         vrelu<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res3, op0Src1,
                                                                useMask, res4);
+      } else if (inst.vOp4 == VectorInstructions::vgelu) {
+        vgelu<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res3, res4);
+      } else if (inst.vOp4 == VectorInstructions::vsilu) {
+        vsilu<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res3, res4);
       } else if (inst.vOp4 == VectorInstructions::vmap) {
         for (int i = 0; i < WIDTH; i++) {
           DataTypes::bfloat16 value = res3[i];

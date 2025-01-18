@@ -1,5 +1,10 @@
 #pragma once
 
+#include <ac_math/ac_gelu_pwl.h>
+#include <ac_math/ac_sigmoid_pwl.h>
+
+using namespace ac_math;
+
 #pragma hls_design ccore
 template <typename ACC_DTYPE, int WIDTH>
 void vadd(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& op1,
@@ -46,6 +51,31 @@ void vrelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH> mask,
 #pragma hls_unroll yes
   for (int i = 0; i < WIDTH; i++) {
     res[i] = tmp[i];
+  }
+}
+
+#pragma hls_design ccore
+template <typename ACC_DTYPE, int WIDTH>
+void vgelu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
+  typedef ac_fixed<9, 4, false, AC_RND, AC_SAT> input_type;
+  typedef ac_fixed<64, 32, false, AC_RND, AC_SAT> output_type;
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    input_type x = static_cast<input_type>(op0[i]);
+    res[i] = ac_gelu_pwl<output_type>(x).to_double();
+  }
+}
+
+#pragma hls_design ccore
+template <typename ACC_DTYPE, int WIDTH>
+void vsilu(Pack1D<ACC_DTYPE, WIDTH>& op0, Pack1D<ACC_DTYPE, WIDTH>& res) {
+  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
+  typedef ac_fixed<30, 3, false, AC_RND, AC_SAT> output_type;
+#pragma hls_unroll yes
+  for (int i = 0; i < WIDTH; i++) {
+    input_type x = static_cast<input_type>(op0[i]);
+    output_type y = ac_sigmoid_pwl<output_type>(x);
+    res[i] = (x * y).to_double();
   }
 }
 

@@ -11,8 +11,6 @@
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
-using INTERMEDIATE_DTYPE = ACCUM_DATATYPE::AccumulationDatatype;
-
 inline std::vector<int> get_shape(const codegen::Tensor &tensor) {
   if (tensor.has_reshape()) {
     const auto &param = tensor.reshape();

@@ -40,8 +40,6 @@ class Int {
   template <int wdth2, bool sgnd2>
   Int(const Int<wdth2, sgnd2> input[2]);
 
-  Int(const Int input[2]);
-
   template <int wdth2, bool sgnd2>
   Int(const Int<wdth2, sgnd2> &input);
 
@@ -189,11 +187,6 @@ Int<wdth, sgnd>::Int(const Int<wdth2, sgnd2> input[2]) {
   for (int i = 0; i < 2; i++) {
     int_val.set_slc(0 + i * (wdth2), input[i].int_val);
   }
-}
-
-template <int wdth, bool sgnd>
-Int<wdth, sgnd>::Int(const Int<wdth, sgnd> input[2]) {
-  *this = input[0];
 }
 
 template <int wdth, bool sgnd>

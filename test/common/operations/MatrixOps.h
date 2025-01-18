@@ -14,45 +14,43 @@ inline bool is_double_precision(const codegen::Tensor &tensor) {
 
 // inline void fused_multiply_add(float a, float b, float &c) { c += a * b; }
 
-template <typename T, typename T2>
-inline void fused_multiply_add(T a, T b, T2 &c) {
+template <typename T1, typename T2>
+inline void fused_multiply_add(T1 a, T1 b, T2 &c) {
 #ifdef HYBRID_FP8
   HYBRID_TYPE hybrid_a(a);
   HYBRID_TYPE hybrid_b(b);
   c = hybrid_a.fma(hybrid_b, c);
 #else
-  typename T::AccumulationDatatype v1 = a;
-  typename T::AccumulationDatatype v2 = b;
+  typename T1::AccumulationDatatype v1 = a;
+  typename T1::AccumulationDatatype v2 = b;
   c = v1.fma(v2, c);
 #endif
 }
 
-template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
-          typename ACCUMULATION_BUFFER_T, typename SCALE_T>
-inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
-                                   std::any weight_tensor,
-                                   std::any weight_scale, std::any bias_tensor,
-                                   const codegen::Operator &param) {
+template <typename Input, typename Psum, typename Buffer, typename Scale>
+inline Buffer *gemm(std::any input_tensor, std::any input_scale,
+                    std::any weight_tensor, std::any weight_scale,
+                    std::any bias_tensor, const codegen::Operator &param) {
   const auto matrix_op = param.matrix_op();
 
   bool is_mx = matrix_op.has_mx_input() && matrix_op.has_mx_weight();
 
-  INPUT_T *inputs = std::any_cast<INPUT_T *>(input_tensor);
-  SCALE_T *input_scales;
+  Input *inputs = std::any_cast<Input *>(input_tensor);
+  Scale *input_scales;
   if (matrix_op.has_mx_input()) {
-    input_scales = std::any_cast<SCALE_T *>(input_scale);
+    input_scales = std::any_cast<Scale *>(input_scale);
   }
 
-  INPUT_T *weights = std::any_cast<INPUT_T *>(weight_tensor);
-  SCALE_T *weight_scales;
+  Input *weights = std::any_cast<Input *>(weight_tensor);
+  Scale *weight_scales;
   if (matrix_op.has_mx_weight()) {
-    weight_scales = std::any_cast<SCALE_T *>(weight_scale);
+    weight_scales = std::any_cast<Scale *>(weight_scale);
   }
 
-  // bias is assumed to be in ACCUMULATION_BUFFER_T
-  ACCUMULATION_BUFFER_T *bias = nullptr;
+  // bias is assumed to be in Buffer
+  Buffer *bias = nullptr;
   if (matrix_op.has_bias()) {
-    bias = std::any_cast<ACCUMULATION_BUFFER_T *>(bias_tensor);
+    bias = std::any_cast<Buffer *>(bias_tensor);
   }
 
   Tiling tiling;
@@ -116,15 +114,15 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
   bool weight_double_precision = is_double_precision(matrix_op.weight());
   bool bias_double_precision = is_double_precision(matrix_op.bias());
 
-  constexpr bool is_mx_based_design = ACCUMULATE_T::is_floating_point !=
-                                      ACCUMULATION_BUFFER_T::is_floating_point;
+  constexpr bool is_mx_based_design =
+      Psum::is_floating_point != Buffer::is_floating_point;
 
-  ACCUMULATION_BUFFER_T *outputs = new ACCUMULATION_BUFFER_T[X * Y * K];
+  Buffer *outputs = new Buffer[X * Y * K];
 
   // only used for replication on MX-based designs
-  ACCUMULATE_T *accumulations = new ACCUMULATE_T[X * Y * K];
+  Psum *accumulations = new Psum[X * Y * K];
   for (int i = 0; i < X * Y * K; i++) {
-    accumulations[i] = ACCUMULATE_T(0.0);
+    accumulations[i] = Psum(0.0);
   }
 
   // initialize to bias
@@ -133,7 +131,7 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
       if (matrix_op.has_bias()) {
         outputs[i * K + k] = bias[k];
       } else {
-        outputs[i * K + k] = ACCUMULATION_BUFFER_T(0.0);
+        outputs[i * K + k] = Buffer(0.0);
       }
     }
   }
@@ -174,13 +172,12 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                       int k = (k1 * K0 + k0) * OC_DIMENSION + oc0;
                       int output_addr = y * X * K + x * K + k;
 
-                      ACCUMULATE_T psum;
+                      Psum psum;
                       if (is_mx || is_mx_based_design) {
-                        psum = ACCUMULATE_T(0.0);
+                        psum = Psum(0.0);
                       } else {
-                        if constexpr (ACCUMULATE_T::is_floating_point ==
-                                      ACCUMULATION_BUFFER_T::
-                                          is_floating_point) {
+                        if constexpr (Psum::is_floating_point ==
+                                      Buffer::is_floating_point) {
                           psum = outputs[output_addr];
                         }
                       }
@@ -196,8 +193,8 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                             STRIDE * x + fx < STRIDE * X &&
                             STRIDE * y + fy >= 0 &&
                             STRIDE * y + fy < STRIDE * Y) {
-                          INTERMEDIATE_T input = inputs[input_addr];
-                          INTERMEDIATE_T weight = weights[weight_addr];
+                          Input input = inputs[input_addr];
+                          Input weight = weights[weight_addr];
 #ifdef CHECK_PE
                           int pe_num = ic0 * OC_DIMENSION + oc0;
                           if (tiling.replication) {
@@ -221,9 +218,9 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                                     IC_unroll * OC_DIMENSION +
                                 oc0;
                           }
-                          INTERMEDIATE_T input;
+                          Input input;
                           input.setZero();
-                          INTERMEDIATE_T weight = weights[weight_addr];
+                          Input weight = weights[weight_addr];
                           pe_checker.addReference(pe_num, input, weight,
                                                   outputs[output_addr]);
 #endif
@@ -231,9 +228,8 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                       }
 
                       if (is_mx) {
-                        if constexpr (!INPUT_T::is_floating_point &&
-                                      ACCUMULATION_BUFFER_T::
-                                          is_floating_point) {
+                        if constexpr (!Input::is_floating_point &&
+                                      Buffer::is_floating_point) {
                           // only perform scaling if within bounds
                           if (STRIDE * x + fx >= 0 &&
                               STRIDE * x + fx < STRIDE * X &&
@@ -255,14 +251,12 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                                 channel_batch * K + k;
                             assert(weight_scale_addr >= 0);
 
-                            SCALE_T input_scale =
-                                input_scales[input_scale_addr];
-                            SCALE_T weight_scale =
+                            Scale input_scale = input_scales[input_scale_addr];
+                            Scale weight_scale =
                                 weight_scales[weight_scale_addr];
-                            SCALE_T scale = input_scale + weight_scale;
+                            Scale scale = input_scale + weight_scale;
 
-                            ACCUMULATION_BUFFER_T scaled_psum =
-                                static_cast<ACCUMULATION_BUFFER_T>(psum);
+                            Buffer scaled_psum = static_cast<Buffer>(psum);
                             scaled_psum.expScale(scale.int_val);
 
                             outputs[output_addr] += scaled_psum;
@@ -276,74 +270,66 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
                         if (tiling.replication) {
                           accumulations[output_addr] += psum;
                           if (IC_DIMENSION == 4) {
-                            ACCUMULATION_BUFFER_T scaled_psum =
-                                static_cast<ACCUMULATION_BUFFER_T>(
-                                    accumulations[output_addr]);
+                            Buffer scaled_psum =
+                                static_cast<Buffer>(accumulations[output_addr]);
                             outputs[output_addr] += scaled_psum;
-                            accumulations[output_addr] = ACCUMULATE_T(0.0);
+                            accumulations[output_addr] = Psum(0.0);
                           } else if (IC_DIMENSION == 8) {
                             if (counters[1][tiling.fx_index] == 1 ||
                                 counters[1][tiling.fx_index] == 3 ||
                                 counters[1][tiling.fx_index] == 5 ||
                                 counters[1][tiling.fx_index] == 6) {
-                              ACCUMULATION_BUFFER_T scaled_psum =
-                                  static_cast<ACCUMULATION_BUFFER_T>(
-                                      accumulations[output_addr]);
+                              Buffer scaled_psum = static_cast<Buffer>(
+                                  accumulations[output_addr]);
                               outputs[output_addr] += scaled_psum;
-                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                              accumulations[output_addr] = Psum(0.0);
                             }
                           } else if (IC_DIMENSION == 16) {
                             if (counters[1][tiling.fx_index] == 3 ||
                                 counters[1][tiling.fx_index] == 6) {
-                              ACCUMULATION_BUFFER_T scaled_psum =
-                                  static_cast<ACCUMULATION_BUFFER_T>(
-                                      accumulations[output_addr]);
+                              Buffer scaled_psum = static_cast<Buffer>(
+                                  accumulations[output_addr]);
                               outputs[output_addr] += scaled_psum;
-                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                              accumulations[output_addr] = Psum(0.0);
                             }
                           } else if (IC_DIMENSION == 32) {
                             if (counters[1][tiling.fx_index] == 6) {
-                              ACCUMULATION_BUFFER_T scaled_psum =
-                                  static_cast<ACCUMULATION_BUFFER_T>(
-                                      accumulations[output_addr]);
+                              Buffer scaled_psum = static_cast<Buffer>(
+                                  accumulations[output_addr]);
                               outputs[output_addr] += scaled_psum;
-                              accumulations[output_addr] = ACCUMULATE_T(0.0);
+                              accumulations[output_addr] = Psum(0.0);
                             }
                           }
                         } else {
                           // use a scale factor of 1 to directly convert the int
                           // value into a float
-                          ACCUMULATION_BUFFER_T scaled_psum =
-                              static_cast<ACCUMULATION_BUFFER_T>(psum);
+                          Buffer scaled_psum = static_cast<Buffer>(psum);
                           outputs[output_addr] += scaled_psum;
                         }
                       } else {
-                        if constexpr (ACCUMULATE_T::is_floating_point ==
-                                      ACCUMULATION_BUFFER_T::
-                                          is_floating_point) {
-                          outputs[output_addr] =
-                              static_cast<ACCUMULATE_T>(psum);
+                        if constexpr (Psum::is_floating_point ==
+                                      Buffer::is_floating_point) {
+                          outputs[output_addr] = static_cast<Psum>(psum);
 
                           if (tiling.replication) {
                             if (IC_DIMENSION == 16) {
                               if (counters[1][tiling.fx_index] == 3 ||
                                   counters[1][tiling.fx_index] == 6) {
                                 outputs[output_addr] =
-                                    static_cast<INTERMEDIATE_T>(psum);
+                                    static_cast<Buffer>(psum);
                               }
                             } else if (IC_DIMENSION == 32) {
                               if (counters[1][tiling.fx_index] == 6) {
                                 outputs[output_addr] =
-                                    static_cast<INTERMEDIATE_T>(psum);
+                                    static_cast<Buffer>(psum);
                               }
                             }
                           } else {
-                            outputs[output_addr] =
-                                static_cast<INTERMEDIATE_T>(psum);
+                            outputs[output_addr] = static_cast<Buffer>(psum);
                           }
                         } else {
                           throw std::runtime_error(
-                              "ACCUMULATE_T and ACCUMULATION_BUFFER_T must "
+                              "Psum and Buffer must "
                               "have the same floating point type");
                         }
                       }
@@ -373,40 +359,39 @@ inline ACCUMULATION_BUFFER_T *gemm(std::any input_tensor, std::any input_scale,
   return outputs;
 }
 
-template <typename INPUT_T, typename ACCUMULATE_T, typename INTERMEDIATE_T,
-          typename VECTOR_T>
-inline VECTOR_T *matrix_vector_multiply(std::any input_tensor,
-                                        std::any weight_tensor,
-                                        std::any bias_tensor,
-                                        const codegen::MatrixOp &param) {
+template <typename Input, typename Psum, typename Vector>
+inline Vector *matrix_vector_multiply(std::any input_tensor,
+                                      std::any weight_tensor,
+                                      std::any bias_tensor,
+                                      const codegen::MatrixOp &param) {
   const auto weight = param.weight();
   int K = weight.shape(0);
   int C = weight.shape(1);
 
-  VECTOR_T *inputs = std::any_cast<VECTOR_T *>(input_tensor);
-  VECTOR_T *weights = std::any_cast<VECTOR_T *>(weight_tensor);
-  VECTOR_T *bias = std::any_cast<VECTOR_T *>(bias_tensor);
+  Vector *inputs = std::any_cast<Vector *>(input_tensor);
+  Vector *weights = std::any_cast<Vector *>(weight_tensor);
+  Vector *bias = std::any_cast<Vector *>(bias_tensor);
 
   bool input_double_precision = is_double_precision(param.input());
   bool weight_double_precision = is_double_precision(param.weight());
   bool bias_double_precision = is_double_precision(param.bias());
 
-  VECTOR_T *outputs = new VECTOR_T[K];
+  Vector *outputs = new Vector[K];
   for (int i = 0; i < K; i++) {
     outputs[i] = 0.0;
   }
 
   for (int k = 0; k < K; k++) {
-    VECTOR_T product[C];
+    Vector product[C];
     for (int c = 0; c < C; c++) {
-      VECTOR_T input = inputs[c];
-      VECTOR_T weight = weights[k * C + c];
-      product[c] = static_cast<VECTOR_T>(input * weight);
+      Vector input = inputs[c];
+      Vector weight = weights[k * C + c];
+      product[c] = static_cast<Vector>(input * weight);
     }
 
     // perform a tree addition
     for (int i = 0; i < C; i += OC_DIMENSION) {
-      VECTOR_T buffer[OC_DIMENSION];
+      Vector buffer[OC_DIMENSION];
       for (int j = 0; j < OC_DIMENSION; j++) {
         buffer[j] = product[i + j];
       }
@@ -414,11 +399,11 @@ inline VECTOR_T *matrix_vector_multiply(std::any input_tensor,
       int depth = OC_DIMENSION;
       while (depth > 1) {
         for (int j = 0; j < depth; j += 2) {
-          buffer[j / 2] = static_cast<VECTOR_T>(buffer[j] + buffer[j + 1]);
+          buffer[j / 2] = static_cast<Vector>(buffer[j] + buffer[j + 1]);
         }
         depth = depth / 2;
       }
-      outputs[k] = static_cast<VECTOR_T>(outputs[k] + buffer[0]);
+      outputs[k] = static_cast<Vector>(outputs[k] + buffer[0]);
     }
 
     if (param.has_bias()) {

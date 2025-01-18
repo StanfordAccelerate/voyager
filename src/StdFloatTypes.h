@@ -44,8 +44,6 @@ class StdFloat {
   StdFloat(const StdFloat<mantissa2, exp2, useDWImpl2, ieee_compliance2, Q2>
                input[2]);
 
-  StdFloat(const StdFloat input[2]);
-
   template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,
             ac_q_mode Q2>
   StdFloat(
@@ -208,16 +206,6 @@ StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
   for (int i = 0; i < 2; i++) {
     float_val.d.set_slc(0 + i * (mantissa2 + exp2 + 1), input[i].float_val.d);
   }
-}
-
-// TODO: this is a bit of a hack for cases where we expect a double precision
-// type, but it's actually the same type. For example, when a BF16 only design,
-// where the accumulation type is the same as the input type.
-template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
-          ac_q_mode Q>
-StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
-    const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> input[2]) {
-  *this = input[0];
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
