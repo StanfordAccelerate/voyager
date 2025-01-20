@@ -334,7 +334,7 @@ def main():
     # generate tilings for all matrix operations
     tilings = tiling_pb2.ModelTiling()
     for param in params.ops:
-        if param.HasField("matrix_op") and param.matrix_op.opcode != "linear":
+        if param.HasField("matrix_op"):
             weights_shape = param.matrix_op.weight.shape
             if len(weights_shape) == 4:
                 # convolution
@@ -362,14 +362,28 @@ def main():
                 width = output_shape[3]
             elif len(output_shape) == 3:
                 assert output_shape[0] == 1
-                height = output_shape[1]
-                width = 1
+                width = output_shape[1]
+                height = 1
             elif len(output_shape) == 2:
-                height = output_shape[0]
-                width = 1
+                width = output_shape[0]
+                height = 1
+                if width == 1:
+                    print("Fully-connected layer, skipping")
+                    continue
             else:
                 print(f"Unsupported output shape: {output_shape}, skipping")
                 continue
+
+            # for operations with reshape, we can look at the input shape to get height and width
+            if param.output.HasField("reshape"):
+                input_shape = param.matrix_op.input.shape
+                if len(input_shape) == 3:
+                    assert input_shape[0] == 1
+                    width = input_shape[1]
+                    height = 1
+                else:
+                    print("Unsupported input shape for reshape, skipping")
+                    continue
 
             if len(param.matrix_op.stride) == 0:
                 stride = 1
