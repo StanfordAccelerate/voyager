@@ -335,7 +335,11 @@ def main():
     tilings = tiling_pb2.ModelTiling()
     for param in params.ops:
         if param.HasField("matrix_op"):
-            weights_shape = param.matrix_op.weight.shape
+            weights_shape = (
+                param.matrix_op.weight.shape
+                if not param.matrix_op.HasField("mx_weight")
+                else param.matrix_op.mx_weight.input.shape
+            )
             if len(weights_shape) == 4:
                 # convolution
                 output_channels = weights_shape[0]
@@ -376,7 +380,11 @@ def main():
 
             # for operations with reshape, we can look at the input shape to get height and width
             if param.output.HasField("reshape"):
-                input_shape = param.matrix_op.input.shape
+                input_shape = (
+                    param.matrix_op.input.shape
+                    if not param.matrix_op.HasField("mx_input")
+                    else param.matrix_op.mx_input.input.shape
+                )
                 if len(input_shape) == 3:
                     assert input_shape[0] == 1
                     width = input_shape[1]
