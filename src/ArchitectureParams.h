@@ -1,5 +1,7 @@
 #pragma once
 
+using E8M0 = UFloat<8, 8>;
+
 #if defined(P8_1)
 
 using P8 = Posit<8, 1>;
@@ -23,7 +25,7 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define ACCUM_BUFFER_DATATYPE F16
 #define OUTPUT_DATATYPE F4
 #define VECTOR_DATATYPE F16
-#define SCALE_DATATYPE UFloat<8, 8>
+#define SCALE_DATATYPE E8M0
 
 #define SUPPORT_MX true
 
@@ -151,7 +153,7 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define ACCUM_BUFFER_DATATYPE F16
 #define OUTPUT_DATATYPE I8
 #define VECTOR_DATATYPE F16
-#define SCALE_DATATYPE UFloat<8, 8>
+#define SCALE_DATATYPE E8M0
 
 #define SUPPORT_MX true
 
@@ -176,7 +178,7 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
 // default to E8M0 scale
 #ifndef SCALE_DATATYPE
-#define SCALE_DATATYPE UFloat<8, 8>
+#define SCALE_DATATYPE E8M0
 #endif
 
 #ifndef SUPPORT_MX

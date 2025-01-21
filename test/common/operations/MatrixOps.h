@@ -6,14 +6,6 @@
 #include "test/checker/PEChecker.h"
 #endif
 
-inline bool is_double_precision(const codegen::Tensor &tensor) {
-  // FIXME: replace with proper check
-  // return tensor.dtype().find("8") == std::string::npos;
-  return false;
-}
-
-// inline void fused_multiply_add(float a, float b, float &c) { c += a * b; }
-
 template <typename T1, typename T2>
 inline void fused_multiply_add(T1 a, T1 b, T2 &c) {
 #ifdef HYBRID_FP8
@@ -109,10 +101,6 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
     FX = 7;
     C = 3;
   }
-
-  bool input_double_precision = is_double_precision(matrix_op.input());
-  bool weight_double_precision = is_double_precision(matrix_op.weight());
-  bool bias_double_precision = is_double_precision(matrix_op.bias());
 
 #if SUPPORT_MX
   bool is_mx_based_design = true;
@@ -354,10 +342,6 @@ inline Vector *matrix_vector_multiply(std::any input_tensor,
   Vector *inputs = std::any_cast<Vector *>(input_tensor);
   Vector *weights = std::any_cast<Vector *>(weight_tensor);
   Vector *bias = std::any_cast<Vector *>(bias_tensor);
-
-  bool input_double_precision = is_double_precision(param.input());
-  bool weight_double_precision = is_double_precision(param.weight());
-  bool bias_double_precision = is_double_precision(param.bias());
 
   Vector *outputs = new Vector[K];
   for (int i = 0; i < K; i++) {
