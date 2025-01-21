@@ -251,7 +251,7 @@ def run_rtl_test(model, layer, output_folder):
             [
                 "grep",
                 "-oP",
-                "(?<=ideal runtime: ).\d+",
+                "(?<=Ideal runtime: ).\d+",
                 f"{output_folder}/{model}_{layer}.log",
             ],
             stdout=subprocess.PIPE,
