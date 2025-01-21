@@ -196,6 +196,12 @@ def run_rtl_test(model, layer, output_folder):
     # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an
     # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
+    if "INPUT_BUFFER_SIZE" not in env_vars:
+        env_vars["INPUT_BUFFER_SIZE"] = "1024"
+    if "WEIGHT_BUFFER_SIZE" not in env_vars:
+        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
+    if "ACCUM_BUFFER_SIZE" not in env_vars:
+        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
 
     # we occasionally see the test fail due to filesystem issues ("no rule to make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
@@ -292,6 +298,13 @@ def run_rtl_tests(layers, num_processes, results_folder, keep_build=False):
         env_vars["TESTS"] = "submodule_0"
         env_vars["SIMS"] = "gold,accelerator"
         env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
+
+        if "INPUT_BUFFER_SIZE" not in env_vars:
+            env_vars["INPUT_BUFFER_SIZE"] = "1024"
+        if "WEIGHT_BUFFER_SIZE" not in env_vars:
+            env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
+        if "ACCUM_BUFFER_SIZE" not in env_vars:
+            env_vars["ACCUM_BUFFER_SIZE"] = "1024"
 
         subprocess.run(
             ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "build"],
