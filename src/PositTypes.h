@@ -5,12 +5,6 @@
 // It's roughly modeled after the Universal Numbers Library posit implementation
 // https://github.com/stillwater-sc/universal
 // but with more emphasis on a lightweight implementation.
-// This implementation mainly consists of two classes: Posit and PositFP
-// PositFP is a decoded version of Posit used for the internal calculations
-// also referred to as AccumulationDatatype.
-
-// TODO(fpedd): Maybe clean this up a little according to
-// https://stackoverflow.com/questions/4421706/what-are-the-basic-rules-and-idioms-for-operator-overloading
 
 #pragma once
 #include <stdint.h>
@@ -48,12 +42,6 @@ template <int nbits, int es, int fbits>
 void convert_(const bool sign, const int scale,
               const ac_int<fbits, false> fraction_in,
               ac_int<nbits, false> &bits) {
-  // if ((es > 0 && scale < -(nbits - 1) * (1 << es) + (1 << max(es - 1, 0))) ||
-  //     (es == 0 && scale < -(nbits - 1))) {
-  //   bits = 0;
-  //   return;
-  // }
-
   if (nbits == 8 && es == 1 && scale < -13) {
     bits = 0;
     return;
@@ -137,8 +125,7 @@ class Posit {
   static constexpr int max_exp = (nbits - 2) * (1 << es);
   static constexpr int sbits = ac::nbits<max_exp>::val + 1;
   static constexpr int fbits = nbits - 3 - es;
-  static constexpr bool is_floating_point = true;
-  typedef StdFloat<fbits, sbits> AccumulationDatatype;
+  typedef StdFloat<fbits, sbits> Decoded;
 
   ac_int<nbits, false> bits;
 
@@ -148,28 +135,19 @@ class Posit {
   Posit(const float f);
 #endif
 
-  template <int W, bool S>
-  Posit(const ac_int<W, S> &rhs);
-
   template <int nbits2, int es2>
   Posit(const Posit<nbits2, es2> &input);
-
-  template <int nbits2, int es2>
-  Posit(const Posit<nbits2, es2> input[2]);
 
   template <int mantissa, int exp>
   Posit(const StdFloat<mantissa, exp> &input);
 
   ac_int<nbits, false> bits_rep() { return bits; }
 
-  bool isZero() const { return bits == 0; }
-
   void setbits(int i) { bits = i; }
   void setZero() { bits = 0; }
+  bool isZero() const { return bits == 0; }
 
-  void sqrt() {
-      throw "Posit sqrt function not implemented.";
-  }
+  void sqrt() { throw "Posit sqrt function not implemented."; }
 
   void relu() {
     if (bits[nbits - 1] == 1) bits = 0;
@@ -201,9 +179,32 @@ class Posit {
 
   bool operator<(const Posit &rhs) const;
 
+  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+            ac_q_mode Q>
+  operator StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>() const {
+    using FloatType = StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>;
+    FloatType f;
+    if (isZero()) {
+      f.setZero();
+    } else {
+      bool sign;
+      int scale;
+      ac_int<mantissa, false> mantissa_bits;
+      decode<nbits, es, mantissa>(bits, sign, scale, mantissa_bits);
+
+      ac_int<1, false> sign_bit = sign;
+      ac_int<exp, true> exp_bits = scale + FloatType::ac_float_rep::exp_bias;
+
+      f.float_val.d.set_slc(0, mantissa_bits);
+      f.float_val.d.set_slc(mantissa, exp_bits);
+      f.float_val.d.set_slc(mantissa + exp, sign_bit);
+    }
+    return f;
+  }
+
 #ifndef __SYNTHESIS__
   operator float() const {
-    AccumulationDatatype tmp(*this);
+    Decoded tmp(*this);
     return static_cast<float>(tmp);
   }
 #endif
@@ -222,26 +223,26 @@ class Posit {
 #endif
 };
 
+#ifndef __SYNTHESIS__
+template <int nbits, int es>
+Posit<nbits, es>::Posit(const float f) {
+  if (f == 0) {
+    bits = 0;
+  } else {
+    union ufloat uf = {f};
+    bool sign = f < 0;
+    int scale = ((uf.u >> 23) & 0xFF) - 127;
+    ac_int<23, false> fraction = uf.u;
+    convert_<nbits, es, 23>(sign, scale, fraction, bits);
+  }
+}
+#endif
+
 template <int nbits, int es>
 template <int nbits2, int es2>
 Posit<nbits, es>::Posit(const Posit<nbits2, es2> &input) {
-  typename Posit<nbits2, es2>::AccumulationDatatype tmp(input);
+  typename Posit<nbits2, es2>::Decoded tmp(input);
   *this = tmp;
-}
-
-template <int nbits, int es>
-template <int nbits2, int es2>
-Posit<nbits, es>::Posit(const Posit<nbits2, es2> input[2]) {
-#pragma hls_unroll yes
-  for (int i = 0; i < 2; i++) {
-    bits.set_slc(i * nbits2, input[i].bits);
-  }
-}
-
-template <int nbits, int es>
-template <int W, bool S>
-Posit<nbits, es>::Posit(const ac_int<W, S> &rhs) {
-  bits = rhs;
 }
 
 template <int nbits, int es>
@@ -261,21 +262,6 @@ Posit<nbits, es>::Posit(const StdFloat<mantissa, exp> &input) {
     convert_<nbits, es, mant_bits>(sign, scale, fraction, bits);
   }
 }
-
-#ifndef __SYNTHESIS__
-template <int nbits, int es>
-Posit<nbits, es>::Posit(const float f) {
-  if (f == 0) {
-    bits = 0;
-  } else {
-    union ufloat uf = {f};
-    bool sign = f < 0;
-    int scale = ((uf.u >> 23) & 0xFF) - 127;
-    ac_int<23, false> fraction = uf.u;
-    convert_<nbits, es, 23>(sign, scale, fraction, bits);
-  }
-}
-#endif
 
 // Implements an optimized exp that is only valid for inputs smaller than zero
 template <int nbits, int es>
@@ -306,16 +292,16 @@ Posit<nbits, es> exponential(Posit<nbits, es> val) {
 template <int nbits, int es>
 inline Posit<nbits, es> Posit<nbits, es>::operator+(
     const Posit<nbits, es> &rhs) {
-  AccumulationDatatype op1 = *this;
-  AccumulationDatatype op2 = rhs;
+  Decoded op1 = *this;
+  Decoded op2 = rhs;
   return op1 + op2;
 }
 
 template <int nbits, int es>
 inline Posit<nbits, es> Posit<nbits, es>::operator*(
     const Posit<nbits, es> &rhs) {
-  AccumulationDatatype op1 = *this;
-  AccumulationDatatype op2 = rhs;
+  Decoded op1 = *this;
+  Decoded op2 = rhs;
   return op1 * op2;
 }
 
@@ -331,8 +317,8 @@ inline Posit<nbits, es> Posit<nbits, es>::operator/(
 template <int nbits, int es>
 inline Posit<nbits, es> Posit<nbits, es>::log_mult(
     const Posit<nbits, es> &rhs) {
-  AccumulationDatatype op1 = *this;
-  AccumulationDatatype op2 = rhs;
+  Decoded op1 = *this;
+  Decoded op2 = rhs;
   return op1.log_mult(op2);
 }
 

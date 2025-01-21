@@ -12,10 +12,9 @@
 class CFloat {
  public:
   static constexpr unsigned int width = 32;
-  static constexpr bool is_floating_point = true;
   float float_val;
 
-  typedef CFloat AccumulationDatatype;
+  typedef CFloat Decoded;
 
   CFloat() : float_val(0) {}
   CFloat(const float val) : float_val(val) {}

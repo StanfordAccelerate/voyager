@@ -22,8 +22,7 @@ inline void gelu(T &i) {
   typedef ac_fixed<9, 4, false, AC_RND, AC_SAT> input_type;
   typedef ac_fixed<64, 32, false, AC_RND, AC_SAT> output_type;
   input_type x = static_cast<float>(i);
-  output_type y = ac_gelu_pwl<output_type>(x);
-  i = y.to_double();
+  i = ac_gelu_pwl<output_type>(x);
 }
 
 template <typename T>
@@ -32,7 +31,7 @@ inline void silu(T &i) {
   typedef ac_fixed<30, 3, false, AC_RND, AC_SAT> output_type;
   input_type x = static_cast<float>(i);
   output_type y = ac_sigmoid_pwl<output_type>(x);
-  i = (x * y).to_double();
+  i = x * y;
 }
 
 template <typename T>

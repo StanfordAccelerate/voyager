@@ -21,8 +21,8 @@ inline void fused_multiply_add(T1 a, T1 b, T2 &c) {
   HYBRID_TYPE hybrid_b(b);
   c = hybrid_a.fma(hybrid_b, c);
 #else
-  typename T1::AccumulationDatatype v1 = a;
-  typename T1::AccumulationDatatype v2 = b;
+  typename T1::Decoded v1 = a;
+  typename T1::Decoded v2 = b;
   c = v1.fma(v2, c);
 #endif
 }
@@ -114,8 +114,11 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
   bool weight_double_precision = is_double_precision(matrix_op.weight());
   bool bias_double_precision = is_double_precision(matrix_op.bias());
 
-  constexpr bool is_mx_based_design =
-      Psum::is_floating_point != Buffer::is_floating_point;
+#if SUPPORT_MX
+  bool is_mx_based_design = true;
+#else
+  bool is_mx_based_design = false;
+#endif
 
   Buffer *outputs = new Buffer[X * Y * K];
 
@@ -176,10 +179,7 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                       if (is_mx || is_mx_based_design) {
                         psum = Psum(0.0);
                       } else {
-                        if constexpr (Psum::is_floating_point ==
-                                      Buffer::is_floating_point) {
-                          psum = outputs[output_addr];
-                        }
+                        psum = outputs[output_addr];
                       }
 
                       for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
@@ -228,44 +228,36 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                       }
 
                       if (is_mx) {
-                        if constexpr (!Input::is_floating_point &&
-                                      Buffer::is_floating_point) {
-                          // only perform scaling if within bounds
-                          if (STRIDE * x + fx >= 0 &&
-                              STRIDE * x + fx < STRIDE * X &&
-                              STRIDE * y + fy >= 0 &&
-                              STRIDE * y + fy < STRIDE * Y) {
-                            int channel_batch = c0 / (32 / IC_DIMENSION);
-                            int num_channel_batches = C / 32;
+                        // only perform scaling if within bounds
+                        if (STRIDE * x + fx >= 0 &&
+                            STRIDE * x + fx < STRIDE * X &&
+                            STRIDE * y + fy >= 0 &&
+                            STRIDE * y + fy < STRIDE * Y) {
+                          int channel_batch = c0 / (32 / IC_DIMENSION);
+                          int num_channel_batches = C / 32;
 
-                            int input_scale_addr =
-                                (STRIDE * y + fy) * STRIDE * X *
-                                    num_channel_batches +
-                                (STRIDE * x + fx) * num_channel_batches +
-                                channel_batch;
-                            assert(input_scale_addr >= 0);
-                            int weight_scale_addr =
-                                (fy + (FY - 1) / 2) * FX * num_channel_batches *
-                                    K +
-                                (fx + (FX - 1) / 2) * num_channel_batches * K +
-                                channel_batch * K + k;
-                            assert(weight_scale_addr >= 0);
+                          int input_scale_addr =
+                              (STRIDE * y + fy) * STRIDE * X *
+                                  num_channel_batches +
+                              (STRIDE * x + fx) * num_channel_batches +
+                              channel_batch;
+                          assert(input_scale_addr >= 0);
+                          int weight_scale_addr =
+                              (fy + (FY - 1) / 2) * FX * num_channel_batches *
+                                  K +
+                              (fx + (FX - 1) / 2) * num_channel_batches * K +
+                              channel_batch * K + k;
+                          assert(weight_scale_addr >= 0);
 
-                            Scale input_scale = input_scales[input_scale_addr];
-                            Scale weight_scale =
-                                weight_scales[weight_scale_addr];
-                            Scale scale = input_scale + weight_scale;
+                          Scale input_scale = input_scales[input_scale_addr];
+                          Scale weight_scale = weight_scales[weight_scale_addr];
+                          Scale scale = input_scale * weight_scale;
 
-                            Buffer scaled_psum = static_cast<Buffer>(psum);
-                            scaled_psum.expScale(scale.int_val);
-
-                            outputs[output_addr] += scaled_psum;
-                          }
-                        } else {
-                          throw std::runtime_error(
-                              "MX operations are not supported for floating "
-                              "point types");
+                          Buffer scaled_psum = static_cast<Buffer>(psum) *
+                                               static_cast<Buffer>(scale);
+                          outputs[output_addr] += scaled_psum;
                         }
+
                       } else if (is_mx_based_design) {
                         if (tiling.replication) {
                           accumulations[output_addr] += psum;
@@ -307,30 +299,21 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                           outputs[output_addr] += scaled_psum;
                         }
                       } else {
-                        if constexpr (Psum::is_floating_point ==
-                                      Buffer::is_floating_point) {
-                          outputs[output_addr] = static_cast<Psum>(psum);
+                        outputs[output_addr] = static_cast<Psum>(psum);
 
-                          if (tiling.replication) {
-                            if (IC_DIMENSION == 16) {
-                              if (counters[1][tiling.fx_index] == 3 ||
-                                  counters[1][tiling.fx_index] == 6) {
-                                outputs[output_addr] =
-                                    static_cast<Buffer>(psum);
-                              }
-                            } else if (IC_DIMENSION == 32) {
-                              if (counters[1][tiling.fx_index] == 6) {
-                                outputs[output_addr] =
-                                    static_cast<Buffer>(psum);
-                              }
+                        if (tiling.replication) {
+                          if (IC_DIMENSION == 16) {
+                            if (counters[1][tiling.fx_index] == 3 ||
+                                counters[1][tiling.fx_index] == 6) {
+                              outputs[output_addr] = static_cast<Buffer>(psum);
                             }
-                          } else {
-                            outputs[output_addr] = static_cast<Buffer>(psum);
+                          } else if (IC_DIMENSION == 32) {
+                            if (counters[1][tiling.fx_index] == 6) {
+                              outputs[output_addr] = static_cast<Buffer>(psum);
+                            }
                           }
                         } else {
-                          throw std::runtime_error(
-                              "Psum and Buffer must "
-                              "have the same floating point type");
+                          outputs[output_addr] = static_cast<Buffer>(psum);
                         }
                       }
                     }

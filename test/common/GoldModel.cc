@@ -51,19 +51,14 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
 
       output_tensor = sum<Vector>(args[arg_index++], input_shape, dims);
     } else if (reduce_op.opcode() == "calculate_mx_qparam") {
-      if (param.output().dtype() != "e8m0") {
-        std::runtime_error(
-            "Unsupported output dtype for calculate_mx_qparam: " +
-            param.output().dtype());
-      }
       if constexpr (std::is_same<Vector, CFloat>::value) {
         std::cerr
             << "No calculate_mx_param operation should be emitted for CFloat"
             << std::endl;
         std::abort();
       } else {
-        output_tensor = calculate_mx_qparam<Vector, DataTypes::e8m0>(
-            args[arg_index++], reduce_op);
+        output_tensor =
+            calculate_mx_qparam<Vector, Scale>(args[arg_index++], reduce_op);
       }
     } else {
       std::cerr << "Unsupported reduce instruction: " << reduce_op.opcode()
@@ -229,13 +224,13 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
                   << std::endl;
         std::abort();
       } else {
-        if (vector_param.other().dtype() == vector_param.input().dtype()) {
+        if (vector_param.other().shape_size() == 1) {
           // perform quantization operation
-          output_tensor = quantize<Vector, Input>(
+          output_tensor = quantize<Vector, Input, Vector>(
               output_tensor, args[arg_index++], get_size(vector_param.input()));
-        } else if (vector_param.other().dtype() == "e8m0") {
+        } else if (vector_param.other().shape_size() > 1) {
           // perform microscaling quantization operation
-          output_tensor = quantizeMX<Vector, DataTypes::e8m0, Input>(
+          output_tensor = quantizeMX<Vector, Input, Scale>(
               output_tensor, args[arg_index++], get_size(vector_param.input()),
               get_size(vector_param.other()));
         } else {
@@ -249,13 +244,6 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
         std::cerr << "No quantization operations should be emitted for CFloat"
                   << std::endl;
         std::abort();
-      } else if constexpr (Psum::is_floating_point !=
-                           AccumBuffer::is_floating_point) {
-        // for MX-based design, if we aren't performing microscaling, we will
-        // see a dequantization instruction. this dequantization instruction is
-        // really just a scale operation.
-        output_tensor = dequantize<AccumBuffer, Vector>(
-            output_tensor, args[arg_index++], get_size(vector_param.input()));
       } else {
         output_tensor = dequantize_tensor<Vector>(
             output_tensor, args[arg_index++], vector_param.input());
@@ -313,5 +301,5 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
 void run_gold_model(const codegen::Operator &param,
                     std::vector<std::any> args) {
   run_operation<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                MX_DATATYPE, VECTOR_DATATYPE>(param, args);
+                SCALE_DATATYPE, VECTOR_DATATYPE>(param, args);
 }

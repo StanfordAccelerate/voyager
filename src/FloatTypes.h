@@ -29,7 +29,7 @@ class Float{
     typedef ac_fixed<2*mantissa, mantissa, false> ac_float_to_fixed_rep_out;
 
     // Set Accumulation datatype size for Floats to floating point type
-    typedef Float<mantissa, exp> AccumulationDatatype;
+    typedef Float<mantissa, exp> Decoded;
 
     Float();
     Float(ac_float_rep input_float_rep);
@@ -200,24 +200,24 @@ Float<mantissa, exp>::Float(Float<i_mantissa, i_exp> rhs){
 template<int mantissa, int exp>
 inline Float<mantissa, exp> Float<mantissa, exp>::operator+(
     const Float<mantissa, exp> &rhs) {
-  AccumulationDatatype op1 = *this;
-  AccumulationDatatype op2 = rhs;
+  Decoded op1 = *this;
+  Decoded op2 = rhs;
   return op1.float_val.add(op1.float_val, op2.float_val);
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> Float<mantissa, exp>::operator*(
     const Float<mantissa, exp> &rhs) {
-  AccumulationDatatype op1 = *this;
-  AccumulationDatatype op2 = rhs;
+  Decoded op1 = *this;
+  Decoded op2 = rhs;
   return static_cast<ac_float_rep>(op1.float_val * op2.float_val);
 }
 
 template<int mantissa, int exp>
 inline Float<mantissa, exp> Float<mantissa, exp>::operator/(
     const Float<mantissa, exp> &rhs) {
-  AccumulationDatatype op1 = *this;
-  AccumulationDatatype op2 = rhs;
+  Decoded op1 = *this;
+  Decoded op2 = rhs;
   return op1.float_val / op2.float_val;
 }
 
@@ -255,15 +255,15 @@ inline bool Float<mantissa, exp>::operator<(const Float<mantissa, exp> &rhs) con
 }
 
 template <int mantissa_i, int exp_i, int mantissa_o, int exp_o>
-typename Float<mantissa_o, exp_o>::AccumulationDatatype decomposed_fma(
-    const typename Float<mantissa_i, exp_i>::AccumulationDatatype &a,
-    const typename Float<mantissa_i, exp_i>::AccumulationDatatype &b,
-    const typename Float<mantissa_o, exp_o>::AccumulationDatatype &c) {
+typename Float<mantissa_o, exp_o>::Decoded decomposed_fma(
+    const typename Float<mantissa_i, exp_i>::Decoded &a,
+    const typename Float<mantissa_i, exp_i>::Decoded &b,
+    const typename Float<mantissa_o, exp_o>::Decoded &c) {
 
-  return  static_cast<typename Float<mantissa_o, exp_o>::AccumulationDatatype >(a * b) + c;
+  return  static_cast<typename Float<mantissa_o, exp_o>::Decoded >(a * b) + c;
   // if (c.isZero()) {
-  //   return typename Posit<nbits2, es2>::AccumulationDatatype(product);
+  //   return typename Posit<nbits2, es2>::Decoded(product);
   // } else {
   //   PositFP<8, abits + 1> sum = PositFP<8, fbits2>(product) + c;
-  //   return typename Posit<nbits2, es2>::AccumulationDatatype(sum);
+  //   return typename Posit<nbits2, es2>::Decoded(sum);
 }

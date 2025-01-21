@@ -11,6 +11,22 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define OUTPUT_DATATYPE P8
 #define VECTOR_DATATYPE ACCUM_DATATYPE
 
+#elif defined(NF4)
+
+using F4 = NormalFloat<4, 5>;
+using I32 = Int<32, true>;
+using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+
+#define INPUT_DATATYPE F4
+#define WEIGHT_DATATYPE F4
+#define ACCUM_DATATYPE I32
+#define ACCUM_BUFFER_DATATYPE F16
+#define OUTPUT_DATATYPE F4
+#define VECTOR_DATATYPE F16
+#define SCALE_DATATYPE UFloat<8, 8>
+
+#define SUPPORT_MX true
+
 #elif defined(E4M3)
 
 using F8 = StdFloat<3, 4, false, true, AC_RND_CONV>;
@@ -135,8 +151,7 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #define ACCUM_BUFFER_DATATYPE F16
 #define OUTPUT_DATATYPE I8
 #define VECTOR_DATATYPE F16
-
-#define MX_DATATYPE Scale<8>
+#define SCALE_DATATYPE UFloat<8, 8>
 
 #define SUPPORT_MX true
 
@@ -155,39 +170,36 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 #endif
 
 // default datatype for the accumulation buffer
-#if !defined ACCUM_BUFFER_DATATYPE
+#ifndef ACCUM_BUFFER_DATATYPE
 #define ACCUM_BUFFER_DATATYPE ACCUM_DATATYPE
 #endif
 
-#if !defined MX_DATATYPE
-#define MX_DATATYPE INPUT_DATATYPE
+// default to E8M0 scale
+#ifndef SCALE_DATATYPE
+#define SCALE_DATATYPE UFloat<8, 8>
 #endif
 
-#if !defined SUPPORT_MX
+#ifndef SUPPORT_MX
 #define SUPPORT_MX false
 #endif
 
-#if !defined(IC_DIMENSION)
-
+#ifndef IC_DIMENSION
 #error "No IC dimension specified!"
-
 #endif
 
-#if !defined(OC_DIMENSION)
-
+#ifndef OC_DIMENSION
 #error "No OC dimension specified!"
-
 #endif
 
-#if !defined(INPUT_BUFFER_SIZE)
+#ifndef INPUT_BUFFER_SIZE
 #define INPUT_BUFFER_SIZE 1024
 #endif
 
-#if !defined(WEIGHT_BUFFER_SIZE)
+#ifndef WEIGHT_BUFFER_SIZE
 #define WEIGHT_BUFFER_SIZE 1024
 #endif
 
-#if !defined(ACCUM_BUFFER_SIZE)
+#ifndef ACCUM_BUFFER_SIZE
 #define ACCUM_BUFFER_SIZE 1024
 #endif
 

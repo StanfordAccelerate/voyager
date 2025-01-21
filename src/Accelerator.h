@@ -21,10 +21,9 @@ SC_MODULE(Accelerator) {
       inputDataResponse);
 #if SUPPORT_MX
   Connections::Out<MemoryRequest> CCS_INIT_S1(inputScaleAddressRequest);
-  Connections::In<Pack1D<INPUT_DATATYPE, 1> > CCS_INIT_S1(
-      inputScaleDataResponse);
+  Connections::In<Pack1D<SCALE_DATATYPE, 1> > CCS_INIT_S1(inputScaleDataResponse);
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightScaleAddressRequest);
-  Connections::In<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
+  Connections::In<Pack1D<SCALE_DATATYPE, OC_DIMENSION> > CCS_INIT_S1(
       weightScaleDataResponse);
 #endif
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
@@ -44,7 +43,7 @@ SC_MODULE(Accelerator) {
   // clang-format on
 #else
   VectorUnit<INPUT_DATATYPE, VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE,
-             MX_DATATYPE, OC_DIMENSION>
+             SCALE_DATATYPE, OC_DIMENSION>
       CCS_INIT_S1(vectorUnit);
 #endif
   Connections::In<int> CCS_INIT_S1(serialVectorParamsIn);

@@ -3,17 +3,16 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename VEC_DTYPE, typename IO_DTYPE, typename MX_DTYPE, int WIDTH>
+template <typename VEC_DTYPE, typename IO_DTYPE, typename Scale, int WIDTH>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(tensorIn);
+  Connections::In<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(tensorIn);
   Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
 
-  Connections::In<MX_DTYPE> CCS_INIT_S1(mxScaleIn);
+  Connections::In<Scale> CCS_INIT_S1(mxScaleIn);
 
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
@@ -105,8 +104,8 @@ SC_MODULE(MaxpoolUnit) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
-                        uncastedOutputPixel = tensorIn.Pop();
+                    Pack1D<VEC_DTYPE, WIDTH> uncastedOutputPixel =
+                        tensorIn.Pop();
 
                     constexpr int num_words =
                         VEC_DTYPE::width / IO_DTYPE::width;
@@ -195,52 +194,26 @@ SC_MODULE(MaxpoolUnit) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
-                        uncastedOutputPixel = tensorIn.Pop();
+                    Pack1D<VEC_DTYPE, WIDTH> uncastedOutputPixel =
+                        tensorIn.Pop();
                     Pack1D<IO_DTYPE, WIDTH> outputPixel;
 
-                    if constexpr (VEC_DTYPE::is_floating_point &&
-                                  IO_DTYPE::is_floating_point) {
-                    // static cast to VEC_DTYPE
+                    if (params.OUTPUT_QUANTIZE_MX) {
+                      Scale scale = mxScaleIn.Pop();
+                      // quantize VEC_DTYPE to IO_DTYPE using microscale
+                      vquantize<VEC_DTYPE, IO_DTYPE, Scale, WIDTH>(
+                          uncastedOutputPixel, outputPixel, scale);
+                    } else if (params.OUTPUT_QUANTIZE) {
+                      // quantize VEC_DTYPE to IO_DTYPE
+                      VEC_DTYPE scale;
+                      scale.setbits(params.outputQuantizeScale);
+                      vquantize<VEC_DTYPE, IO_DTYPE, VEC_DTYPE, WIDTH>(
+                          uncastedOutputPixel, outputPixel, scale);
+                    } else {
 #pragma hls_unroll yes
                       for (int i = 0; i < WIDTH; i++) {
-                        outputPixel[i] =
-                            static_cast<IO_DTYPE>(uncastedOutputPixel[i]);
-                      }
-
-                    } else {
-                      if constexpr (!std::is_same<MX_DTYPE, IO_DTYPE>::value) {
-                        // supports microscaling
-                        if (params.OUTPUT_QUANTIZE_MX) {
-                          MX_DTYPE scale = mxScaleIn.Pop();
-                          // quantize VEC_DTYPE to IO_DTYPE using microscale
-                          vmxquantize<VEC_DTYPE, IO_DTYPE, MX_DTYPE, WIDTH>(
-                              uncastedOutputPixel, outputPixel, scale);
-                        } else if (params.OUTPUT_QUANTIZE) {
-                          // quantize VEC_DTYPE to IO_DTYPE
-                          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                              uncastedOutputPixel, outputPixel,
-                              params.outputQuantizeScale);
-                        } else {
-#pragma hls_unroll yes
-                          for (int i = 0; i < WIDTH; i++) {
-                            outputPixel[i].setbits(
-                                uncastedOutputPixel[i].bits_rep());
-                          }
-                        }
-                      } else {
-                        if (params.OUTPUT_QUANTIZE) {
-                          // quantize VEC_DTYPE to IO_DTYPE
-                          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                              uncastedOutputPixel, outputPixel,
-                              params.outputQuantizeScale);
-                        } else {
-#pragma hls_unroll yes
-                          for (int i = 0; i < WIDTH; i++) {
-                            outputPixel[i].setbits(
-                                uncastedOutputPixel[i].bits_rep());
-                          }
-                        }
+                        outputPixel[i].setbits(
+                            uncastedOutputPixel[i].bits_rep());
                       }
                     }
 

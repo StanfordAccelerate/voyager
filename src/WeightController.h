@@ -7,7 +7,7 @@
 #include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
 
-template <typename DTYPE, typename ACC_DTYPE, int NROWS, int NCOLS>
+template <typename Weight, typename Bias, int NRows, int NCols>
 SC_MODULE(WeightController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -15,15 +15,15 @@ SC_MODULE(WeightController) {
   Connections::In<int> serialParamsIn;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(dataResponse);
+  Connections::In<Pack1D<Weight, NCols> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<DTYPE, NCOLS> > writeRequest[2];
+  Connections::Out<BufferWriteRequest<Weight, NCols> > writeRequest[2];
   Connections::Out<ac_int<32, false> > writeControl[2];
   Connections::Out<ac_int<16, false> > readAddress[2];
   Connections::Out<ac_int<32, false> > readControl[2];
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
-  Connections::In<Pack1D<DTYPE, NCOLS> > CCS_INIT_S1(biasDataResponse);
+  Connections::In<Pack1D<Weight, NCols> > CCS_INIT_S1(biasDataResponse);
 
   static constexpr int int_log2(unsigned int n) {
     return (n <= 1) ? 0 : 1 + int_log2(n / 2);
@@ -31,17 +31,17 @@ SC_MODULE(WeightController) {
 
   static constexpr int LOOP_WIDTH =
       (10 + int_log2(16 / (IC_DIMENSION < OC_DIMENSION ? IC_DIMENSION
-                                                      : OC_DIMENSION)));
+                                                       : OC_DIMENSION)));
 
 #ifdef HYBRID_FP8
-  Connections::Out<Pack1D<HYBRID_TYPE, NCOLS> > CCS_INIT_S1(
+  Connections::Out<Pack1D<HYBRID_TYPE, NCols> > CCS_INIT_S1(
       weightsToSystolicArray);
 #else
-  Connections::Out<Pack1D<typename DTYPE::AccumulationDatatype, NCOLS> >
-      CCS_INIT_S1(weightsToSystolicArray);
+  Connections::Out<Pack1D<typename Weight::Decoded, NCols> > CCS_INIT_S1(
+      weightsToSystolicArray);
 #endif
 
-  Connections::Out<Pack1D<ACC_DTYPE, NCOLS> > CCS_INIT_S1(biasToSystolicArray);
+  Connections::Out<Pack1D<Bias, NCols> > CCS_INIT_S1(biasToSystolicArray);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
@@ -51,8 +51,8 @@ SC_MODULE(WeightController) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(biasFetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(biasCombinerParams);
 
-  Connections::Combinational<Pack1D<DTYPE, NCOLS> > transposeOut;
-  Connections::Combinational<Pack1D<DTYPE, NCOLS> > gradTransposeOut;
+  Connections::Combinational<Pack1D<Weight, NCols> > transposeOut;
+  Connections::Combinational<Pack1D<Weight, NCols> > gradTransposeOut;
 
   MatrixParamsDeserializer<2> CCS_INIT_S1(paramsDeserializer);
 
@@ -110,7 +110,7 @@ SC_MODULE(WeightController) {
         }
       }
 
-      // int c0_bound = NROWS;
+      // int c0_bound = NRows;
       // if (params.REPLICATION) {
       //   c0_bound = 3;
       //   loop_bounds[1][params.fxIndex] = 7;
@@ -174,17 +174,17 @@ SC_MODULE(WeightController) {
                       ac_int<32, false> baseAddress =
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
                       if (params.WEIGHT_TRANSPOSE) {
-                        C = C1 * NCOLS;
+                        C = C1 * NCols;
                         baseAddress = (k + c0) * C + c1 * OC_DIMENSION;
                       } else if (params.CONCAT_HEAD_WEIGHTS) {
                         baseAddress = ((k / 32) * C * 32) + (c * 32) + (k % 32);
                       }
-                      int burstSize = NCOLS;
+                      int burstSize = NCols;
 
                       MemoryRequest memRequest = {
                           params.WEIGHT_OFFSET +
-                              baseAddress * (DTYPE::width / 8),
-                          burstSize * (DTYPE::width / 8)};
+                              baseAddress * (Weight::width / 8),
+                          burstSize * (Weight::width / 8)};
                       addressRequest.Push(memRequest);
 
                       if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
@@ -248,7 +248,7 @@ SC_MODULE(WeightController) {
         }
       }
 
-      // int c0_bound = NROWS;
+      // int c0_bound = NRows;
       // if (params.REPLICATION) {
       //   c0_bound = 3;
       //   loop_bounds[1][params.fxIndex] = 7;
@@ -310,7 +310,7 @@ SC_MODULE(WeightController) {
                           k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                       ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
 
-                      Pack1D<DTYPE, NCOLS> data = transposeOut.Pop();
+                      Pack1D<Weight, NCols> data = transposeOut.Pop();
 
                       int address =
                           (fy * FX * C * K1) + (fx * C * K1) + (c0 * K1) + k1;
@@ -324,7 +324,7 @@ SC_MODULE(WeightController) {
                       //     == loop_bounds[1][5] - 1);
 
                       // writeControl[bankSel].Push(!swapBank);
-                      BufferWriteRequest<DTYPE, NCOLS> req;
+                      BufferWriteRequest<Weight, NCols> req;
                       req.address = address;
                       req.data = data;
                       writeRequest[bankSel].Push(req);
@@ -421,7 +421,7 @@ SC_MODULE(WeightController) {
               readControl[bankSel].Push(
                   (loop_bounds[1][1] * loop_bounds[1][2]) *
                   (loop_bounds[1][3] * loop_bounds[1][4]) *
-                  (loop_bounds[1][5] * NROWS * rep_bound));
+                  (loop_bounds[1][5] * NRows * rep_bound));
               for (int rep = 0; rep < rep_bound; rep++) {
                 for (loop_counters[1][1] = 0;
                      loop_counters[1][1] < loop_bounds[1][1];
@@ -445,40 +445,40 @@ SC_MODULE(WeightController) {
                            */
                           ac_int<8, false> numPadding = 0;
                           ac_int<4, false> replicationBound = 1;
-                          ac_int<8, false> startingC = NROWS - 1;
-                          ac_int<8, false> endingC = NROWS;
+                          ac_int<8, false> startingC = NRows - 1;
+                          ac_int<8, false> endingC = NRows;
                           if (params.REPLICATION) {
                             startingC = 3 - 1;
                             endingC = 3;
                             if (IC_DIMENSION == 4) {
-                              numPadding = NROWS - 3;
+                              numPadding = NRows - 3;
                               replicationBound = 1;
                             } else if (IC_DIMENSION == 8) {
                               if (loop_counters[1][params.fxIndex] ==
                                   3) {  // last iteration only unrolls 1 fx
-                                numPadding = NROWS - 3;
+                                numPadding = NRows - 3;
                                 replicationBound = 1;
                               } else {
-                                numPadding = NROWS - 6;
+                                numPadding = NRows - 6;
                                 replicationBound = 2;
                               }
                             } else if (IC_DIMENSION == 16) {
                               if (loop_counters[1][params.fxIndex] == 0) {
-                                numPadding = NROWS - 12;
+                                numPadding = NRows - 12;
                                 replicationBound = 4;
                               } else {
-                                numPadding = NROWS - 9;
+                                numPadding = NRows - 9;
                                 replicationBound = 3;
                               }
                             } else if (IC_DIMENSION == 32) {
                               replicationBound = 7;
-                              numPadding = NROWS - replicationBound * 3;
+                              numPadding = NRows - replicationBound * 3;
                             }
                           }
 
                           ac_int<LOOP_WIDTH, false> fx_repl = 0;
                           ac_int<LOOP_WIDTH, false> c = 0;
-                          for (int row = 0; row < NROWS; row++) {
+                          for (int row = 0; row < NRows; row++) {
                             ac_int<LOOP_WIDTH, false> k2 =
                                 loop_counters[0][params.weightLoopIndex[0]];
                             ac_int<LOOP_WIDTH, false> K2 =
@@ -547,7 +547,7 @@ SC_MODULE(WeightController) {
                                   OC_DIMENSION > IC_DIMENSION) {
                                 address = (fy * FX * C * 2 * K1) +
                                           (fx * C * 2 * K1) +
-                                          (c + rep * NROWS) * K1 + k1;
+                                          (c + rep * NRows) * K1 + k1;
                               }
                               readAddress[bankSel].Push(address);
                             }
@@ -615,19 +615,19 @@ SC_MODULE(WeightController) {
         }
       }
 
-      // int c0_bound = NROWS;
+      // int c0_bound = NRows;
       // if (params.REPLICATION) {
       //   c0_bound = 3;
       //   loop_bounds[1][params.fxIndex] = 7;
       // }
 
-      if (params.WEIGHT_TRANSPOSE && NROWS < 64 &&
-          NCOLS <
+      if (params.WEIGHT_TRANSPOSE && NRows < 64 &&
+          NCols <
               64) {  // don't support transpose when systolic array is larger
                      // than 32x32, as it will require a very large buffer
         // we need a square buffer to store the transpose
-        INPUT_DATATYPE transposeBuffer[NROWS > NCOLS ? NROWS : NCOLS]
-                                      [NROWS > NCOLS ? NROWS : NCOLS];
+        Weight transposeBuffer[NRows > NCols ? NRows : NCols]
+                              [NRows > NCols ? NRows : NCols];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -655,20 +655,21 @@ SC_MODULE(WeightController) {
                       // Must be true for the transpose case
 
                       // Fill up transposeBuffer
-                      for (int c0 = 0; c0 < NCOLS; c0++) {
-                        Pack1D<DTYPE, NCOLS> originalValue = dataResponse.Pop();
+                      for (int c0 = 0; c0 < NCols; c0++) {
+                        Pack1D<Weight, NCols> originalValue =
+                            dataResponse.Pop();
 #pragma hls_unroll yes
-                        for (int dim = 0; dim < NCOLS; dim++) {
+                        for (int dim = 0; dim < NCols; dim++) {
                           transposeBuffer[dim][c0] = originalValue[dim];
                         }
                       }
 
                       // Write out from tranposeBuffer
-                      for (int c0 = 0; c0 < NCOLS; c0++) {
-                        Pack1D<DTYPE, NCOLS> transposedValue;
+                      for (int c0 = 0; c0 < NCols; c0++) {
+                        Pack1D<Weight, NCols> transposedValue;
 
 #pragma hls_unroll yes
-                        for (int dim = 0; dim < NCOLS; dim++) {
+                        for (int dim = 0; dim < NCols; dim++) {
                           transposedValue[dim] = transposeBuffer[c0][dim];
                         }
                         transposeOut.Push(transposedValue);
@@ -782,8 +783,7 @@ SC_MODULE(WeightController) {
                             k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
                         ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
 
-                        constexpr int num_words =
-                            ACC_DTYPE::width / DTYPE::width;
+                        constexpr int num_words = Bias::width / Weight::width;
 
                         unsigned long long baseAddress = params.BIAS_OFFSET;
                         MemoryRequest memRequest = {baseAddress + k * num_words,
@@ -883,15 +883,14 @@ SC_MODULE(WeightController) {
                       for (loop_counters[1][5] = 0;
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
-                        constexpr int num_words =
-                            ACC_DTYPE::width / DTYPE::width;
-                        Pack1D<DTYPE, NCOLS> response[num_words];
+                        constexpr int num_words = Bias::width / Weight::width;
+                        Pack1D<Weight, NCols> response[num_words];
                         for (int word = 0; word < num_words; word++) {
                           response[word] = biasDataResponse.Pop();
                         }
 
-                        Pack1D<ACC_DTYPE, NCOLS> fullPrecisionDataResponse;
-                        convertPack1D<DTYPE, ACC_DTYPE, NCOLS>(
+                        Pack1D<Bias, NCols> fullPrecisionDataResponse;
+                        convertPack1D<Weight, Bias, NCols>(
                             response, fullPrecisionDataResponse);
 
                         biasToSystolicArray.Push(fullPrecisionDataResponse);

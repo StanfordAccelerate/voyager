@@ -33,49 +33,36 @@ SC_MODULE(VectorOpUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
   Connections::In<IO_DTYPE> CCS_INIT_S1(vectorFetch3DataResponse);
 
-  Connections::Out<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(vectorOpUnitOutput);
+  Connections::Out<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(vectorOpUnitOutput);
 
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(accumulationOpInput);
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(accumulationOpOutput);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      accumulationOpInput);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      accumulationOpOutput);
 
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(reductionOpInput);
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(reductionOpOutputOp0Src0);
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(reductionOpOutputOp0Src1);
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(reductionOpOutputOp3Src1);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      reductionOpInput);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      reductionOpOutputOp0Src0);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      reductionOpOutputOp0Src1);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      reductionOpOutputOp3Src1);
 
-  Broadcaster<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(broadcastReduction0);
+  Broadcaster<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(broadcastReduction0);
   Connections::Combinational<ac_int<16, false> > broadcastReduction0Count;
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(broadcastReductionOpOutputOp0Src0);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      broadcastReductionOpOutputOp0Src0);
 
-  Broadcaster<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(broadcastReduction1);
+  Broadcaster<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(broadcastReduction1);
   Connections::Combinational<ac_int<16, false> > broadcastReduction1Count;
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(broadcastReductionOpOutputOp0Src1);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      broadcastReductionOpOutputOp0Src1);
 
-  Broadcaster<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(broadcastReduction2);
+  Broadcaster<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(broadcastReduction2);
   Connections::Combinational<ac_int<16, false> > broadcastReduction2Count;
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(broadcastReductionOpOutputOp3Src1);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      broadcastReductionOpOutputOp3Src1);
 
   SC_CTOR(VectorOpUnit) {
     // systolicArrayOutput.enable_local_rand_stall();
@@ -134,40 +121,27 @@ SC_MODULE(VectorOpUnit) {
     while (true) {
       VectorInstructions inst = vectorOpUnitInstructions.Pop();
 
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op0;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op1;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op2;
+      Pack1D<VEC_DTYPE, WIDTH> op0;
+      Pack1D<VEC_DTYPE, WIDTH> op1;
+      Pack1D<VEC_DTYPE, WIDTH> op2;
 
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res0;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res1;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res2;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res3;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res4;
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res5;
+      Pack1D<VEC_DTYPE, WIDTH> res0;
+      Pack1D<VEC_DTYPE, WIDTH> res1;
+      Pack1D<VEC_DTYPE, WIDTH> res2;
+      Pack1D<VEC_DTYPE, WIDTH> res3;
+      Pack1D<VEC_DTYPE, WIDTH> res4;
+      Pack1D<VEC_DTYPE, WIDTH> res5;
 
       /*
        * Stage 0: add, sub, mult
        */
       // Read from interfaces
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op0Src0;
+      Pack1D<VEC_DTYPE, WIDTH> op0Src0;
       if (inst.vInput == VectorInstructions::readFromSystolicArray) {
         Pack1D<MU_OUTPUT_DTYPE, WIDTH> tmp = systolicArrayOutput.Pop();
-
-        if constexpr (!MU_OUTPUT_DTYPE::is_floating_point &&
-                      VEC_DTYPE::is_floating_point) {
-          vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(tmp, op0Src0,
+        if (inst.vDequantize) {
+          vdequantize<MU_OUTPUT_DTYPE, VEC_DTYPE, WIDTH>(tmp, op0Src0,
                                                          inst.vDequantizeScale);
-        } else if constexpr (std::is_same_v<MU_OUTPUT_DTYPE, VEC_DTYPE>) {
-          // with MX types, we might need to perform a dequantize operation
-          if (inst.vDequantize) {
-            vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(
-                tmp, op0Src0, inst.vDequantizeScale);
-          } else {
-#pragma hls_unroll yes
-            for (int i = 0; i < WIDTH; i++) {
-              op0Src0[i] = tmp[i];
-            }
-          }
         } else {
 #pragma hls_unroll yes
           for (int i = 0; i < WIDTH; i++) {
@@ -187,7 +161,7 @@ SC_MODULE(VectorOpUnit) {
         op0Src0 = broadcastReductionOpOutputOp0Src0.Pop();
       }
 
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op0Src1;
+      Pack1D<VEC_DTYPE, WIDTH> op0Src1;
       if (inst.vOp0Src1 == VectorInstructions::readInterface) {
         Pack1D<VEC_DTYPE, WIDTH> tmp = vectorFetch1Output.Pop();
 #pragma hls_unroll yes
@@ -195,7 +169,7 @@ SC_MODULE(VectorOpUnit) {
           op0Src1[i] = tmp[i];
         }
       } else if (inst.vOp0Src1 == VectorInstructions::op0immediate) {
-        typename VEC_DTYPE::AccumulationDatatype immediate;
+        VEC_DTYPE immediate;
         immediate.setbits(inst.immediate0);
 
 #pragma hls_unroll yes
@@ -216,16 +190,14 @@ SC_MODULE(VectorOpUnit) {
             op0Src1[i].negate();
           }
         }
-        vadd<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(op0Src0, op0Src1,
-                                                              res0);
+        vadd<VEC_DTYPE, WIDTH>(op0Src0, op0Src1, res0);
         DLOG(op0Src0 << std::endl
                      << " + " << std::endl
                      << op0Src1 << std::endl
                      << " = " << std::endl
                      << res0);
       } else if (inst.vOp0 == VectorInstructions::vmult) {
-        vmult<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(op0Src0, op0Src1,
-                                                               res0);
+        vmult<VEC_DTYPE, WIDTH>(op0Src0, op0Src1, res0);
         DLOG(op0Src0 << std::endl
                      << " * " << std::endl
                      << op0Src1 << std::endl
@@ -240,14 +212,13 @@ SC_MODULE(VectorOpUnit) {
        * Stage 1: exp
        */
       if (inst.vOp1 == VectorInstructions::vexp) {
-        vexp<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res0, res1);
+        vexp<VEC_DTYPE, WIDTH>(res0, res1);
       } else if (inst.vOp1 == VectorInstructions::vscaleexp) {
         ac_int<8, true> scaleVal;
         if (inst.vOp1Src1 == VectorInstructions::op1immediate) {
           scaleVal = inst.immediate0;
         }
-        vscaleexp<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(
-            res0, scaleVal, res1);
+        vscaleexp<VEC_DTYPE, WIDTH>(res0, scaleVal, res1);
       } else {
         res1 = res0;
       }
@@ -265,10 +236,10 @@ SC_MODULE(VectorOpUnit) {
       /*
        * Stage 3: add, div
        */
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op3Src0;
+      Pack1D<VEC_DTYPE, WIDTH> op3Src0;
       op3Src0 = res2;
 
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op3Src1;
+      Pack1D<VEC_DTYPE, WIDTH> op3Src1;
       if (inst.vOp3Src1 == VectorInstructions::readReduceInterface) {
         op3Src1 = broadcastReductionOpOutputOp3Src1.Pop();
       } else if (inst.vOp3Src1 == VectorInstructions::readNormalInterface) {
@@ -279,7 +250,7 @@ SC_MODULE(VectorOpUnit) {
           op3Src1[i] = tmp[i];
         }
       } else if (inst.vOp3Src1 == VectorInstructions::op3immediate) {
-        typename VEC_DTYPE::AccumulationDatatype immediate;
+        VEC_DTYPE immediate;
         immediate.setbits(inst.immediate1);
 
 #pragma hls_unroll yes
@@ -289,8 +260,7 @@ SC_MODULE(VectorOpUnit) {
       }
 
       if (inst.vOp3 == VectorInstructions::vadd) {
-        vadd<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(op3Src0, op3Src1,
-                                                              res3);
+        vadd<VEC_DTYPE, WIDTH>(op3Src0, op3Src1, res3);
         DLOG(op3Src0 << std::endl
                      << " + " << std::endl
                      << op3Src1 << std::endl
@@ -301,8 +271,7 @@ SC_MODULE(VectorOpUnit) {
         if (inst.vOp3 == VectorInstructions::vsquare) {
           op3Src1 = op3Src0;
         }
-        vmult<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(op3Src0, op3Src1,
-                                                               res3);
+        vmult<VEC_DTYPE, WIDTH>(op3Src0, op3Src1, res3);
         DLOG(op3Src0 << std::endl
                      << " * " << std::endl
                      << op3Src1 << std::endl
@@ -311,8 +280,7 @@ SC_MODULE(VectorOpUnit) {
       } else if (inst.vOp3 == VectorInstructions::vscaleexp) {
         ac_int<8, true> scaleVal;
         scaleVal = inst.immediate1;
-        vscaleexp<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(
-            op3Src0, scaleVal, res3);
+        vscaleexp<VEC_DTYPE, WIDTH>(op3Src0, scaleVal, res3);
       } else {
         res3 = op3Src0;
       }
@@ -325,12 +293,11 @@ SC_MODULE(VectorOpUnit) {
       if (inst.vOp4 == VectorInstructions::vrelu ||
           inst.vOp4 == VectorInstructions::vrelumask) {
         bool useMask = inst.vOp4 == VectorInstructions::vrelumask;
-        vrelu<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res3, op0Src1,
-                                                               useMask, res4);
+        vrelu<VEC_DTYPE, WIDTH>(res3, op0Src1, useMask, res4);
       } else if (inst.vOp4 == VectorInstructions::vgelu) {
-        vgelu<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res3, res4);
+        vgelu<VEC_DTYPE, WIDTH>(res3, res4);
       } else if (inst.vOp4 == VectorInstructions::vsilu) {
-        vsilu<typename VEC_DTYPE::AccumulationDatatype, WIDTH>(res3, res4);
+        vsilu<VEC_DTYPE, WIDTH>(res3, res4);
       } else if (inst.vOp4 == VectorInstructions::vmap) {
         for (int i = 0; i < WIDTH; i++) {
           DataTypes::bfloat16 value = res3[i];
@@ -380,7 +347,7 @@ SC_MODULE(VectorOpUnit) {
     while (true) {
       VectorInstructions inst = accumulationOpUnitInstructions.Pop();
 
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> accum;
+      Pack1D<VEC_DTYPE, WIDTH> accum;
 
 #pragma hls_unroll yes
       for (int i = 0; i < WIDTH; i++) {
@@ -391,8 +358,7 @@ SC_MODULE(VectorOpUnit) {
 #pragma hls_pipeline_stall_mode flush
       for (int count = 0; count < inst.rCount; count++) {
         DLOG("accumulation " << count << " / " << inst.rCount);
-        Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op =
-            accumulationOpInput.Pop();
+        Pack1D<VEC_DTYPE, WIDTH> op = accumulationOpInput.Pop();
 
         if (inst.rOp == VectorInstructions::radd) {
 #pragma hls_unroll yes
@@ -428,29 +394,23 @@ SC_MODULE(VectorOpUnit) {
     while (true) {
       VectorInstructions inst = reductionOpUnitInstructions.Pop();
 
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> res;
+      Pack1D<VEC_DTYPE, WIDTH> res;
 
       int iterationCount = inst.rDuplicate ? 1 : WIDTH;
 
-      typename VEC_DTYPE::AccumulationDatatype scalarResult;
+      VEC_DTYPE scalarResult;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (int index = 0; index < iterationCount; index++) {
-        typename VEC_DTYPE::AccumulationDatatype prevResult;
+        VEC_DTYPE prevResult;
 
         if (inst.rOp == VectorInstructions::radd) {
           for (int i = 0; i < inst.rCount; i++) {
-            Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op =
-                reductionOpInput.Pop();
-            typename VEC_DTYPE::AccumulationDatatype result = treeadd(op);
-            // TreeOps<typename VEC_DTYPE::AccumulationDatatype,
-            // WIDTH>().treeadd(
-            //     op);
+            Pack1D<VEC_DTYPE, WIDTH> op = reductionOpInput.Pop();
+            VEC_DTYPE result = treeadd(op);
             DLOG("reduction: " << op << " = " << result);
             if (i != 0) {
-              // result = (typename VEC_DTYPE::AccumulationDatatype)(result +
-              // prevResult);
               result += prevResult;
             }
 
@@ -458,12 +418,8 @@ SC_MODULE(VectorOpUnit) {
           }
         } else if (inst.rOp == VectorInstructions::rmax) {
           for (int i = 0; i < inst.rCount; i++) {
-            Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op =
-                reductionOpInput.Pop();
-            typename VEC_DTYPE::AccumulationDatatype result = treemax(op);
-            // TreeOps<typename VEC_DTYPE::AccumulationDatatype,
-            // WIDTH>().treemax(
-            //     op);
+            Pack1D<VEC_DTYPE, WIDTH> op = reductionOpInput.Pop();
+            VEC_DTYPE result = treemax(op);
             if (i != 0) {
               result = result < prevResult ? prevResult : result;
             }
@@ -471,13 +427,11 @@ SC_MODULE(VectorOpUnit) {
             prevResult = result;
           }
         } else if (inst.rOp == VectorInstructions::rmxscale) {
-          typedef ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, false>
-              exp_type_t;
+          typedef ac_int<VEC_DTYPE::exponent_width, false> exp_type_t;
 
           exp_type_t prevExpResult;
           for (int i = 0; i < inst.rCount; i++) {
-            Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> op =
-                reductionOpInput.Pop();
+            Pack1D<VEC_DTYPE, WIDTH> op = reductionOpInput.Pop();
 
             Pack1D<exp_type_t, WIDTH> exponents;
 
@@ -495,11 +449,8 @@ SC_MODULE(VectorOpUnit) {
             prevExpResult = result;
           }
 
-          ac_int<VEC_DTYPE::AccumulationDatatype::exponent_width, true>
-              scaledExp =
-                  prevExpResult -
-                  VEC_DTYPE::AccumulationDatatype::ac_float_rep::exp_bias -
-                  (IO_DTYPE::width - 2);
+          // FIXME: 6 is hardcoded for INT8
+          ac_int<VEC_DTYPE::exponent_width, true> scaledExp = prevExpResult - 6;
 
           prevResult.setbits(scaledExp);
         }
@@ -598,9 +549,8 @@ SC_MODULE(VectorUnit) {
 
   Connections::Out<ac_int<64, false> > CCS_INIT_S1(vectorOutputAddress);
   Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(finalVectorOutput);
-  Connections::Combinational<
-      Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(vectorOpUnitOutput);
+  Connections::Combinational<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
+      vectorOpUnitOutput);
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);

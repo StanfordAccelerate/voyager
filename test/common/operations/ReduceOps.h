@@ -6,8 +6,8 @@
 
 template <typename T>
 inline T exponent(const T &x) {
-  typename T::AccumulationDatatype tmp =
-      static_cast<typename T::AccumulationDatatype>(x);
+  typename T::Decoded tmp =
+      static_cast<typename T::Decoded>(x);
   tmp.exponential();
   return static_cast<T>(tmp);
 }
