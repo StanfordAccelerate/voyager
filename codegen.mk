@@ -30,6 +30,10 @@ test/compiler/networks/resnet18/CFLOAT/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py resnet18 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
+test/compiler/networks/resnet18/FP32/model.txt: test/compiler/run_compiler.py
+	mkdir -p $(dir $@)
+	python test/compiler/run_compiler.py resnet18 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+
 test/compiler/networks/resnet18/BF16/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py resnet18 --bf16 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
@@ -58,6 +62,10 @@ $(CODEGEN_DIR)/networks/resnet50/P8_1/model.txt: test/compiler/run_compiler.py
 	python test/compiler/run_compiler.py resnet50 $(P8_1_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 test/compiler/networks/resnet50/CFLOAT/model.txt: test/compiler/run_compiler.py
+	mkdir -p $(dir $@)
+	python test/compiler/run_compiler.py resnet50 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+
+test/compiler/networks/resnet50/FP32/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py resnet50 --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
@@ -124,6 +132,10 @@ $(CODEGEN_DIR)/networks/mobilebert_encoder/P8_1/model.txt: test/compiler/run_com
 	python test/compiler/run_compiler.py mobilebert_encoder $(P8_1_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 test/compiler/networks/mobilebert_encoder/CFLOAT/model.txt: test/compiler/run_compiler.py
+	mkdir -p $(dir $@)
+	python test/compiler/run_compiler.py mobilebert_encoder --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+
+test/compiler/networks/mobilebert_encoder/FP32/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py mobilebert_encoder --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 

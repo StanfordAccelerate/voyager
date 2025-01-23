@@ -233,7 +233,7 @@ template <int mantissa2, int exp2, bool useDWImpl2, bool ieee_compliance2,
           ac_q_mode Q2>
 StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>::StdFloat(
     const StdFloat<mantissa2, exp2, useDWImpl2, ieee_compliance2, Q2> &input) {
-  float_val = static_cast<ac_float_rep>(input);
+  float_val = static_cast<ac_float_rep>(input.float_val);
 }
 
 template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,

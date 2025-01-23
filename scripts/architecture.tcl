@@ -95,17 +95,17 @@ if { $DATATYPE == "P8_1" } {
   set ACCUM_DATATYPE_WIDTH 16
 } elseif { $DATATYPE == "BF16" } {
   set IO_DATATYPE "F16"
-  set ACCUM_DATATYPE "F32"
-  set INTERMEDIATE_DATATYPE "F32"
-  set VECTOR_DATATYPE "F32"
+  set ACCUM_DATATYPE "F16"
+  set INTERMEDIATE_DATATYPE "F16"
+  set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
-  set PE_PSUM_DATATYPE "StdFloat<23, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
+  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::AccumulationDatatype"
   set C_DATA_REP_NAME "float_val.d"
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
-  set ACCUM_DATATYPE_WIDTH 32
+  set ACCUM_DATATYPE_WIDTH 16
 } elseif { $DATATYPE == "BF16_NS" } {
   set IO_DATATYPE "F16"
   set ACCUM_DATATYPE "F32"

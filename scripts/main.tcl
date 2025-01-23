@@ -3,6 +3,7 @@ source scripts/utils/read_env_vars.tcl
 source scripts/architecture.tcl
 
 # Dummy procedures that can be overriden by block-specific scripts
+proc pre_analyze {} {}
 proc pre_compile {} {}
 proc pre_libraries {} {}
 proc pre_assembly {} {}
@@ -15,6 +16,7 @@ source scripts/blocks/$BLOCK.tcl
 # Setup project setting and folder
 source scripts/utils/setup_project.tcl
 
+pre_analyze
 go analyze
 
 solution design set $full_block_name -top

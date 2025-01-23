@@ -2,6 +2,28 @@ set block "MatrixProcessor"
 set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SUPPORT_MX, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
 set full_block_name_stripped [string map {" " ""} $full_block_name]
 
+
+proc pre_analyze {} {
+  global CATAPULT_BUILD_DIR ROOT 
+
+  set path $ROOT/$CATAPULT_BUILD_DIR/ProcessingElement.log
+  puts $path
+  if [file exist $path] {
+        if {[catch {exec grep -P "Info:.+Final schedule of SEQUENTIAL '/ProcessingElement.+:run/run" $path} res] == 0} {
+            puts "$res"
+            regexp {Latency = (\d+),} $res temp pe_latency
+            puts "PE Latency: $pe_latency"
+            
+            solution options set Input/CompilerFlags  "[solution options get Input/CompilerFlags] -DPE_LATENCY=$pe_latency"
+        } else {
+            puts "\033\[31mERROR: PE latency not found\033\[0m"
+        }
+  } else {
+    puts "\033\[31mERROR: $path not found\033\[0m"
+  }
+ 
+}
+
 proc pre_compile {} {
   global PE_INPUT_DATATYPE PE_WEIGHT_DATATYPE PE_PSUM_DATATYPE IC_DIMENSION OC_DIMENSION
   solution design set "SystolicArray<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $PE_PSUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>" -mapped
@@ -33,13 +55,6 @@ proc pre_architect {} {
   if {$TECHNOLOGY != "generic"} {
     set memory_width [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
     directive set $accumulation_buffer_path:rsc -MAP_TO_MODULE $memories(1r1w)
-  }
-
-  # Unroll loops that were not unrolled
-  if {$SUPPORT_MX == true} {
-    for {set index 0} { $index < 6 } { incr index } {
-      directive set /$full_block_name_stripped/process_accumulation/UNROLL_$index -UNROLL yes
-    }
   }
 }
 

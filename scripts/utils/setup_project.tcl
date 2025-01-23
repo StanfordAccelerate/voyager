@@ -7,9 +7,6 @@ if { [file exists $project_folder] } {
 project new -dir $project_folder
 project save
 
-# Set log file
-logfile move "$ROOT/$CATAPULT_BUILD_DIR/$BLOCK.log"
-
 # Configure options
 solution options set Project/SolutionName $BLOCK
 solution options set Message/ErrorOverride ASSERT-1 -remove
@@ -18,7 +15,7 @@ solution options set Input/CppStandard c++17
 solution options set Input/CompilerFlags "-D$DATATYPE -DIC_DIMENSION=$IC_DIMENSION -DOC_DIMENSION=$OC_DIMENSION -DINPUT_BUFFER_SIZE=$INPUT_BUFFER_SIZE -DWEIGHT_BUFFER_SIZE=$WEIGHT_BUFFER_SIZE -DACCUM_BUFFER_SIZE=$ACCUM_BUFFER_SIZE"
 solution options set Input/SearchPath "$ROOT/lib"
 solution options set Output/OutputVHDL false
-solution options set Architectural/DefaultMemMapThreshold 256
+solution options set Architectural/DefaultMemMapThreshold 1024
 solution options set Architectural/DefaultRegisterThreshold 4096
 solution options set Flows/Enable-SCVerify yes
 solution options set Flows/VCS/SYSC_VERSION 2.3.3

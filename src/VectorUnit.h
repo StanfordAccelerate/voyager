@@ -163,13 +163,13 @@ SC_MODULE(VectorOpUnit) {
             vdequantize<VEC_DTYPE, MU_OUTPUT_DTYPE, WIDTH>(
                 tmp, op0Src0, inst.vDequantizeScale);
           } else {
-          UNROLL_0:
+#pragma hls_unroll yes
             for (int i = 0; i < WIDTH; i++) {
               op0Src0[i] = tmp[i];
             }
           }
         } else {
-        UNROLL_1:
+#pragma hls_unroll yes
           for (int i = 0; i < WIDTH; i++) {
             op0Src0[i] = tmp[i];
           }
