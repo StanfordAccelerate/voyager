@@ -211,6 +211,7 @@ SC_MODULE(VectorFetchUnit) {
                                                       loop_3, loop_4, loop_5};
                       ac_int<11, false> orig_indices[6];
 
+#pragma hls_unroll yes
                       for (int i = 0; i < 6; i++) {
                         orig_indices[params.addressGen0AxisOrder[i]] =
                             indices[i];
@@ -248,29 +249,28 @@ SC_MODULE(VectorFetchUnit) {
                   }
 
                   if (loop_counters[1][2] >=
-                      loop_bounds[1][2] - loop_strides[1][2]) {
+                      loop_ends[1][2] - loop_strides[1][2]) {
                     break;
                   }
                 }
                 if (loop_counters[1][1] >=
-                    loop_bounds[1][1] - loop_strides[1][1]) {
+                    loop_ends[1][1] - loop_strides[1][1]) {
                   break;
                 }
               }
-              if (loop_counters[1][0] >=
-                  loop_bounds[1][0] - loop_strides[1][0]) {
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
                 break;
               }
             }
-            if (loop_counters[0][2] >= loop_bounds[0][2] - loop_strides[0][2]) {
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
               break;
             }
           }
-          if (loop_counters[0][1] >= loop_bounds[0][1] - loop_strides[0][1]) {
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
             break;
           }
         }
-        if (loop_counters[0][0] >= loop_bounds[0][0] - loop_strides[0][0]) {
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
           break;
         }
       }
@@ -303,8 +303,9 @@ SC_MODULE(VectorFetchUnit) {
       }
 
       if (params.VECTOR_INPUT0_SLICING) {
-        int i = params.addressGen0Dim / 3;
-        int j = params.addressGen0Dim % 3;
+        int slice_dim = params.addressGen0Dim;
+        int i = slice_dim >= 3 ? 1 : 0;
+        int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addressGen0Start;
         loop_ends[i][j] = params.addressGen0End;
         loop_strides[i][j] = params.addressGen0Stride;
@@ -349,6 +350,7 @@ SC_MODULE(VectorFetchUnit) {
                         response, fullPrecisionDataResponse,
                         params.vec0DequantizeScale);
                   }
+
                   vectorFetch0DataResponseBroadcasted.Push(
                       fullPrecisionDataResponse);
 
