@@ -48,12 +48,14 @@ proc pre_architect {} {
   set double_buffer "DoubleBuffer<$IO_DATATYPE,$IC_DIMENSION,$INPUT_BUFFER_SIZE>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$IC_DIMENSION]
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$IC_DIMENSION]
+  set memory_width [expr $IO_DATATYPE_WIDTH*$IC_DIMENSION]
+
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH $memory_width
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH $memory_width
 
   if {$TECHNOLOGY != "generic"} {
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1rw)
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1rw)
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $memory_width]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $memory_width]
   }
 
   # Weight double buffer
@@ -61,12 +63,14 @@ proc pre_architect {} {
   set double_buffer "DoubleBuffer<$IO_DATATYPE,$OC_DIMENSION,$WEIGHT_BUFFER_SIZE>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$OC_DIMENSION]
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH [expr $IO_DATATYPE_WIDTH*$OC_DIMENSION]
+  set memory_width [expr $IO_DATATYPE_WIDTH*$OC_DIMENSION]
+
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME -WORD_WIDTH $memory_width
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME -WORD_WIDTH $memory_width
 
     if {$TECHNOLOGY != "generic"} {
-      directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1rw)
-      directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE $memories(1rw)
+      directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $memory_width]
+      directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1.value.$C_DATA_REP_NAME:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $memory_width]
     }
 
   if {$SUPPORT_MX == true} {
