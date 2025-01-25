@@ -19,6 +19,16 @@ class CFloat {
   CFloat() : float_val(0) {}
   CFloat(const float val) : float_val(val) {}
 
+  template <int W, int I, bool S, ac_q_mode Q2, ac_o_mode O>
+  CFloat(const ac_fixed<W, I, S, Q2, O> &rhs) {
+    float_val = rhs.to_double();
+  }
+
+  template <int WFX, int IFX, bool SFX, ac_q_mode QFX, ac_o_mode OFX>
+  ac_fixed<WFX, IFX, SFX, QFX, OFX> to_ac_fixed() {
+    return ac_fixed<WFX, IFX, SFX, QFX, OFX>(float_val);
+  }
+
   ac_int<width, false> bits_rep() {
     uint32_t float_bits = *reinterpret_cast<uint32_t *>(&float_val);
     ac_int<width, false> bits = float_bits;
