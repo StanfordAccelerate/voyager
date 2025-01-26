@@ -40,6 +40,7 @@ Tiling get_tiling(const Operation& operation) {
     } else {
       tiling = get_linear_tiling(param);
     }
+    adjust_tiling_for_dimension(tiling);
   } else {
     tiling = get_interstellar_tiling(operation.tiling);
     if (matrix_op.stride_size() > 0) {
@@ -47,10 +48,6 @@ Tiling get_tiling(const Operation& operation) {
     } else {
       tiling.stride = 1;
     }
-  }
-
-  if (manual_tiling) {
-    adjust_tiling_for_dimension(tiling);
   }
 
   return tiling;
