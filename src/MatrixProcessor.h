@@ -6,37 +6,35 @@
 #include "ParamsDeserializer.h"
 #include "SystolicArray.h"
 
-template <typename IDTYPE, typename ODTYPE, typename ACCUM_BUFFER_TYPE,
-          bool IS_MX, int NROWS, int NCOLS, int BUFFER_SIZE>
+template <typename IDTYPE, typename ODTYPE, typename AccumBuffer,
+          typename Scale, bool IS_MX, int NROWS, int NCOLS, int BUFFER_SIZE>
 SC_MODULE(MatrixProcessor) {
  private:
   Connections::SyncChannel CCS_INIT_S1(weightLoadDone);
   Connections::SyncChannel CCS_INIT_S1(weightSwapDone);
 
-  MultiInputSerializedSkewer<IDTYPE, typename IDTYPE::AccumulationDatatype,
-                             NROWS>
+  MultiInputSerializedSkewer<IDTYPE, typename IDTYPE::Decoded, NROWS>
       CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<PEInput<IDTYPE>, NROWS> > CCS_INIT_S1(
       inputSkewerDin);
 
-  WeightSerializedSkewer<IDTYPE, typename IDTYPE::AccumulationDatatype, NCOLS>
-      CCS_INIT_S1(weightSkewer);
+  WeightSerializedSkewer<IDTYPE, typename IDTYPE::Decoded, NCOLS> CCS_INIT_S1(
+      weightSkewer);
   Connections::Combinational<Pack1D<PEWeight<IDTYPE>, NCOLS> > CCS_INIT_S1(
       weightSkewerDin);
 
-  SerializedSkewer<ODTYPE, typename ODTYPE::AccumulationDatatype, NCOLS>
-      CCS_INIT_S1(psumInSkewer);
+  SerializedSkewer<ODTYPE, typename ODTYPE::Decoded, NCOLS> CCS_INIT_S1(
+      psumInSkewer);
   Connections::Combinational<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(
       psumInSkewerDin);
 
-  DeserializedSkewer<typename ODTYPE::AccumulationDatatype, ODTYPE, NCOLS>
-      CCS_INIT_S1(psumOutSkewer);
+  DeserializedSkewer<typename ODTYPE::Decoded, ODTYPE, NCOLS> CCS_INIT_S1(
+      psumOutSkewer);
   Connections::Combinational<Pack1D<ODTYPE, NCOLS> > CCS_INIT_S1(
       psumOutSkewerDout);
 
-  SystolicArray<typename IDTYPE::AccumulationDatatype,
-                typename IDTYPE::AccumulationDatatype,
-                typename ODTYPE::AccumulationDatatype, NROWS, NCOLS>
+  SystolicArray<typename IDTYPE::Decoded, typename IDTYPE::Decoded,
+                typename ODTYPE::Decoded, NROWS, NCOLS>
       CCS_INIT_S1(systolicArray);
 
   MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
@@ -55,22 +53,21 @@ SC_MODULE(MatrixProcessor) {
 
   Connections::In<Pack1D<IDTYPE, NROWS> > CCS_INIT_S1(inputsChannel);
   Connections::In<Pack1D<IDTYPE, NCOLS> > CCS_INIT_S1(weightsChannel);
-  Connections::In<Pack1D<ACCUM_BUFFER_TYPE, NCOLS> > CCS_INIT_S1(biasChannel);
-  Connections::Out<Pack1D<ACCUM_BUFFER_TYPE, NCOLS> > CCS_INIT_S1(
-      outputsChannel);
+  Connections::In<Pack1D<AccumBuffer, NCOLS> > CCS_INIT_S1(biasChannel);
+  Connections::Out<Pack1D<AccumBuffer, NCOLS> > CCS_INIT_S1(outputsChannel);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<PEInput<typename IDTYPE::AccumulationDatatype> >
+  Connections::Combinational<PEInput<typename IDTYPE::Decoded> >
       inputsToSystolicArray[NROWS];
   // Connections::Combinational<ac_int<1, false> >
   //     weightSwapToSystolicArray[NROWS];
-  Connections::Combinational<typename ODTYPE::AccumulationDatatype>
+  Connections::Combinational<typename ODTYPE::Decoded>
       psumsToSystolicArray[NCOLS];
-  Connections::Combinational<typename ODTYPE::AccumulationDatatype>
+  Connections::Combinational<typename ODTYPE::Decoded>
       outputsFromSystolicArray[NCOLS];
-  Connections::Combinational<PEWeight<typename IDTYPE::AccumulationDatatype> >
+  Connections::Combinational<PEWeight<typename IDTYPE::Decoded> >
       weightsToSystolicArray[NCOLS];
 
   // only used for MX
@@ -79,9 +76,9 @@ SC_MODULE(MatrixProcessor) {
   Connections::ConditionalCombinational<Pack1D<ODTYPE, NCOLS>, IS_MX>
       CCS_INIT_S1(unscaledAccumulationChannel);
 
-  Connections::ConditionalIn<Pack1D<IDTYPE, 1>, IS_MX> CCS_INIT_S1(
+  Connections::ConditionalIn<Pack1D<Scale, 1>, IS_MX> CCS_INIT_S1(
       inputScaleChannel);
-  Connections::ConditionalIn<Pack1D<IDTYPE, NCOLS>, IS_MX> CCS_INIT_S1(
+  Connections::ConditionalIn<Pack1D<Scale, NCOLS>, IS_MX> CCS_INIT_S1(
       weightScaleChannel);
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
@@ -240,10 +237,10 @@ SC_MODULE(MatrixProcessor) {
           params.loops[1][3] * params.loops[1][4] * params.loops[1][5];
 
 #ifdef __SYNTHESIS__
-      Pack1D<ACCUM_BUFFER_TYPE, NCOLS> accumulation_buffer[BUFFER_SIZE];
+      Pack1D<AccumBuffer, NCOLS> accumulation_buffer[BUFFER_SIZE];
 #else
-      Pack1D<ACCUM_BUFFER_TYPE, NCOLS> *accumulation_buffer =
-          new Pack1D<ACCUM_BUFFER_TYPE, NCOLS>[BUFFER_SIZE];
+      Pack1D<AccumBuffer, NCOLS> *accumulation_buffer =
+          new Pack1D<AccumBuffer, NCOLS>[BUFFER_SIZE];
 #endif
 
       ac_int<32, false> step = 0;
@@ -352,7 +349,7 @@ SC_MODULE(MatrixProcessor) {
         Pack1D<ODTYPE, NCOLS> psum;
 #pragma hls_unroll yes
         for (int i = 0; i < NCOLS; i++) {
-          psum.value[i].setZero();
+          psum.value[i].set_zero();
         }
 
         if constexpr (!IS_MX) {
@@ -588,16 +585,16 @@ SC_MODULE(MatrixProcessor) {
             params.loops[1][3] * params.loops[1][4] * params.loops[1][5];
 
 #ifdef __SYNTHESIS__
-        Pack1D<ACCUM_BUFFER_TYPE, NCOLS> accumulation_buffer[BUFFER_SIZE];
+        Pack1D<AccumBuffer, NCOLS> accumulation_buffer[BUFFER_SIZE];
 #else
-        Pack1D<ACCUM_BUFFER_TYPE, NCOLS> *accumulation_buffer =
-            new Pack1D<ACCUM_BUFFER_TYPE, NCOLS>[BUFFER_SIZE];
+        Pack1D<AccumBuffer, NCOLS> *accumulation_buffer =
+            new Pack1D<AccumBuffer, NCOLS>[BUFFER_SIZE];
 #endif
 
         ac_int<32, false> step = 0;
 
-        Pack1D<ACCUM_BUFFER_TYPE, NCOLS> bias;
-        Pack1D<IDTYPE, NCOLS> weightScales;
+        Pack1D<AccumBuffer, NCOLS> bias;
+        Pack1D<Scale, NCOLS> weightScales;
 
         // loop indices that are used to determine when to read in a new bias
         int biasReuseIndices[4] = {5, 5, 5, 5};
@@ -614,11 +611,11 @@ SC_MODULE(MatrixProcessor) {
               loop_counters[1][params.fxIndex] == 0 &&
               loop_counters[1][params.fyIndex] == 0;
 
-          Pack1D<ACCUM_BUFFER_TYPE, NCOLS> previous_accumulation;
+          Pack1D<AccumBuffer, NCOLS> previous_accumulation;
 
 #pragma hls_unroll yes
           for (int i = 0; i < NCOLS; i++) {
-            previous_accumulation.value[i].setZero();
+            previous_accumulation.value[i].set_zero();
           }
 
           if (firstAccumulation) {
@@ -657,7 +654,7 @@ SC_MODULE(MatrixProcessor) {
           // CCS_LOG("outputs: " << outputs);
 
           // TODO: add scale factors and scale the psum
-          Pack1D<IDTYPE, 1> inputScale;
+          Pack1D<Scale, 1> inputScale;
           if (params.MX) {
             inputScale = inputScaleChannel.Pop();
           }
@@ -677,19 +674,15 @@ SC_MODULE(MatrixProcessor) {
             // CCS_LOG("weightScales: " << weightScales);
           }
 
-          Pack1D<ACCUM_BUFFER_TYPE, NCOLS> scaled_outputs;
+          Pack1D<AccumBuffer, NCOLS> scaled_outputs;
 
 #pragma hls_unroll yes
           for (int i = 0; i < NCOLS; i++) {
-            IDTYPE scale = inputScale[0] + weightScales[i];
-            // CCS_LOG("scale: " << scale);
-            // IDTYPE scale = inputScale[0];
-            scaled_outputs[i] = static_cast<ACCUM_BUFFER_TYPE>(outputs[i]);
-            // CCS_LOG("scaled_outputs: " << scaled_outputs[i]);
+            Scale scale = inputScale[0] * weightScales[i];
+            scaled_outputs[i] = static_cast<AccumBuffer>(outputs[i]);
             if (params.MX) {
-              scaled_outputs[i].expScale(scale.int_val);
+              scaled_outputs[i] = scaled_outputs[i] * scale;
             }
-            // CCS_LOG("scaled_outputs after scale: " << scaled_outputs[i]);
             previous_accumulation.value[i] += scaled_outputs[i];
           }
           int addr = static_cast<ac_int<10, false> >(
@@ -700,11 +693,6 @@ SC_MODULE(MatrixProcessor) {
                          loop_counters[1][params.inputYLoopIndex[1]] *
                          params.loops[1][params.inputXLoopIndex[1]]) +
                      loop_counters[1][params.inputXLoopIndex[1]];
-          if (addr == 0) {
-            IDTYPE scale = inputScale[0] + weightScales[0];
-            // CCS_LOG(inputScale[0] << " + " << weightScales[0] << " = " <<
-            // scale); CCS_LOG("scaled psums: " << previous_accumulation);
-          }
 
           bool accumulationFinished =
               (loop_counters[1][params.reductionLoopIndex[1]] ==

@@ -1,5 +1,5 @@
 set block "VectorUnit"
-set full_block_name "VectorUnit<$IO_DATATYPE, $VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $MX_DATATYPE, $OC_DIMENSION>"
+set full_block_name "VectorUnit<$IO_DATATYPE, $VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>"
 
 proc pre_libraries {} {
   solution library add {[Block] MaxpoolUnit.v1}
@@ -12,10 +12,10 @@ proc pre_assembly {} {
   global full_block_name
   set full_block_name_stripped [string map {" " ""} $full_block_name]
 
-  global IO_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE OC_DIMENSION MX_DATATYPE
-  set maxpool_name "MaxpoolUnit<$VECTOR_DATATYPE,$IO_DATATYPE,$MX_DATATYPE,$OC_DIMENSION>"
+  global IO_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE OC_DIMENSION SCALE_DATATYPE
+  set maxpool_name "MaxpoolUnit<$VECTOR_DATATYPE,$IO_DATATYPE,$SCALE_DATATYPE,$OC_DIMENSION>"
   set maxpool_name_stripped [string map {" " ""} $maxpool_name]
-  set vector_fetch_name "VectorFetchUnit<$IO_DATATYPE,$VECTOR_DATATYPE,$MX_DATATYPE,$OC_DIMENSION>"
+  set vector_fetch_name "VectorFetchUnit<$IO_DATATYPE,$VECTOR_DATATYPE,$SCALE_DATATYPE,$OC_DIMENSION>"
   set vector_fetch_name_stripped [string map {" " ""} $vector_fetch_name]
   set output_address_name "OutputAddressGenerator<$IO_DATATYPE,$OC_DIMENSION>"
   set output_address_name_stripped [string map {" " ""} $output_address_name]

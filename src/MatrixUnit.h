@@ -43,17 +43,17 @@ SC_MODULE(MatrixUnit) {
       inputsToWindowBuffer);
 
   // Only instantiate if MX is supported
-  ConditionalModule<InputScaleController<INPUT_DATATYPE, IC_DIMENSION>,
+  ConditionalModule<InputScaleController<SCALE_DATATYPE, IC_DIMENSION>,
                     SUPPORT_MX>
       CCS_INIT_S1(inputScaleController);
-  ConditionalModule<DoubleBuffer<INPUT_DATATYPE, 1, INPUT_BUFFER_SIZE>,
+  ConditionalModule<DoubleBuffer<SCALE_DATATYPE, 1, INPUT_BUFFER_SIZE>,
                     SUPPORT_MX>
       CCS_INIT_S1(inputScaleBuffer);
   Connections::ConditionalOut<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
       inputScaleAddressRequest);
-  Connections::ConditionalIn<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX> CCS_INIT_S1(
+  Connections::ConditionalIn<Pack1D<SCALE_DATATYPE, 1>, SUPPORT_MX> CCS_INIT_S1(
       inputScaleDataResponse);
-  Connections::ConditionalCombinational<BufferWriteRequest<INPUT_DATATYPE, 1>,
+  Connections::ConditionalCombinational<BufferWriteRequest<SCALE_DATATYPE, 1>,
                                         SUPPORT_MX>
       inputScaleWriteRequest[2];
   Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
@@ -62,7 +62,7 @@ SC_MODULE(MatrixUnit) {
       inputScaleReadAddress[2];
   Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       inputScaleReadControl[2];
-  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX>
+  Connections::ConditionalCombinational<Pack1D<SCALE_DATATYPE, 1>, SUPPORT_MX>
       CCS_INIT_S1(inputScaleFromBuffer);
 
 #ifdef SIM_WeightController
@@ -92,20 +92,20 @@ SC_MODULE(MatrixUnit) {
       weightsFromBuffer);
 
   // TODO: conditional initialization
-  ConditionalModule<WeightScaleController<INPUT_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                                          IC_DIMENSION, OC_DIMENSION>,
-                    SUPPORT_MX>
+  ConditionalModule<
+      WeightScaleController<SCALE_DATATYPE, IC_DIMENSION, OC_DIMENSION>,
+      SUPPORT_MX>
       CCS_INIT_S1(weightScaleController);
   ConditionalModule<
-      DoubleBuffer<INPUT_DATATYPE, OC_DIMENSION, WEIGHT_BUFFER_SIZE>,
+      DoubleBuffer<SCALE_DATATYPE, OC_DIMENSION, WEIGHT_BUFFER_SIZE>,
       SUPPORT_MX>
       CCS_INIT_S1(weightScaleBuffer);
   Connections::ConditionalOut<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
       weightScaleAddressRequest);
-  Connections::ConditionalIn<Pack1D<INPUT_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
+  Connections::ConditionalIn<Pack1D<SCALE_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
       CCS_INIT_S1(weightScaleDataResponse);
   Connections::ConditionalCombinational<
-      BufferWriteRequest<INPUT_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
+      BufferWriteRequest<SCALE_DATATYPE, OC_DIMENSION>, SUPPORT_MX>
       weightScaleWriteRequest[2];
   Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       weightScaleWriteControl[2];
@@ -113,22 +113,25 @@ SC_MODULE(MatrixUnit) {
       weightScaleReadAddress[2];
   Connections::ConditionalCombinational<ac_int<32, false>, SUPPORT_MX>
       weightScaleReadControl[2];
-  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION>,
+  Connections::ConditionalCombinational<Pack1D<SCALE_DATATYPE, OC_DIMENSION>,
                                         SUPPORT_MX>
       CCS_INIT_S1(weightScaleFromBuffer);
 
 #ifdef SIM_MatrixProcessor
   // clang-format off
-  CCS_DESIGN( (MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>) ) CCS_INIT_S1(matrixProcessor);
+  CCS_DESIGN( (MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
+                  SCALE_DATATYPE, SUPPORT_MX, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>) ) CCS_INIT_S1(matrixProcessor);
 // clang-format on
 #else
 #ifdef HYBRID_FP8
-  MatrixProcessor<HYBRID_TYPE, ACCUM_DATATYPE, IC_DIMENSION, OC_DIMENSION,
+  MatrixProcessor<HYBRID_TYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
+                  SCALE_DATATYPE, SUPPORT_MX, IC_DIMENSION, OC_DIMENSION,
                   ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 #else
   MatrixProcessor<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                  SUPPORT_MX, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
+                  SCALE_DATATYPE, SUPPORT_MX, IC_DIMENSION, OC_DIMENSION,
+                  ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 #endif
 #endif
@@ -142,8 +145,7 @@ SC_MODULE(MatrixUnit) {
   Connections::Combinational<Pack1D<INPUT_DATATYPE, IC_DIMENSION> > CCS_INIT_S1(
       inputsToSystolicArray);
 
-  Connections::Combinational<
-      Pack1D<INPUT_DATATYPE::AccumulationDatatype, OC_DIMENSION> >
+  Connections::Combinational<Pack1D<INPUT_DATATYPE::Decoded, OC_DIMENSION> >
       CCS_INIT_S1(weightsToSystolicArray);
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION> >
       CCS_INIT_S1(biasToSystolicArray);

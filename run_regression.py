@@ -160,7 +160,7 @@ def run_systemc_tests(layers, num_processes, results_folder, fast):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
     # Build TestRunner binary
-    # subprocess.run(["make", "clean"], env=os.environ)
+    subprocess.run(["make", "clean"], env=os.environ)
 
     with open(f"{results_folder}/build.log", "w") as stdout_file:
         subprocess.run(

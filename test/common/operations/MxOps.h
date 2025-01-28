@@ -2,10 +2,10 @@
 
 #include "test/common/operations/Common.h"
 
-template <typename INPUT_T, typename OUTPUT_T>
-OUTPUT_T* calculate_mx_qparam(std::any input_tensor,
-                              const codegen::ReduceOp& param) {
-  INPUT_T* inputs = std::any_cast<INPUT_T*>(input_tensor);
+template <typename Input, typename Scale>
+Scale* calculate_mx_qparam(std::any input_tensor,
+                           const codegen::ReduceOp& param) {
+  Input* inputs = std::any_cast<Input*>(input_tensor);
 
   int mx_axis = param.dim(0);
   if (mx_axis == -1) {
@@ -25,28 +25,27 @@ OUTPUT_T* calculate_mx_qparam(std::any input_tensor,
 
   int num_blocks = (mx_axis_size + block_size - 1) / block_size;
 
-  OUTPUT_T* outputs = new OUTPUT_T[num_blocks * outer_size];
+  Scale* outputs = new Scale[num_blocks * outer_size];
 
   for (int i = 0; i < outer_size; i++) {
     for (int c = 0; c < num_blocks; c++) {
-      ac_int<INPUT_T::exponent_width, false> max_exponent = 0;
+      ac_int<Input::exponent_width, false> max_exponent = 0;
 
       int index = i * num_blocks + c;
 
       for (int block = 0; block < block_size; block++) {
         int input_index = i * mx_axis_size + c * block_size + block;
 
-        ac_int<INPUT_T::exponent_width, false> exponent =
+        ac_int<Input::exponent_width, false> exponent =
             inputs[input_index].unbiased_exponent();
 
         max_exponent = std::max(max_exponent, exponent);
       }
 
-      ac_int<INPUT_T::exponent_width, true> scaled_exponent =
-          max_exponent - INPUT_T::ac_float_rep::exp_bias -
-          (OUTPUT_T::width - 2);
+      // FIXME: 6 is hardcoded for INT8
+      ac_int<Input::exponent_width, true> scaled_exponent = max_exponent - 6;
 
-      outputs[index].setbits(scaled_exponent);
+      outputs[index].set_bits(scaled_exponent);
     }
   }
 

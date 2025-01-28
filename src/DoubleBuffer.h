@@ -87,7 +87,7 @@ SC_MODULE(DoubleBuffer) {
         } else {
 #pragma hls_unroll yes
           for (int j = 0; j < WIDTH; j++) {
-            data[j].setZero();
+            data[j].set_zero();
           }
         }
         readData[0].Push(data);
@@ -142,7 +142,7 @@ SC_MODULE(DoubleBuffer) {
         } else {
 #pragma hls_unroll yes
           for (int j = 0; j < WIDTH; j++) {
-            data[j].setZero();
+            data[j].set_zero();
           }
         }
 

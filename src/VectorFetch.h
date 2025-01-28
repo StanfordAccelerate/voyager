@@ -1,6 +1,6 @@
 #pragma once
 
-template <typename IO_DTYPE, typename VEC_DTYPE, typename MX_DTYPE, int WIDTH>
+template <typename IO_DTYPE, typename VEC_DTYPE, typename Scale, int WIDTH>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -25,7 +25,7 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
 
-  Connections::Out<MX_DTYPE> CCS_INIT_S1(vectorFetch1Scale);
+  Connections::Out<Scale> CCS_INIT_S1(vectorFetch1Scale);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(addressGen0Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse0Params);
@@ -91,19 +91,20 @@ SC_MODULE(VectorFetchUnit) {
       }
 
       if (params.VECTOR_INPUT0_SLICING) {
-        int i = params.addressGen0Dim / 3;
-        int j = params.addressGen0Dim % 3;
+        int slice_dim = params.addressGen0Dim;
+        int i = slice_dim >= 3 ? 1 : 0;
+        int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addressGen0Start;
         loop_ends[i][j] = params.addressGen0End;
         loop_strides[i][j] = params.addressGen0Stride;
       } else if (params.VECTOR_INPUT0_RESHAPE) {
 #pragma hls_unroll yes
         for (int dim = 0; dim < 6; dim++) {
-          int i = dim / 3;
-          int j = dim % 3;
+          int i = dim >= 3 ? 1 : 0;
+          int j = dim >= 3 ? dim - 3 : dim;
           int new_dim = params.addressGen0AxisOrder[dim];
-          int new_i = new_dim / 3;
-          int new_j = new_dim % 3;
+          int new_i = new_dim >= 3 ? 1 : 0;
+          int new_j = new_dim >= 3 ? new_dim - 3 : new_dim;
           loop_ends[i][j] = loop_bounds[new_i][new_j];
         }
       }
@@ -210,6 +211,7 @@ SC_MODULE(VectorFetchUnit) {
                                                       loop_3, loop_4, loop_5};
                       ac_int<11, false> orig_indices[6];
 
+#pragma hls_unroll yes
                       for (int i = 0; i < 6; i++) {
                         orig_indices[params.addressGen0AxisOrder[i]] =
                             indices[i];
@@ -245,10 +247,31 @@ SC_MODULE(VectorFetchUnit) {
                         WIDTH * (IO_DTYPE::width / 8)};
                     vectorFetch0AddressRequest.Push(memRequest);
                   }
+
+                  if (loop_counters[1][2] >=
+                      loop_ends[1][2] - loop_strides[1][2]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >=
+                    loop_ends[1][1] - loop_strides[1][1]) {
+                  break;
                 }
               }
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
+          break;
         }
       }
     }
@@ -280,8 +303,9 @@ SC_MODULE(VectorFetchUnit) {
       }
 
       if (params.VECTOR_INPUT0_SLICING) {
-        int i = params.addressGen0Dim / 3;
-        int j = params.addressGen0Dim % 3;
+        int slice_dim = params.addressGen0Dim;
+        int i = slice_dim >= 3 ? 1 : 0;
+        int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addressGen0Start;
         loop_ends[i][j] = params.addressGen0End;
         loop_strides[i][j] = params.addressGen0Stride;
@@ -322,29 +346,38 @@ SC_MODULE(VectorFetchUnit) {
                   } else {
                     Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch0DataResponse.Pop();
-
-                    if constexpr (VEC_DTYPE::is_floating_point &&
-                                  IO_DTYPE::is_floating_point) {
-                      // static cast to VEC_DTYPE
-
-#pragma hls_unroll yes
-                      for (int dim = 0; dim < WIDTH; dim++) {
-                        fullPrecisionDataResponse[dim] =
-                            static_cast<VEC_DTYPE>(response[dim]);
-                      }
-                    } else {
-                      // dequantize IO_DTYPE to VEC_DTYPE
-                      vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                          response, fullPrecisionDataResponse,
-                          params.vec0DequantizeScale);
-                    }
+                    vdequantize<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        response, fullPrecisionDataResponse,
+                        params.vec0DequantizeScale);
                   }
+
                   vectorFetch0DataResponseBroadcasted.Push(
                       fullPrecisionDataResponse);
+
+                  if (loop_counters[1][2] >=
+                      loop_ends[1][2] - loop_strides[1][2]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >=
+                    loop_ends[1][1] - loop_strides[1][1]) {
+                  break;
                 }
               }
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
+          break;
         }
       }
     }
@@ -452,10 +485,31 @@ SC_MODULE(VectorFetchUnit) {
                         WIDTH * (IO_DTYPE::width / 8)};
                     vectorFetch1AddressRequest.Push(memRequest);
                   }
+
+                  if (loop_counters[1][2] >=
+                      loop_ends[1][2] - loop_strides[1][2]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >=
+                    loop_ends[1][1] - loop_strides[1][1]) {
+                  break;
                 }
               }
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
+          break;
         }
       }
     }
@@ -525,46 +579,65 @@ SC_MODULE(VectorFetchUnit) {
                     Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch1DataResponse.Pop();
 
-                    if constexpr (VEC_DTYPE::is_floating_point &&
-                                  IO_DTYPE::is_floating_point) {
-                      // static cast to VEC_DTYPE
-
-#pragma hls_unroll yes
-                      for (int dim = 0; dim < WIDTH; dim++) {
-                        fullPrecisionDataResponse[dim] =
-                            static_cast<VEC_DTYPE>(response[dim]);
-                      }
-                    } else if constexpr (!std::is_same<IO_DTYPE,
-                                                       MX_DTYPE>::value) {
+#ifdef SUPPORT_MX
+                    if (params.BROADCAST_VEC1_SCALE) {
 #pragma hls_unroll yes
                       for (int i = 0; i < WIDTH; i++) {
-                        fullPrecisionDataResponse[i].setbits(
+                        fullPrecisionDataResponse[i].set_bits(
                             response[i].bits_rep());
                       }
                     } else {
-                      // dequantize IO_DTYPE to VEC_DTYPE
-                      vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
+#endif
+                      vdequantize<IO_DTYPE, VEC_DTYPE, WIDTH>(
                           response, fullPrecisionDataResponse,
                           params.vec1DequantizeScale);
+#ifdef SUPPORT_MX
                     }
+#endif
                   }
 
+#ifdef SUPPORT_MX
                   if (params.BROADCAST_VEC1_SCALE) {
                     for (int i = 0; i < WIDTH; i++) {
                       for (int count = 0; count < params.vec1BroadcastCount;
                            count++) {
-                        vectorFetch1Scale.Push(
-                            fullPrecisionDataResponse[i].bits_rep());
+                        Scale scale;
+                        scale.set_bits(fullPrecisionDataResponse[i].bits_rep());
+                        vectorFetch1Scale.Push(scale);
                       }
                     }
                   } else {
+#endif
                     vectorFetch1DataResponseConverted.Push(
                         fullPrecisionDataResponse);
+#ifdef SUPPORT_MX
+                  }
+#endif
+
+                  if (loop_counters[1][2] >=
+                      loop_ends[1][2] - loop_strides[1][2]) {
+                    break;
                   }
                 }
+                if (loop_counters[1][1] >=
+                    loop_ends[1][1] - loop_strides[1][1]) {
+                  break;
+                }
+              }
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
+                break;
               }
             }
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
+              break;
+            }
           }
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
+          break;
         }
       }
     }
@@ -672,10 +745,31 @@ SC_MODULE(VectorFetchUnit) {
                         WIDTH * (IO_DTYPE::width / 8)};
                     vectorFetch2AddressRequest.Push(memRequest);
                   }
+
+                  if (loop_counters[1][2] >=
+                      loop_ends[1][2] - loop_strides[1][2]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >=
+                    loop_ends[1][1] - loop_strides[1][1]) {
+                  break;
                 }
               }
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
+          break;
         }
       }
     }
@@ -742,28 +836,37 @@ SC_MODULE(VectorFetchUnit) {
                     Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch2DataResponse.Pop();
 
-                    if constexpr (VEC_DTYPE::is_floating_point &&
-                                  IO_DTYPE::is_floating_point) {
-                      // static cast to VEC_DTYPE
-
-#pragma hls_unroll yes
-                      for (int dim = 0; dim < WIDTH; dim++) {
-                        fullPrecisionDataResponse[dim] =
-                            static_cast<VEC_DTYPE>(response[dim]);
-                      }
-                    } else {
-                      // dequantize IO_DTYPE to VEC_DTYPE
-                      vdequantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                          response, fullPrecisionDataResponse,
-                          params.vec2DequantizeScale);
-                    }
+                    vdequantize<IO_DTYPE, VEC_DTYPE, WIDTH>(
+                        response, fullPrecisionDataResponse,
+                        params.vec2DequantizeScale);
                   }
                   vectorFetch2DataResponseConverted.Push(
                       fullPrecisionDataResponse);
+
+                  if (loop_counters[1][2] >=
+                      loop_ends[1][2] - loop_strides[1][2]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][1] >=
+                    loop_ends[1][1] - loop_strides[1][1]) {
+                  break;
                 }
               }
+              if (loop_counters[1][0] >= loop_ends[1][0] - loop_strides[1][0]) {
+                break;
+              }
+            }
+            if (loop_counters[0][2] >= loop_ends[0][2] - loop_strides[0][2]) {
+              break;
             }
           }
+          if (loop_counters[0][1] >= loop_ends[0][1] - loop_strides[0][1]) {
+            break;
+          }
+        }
+        if (loop_counters[0][0] >= loop_ends[0][0] - loop_strides[0][0]) {
+          break;
         }
       }
     }

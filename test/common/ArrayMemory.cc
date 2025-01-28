@@ -131,15 +131,22 @@ void ArrayMemory::read_tensor_from_memory(const long long address,
                                           const int partition, const int size,
                                           T* tensor) {
   char* memory = get_memory(partition) + address;
+  ac_int<(T::width / 8 + 2) * 8> bits;
 
   for (int i = 0; i < size; i++) {
-    ac_int<T::width> bits;
-    assert(T::width % 8 == 0);
-    for (int j = 0; j < T::width / 8; j++) {
-      bits.set_slc(
-          j * 8, static_cast<ac_int<8, false> >(memory[i * T::width / 8 + j]));
+    // Data may be unaligned and span multiple bytes. We calculate the start
+    // and end byte indices and the offset within the first byte. We then read
+    // the bytes into a temporary ac_int and shift it to the correct position.
+    int start = i * T::width / 8;
+    int end = (i + 1) * T::width / 8;
+    int offset = (i * T::width) % 8;
+
+    for (int j = start; j <= end; j++) {
+      bits.set_slc((j - start) * 8, static_cast<ac_int<8>>(memory[j]));
     }
-    tensor[i].setbits(bits);
+
+    bits = bits >> offset;
+    tensor[i].set_bits(bits.template slc<T::width>(0));
   }
 }
 
@@ -208,9 +215,11 @@ std::any ArrayMemory::get_tensor(const codegen::Tensor& tensor) {
 
 void ArrayMemory::write_bytes_to_memory(const long long address,
                                         const int partition, const int size,
-                                        const char* bytes) {
+                                        const char* bytes, const char* masks) {
   auto memory = get_memory(partition);
   for (int i = 0; i < size; i++) {
-    memory[address + i] = bytes[i];
+    char new_data = bytes[i] & masks[i];
+    char orig_data = memory[address + i] & ~masks[i];
+    memory[address + i] = new_data | orig_data;
   }
 }

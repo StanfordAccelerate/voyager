@@ -157,7 +157,7 @@ test/compiler/networks/bert/%/model.txt: quantized-training/test/test_codegen.py
 
 test/compiler/networks/llama/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llama_encoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llama_decoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
 
 test/compiler/networks/vit/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)

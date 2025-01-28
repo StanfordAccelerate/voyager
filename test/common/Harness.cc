@@ -41,7 +41,7 @@ void register_interface(
         *vectorFetch3AddressResponse,
     std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *vectorOutput,
-    std::deque<sc_lv<Wrapped<unsigned long long>::width>> *vectorOutputAddress);
+    std::deque<sc_lv<Wrapped<uint64_t>::width>> *vectorOutputAddress);
 // void copy_output(void *sram, int size, int data_size);
 #endif
 
@@ -202,10 +202,10 @@ void Harness::reset() {
   wait();
 }
 
-template <long unsigned int DIMENSION>
+template <typename Input, long unsigned int Dim>
 void Harness::readMemoryRequest(
     CombinationalInterface<MemoryRequest> *addressRequest,
-    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION>> *dataResponse_fifo) {
+    sc_fifo<Pack1D<Input, Dim>> *dataResponse_fifo) {
   addressRequest->ResetRead();
 
   wait();
@@ -215,20 +215,19 @@ void Harness::readMemoryRequest(
 
     int total_num_bytes = memRequest.burstSize;
 
-    for (int b = 0;
-         b < total_num_bytes / DIMENSION / (INPUT_DATATYPE::width / 8); b++) {
-      Pack1D<INPUT_DATATYPE, DIMENSION> data;
-      for (int i = 0; i < DIMENSION; i++) {
-        ac_int<INPUT_DATATYPE::width, false> bits;
-        int num_bytes = INPUT_DATATYPE::width / 8;
-        unsigned long long base_address = memRequest.address;
+    for (int b = 0; b < total_num_bytes / Dim / (Input::width / 8); b++) {
+      Pack1D<Input, Dim> data;
+      for (int i = 0; i < Dim; i++) {
+        ac_int<Input::width, false> bits;
+        int num_bytes = Input::width / 8;
+        uint64_t base_address = memRequest.address;
         for (int byte = 0; byte < num_bytes; byte++) {
-          unsigned long long address =
-              base_address + b * DIMENSION * num_bytes + i * num_bytes + byte;
+          uint64_t address =
+              base_address + b * Dim * num_bytes + i * num_bytes + byte;
           bits.set_slc(byte * 8,
                        static_cast<ac_int<8, false>>(memory[address]));
         }
-        data[i].setbits(bits);
+        data[i].set_bits(bits);
       }
       DLOG("read addr: " << memRequest.address << " data: " << data
                          << std::endl);
@@ -237,10 +236,10 @@ void Harness::readMemoryRequest(
   }
 }
 
-template <long unsigned int DIMENSION>
+template <typename Input, long unsigned int Dim>
 void Harness::sendMemoryResponse(
-    sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION>> *dataResponse_fifo,
-    CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION>> *dataResponse) {
+    sc_fifo<Pack1D<Input, Dim>> *dataResponse_fifo,
+    CombinationalInterface<Pack1D<Input, Dim>> *dataResponse) {
   dataResponse->ResetWrite();
 
   wait();
@@ -264,12 +263,12 @@ void Harness::readSingleMemoryRequest(
       INPUT_DATATYPE data;
       ac_int<INPUT_DATATYPE::width, false> bits;
       int num_bytes = INPUT_DATATYPE::width / 8;
-      unsigned long long base_address = memRequest.address;
+      uint64_t base_address = memRequest.address;
       for (int byte = 0; byte < num_bytes; byte++) {
-        unsigned long long address = base_address + b * num_bytes + byte;
+        uint64_t address = base_address + b * num_bytes + byte;
         bits.set_slc(byte * 8, static_cast<ac_int<8, false>>(memory[address]));
       }
-      data.setbits(bits);
+      data.set_bits(bits);
       DLOG("read addr: " << memRequest.address << " data: " << data
                          << std::endl);
       dataResponse_fifo->write(data);
@@ -488,13 +487,12 @@ void Harness::storeVectorOutputs() {
 
   while (true) {
     Pack1D<OUTPUT_DATATYPE, OC_DIMENSION> data = vectorOutput.Pop();
-    unsigned long long base_address = vectorOutputAddress.Pop();
+    uint64_t base_address = vectorOutputAddress.Pop();
     DLOG("write address: " << base_address << " data: " << data);
     for (int i = 0; i < OC_DIMENSION; i++) {
       ac_int<OUTPUT_DATATYPE::width, false> bits = data[i].bits_rep();
       for (int byte = 0; byte < OUTPUT_DATATYPE::width / 8; byte++) {
-        unsigned long long address =
-            base_address + i * OUTPUT_DATATYPE::width / 8 + byte;
+        uint64_t address = base_address + i * OUTPUT_DATATYPE::width / 8 + byte;
         memory[address] = bits.slc<8>(byte * 8);
       }
     }
