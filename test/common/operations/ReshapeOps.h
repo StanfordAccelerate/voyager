@@ -31,32 +31,20 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeOp param) {
   for (size_t i = 0; i < order.size(); ++i) {
     permuted_shape[i] = shape[order[i]];
   }
-  std::vector<int> permuted_strides = compute_strides(permuted_shape);
 
   const int size = get_size(shape);
   T* outputs = new T[size];
 
-  std::vector<int> indices(shape.size(), 0);
-
   for (int i = 0; i < size; ++i) {
+    std::vector<int> indices = get_indices(i, shape);
+
     std::vector<int> permuted_indices(order.size());
     for (size_t j = 0; j < order.size(); ++j) {
       permuted_indices[j] = indices[order[j]];
     }
 
-    int permuted_index =
-        compute_linear_index(permuted_indices, permuted_strides);
-
+    int permuted_index = get_flat_index(permuted_indices, permuted_shape);
     outputs[permuted_index] = inputs[i];
-
-    // Update multi-dimensional indices
-    for (int j = shape.size() - 1; j >= 0; --j) {
-      indices[j]++;
-      if (indices[j] < shape[j]) {
-        break;
-      }
-      indices[j] = 0;
-    }
   }
 
   delete[] inputs;

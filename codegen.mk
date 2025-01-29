@@ -6,6 +6,7 @@ P8_1_FLAGS := --activation posit8_1 --weight posit8_1 --bf16
 INT8_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16
 INT8_32_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int32 --bf16
 MXINT8_FLAGS := --activation int8,qs=microscaling,bs=32 --weight int8,qs=microscaling,bs=32 --force_scale_power_of_two --bf16
+MXNF4_FLAGS := --activation nf4_5,qs=microscaling,bs=32,scale=fp8_e5m3 --weight nf4_5,qs=microscaling,bs=32,scale=fp8_e5m3 --bf16
 
 ################################################################################
 # ResNet18

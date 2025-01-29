@@ -9,4 +9,5 @@
 #include "src/ArchitectureParams.h"
 #include "test/compiler/proto/param.pb.h"
 
-void run_gold_model(const codegen::Operator &param, std::vector<std::any> args);
+std::any run_gold_model(const codegen::Operator &param,
+                        std::vector<std::any> args);

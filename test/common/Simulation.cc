@@ -149,7 +149,8 @@ void Simulation::run() {
     if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
       auto memory = (ArrayMemory*)(memories["gold"]);
       auto args = memory->get_args(param);
-      run_gold_model(param, args);
+      std::any outputs = run_gold_model(param, args);
+      memory->write_tensor(param.output(), outputs);
     }
   }
 
@@ -239,6 +240,10 @@ int Simulation::check_outputs() {
           false);
     } else if (param.output().dtype() == "bfloat16") {
       rel_err += compare_arrays<DataTypes::bfloat16, DataTypes::bfloat16>(
+          output1, output_names[0], output2, output_names[1], size, filename,
+          false);
+    } else if (param.output().dtype() == "fp8_e5m3") {
+      rel_err += compare_arrays<DataTypes::fp8_e5m3, DataTypes::fp8_e5m3>(
           output1, output_names[0], output2, output_names[1], size, filename,
           false);
     } else {

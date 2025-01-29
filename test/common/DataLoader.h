@@ -10,28 +10,26 @@
 // clang-format on
 
 #include "src/ArchitectureParams.h"
-#include "test/common/MemoryInterface.h"
+#include "test/common/ArrayMemory.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
 class DataLoader {
  public:
-  DataLoader(MemoryInterface*, bool);
+  DataLoader(ArrayMemory*, bool);
 
   void load_inputs(const codegen::Operator param, std::string data_dir,
                    bool random_data = false);
   void load_weights(const codegen::Operator param, std::string data_dir,
                     bool random_data = false);
-  void load_outputs(const codegen::Operator param,
-                    std::string data_dir);
+  void load_outputs(const codegen::Operator param, std::string data_dir);
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
                    bool transpose = false, bool replication = false);
 
-  bool is_double_precision(const codegen::Tensor& tensor);
   float* read_tensor_from_file(const std::string& filename, int size);
 
  private:
-  MemoryInterface* memory_interface;
+  ArrayMemory* memory_interface;
   // special addressing is sometimes needed for DUT memory (ex. replication)
   bool is_dut;
 };

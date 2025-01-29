@@ -34,7 +34,11 @@ typedef StdFloat<7, 8, false, true, AC_RND_CONV> bfloat16;
 typedef StdFloat<23, 8, false, true, AC_RND_CONV> fp32;
 
 typedef Posit<8, 1> posit8;
+
+typedef NormalFloat<4, 5> nf4_5;
+
 typedef UFloat<8, 8> e8m0;
+typedef UFloat<8, 5> fp8_e5m3;
 
 template <typename T>
 struct TypeName {
@@ -77,18 +81,28 @@ struct TypeName<bfloat16> {
 };
 
 template <>
-struct TypeName<e8m0> {
-  static std::string name() { return "e8m0"; }
-};
-
-template <>
 struct TypeName<fp32> {
   static std::string name() { return "float32"; }
 };
 
 template <>
+struct TypeName<e8m0> {
+  static std::string name() { return "e8m0"; }
+};
+
+template <>
+struct TypeName<fp8_e5m3> {
+  static std::string name() { return "fp8_e5m3"; }
+};
+
+template <>
 struct TypeName<posit8> {
   static std::string name() { return "posit8_1"; }
+};
+
+template <>
+struct TypeName<nf4_5> {
+  static std::string name() { return "nf4_5"; }
 };
 
 };  // namespace DataTypes

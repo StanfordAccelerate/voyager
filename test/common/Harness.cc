@@ -214,13 +214,13 @@ void Harness::readMemoryRequest(
     MemoryRequest memRequest = addressRequest->Pop();
 
     int total_num_bytes = memRequest.burstSize;
+    int num_bytes = (Input::width + 7) / 8;
+    uint64_t base_address = memRequest.address;
 
-    for (int b = 0; b < total_num_bytes / Dim / (Input::width / 8); b++) {
+    for (int b = 0; b < total_num_bytes / Dim / num_bytes; b++) {
       Pack1D<Input, Dim> data;
       for (int i = 0; i < Dim; i++) {
         ac_int<Input::width, false> bits;
-        int num_bytes = Input::width / 8;
-        uint64_t base_address = memRequest.address;
         for (int byte = 0; byte < num_bytes; byte++) {
           uint64_t address =
               base_address + b * Dim * num_bytes + i * num_bytes + byte;

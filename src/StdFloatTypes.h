@@ -17,6 +17,7 @@ class StdFloat {
   static constexpr unsigned int width = ac_float_rep::width;
   static constexpr unsigned int exponent_width = ac_float_rep::e_width;
   static constexpr unsigned int mantissa_width = ac_float_rep::mant_bits;
+  static constexpr float max_value = ac_float_rep::max();
 
   typedef StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> Decoded;
   typedef ac_fixed<2 * mantissa, mantissa, true> ac_float_to_fixed_rep;

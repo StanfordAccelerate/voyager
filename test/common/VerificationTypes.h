@@ -704,7 +704,7 @@ inline Tiling get_linear_tiling(codegen::Operator param) {
   int c0 = weight_shape[1] / ic_dim;
 
   // torch.matmul weight is also an activation
-  if (matrix_op.opcode() == "matmul") {
+  if (matrix_op.opcode() == "matmul" || matrix_op.opcode() == "matmul_mx") {
     int size = weight_shape.size();
     c0 = weight_shape[size - 2] / ic_dim;
     k0 = weight_shape[size - 1] / oc_dim;

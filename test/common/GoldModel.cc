@@ -30,7 +30,8 @@ void save_tensor(char *output_bytes, std::any output_tensor, int size) {
 
 template <typename Input, typename Psum, typename AccumBuffer, typename Scale,
           typename Vector>
-void run_operation(const codegen::Operator param, std::vector<std::any> args) {
+std::any run_operation(const codegen::Operator param,
+                       std::vector<std::any> args) {
   int arg_index = 0;
   std::any output_tensor;
 
@@ -57,8 +58,8 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
             << std::endl;
         std::abort();
       } else {
-        output_tensor =
-            calculate_mx_qparam<Vector, Scale>(args[arg_index++], reduce_op);
+        output_tensor = calculate_mx_qparam<Vector, Scale, Input>(
+            args[arg_index++], reduce_op);
       }
     } else {
       std::cerr << "Unsupported reduce instruction: " << reduce_op.opcode()
@@ -74,7 +75,12 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
 
   if (param.has_reshape_op()) {
     const auto &reshape_op = param.reshape_op();
-    output_tensor = permute<Vector>(args[arg_index++], reshape_op);
+    if (reshape_op.input().dtype() ==
+        DataTypes::TypeName<INPUT_DATATYPE>::name()) {
+      output_tensor = permute<INPUT_DATATYPE>(args[arg_index++], reshape_op);
+    } else {
+      output_tensor = permute<Vector>(args[arg_index++], reshape_op);
+    }
   }
 
   if (param.has_slicing_op()) {
@@ -138,9 +144,25 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
       output_tensor = matrix_vector_multiply<Input, Psum, Vector>(
           input_tensor, weight_tensor, args[arg_index++], matrix_op);
     } else {
-      output_tensor = gemm<Input, Psum, AccumBuffer, Scale>(
+      AccumBuffer *outputs = gemm<Input, Psum, AccumBuffer, Scale>(
           input_tensor, input_scale, weight_tensor, weight_scale,
           args[arg_index++], param);
+
+      // If accumulation buffer type is different from vector unit type, cast
+      // the output of GEMM to vector unit type
+      if (DataTypes::TypeName<AccumBuffer>::name() !=
+          DataTypes::TypeName<Vector>::name()) {
+        int size = get_size(param.output());
+        Vector *casted_outputs = new Vector[size];
+        for (int i = 0; i < size; i++) {
+          casted_outputs[i] = static_cast<Vector>(outputs[i]);
+        }
+
+        output_tensor = casted_outputs;
+        delete[] outputs;
+      } else {
+        output_tensor = outputs;
+      }
     }
   } else if (param.vector_ops_size() > 0) {
     // fetch the input of the first vector instruction
@@ -155,22 +177,22 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
   }
 
   for (const auto &vector_param : param.vector_ops()) {
+    Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
+
     if (vector_param.opcode().rfind("sqrt", 0) == 0) {
-      Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
       output_tensor = sqrt(input_tensor, get_shape(vector_param.input()));
     } else if (activations.find(vector_param.opcode()) != activations.end()) {
-      Vector *tensor = std::any_cast<Vector *>(output_tensor);
       int input_size = get_size(vector_param.input());
       for (int i = 0; i < input_size; i++) {
         if (vector_param.opcode() == "relu" ||
             vector_param.opcode() == "relu_") {
-          relu(tensor[i]);
+          relu(input_tensor[i]);
         } else if (vector_param.opcode() == "gelu" ||
                    vector_param.opcode() == "gelu_") {
-          gelu(tensor[i]);
+          gelu(input_tensor[i]);
         } else if (vector_param.opcode() == "silu" ||
                    vector_param.opcode() == "silu_") {
-          silu(tensor[i]);
+          silu(input_tensor[i]);
         }
       }
     } else if (arithmetics.find(vector_param.opcode()) != arithmetics.end()) {
@@ -181,7 +203,6 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
       const auto &other =
           use_input ? vector_param.other() : vector_param.input();
 
-      Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
       const auto input_shape = get_shape(input);
 
       Vector *other_tensor;
@@ -215,7 +236,7 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
       }
 
       output_tensor =
-          perform_elwise_operation(input_tensor, input_shape, other_tensor,
+          perform_vector_operation(input_tensor, input_shape, other_tensor,
                                    other_shape, vector_param.opcode());
 
     } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
@@ -227,12 +248,11 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
         if (vector_param.other().shape_size() == 1) {
           // perform quantization operation
           output_tensor = quantize<Vector, Input, Vector>(
-              output_tensor, args[arg_index++], get_size(vector_param.input()));
+              input_tensor, args[arg_index++], get_size(vector_param.input()));
         } else if (vector_param.other().shape_size() > 1) {
           // perform microscaling quantization operation
-          output_tensor = quantizeMX<Vector, Input, Scale>(
-              output_tensor, args[arg_index++], get_size(vector_param.input()),
-              get_size(vector_param.other()));
+          output_tensor = quantize_mx<Vector, Input, Scale>(
+              input_tensor, args[arg_index++], vector_param);
         } else {
           std::cerr << "No quantization operation for dtype: "
                     << vector_param.other().dtype() << std::endl;
@@ -246,13 +266,11 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
         std::abort();
       } else {
         output_tensor = dequantize_tensor<Vector>(
-            output_tensor, args[arg_index++], vector_param.input());
+            input_tensor, args[arg_index++], vector_param.input());
       }
     } else if (vector_param.opcode().rfind("vmap", 0) == 0) {
       const auto &input = vector_param.input();
       const int size = get_size(input);
-
-      Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
 
       DataTypes::bfloat16 *value_map =
           std::any_cast<DataTypes::bfloat16 *>(args[arg_index++]);
@@ -283,23 +301,11 @@ void run_operation(const codegen::Operator param, std::vector<std::any> args) {
     }
   }
 
-  // save the output tensor
-  char *output_bytes = std::any_cast<char *>(args.back());
-
-  if (param.output().dtype() == "bfloat16") {
-    save_tensor<DataTypes::bfloat16>(output_bytes, output_tensor, output_size);
-  } else if (param.output().dtype() == "int8") {
-    save_tensor<DataTypes::int8>(output_bytes, output_tensor, output_size);
-  } else if (param.output().dtype() == "e8m0") {
-    save_tensor<DataTypes::e8m0>(output_bytes, output_tensor, output_size);
-  } else {
-    // assume Input if the output tensor is not bfloat16 or int8
-    save_tensor<Input>(output_bytes, output_tensor, output_size);
-  }
+  return output_tensor;
 }
 
-void run_gold_model(const codegen::Operator &param,
-                    std::vector<std::any> args) {
-  run_operation<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                SCALE_DATATYPE, VECTOR_DATATYPE>(param, args);
+std::any run_gold_model(const codegen::Operator &param,
+                        std::vector<std::any> args) {
+  return run_operation<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
+                       SCALE_DATATYPE, VECTOR_DATATYPE>(param, args);
 }

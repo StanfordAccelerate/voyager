@@ -106,65 +106,65 @@ inline std::vector<int> pad_shape(const std::vector<int> &shape, size_t size) {
   return padded_shape;
 }
 
-// Recursive function to add tensors with broadcasting
 template <typename T>
-inline void perform_elwise_op_recursivly(
-    const T *tensor1, const std::vector<int> &shape1, const T *tensor2,
-    const std::vector<int> &shape2, T *result,
-    const std::vector<int> &result_shape, std::string operation, int dim,
-    int offset1, int offset2, int offset_res) {
-  if (dim == result_shape.size()) {
-    if (operation == "add" || operation == "add_") {
-      result[offset_res] = tensor1[offset1] + tensor2[offset2];
-    } else if (operation == "sub" || operation == "sub_") {
-      result[offset_res] = tensor1[offset1] - tensor2[offset2];
-    } else if (operation == "mul" || operation == "mul_") {
-      result[offset_res] = tensor1[offset1] * tensor2[offset2];
-    } else if (operation == "div" || operation == "div_") {
-      T immediate = 1.0 / tensor2[offset2];
-      result[offset_res] = tensor1[offset1] * immediate;
-    } else {
-      throw std::invalid_argument("Invalid operation: " + operation);
-    }
-    return;
-  }
-
-  int size1 = 1;
-  int size2 = 1;
-  int size_res = 1;
-  for (int i = dim + 1; i < result_shape.size(); i++) {
-    size1 *= shape1[i];
-    size2 *= shape2[i];
-    size_res *= result_shape[i];
-  }
-
-  int stride_res = result_shape[dim];
-
-  for (int i = 0; i < stride_res; i++) {
-    perform_elwise_op_recursivly(tensor1, shape1, tensor2, shape2, result,
-                                 result_shape, operation, dim + 1,
-                                 offset1 + (shape1[dim] == 1 ? 0 : i * size1),
-                                 offset2 + (shape2[dim] == 1 ? 0 : i * size2),
-                                 offset_res + i * size_res);
-  }
-}
-
-// Function to add two tensors with broadcasting
-template <typename T>
-inline T *perform_elwise_operation(const T *tensor1,
+inline T *perform_vector_operation(const T *tensor1,
                                    const std::vector<int> &shape1,
                                    const T *tensor2,
                                    const std::vector<int> &shape2,
-                                   std::string operation) {
+                                   std::string opcode) {
   auto result_shape = broadcast_shape(shape1, shape2);
-  auto padded_shape1 = pad_shape(shape1, result_shape.size());
-  auto padded_shape2 = pad_shape(shape2, result_shape.size());
 
-  int result_size = get_size(result_shape);
-  T *result = new T[result_size];
+  auto shape_a = pad_shape(shape1, result_shape.size());
+  auto shape_b = pad_shape(shape2, result_shape.size());
 
-  perform_elwise_op_recursivly(tensor1, padded_shape1, tensor2, padded_shape2,
-                               result, result_shape, operation, 0, 0, 0, 0);
+  int num_dims = result_shape.size();
+
+  int total_elements = get_size(result_shape);
+  T *result = new T[total_elements];
+
+  for (int i = 0; i < total_elements; ++i) {
+    std::vector<int> indices = get_indices(i, result_shape);
+
+    // Map indices to indices_a with broadcasting
+    std::vector<int> indices_a(num_dims);
+    for (size_t d = 0; d < num_dims; ++d) {
+      if (shape_a[d] == result_shape[d]) {
+        indices_a[d] = indices[d];  // Match
+      } else if (result_shape[d] % shape_a[d] == 0) {
+        indices_a[d] = indices[d] / (result_shape[d] / shape_a[d]);
+      } else {
+        throw std::runtime_error("Invalid shape for broadcasting!");
+      }
+    }
+
+    // Map indices_a to indices_b with broadcasting
+    std::vector<int> indices_b(num_dims);
+    for (int d = 0; d < num_dims; ++d) {
+      if (shape_b[d] == result_shape[d]) {
+        indices_b[d] = indices[d];  // Match
+      } else if (result_shape[d] % shape_b[d] == 0) {
+        indices_b[d] = indices[d] / (result_shape[d] / shape_b[d]);
+      } else {
+        throw std::runtime_error("Invalid shape for broadcasting!");
+      }
+    }
+
+    int flat_idx_a = get_flat_index(indices_a, shape_a);
+    int flat_idx_b = get_flat_index(indices_b, shape_b);
+
+    if (opcode == "add" || opcode == "add_") {
+      result[i] = tensor1[flat_idx_a] + tensor2[flat_idx_b];
+    } else if (opcode == "sub" || opcode == "sub_") {
+      result[i] = tensor1[flat_idx_a] - tensor2[flat_idx_b];
+    } else if (opcode == "mul" || opcode == "mul_") {
+      result[i] = tensor1[flat_idx_a] * tensor2[flat_idx_b];
+    } else if (opcode == "div" || opcode == "div_") {
+      T immediate = 1.0 / tensor2[flat_idx_b];
+      result[i] = tensor1[flat_idx_a] * immediate;
+    } else {
+      throw std::invalid_argument("Invalid opcode: " + opcode);
+    }
+  }
 
   delete[] tensor1;
   delete[] tensor2;

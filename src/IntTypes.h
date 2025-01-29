@@ -16,6 +16,7 @@ class Int {
   typedef ac_int<W, S> ac_int_rep;
 
   static constexpr unsigned int width = W;
+  static constexpr float max_value = (1 << (W - 1)) - 1;
 
   typedef Int<W, S> Decoded;
   typedef ac_fixed<2 * W, W, true> ac_int_to_fixed_rep;

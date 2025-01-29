@@ -37,22 +37,33 @@ inline int get_size(const codegen::Tensor &tensor) {
   return get_size(shape);
 }
 
-// Helper function to compute strides
-inline std::vector<int> compute_strides(const std::vector<int> &shape) {
-  std::vector<int> strides(shape.size());
-  strides.back() = 1;
-  for (int i = shape.size() - 2; i >= 0; --i) {
-    strides[i] = strides[i + 1] * shape[i + 1];
+// Function to compute multi-dimensional indices from a flat index
+inline std::vector<int> get_indices(int flat_idx,
+                                    const std::vector<int> &shape) {
+  int num_dims = shape.size();
+  std::vector<int> indices(num_dims, 0);
+  for (int i = num_dims - 1; i >= 0; --i) {
+    indices[i] = flat_idx % shape[i];
+    flat_idx /= shape[i];
   }
-  return strides;
+  return indices;
 }
 
-// Helper function to compute the linear index from multi-dimensional indices
-inline int compute_linear_index(const std::vector<int> &indices,
-                                const std::vector<int> &strides) {
-  int linear_index = 0;
-  for (size_t i = 0; i < indices.size(); ++i) {
-    linear_index += indices[i] * strides[i];
+// Function to compute flat index from multi-dimensional indices
+inline int get_flat_index(const std::vector<int> &indices,
+                          const std::vector<int> &shape) {
+  int flat_idx = 0, multiplier = 1;
+  for (int i = shape.size() - 1; i >= 0; --i) {
+    flat_idx += indices[i] * multiplier;
+    multiplier *= shape[i];
   }
-  return linear_index;
+  return flat_idx;
+}
+
+inline void print_shape(const std::vector<int> &shape) {
+  std::cerr << "(";
+  for (size_t i = 0; i < shape.size(); ++i) {
+    std::cerr << shape[i] << (i + 1 < shape.size() ? ", " : ")");
+  }
+  std::cerr << std::endl;
 }

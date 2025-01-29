@@ -3,7 +3,7 @@
 #include "xtensor/xadapt.hpp"
 #include "xtensor/xarray.hpp"
 
-DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut)
+DataLoader::DataLoader(ArrayMemory* memory_interface, bool is_dut)
     : memory_interface(memory_interface), is_dut(is_dut) {}
 
 void DataLoader::load_tensor(const codegen::Tensor& tensor,
@@ -11,8 +11,17 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
                              bool replication) {
   auto repeated_field = tensor.shape();
   std::vector<size_t> shape(repeated_field.begin(), repeated_field.end());
+
   int size = 1;
-  for (int dim : shape) size *= dim;
+  for (int dim : shape) {
+    size *= dim;
+  }
+
+  // if size is 1, then it is a scalar, so it should not be
+  // written to memory
+  if (size == 1) {
+    return;
+  }
 
   std::string filename = data_dir + "/" + tensor.node() + ".bin";
   auto array_ptr = read_tensor_from_file(filename, size);
@@ -31,15 +40,10 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   int partition = memory.partition();
   long long offset = memory.offset();
 
-  // if size is 1, then it is a scalar, so it should not be
-  // written to memory
-  if (size == 1) {
-    return;
-  }
-
-  // std::cerr << "Loading tensor file " << filename << std::endl;
-  // std::cerr << "Datatype: " << tensor.dtype() << std::endl;
-  // std::cerr << "Offset: " << offset << std::endl;
+  std::cerr << "Loading tensor file " << filename << std::endl;
+  std::cerr << "Datatype: " << tensor.dtype() << std::endl;
+  std::cerr << "Offset: " << offset << std::endl;
+  std::cerr << "transpose: " << transpose << std::endl;
 
   // number of elements packed into a single word for replication
   const int packing_factor = IC_DIMENSION / 4 * 3;
@@ -50,24 +54,27 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
     if (tensor.dtype() == "int8") {
-      memory_interface->write_to_memory<DataTypes::int8>(offset, address, *it,
-                                                         partition);
+      memory_interface->write_data_to_memory<DataTypes::int8>(offset, partition,
+                                                              address, *it);
     } else if (tensor.dtype() == "bfloat16") {
-      memory_interface->write_to_memory<DataTypes::bfloat16>(offset, address,
-                                                             *it, partition);
+      memory_interface->write_data_to_memory<DataTypes::bfloat16>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "int24") {
-      memory_interface->write_to_memory<DataTypes::int24>(offset, address, *it,
-                                                          partition);
+      memory_interface->write_data_to_memory<DataTypes::int24>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "int32") {
-      memory_interface->write_to_memory<DataTypes::int32>(offset, address, *it,
-                                                          partition);
+      memory_interface->write_data_to_memory<DataTypes::int32>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "e8m0") {
-      memory_interface->write_to_memory<DataTypes::e8m0>(offset, address, *it,
-                                                         partition);
+      memory_interface->write_data_to_memory<DataTypes::e8m0>(offset, partition,
+                                                              address, *it);
+    } else if (tensor.dtype() == "fp8_e5m3") {
+      memory_interface->write_data_to_memory<DataTypes::fp8_e5m3>(
+          offset, partition, address, *it);
     } else {
       // if unspecified, we will assume it's INPUT_DATATYPE
-      memory_interface->write_to_memory<INPUT_DATATYPE>(offset, address, *it,
-                                                        partition);
+      memory_interface->write_data_to_memory<INPUT_DATATYPE>(offset, partition,
+                                                             address, *it);
     }
 
     address++;
@@ -101,7 +108,7 @@ void DataLoader::load_inputs(const codegen::Operator param,
       load_tensor(matrix_op.mx_input().scale(), data_dir, is_conv2d);
     }
 
-    if (matrix_op.opcode() == "matmul") {
+    if (matrix_op.opcode() == "matmul" || matrix_op.opcode() == "matmul_mx") {
       const auto& weight = matrix_op.has_mx_weight()
                                ? matrix_op.mx_weight().input()
                                : matrix_op.weight();
@@ -146,7 +153,8 @@ void DataLoader::load_inputs(const codegen::Operator param,
 
 void DataLoader::load_weights(const codegen::Operator param,
                               std::string data_dir, bool random_data) {
-  if (param.has_matrix_op() && param.matrix_op().opcode() != "matmul") {
+  if (param.has_matrix_op() && param.matrix_op().opcode() != "matmul" &&
+      param.matrix_op().opcode() != "matmul_mx") {
     const auto matrix_op = param.matrix_op();
     const auto input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
                                                 : matrix_op.input();
@@ -210,11 +218,6 @@ void DataLoader::load_outputs(const codegen::Operator param,
                    param.matrix_op().opcode() == "conv2d_mx" ||
                    param.has_pooling_op();
   load_tensor(output_tensor, data_dir, transpose);
-}
-
-bool DataLoader::is_double_precision(const codegen::Tensor& tensor) {
-  // FIXME: replace with proper check
-  return false;
 }
 
 float* DataLoader::read_tensor_from_file(const std::string& filename,

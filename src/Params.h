@@ -55,7 +55,7 @@ struct MatrixParams : BaseParams {
     CONCAT_HEAD_WEIGHTS = false;
     TRANPOSE_INPUTS = false;
 
-    headSizeInPowerOfTwo = 32;
+    headSizeInPowerOfTwo = 0;
   }
 #endif
 

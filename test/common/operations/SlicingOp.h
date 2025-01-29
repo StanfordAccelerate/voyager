@@ -7,7 +7,6 @@ inline T* slice(std::any input_tensor, const codegen::SlicingOp param,
                 const codegen::Tensor input) {
   const auto repeated_field = input.shape();
   const std::vector<int> shape(repeated_field.begin(), repeated_field.end());
-  const auto strides = compute_strides(shape);
 
   const int dim = param.dim() < 0 ? param.dim() + shape.size() : param.dim();
   const int start = param.start();
@@ -33,7 +32,8 @@ inline T* slice(std::any input_tensor, const codegen::SlicingOp param,
       }
     }
 
-    outputs[i] = inputs[compute_linear_index(indices, strides)];
+    int flat_index = get_flat_index(indices, shape);
+    outputs[i] = inputs[flat_index];
   }
 
   return outputs;

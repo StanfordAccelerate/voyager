@@ -38,7 +38,7 @@ class Simulation {
 
   Network *network;
   std::vector<codegen::Operator> params;
-  std::map<std::string, MemoryInterface *> memories;
+  std::map<std::string, ArrayMemory *> memories;
   std::map<std::string, DataLoader *> dataLoaders;
 
  private:

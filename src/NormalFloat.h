@@ -11,32 +11,32 @@
 template <typename T>
 inline ac_int<4, false> get_nf4_index(T val) {
   // -31, -22, -16, -12, -9, -6, -3, 0, 2, 5, 8, 10, 14, 17, 22, 31
-  if (val <= 1) {
-    if (val <= -10.5) {
-      if (val <= -19.0) {
-        return val <= -26.5 ? 0 : 1;
+  if (val <= static_cast<T>(1)) {
+    if (val <= static_cast<T>(-10.5)) {
+      if (val <= static_cast<T>(-19.0)) {
+        return val <= static_cast<T>(-26.5) ? 0 : 1;
       } else {
-        return val <= -14.0 ? 2 : 3;
+        return val <= static_cast<T>(-14.0) ? 2 : 3;
       }
     } else {
-      if (val <= -4.5) {
-        return val <= -7.5 ? 4 : 5;
+      if (val <= static_cast<T>(-4.5)) {
+        return val <= static_cast<T>(-7.5) ? 4 : 5;
       } else {
-        return val <= -1.5 ? 6 : 7;
+        return val <= static_cast<T>(-1.5) ? 6 : 7;
       }
     }
   } else {
-    if (val <= 12.0) {
-      if (val < 6.5) {
-        return val < 3.5 ? 8 : 9;
+    if (val <= static_cast<T>(12.0)) {
+      if (val < static_cast<T>(6.5)) {
+        return val < static_cast<T>(3.5) ? 8 : 9;
       } else {
-        return val < 9.0 ? 10 : 11;
+        return val < static_cast<T>(9.0) ? 10 : 11;
       }
     } else {
-      if (val < 19.5) {
-        return val < 15.5 ? 12 : 13;
+      if (val < static_cast<T>(19.5)) {
+        return val < static_cast<T>(15.5) ? 12 : 13;
       } else {
-        return val < 26.5 ? 14 : 15;
+        return val < static_cast<T>(26.5) ? 14 : 15;
       }
     }
   }
@@ -48,6 +48,7 @@ class NormalFloat {
   typedef ac_int<nbits, false> ac_int_rep;
 
   static constexpr unsigned int width = nbits;
+  static constexpr float max_value = (1 << ibits) - 1;
 
   typedef Int<ibits + 1, true> Decoded;
 
@@ -96,7 +97,7 @@ class NormalFloat {
 
 template <int nbits, int ibits>
 NormalFloat<nbits, ibits>::NormalFloat(const float val) {
-  encoding = get_nf4_index(val);
+  encoding = val;
 }
 #endif
 

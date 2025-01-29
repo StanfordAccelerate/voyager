@@ -2,51 +2,42 @@
 
 #include "test/common/operations/Common.h"
 
-template <typename Input, typename Scale>
+template <typename Input, typename Scale, typename Output>
 Scale* calculate_mx_qparam(std::any input_tensor,
                            const codegen::ReduceOp& param) {
   Input* inputs = std::any_cast<Input*>(input_tensor);
 
+  const auto& shape = get_shape(param.input());
+
   int mx_axis = param.dim(0);
-  if (mx_axis == -1) {
-    mx_axis = param.input().shape().size() - 1;
+  if (mx_axis < 0) {
+    mx_axis += shape.size();
   }
-  int mx_axis_size = param.input().shape(mx_axis);
+  int mx_axis_size = shape[mx_axis];
 
-  int tensor_size = 1;
-  for (int i = 0; i < param.input().shape().size(); i++) {
-    tensor_size *= param.input().shape(i);
-  }
-
+  int tensor_size = get_size(param.input());
   int outer_size = tensor_size / mx_axis_size;
-
-  // assume block size is 32
   int block_size = std::min(mx_axis_size, 32);
-
   int num_blocks = (mx_axis_size + block_size - 1) / block_size;
+
+  std::vector<int> output_shape(shape);
+  output_shape[mx_axis] = num_blocks;
+
+  float* amax_arr = new float[num_blocks * outer_size];
+  std::fill(amax_arr, amax_arr + num_blocks * outer_size, 0);
+
+  for (int i = 0; i < tensor_size; i++) {
+    auto indices = get_indices(i, shape);
+    indices[mx_axis] = indices[mx_axis] / block_size;
+
+    int index = get_flat_index(indices, output_shape);
+    amax_arr[index] = std::max(amax_arr[index], abs(inputs[i]));
+  }
 
   Scale* outputs = new Scale[num_blocks * outer_size];
 
-  for (int i = 0; i < outer_size; i++) {
-    for (int c = 0; c < num_blocks; c++) {
-      ac_int<Input::exponent_width, false> max_exponent = 0;
-
-      int index = i * num_blocks + c;
-
-      for (int block = 0; block < block_size; block++) {
-        int input_index = i * mx_axis_size + c * block_size + block;
-
-        ac_int<Input::exponent_width, false> exponent =
-            inputs[input_index].unbiased_exponent();
-
-        max_exponent = std::max(max_exponent, exponent);
-      }
-
-      // FIXME: 6 is hardcoded for INT8
-      ac_int<Input::exponent_width, true> scaled_exponent = max_exponent - 6;
-
-      outputs[index].set_bits(scaled_exponent);
-    }
+  for (int i = 0; i < outer_size * num_blocks; i++) {
+    outputs[i] = amax_arr[i] / Output::max_value;
   }
 
   delete[] inputs;
