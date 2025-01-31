@@ -12,29 +12,21 @@ void MapMXQparam(const codegen::Operator &param,
   AcceleratorMemoryMap accelerator_memory_map;
 
   const auto &reduce_op = param.reduce_op();
-  const auto vector_input = reduce_op.input();
+  const auto &vector_input = reduce_op.input();
+  const auto &input_shape = get_tensor_shape(vector_input);
 
   int mx_axis = reduce_op.dim(0);
-  if (mx_axis == -1) {
-    mx_axis = reduce_op.input().shape().size() - 1;
+  if (mx_axis < 0) {
+    mx_axis += reduce_op.input().shape_size();
   }
-  int reduction_dim_size = reduce_op.input().shape(mx_axis);
-
-  int tensor_dim_size = 1;
-  for (int i = 0; i < reduce_op.input().shape().size(); i++) {
-    tensor_dim_size *= reduce_op.input().shape(i);
-  }
-  tensor_dim_size /= reduction_dim_size;
+  int reduction_dim_size = input_shape[mx_axis];
 
   // assume block size of 32
   int block_size = 32;
 
-  int dim = 1;
-  for (int i = 0; i < vector_input.shape_size(); i++) {
-    dim *= vector_input.shape(i);
-  }
+  int dim = get_size(vector_input);
   int dim_factors[2];
-  factorizeForAddressGen(dim / OC_DIMENSION, dim_factors);
+  factorize_for_address_gen(dim / OC_DIMENSION, dim_factors);
 
   // inputs
   const auto input_memory = vector_input.memory();
@@ -58,7 +50,8 @@ void MapMXQparam(const codegen::Operator &param,
       DataTypes::TypeName<INPUT_DATATYPE>::name() != vector_input.dtype();
 
   int output_dim_factors[2];
-  factorizeForAddressGen(dim / OC_DIMENSION / block_size, output_dim_factors);
+  factorize_for_address_gen(dim / OC_DIMENSION / block_size,
+                            output_dim_factors);
 
   // output
   const auto output_mem = param.output().memory();
@@ -77,8 +70,7 @@ void MapMXQparam(const codegen::Operator &param,
     vector_params->outputWeightLoopIndex[i] = 2;
   }
 
-  vector_params->output_vector_type = false;
-  vector_params->OUTPUT_QUANTIZE = false;
+  vector_params->output_scale_type = true;
 
   // inst 0 - start reduction engine to calculate mx scale
   VectorInstructions vinst0;

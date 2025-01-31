@@ -50,6 +50,11 @@ class StdFloat {
 
   static Decoded max() { return ac_float_rep::max(); }
 
+  StdFloat abs() {
+    StdFloat r(float_val.abs());
+    return r;
+  }
+
   void negate() { float_val = -float_val; }
 
   void relu() {

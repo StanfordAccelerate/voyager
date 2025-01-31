@@ -28,10 +28,15 @@ class UFloat {
 #endif
 
   template <int W2, int E2>
-  UFloat(const ac_std_float<W2, E2> &i) {
-    ac_float_rep tmp = i.abs();
-    d = tmp.data();
+  UFloat(const ac_std_float<W2, E2> &other) {
+    ac_float_rep r(other.abs());
+    d = r.data();
   }
+
+  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+            ac_q_mode Q>
+  UFloat(const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &other)
+      : UFloat(other.float_val) {}
 
   ac_float_rep to_ac_float() const {
     ac_float_rep result;

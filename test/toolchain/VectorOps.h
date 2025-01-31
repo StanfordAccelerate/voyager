@@ -303,7 +303,7 @@ void MapVectorOperations(const codegen::Operator &param,
         }
 
         int other_dim_factors[2];
-        factorizeForAddressGen(total_size / OC_DIMENSION, other_dim_factors);
+        factorize_for_address_gen(total_size / OC_DIMENSION, other_dim_factors);
 
         other_dim_factors[1] *= OC_DIMENSION;
         other_shape = {other_dim_factors[0], other_dim_factors[1]};
@@ -383,8 +383,10 @@ void MapVectorOperations(const codegen::Operator &param,
                 vinst.immediate1 = immediate.bits_rep();
               }
             } else {
-              const auto input_shape = get_input_shape(it->input());
-              const auto other_shape = get_input_shape(it->other());
+              const auto input_shape =
+                  get_shape_after_fused_reshape_or_slicing(it->input());
+              const auto other_shape =
+                  get_shape_after_fused_reshape_or_slicing(it->other());
               const auto output_shape =
                   squeeze_shape(broadcast_shape(input_shape, other_shape));
 

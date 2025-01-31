@@ -67,7 +67,7 @@ int getLargestFactor(const int dim) {
   return largestFactor;
 }
 
-void factorizeForAddressGen(const int dim, int *factors) {
+void factorize_for_address_gen(const int dim, int *factors) {
   if (dim > 1024) {
     int largestFactor = getLargestFactor(dim);
     factors[0] = dim / largestFactor;
@@ -82,7 +82,8 @@ inline std::vector<int> get_tensor_shape(const codegen::Tensor &tensor) {
   return std::vector<int>(tensor.shape().begin(), tensor.shape().end());
 }
 
-inline std::vector<int> get_input_shape(const codegen::Tensor &tensor) {
+inline std::vector<int> get_shape_after_fused_reshape_or_slicing(
+    const codegen::Tensor &tensor) {
   if (tensor.has_reshape()) {
     const auto &param = tensor.reshape();
     return {param.output_sizes().begin(), param.output_sizes().end()};
@@ -114,7 +115,7 @@ inline int get_size(const std::vector<int> &shape) {
 }
 
 inline int get_size(const codegen::Tensor &tensor) {
-  const auto shape = get_input_shape(tensor);
+  const auto shape = get_shape_after_fused_reshape_or_slicing(tensor);
   return get_size(shape);
 }
 

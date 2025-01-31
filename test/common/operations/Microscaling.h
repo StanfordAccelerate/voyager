@@ -2,10 +2,10 @@
 
 #include "test/common/operations/Common.h"
 
-template <typename Input, typename Scale, typename Output>
+template <typename Vector, typename Scale, typename Input>
 Scale* calculate_mx_qparam(std::any input_tensor,
                            const codegen::ReduceOp& param) {
-  Input* inputs = std::any_cast<Input*>(input_tensor);
+  Vector* inputs = std::any_cast<Vector*>(input_tensor);
 
   const auto& shape = get_shape(param.input());
 
@@ -22,18 +22,18 @@ Scale* calculate_mx_qparam(std::any input_tensor,
   Scale* outputs = new Scale[result_size];
 
   for (int i = 0; i < result_size; i++) {
-    float max_value = 0;
+    Vector max_value = 0;
 
     for (int block = 0; block < block_size; block++) {
       int index = i * block_size + block;
-      max_value = std::max(max_value, abs(inputs[index]));
+      max_value = std::max(max_value, Vector(abs(inputs[index])));
     }
 
     if constexpr (Scale::width == Scale::exponent_width) {
-      int power_of_two = floor(log2(max_value)) - floor(log2(Output::max()));
+      int power_of_two = floor(log2(max_value)) - floor(log2(Input::max()));
       outputs[i] = max_value == 0 ? 1 : pow(2, power_of_two);
     } else {
-      float scale = max_value / static_cast<float>(Output::max());
+      float scale = max_value / Input::max();
       outputs[i] = max_value == 0 ? 1 : scale;
     }
   }
@@ -42,10 +42,10 @@ Scale* calculate_mx_qparam(std::any input_tensor,
   return outputs;
 }
 
-// template <typename Input, typename Scale, typename Output>
+// template <typename Vector, typename Scale, typename Input>
 // Scale* calculate_mx_qparam(std::any input_tensor,
 //                            const codegen::ReduceOp& param) {
-//   Input* inputs = std::any_cast<Input*>(input_tensor);
+//   Vector* inputs = std::any_cast<Vector*>(input_tensor);
 
 //   const auto& shape = get_shape(param.input());
 
@@ -77,9 +77,9 @@ Scale* calculate_mx_qparam(std::any input_tensor,
 //   for (int i = 0; i < result_size; i++) {
 //     if constexpr (Scale::width == Scale::exponent_width) {
 //       int power_of_two = floor(log2(amax_arr[i])) -
-//       floor(log2(Output::max())); outputs[i] = pow(2, power_of_two);
+//       floor(log2(Input::max())); outputs[i] = pow(2, power_of_two);
 //     } else {
-//       outputs[i] = amax_arr[i] / static_cast<float>(Output::max());
+//       outputs[i] = amax_arr[i] / static_cast<float>(Input::max());
 //     }
 //   }
 

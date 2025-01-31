@@ -517,6 +517,7 @@ struct VectorParams : BaseParams {
 
 #ifndef __SYNTHESIS__
   VectorParams() {
+    addressGen0Mode = 0;
     VECTOR_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -531,19 +532,7 @@ struct VectorParams : BaseParams {
     vec0DequantizeScale = 0;
     fetch_vector_type_0 = false;
 
-    addressGen0Broadcast = 0;
-
-    VECTOR_INPUT0_SLICING = false;
-    addressGen0Dim = 0;
-    addressGen0Start = 0;
-    addressGen0End = 0;
-    addressGen0Stride = 0;
-
-    VECTOR_INPUT0_RESHAPE = false;
-    for (int i = 0; i < 6; i++) {
-      addressGen0AxisOrder[i] = i;
-    }
-
+    addressGen1Mode = 0;
     ADDRESS_GEN1_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -557,8 +546,8 @@ struct VectorParams : BaseParams {
     }
     vec1DequantizeScale = 0;
     fetch_vector_type_1 = false;
-    fetch_scale_type_1 = false;
 
+    addressGen2Mode = 0;
     ADDRESS_GEN2_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -573,6 +562,7 @@ struct VectorParams : BaseParams {
     vec2DequantizeScale = 0;
     fetch_vector_type_2 = false;
 
+    outputAddressMode = 1;
     VECTOR_OUTPUT_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -584,12 +574,25 @@ struct VectorParams : BaseParams {
       outputYLoopIndex[i] = 0;
       outputWeightLoopIndex[i] = 0;
     }
+    outputQuantizeScale = 0;
     output_vector_type = false;
 
-    addressGen0Mode = 0;
-    addressGen1Mode = 0;
-    addressGen2Mode = 0;
-    outputAddressMode = 1;
+    addressGen0Broadcast = 0;
+
+    VECTOR_INPUT0_SLICING = false;
+    addressGen0Dim = 0;
+    addressGen0Start = 0;
+    addressGen0End = 0;
+    addressGen0Stride = 0;
+
+    VECTOR_INPUT0_RESHAPE = false;
+    for (int i = 0; i < 6; i++) {
+      addressGen0AxisOrder[i] = i;
+    }
+
+    fetch_scale_type_1 = false;
+    output_scale_type = false;
+    mx_block_size = 0;
 
     headSizeInPowerOfTwo = 32;
     SPLIT_OUTPUT = false;
@@ -603,8 +606,9 @@ struct VectorParams : BaseParams {
   }
 #endif
 
-  // Address Gen 0 (vector input)
-  unsigned long long VECTOR_OFFSET;
+  // Address generator 0 (vector input)
+  ac_int<2, false> addressGen0Mode;
+  uint64_t VECTOR_OFFSET;
   ac_int<11, false> addressGen0Loop[2][3];
   ac_int<3, false> addressGen0InputXLoopIndex[2];
   ac_int<3, false> addressGen0InputYLoopIndex[2];
@@ -612,10 +616,40 @@ struct VectorParams : BaseParams {
   ac_int<16, false> vec0DequantizeScale;
   bool fetch_vector_type_0;
 
-  // A vector where each bit represents if the corresponding dimension is
-  // broadcasted
+  // Address generator 1 (op0src1)
+  ac_int<2, false> addressGen1Mode;
+  uint64_t ADDRESS_GEN1_OFFSET;
+  ac_int<11, false> addressGen1Loops[2][3];
+  ac_int<3, false> addressGen1InputXLoopIndex[2];
+  ac_int<3, false> addressGen1InputYLoopIndex[2];
+  ac_int<3, false> addressGen1WeightLoopIndex[2];
+  ac_int<16, false> vec1DequantizeScale;
+  bool fetch_vector_type_1;
+
+  // Address generator 2 (op3src1)
+  ac_int<2, false> addressGen2Mode;
+  uint64_t ADDRESS_GEN2_OFFSET;
+  ac_int<11, false> addressGen2Loops[2][3];
+  ac_int<3, false> addressGen2InputXLoopIndex[2];
+  ac_int<3, false> addressGen2InputYLoopIndex[2];
+  ac_int<3, false> addressGen2WeightLoopIndex[2];
+  ac_int<16, false> vec2DequantizeScale;
+  bool fetch_vector_type_2;
+
+  // Output address generator
+  ac_int<2, false> outputAddressMode;
+  uint64_t VECTOR_OUTPUT_OFFSET;
+  ac_int<11, false> outputLoops[2][3];
+  ac_int<3, false> outputXLoopIndex[2];
+  ac_int<3, false> outputYLoopIndex[2];
+  ac_int<3, false> outputWeightLoopIndex[2];
+  ac_int<16, false> outputQuantizeScale;
+  bool output_vector_type;
+
+  // Address generator 0 broadcast
   ac_int<6, false> addressGen0Broadcast;
 
+  // Address generator 0 slicing and reshape
   bool VECTOR_INPUT0_SLICING;
   ac_int<3, false> addressGen0Dim;
   ac_int<11, false> addressGen0Start;
@@ -625,38 +659,10 @@ struct VectorParams : BaseParams {
   bool VECTOR_INPUT0_RESHAPE;
   ac_int<3, false> addressGen0AxisOrder[6];
 
-  // Address Gen 1 (op0src1)
-  unsigned long long ADDRESS_GEN1_OFFSET;
-  ac_int<11, false> addressGen1Loops[2][3];
-  ac_int<3, false> addressGen1InputXLoopIndex[2];
-  ac_int<3, false> addressGen1InputYLoopIndex[2];
-  ac_int<3, false> addressGen1WeightLoopIndex[2];
-  ac_int<16, false> vec1DequantizeScale;
-  bool fetch_vector_type_1;
+  // Microscaling flags
   bool fetch_scale_type_1;
+  bool output_scale_type;
   ac_int<8, false> mx_block_size;
-
-  // Address Gen 2 (op3src1)
-  unsigned long long ADDRESS_GEN2_OFFSET;
-  ac_int<11, false> addressGen2Loops[2][3];
-  ac_int<3, false> addressGen2InputXLoopIndex[2];
-  ac_int<3, false> addressGen2InputYLoopIndex[2];
-  ac_int<3, false> addressGen2WeightLoopIndex[2];
-  ac_int<16, false> vec2DequantizeScale;
-  bool fetch_vector_type_2;
-
-  unsigned long long VECTOR_OUTPUT_OFFSET;
-  ac_int<11, false> outputLoops[2][3];
-  ac_int<3, false> outputXLoopIndex[2];
-  ac_int<3, false> outputYLoopIndex[2];
-  ac_int<3, false> outputWeightLoopIndex[2];
-  ac_int<16, false> outputQuantizeScale;
-  bool output_vector_type;
-
-  ac_int<2, false> addressGen0Mode;
-  ac_int<2, false> addressGen1Mode;
-  ac_int<2, false> addressGen2Mode;
-  ac_int<2, false> outputAddressMode;
 
   // Transformer head permutation
   ac_int<4, false> headSizeInPowerOfTwo;
@@ -669,20 +675,23 @@ struct VectorParams : BaseParams {
   bool MAXPOOL;
   bool AVGPOOL;
 
-  // Each address generator has a 64-bit offset, 6 11-bit loop boundaries, 6
-  // 3-bit loop indices, a 16-bit dequantize scale and a double precision
-  // boolean flag
-  static const unsigned int address_gen_width = 64 + 6 * 11 + 6 * 3 + 16 + 1;
+  // Each address generator has a 2-bit mode flag, 64-bit address, 6 11-bit loop
+  // boundaries, 6 3-bit loop indices, a 16-bit dequantize scale and a vector
+  // type output boolean flag
+  static const unsigned int address_gen_width =
+      2 + 64 + 6 * 11 + 6 * 3 + 16 + 1;
 
-  // 4 address generators + 4 2-bit generator mode + 7 boolean flags + 8-bit
-  // head size + 8-bit broadcast count + addr generator 0 start, end, stride,
-  // and misc values
+  // There are 4 address generators in total + 6-bit broadcasting flag + 36-bit
+  // slicing params + 18-bit reshape params + 8-bit mx block size + 4-bit head
+  // size + 10 boolean flags
   static const unsigned int width =
-      4 * address_gen_width + 4 * 2 + 7 + 4 + 8 + 62;
+      4 * address_gen_width + 6 + 36 + 18 + 8 + 4 + 10;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
+    // Address generator 0
+    m & addressGen0Mode;
     m & VECTOR_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -701,19 +710,8 @@ struct VectorParams : BaseParams {
     m & vec0DequantizeScale;
     m & fetch_vector_type_0;
 
-    m & addressGen0Broadcast;
-
-    m & VECTOR_INPUT0_SLICING;
-    m & addressGen0Dim;
-    m & addressGen0Start;
-    m & addressGen0End;
-    m & addressGen0Stride;
-
-    m & VECTOR_INPUT0_RESHAPE;
-    for (int i = 0; i < 6; i++) {
-      m& addressGen0AxisOrder[i];
-    }
-
+    // Address generator 1
+    m & addressGen1Mode;
     m & ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -732,9 +730,8 @@ struct VectorParams : BaseParams {
     m & vec1DequantizeScale;
     m & fetch_vector_type_1;
 
-    m & fetch_scale_type_1;
-    m & mx_block_size;
-
+    // Address generator 2
+    m & addressGen2Mode;
     m & ADDRESS_GEN2_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -753,6 +750,8 @@ struct VectorParams : BaseParams {
     m & vec2DequantizeScale;
     m & fetch_vector_type_2;
 
+    // Output address generator
+    m & outputAddressMode;
     m & VECTOR_OUTPUT_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -771,11 +770,26 @@ struct VectorParams : BaseParams {
     m & outputQuantizeScale;
     m & output_vector_type;
 
-    m & addressGen0Mode;
-    m & addressGen1Mode;
-    m & addressGen2Mode;
-    m & outputAddressMode;
+    m & addressGen0Broadcast;
 
+    // Slicing and reshape
+    m & VECTOR_INPUT0_SLICING;
+    m & addressGen0Dim;
+    m & addressGen0Start;
+    m & addressGen0End;
+    m & addressGen0Stride;
+
+    m & VECTOR_INPUT0_RESHAPE;
+    for (int i = 0; i < 6; i++) {
+      m& addressGen0AxisOrder[i];
+    }
+
+    // Microscaling flags
+    m & fetch_scale_type_1;
+    m & output_scale_type;
+    m & mx_block_size;
+
+    // Transformer head permutation flags
     m & headSizeInPowerOfTwo;
     m & SPLIT_OUTPUT;
     m & CONCAT_OUTPUT;
@@ -795,6 +809,7 @@ struct VectorParams : BaseParams {
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorParams& params) {
+    os << "addressGen0Mode: " << params.addressGen0Mode << std::endl;
     os << "VECTOR_OFFSET: " << params.VECTOR_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -814,26 +829,10 @@ struct VectorParams : BaseParams {
       os << "addressGen0WeightLoopIndex[" << i
          << "]: " << params.addressGen0WeightLoopIndex[i] << std::endl;
     }
-    os << "fetch_vector_type_0: " << params.fetch_vector_type_0 << std::endl;
-    os << "addressGen0Mode: " << params.addressGen0Mode << std::endl;
     os << "vec0DequantizeScale: " << params.vec0DequantizeScale << std::endl;
+    os << "fetch_vector_type_0: " << params.fetch_vector_type_0 << std::endl;
 
-    os << "addressGen0Broadcast: " << params.addressGen0Broadcast << std::endl;
-
-    os << "VECTOR_INPUT0_SLICING: " << params.VECTOR_INPUT0_SLICING
-       << std::endl;
-    os << "addressGen0Dim: " << params.addressGen0Dim << std::endl;
-    os << "addressGen0Start: " << params.addressGen0Start << std::endl;
-    os << "addressGen0End: " << params.addressGen0End << std::endl;
-    os << "addressGen0Stride: " << params.addressGen0Stride << std::endl;
-
-    os << "VECTOR_INPUT0_RESHAPE: " << params.VECTOR_INPUT0_RESHAPE
-       << std::endl;
-    for (int i = 0; i < 6; i++) {
-      os << "addressGen0AxisOrder[" << i
-         << "]: " << params.addressGen0AxisOrder[i] << std::endl;
-    }
-
+    os << "addressGen1Mode: " << params.addressGen1Mode << std::endl;
     os << "ADDRESS_GEN1_OFFSET: " << params.ADDRESS_GEN1_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -855,10 +854,8 @@ struct VectorParams : BaseParams {
     }
     os << "vec1DequantizeScale: " << params.vec1DequantizeScale << std::endl;
     os << "fetch_vector_type_1: " << params.fetch_vector_type_1 << std::endl;
-    os << "fetch_scale_type_1: " << params.fetch_scale_type_1 << std::endl;
-    os << "mx_block_size: " << params.mx_block_size << std::endl;
-    os << "addressGen1Mode: " << params.addressGen1Mode << std::endl;
 
+    os << "addressGen2Mode: " << params.addressGen2Mode << std::endl;
     os << "ADDRESS_GEN2_OFFSET: " << params.ADDRESS_GEN2_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -880,8 +877,8 @@ struct VectorParams : BaseParams {
     }
     os << "vec2DequantizeScale: " << params.vec2DequantizeScale << std::endl;
     os << "fetch_vector_type_2: " << params.fetch_vector_type_2 << std::endl;
-    os << "addressGen2Mode: " << params.addressGen2Mode << std::endl;
 
+    os << "outputAddressMode: " << params.outputAddressMode << std::endl;
     os << "VECTOR_OUTPUT_OFFSET: " << params.VECTOR_OUTPUT_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -901,8 +898,28 @@ struct VectorParams : BaseParams {
       os << "outputWeightLoopIndex[" << i
          << "]: " << params.outputWeightLoopIndex[i] << std::endl;
     }
+    os << "outputQuantizeScale: " << params.outputQuantizeScale << std::endl;
     os << "output_vector_type: " << params.output_vector_type << std::endl;
-    os << "outputAddressMode: " << params.outputAddressMode << std::endl;
+
+    os << "addressGen0Broadcast: " << params.addressGen0Broadcast << std::endl;
+
+    os << "VECTOR_INPUT0_SLICING: " << params.VECTOR_INPUT0_SLICING
+       << std::endl;
+    os << "addressGen0Dim: " << params.addressGen0Dim << std::endl;
+    os << "addressGen0Start: " << params.addressGen0Start << std::endl;
+    os << "addressGen0End: " << params.addressGen0End << std::endl;
+    os << "addressGen0Stride: " << params.addressGen0Stride << std::endl;
+
+    os << "VECTOR_INPUT0_RESHAPE: " << params.VECTOR_INPUT0_RESHAPE
+       << std::endl;
+    for (int i = 0; i < 6; i++) {
+      os << "addressGen0AxisOrder[" << i
+         << "]: " << params.addressGen0AxisOrder[i] << std::endl;
+    }
+
+    os << "fetch_scale_type_1: " << params.fetch_scale_type_1 << std::endl;
+    os << "output_scale_type: " << params.output_scale_type << std::endl;
+    os << "mx_block_size: " << params.mx_block_size << std::endl;
 
     os << "headSizeInPowerOfTwo: " << params.headSizeInPowerOfTwo << std::endl;
     os << "SPLIT_OUTPUT: " << params.SPLIT_OUTPUT << std::endl;
@@ -961,8 +978,6 @@ struct VectorParams : BaseParams {
     }
     if (lhs.fetch_vector_type_1 != rhs.fetch_vector_type_1) return false;
     if (lhs.vec1DequantizeScale != rhs.vec1DequantizeScale) return false;
-    if (lhs.fetch_scale_type_1 != rhs.fetch_scale_type_1) return false;
-    if (lhs.mx_block_size != rhs.mx_block_size) return false;
 
     // Compare Address Gen 2 members
     if (lhs.ADDRESS_GEN2_OFFSET != rhs.ADDRESS_GEN2_OFFSET) return false;
@@ -999,18 +1014,39 @@ struct VectorParams : BaseParams {
       if (lhs.outputWeightLoopIndex[i] != rhs.outputWeightLoopIndex[i])
         return false;
     }
+    if (lhs.outputQuantizeScale != rhs.outputQuantizeScale) return false;
+    if (lhs.output_vector_type != rhs.output_vector_type) return false;
+
+    if (lhs.addressGen0Broadcast != rhs.addressGen0Broadcast) return false;
+
+    if (lhs.VECTOR_INPUT0_SLICING != rhs.VECTOR_INPUT0_SLICING) return false;
+    if (lhs.addressGen0Dim != rhs.addressGen0Dim) return false;
+    if (lhs.addressGen0Start != rhs.addressGen0Start) return false;
+    if (lhs.addressGen0End != rhs.addressGen0End) return false;
+    if (lhs.addressGen0Stride != rhs.addressGen0Stride) return false;
+
+    if (lhs.VECTOR_INPUT0_RESHAPE != rhs.VECTOR_INPUT0_RESHAPE) return false;
+    for (int i = 0; i < 6; i++) {
+      if (lhs.addressGen0AxisOrder[i] != rhs.addressGen0AxisOrder[i])
+        return false;
+    }
+
+    if (lhs.fetch_scale_type_1 != rhs.fetch_scale_type_1) return false;
+    if (lhs.output_scale_type != rhs.output_scale_type) return false;
+    if (lhs.mx_block_size != rhs.mx_block_size) return false;
+
+    if (lhs.headSizeInPowerOfTwo != rhs.headSizeInPowerOfTwo) return false;
     if (lhs.SPLIT_OUTPUT != rhs.SPLIT_OUTPUT) return false;
     if (lhs.CONCAT_OUTPUT != rhs.CONCAT_OUTPUT) return false;
-    if (lhs.output_vector_type != rhs.output_vector_type) return false;
+
     if (lhs.OUTPUT_QUANTIZE != rhs.OUTPUT_QUANTIZE) return false;
-    if (lhs.outputQuantizeScale != rhs.outputQuantizeScale) return false;
     if (lhs.OUTPUT_QUANTIZE_MX != rhs.OUTPUT_QUANTIZE_MX) return false;
 
     // Compare address generation modes and pooling settings
     if (lhs.addressGen0Mode != rhs.addressGen0Mode) return false;
-    // if (lhs.addressGen0Broadcast != rhs.addressGen0Broadcast) return false;
     if (lhs.addressGen1Mode != rhs.addressGen1Mode) return false;
     if (lhs.addressGen2Mode != rhs.addressGen2Mode) return false;
+    if (lhs.outputAddressMode != rhs.outputAddressMode) return false;
     if (lhs.MAXPOOL != rhs.MAXPOOL) return false;
     if (lhs.AVGPOOL != rhs.AVGPOOL) return false;
 

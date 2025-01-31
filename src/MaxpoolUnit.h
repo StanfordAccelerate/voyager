@@ -3,14 +3,14 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename Vector, typename Input, typename Scale, int Width>
+template <typename Vector, typename Scale, typename IOType, int Width>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
   Connections::In<Pack1D<Vector, Width> > CCS_INIT_S1(tensorIn);
-  Connections::Out<Pack1D<Input, Width> > CCS_INIT_S1(tensorOut);
+  Connections::Out<Pack1D<IOType, Width> > CCS_INIT_S1(tensorOut);
 
   Connections::In<Scale> CCS_INIT_S1(mxScaleIn);
 
@@ -105,34 +105,48 @@ SC_MODULE(MaxpoolUnit) {
                   Pack1D<Vector, Width> outputs = tensorIn.Pop();
 
                   if (params.output_vector_type) {
-                    constexpr int num_words = Vector::width / Input::width;
-                    Pack1D<Input, Width> converted_outputs[num_words];
+                    constexpr int num_words = Vector::width / IOType::width;
+                    Pack1D<IOType, Width> converted_outputs[num_words];
 
-                    convertPack1D<Input, Vector, Width>(outputs,
+                    convertPack1D<IOType, Vector, Width>(outputs,
+                                                         converted_outputs);
+
+                    for (int word = 0; word < num_words; word++) {
+                      tensorOut.Push(converted_outputs[word]);
+                    }
+#if SUPPORT_MX
+                  } else if (params.output_scale_type) {
+                    constexpr int num_words = Scale::width / IOType::width;
+
+                    Pack1D<Scale, Width> scales;
+#pragma hls_unroll yes
+                    for (int i = 0; i < Width; i++) {
+                      scales[i].set_bits(outputs[i].bits_rep());
+                    }
+
+                    Pack1D<IOType, Width> converted_outputs[num_words];
+
+                    convertPack1D<IOType, Scale, Width>(scales,
                                                         converted_outputs);
 
                     for (int word = 0; word < num_words; word++) {
                       tensorOut.Push(converted_outputs[word]);
                     }
+#endif
                   } else {
-                    Pack1D<Input, Width> converted_outputs;
+                    Pack1D<IOType, Width> converted_outputs;
 
                     if (params.OUTPUT_QUANTIZE) {
                       Vector scale;
                       scale.set_bits(params.outputQuantizeScale);
-                      vquantize<Vector, Input, Vector, Width>(
+                      vquantize<Vector, IOType, Vector, Width>(
                           outputs, converted_outputs, scale);
 #if SUPPORT_MX
                     } else if (params.OUTPUT_QUANTIZE_MX) {
                       Scale scale = mxScaleIn.Pop();
-                      vquantize<Vector, Input, Scale, Width>(
+                      vquantize<Vector, IOType, Scale, Width>(
                           outputs, converted_outputs, scale);
 #endif
-                    } else {
-#pragma hls_unroll yes
-                      for (int i = 0; i < Width; i++) {
-                        converted_outputs[i].set_bits(outputs[i].bits_rep());
-                      }
                     }
 
                     tensorOut.Push(converted_outputs);

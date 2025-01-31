@@ -1,6 +1,6 @@
 #pragma once
 
-template <typename Input, typename Output, int Width>
+template <typename VectorType, typename ScaleType, typename IOType, int Width>
 SC_MODULE(OutputAddressGenerator) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -158,15 +158,24 @@ SC_MODULE(OutputAddressGenerator) {
                   }
 
                   if (params.output_vector_type) {
-                    constexpr int num_words = Input::width / Output::width;
+                    constexpr int num_words = VectorType::width / IOType::width;
                     for (int i = 0; i < num_words; i++) {
                       vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
-                                               address * Input::width / 8 +
-                                               i * Width * Output::width / 8);
+                                               address * VectorType::width / 8 +
+                                               i * Width * IOType::width / 8);
                     }
+#if SUPPORT_MX
+                  } else if (params.output_scale_type) {
+                    constexpr int num_words = ScaleType::width / IOType::width;
+                    for (int i = 0; i < num_words; i++) {
+                      vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
+                                               address * ScaleType::width / 8 +
+                                               i * Width * IOType::width / 8);
+                    }
+#endif
                   } else {
                     vectorOutputAddress.Push(params.VECTOR_OUTPUT_OFFSET +
-                                             address * Output::width / 8);
+                                             address * IOType::width / 8);
                   }
 
                   if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
