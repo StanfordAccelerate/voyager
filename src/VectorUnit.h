@@ -315,7 +315,7 @@ SC_MODULE(VectorOpUnit) {
 #pragma hls_unroll yes
           for (int j = 0; j < num_words; j++) {
             ac_int<16, false> bits_rep = response[j].bits_rep();
-            bits = bits | (bits_rep << (8 * j));
+            bits = bits | (bits_rep << (IO_DTYPE::width * j));
           }
 
           value.set_bits(bits);
