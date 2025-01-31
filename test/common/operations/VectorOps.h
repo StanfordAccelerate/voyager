@@ -14,17 +14,17 @@ const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
 
 template <typename T>
 inline T gelu(T i) {
-  typedef ac_fixed<15, 7, false, AC_RND, AC_SAT> input_type;
-  typedef ac_fixed<15, 7, false, AC_RND, AC_SAT> output_type;
-  input_type x = i.template to_ac_fixed<15, 7, false, AC_RND, AC_SAT>();;
+  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
+  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> output_type;
+  input_type x = i.template to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
   return ac_gelu_pwl<output_type>(x);
 }
 
 template <typename T>
 inline T silu(T i) {
   typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
-  typedef ac_fixed<15, 7, false, AC_RND, AC_SAT> output_type;
-  input_type x = i.template to_ac_fixed<15, 7, false, AC_RND, AC_SAT>();;
+  typedef ac_fixed<30, 3, false, AC_RND, AC_SAT> output_type;
+  input_type x = i.template to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
   output_type y = ac_sigmoid_pwl<output_type>(x);
   return x * y;
 }

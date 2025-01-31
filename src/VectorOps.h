@@ -57,16 +57,13 @@ void vrelu(Pack1D<Input, Width>& op0, Pack1D<Input, Width> mask, bool useMask,
 #pragma hls_design ccore
 template <typename Input, int Width>
 void vgelu(Pack1D<Input, Width>& op0, Pack1D<Input, Width>& res) {
-  // typedef ac_fixed<9, 4, true, AC_RND, AC_SAT> input_type;
-  // typedef ac_fixed<64, 32, true, AC_RND, AC_SAT> output_type;
   typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
   typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> output_type;
   Pack1D<input_type, Width> tmp;
 
 #pragma hls_unroll yes
   for (int i = 0; i < Width; i++) {
-    // tmp[i] = op0[i].template to_ac_fixed<9, 4, false, AC_RND, AC_SAT>();
-    tmp[i] = op0[i].template to_ac_fixed<15, 7, false, AC_RND, AC_SAT>();
+    tmp[i] = op0[i].template to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
   }
 
 #pragma hls_unroll yes
@@ -79,8 +76,7 @@ void vgelu(Pack1D<Input, Width>& op0, Pack1D<Input, Width>& res) {
 template <typename Input, int Width>
 void vsilu(Pack1D<Input, Width>& op0, Pack1D<Input, Width>& res) {
   typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
-  // typedef ac_fixed<30, 3, false, AC_RND, AC_SAT> output_type;
-  typedef ac_fixed<15, 7, false, AC_RND, AC_SAT> output_type;
+  typedef ac_fixed<30, 3, false, AC_RND, AC_SAT> output_type;
   Pack1D<input_type, Width> tmp;
 
 #pragma hls_unroll yes
