@@ -23,10 +23,10 @@ class NormalFloat4 {
   NormalFloat4(const float other) { index = other; }
 #endif
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
   NormalFloat4(
-      const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &other);
+      const StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q> &other);
 
   ac_int<4, false> bits_rep() { return index; }
 
@@ -46,12 +46,13 @@ class NormalFloat4 {
 
   operator float() const { return code[index]; }
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
-  operator StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>() const {
-    using FloatType = StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>;
-    FloatType f;
-    f.float_val = typename FloatType::ac_float_rep(code[index]);
+  operator StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>() const {
+    using std_float_t =
+        StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>;
+    std_float_t f;
+    f.float_val = typename std_float_t::ac_float_t(code[index]);
     return f;
   }
 
@@ -63,41 +64,41 @@ class NormalFloat4 {
 #endif
 };
 
-template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
           ac_q_mode Q>
 NormalFloat4::NormalFloat4(
-    const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &other) {
-  using FloatType = typename StdFloat<mantissa, exp, useDWImpl, ieee_compliance,
-                                      Q>::ac_float_rep;
+    const StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q> &other) {
+  using ac_float_t = typename StdFloat<mantissa, exp, use_dw_impl,
+                                       ieee_compliance, Q>::ac_float_rep;
 
-  const FloatType float_val = other.float_val;
+  const ac_float_t float_val = other.float_val;
 
-  if (float_val <= FloatType(1.0)) {
-    if (float_val <= FloatType(-10.5)) {
-      if (float_val <= FloatType(-19.0)) {
-        index = float_val <= FloatType(-26.5) ? 0 : 1;
+  if (float_val <= ac_float_t(1.0)) {
+    if (float_val <= ac_float_t(-10.5)) {
+      if (float_val <= ac_float_t(-19.0)) {
+        index = float_val <= ac_float_t(-26.5) ? 0 : 1;
       } else {
-        index = float_val <= FloatType(-14.0) ? 2 : 3;
+        index = float_val <= ac_float_t(-14.0) ? 2 : 3;
       }
     } else {
-      if (float_val <= FloatType(-4.5)) {
-        index = float_val <= FloatType(-7.5) ? 4 : 5;
+      if (float_val <= ac_float_t(-4.5)) {
+        index = float_val <= ac_float_t(-7.5) ? 4 : 5;
       } else {
-        index = float_val <= FloatType(-1.5) ? 6 : 7;
+        index = float_val <= ac_float_t(-1.5) ? 6 : 7;
       }
     }
   } else {
-    if (float_val <= FloatType(12.0)) {
-      if (float_val <= FloatType(6.5)) {
-        index = float_val <= FloatType(3.5) ? 8 : 9;
+    if (float_val <= ac_float_t(12.0)) {
+      if (float_val <= ac_float_t(6.5)) {
+        index = float_val <= ac_float_t(3.5) ? 8 : 9;
       } else {
-        index = float_val <= FloatType(9.0) ? 10 : 11;
+        index = float_val <= ac_float_t(9.0) ? 10 : 11;
       }
     } else {
-      if (float_val <= FloatType(19.5)) {
-        index = float_val <= FloatType(15.5) ? 12 : 13;
+      if (float_val <= ac_float_t(19.5)) {
+        index = float_val <= ac_float_t(15.5) ? 12 : 13;
       } else {
-        index = float_val <= FloatType(26.5) ? 14 : 15;
+        index = float_val <= ac_float_t(26.5) ? 14 : 15;
       }
     }
   }

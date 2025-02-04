@@ -180,11 +180,12 @@ class Posit {
 
   bool operator<(const Posit &rhs) const;
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
-  operator StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>() const {
-    using FloatType = StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>;
-    FloatType f;
+  operator StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>() const {
+    using std_float_t =
+        StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>;
+    std_float_t f;
     if (bits == 0) {
       f.set_zero();
     } else {
@@ -194,7 +195,7 @@ class Posit {
       decode<nbits, es, mantissa>(bits, sign, scale, mantissa_bits);
 
       ac_int<1, false> sign_bit = sign;
-      ac_int<exp, true> exp_bits = scale + FloatType::ac_float_rep::exp_bias;
+      ac_int<exp, true> exp_bits = scale + std_float_t::ac_float_rep::exp_bias;
 
       f.float_val.d.set_slc(0, mantissa_bits);
       f.float_val.d.set_slc(mantissa, exp_bits);

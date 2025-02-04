@@ -33,9 +33,9 @@ class Int {
   template <int W2, bool S2>
   Int(const Int<W2, S2> &other);
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
-  Int(const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &other);
+  Int(const StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q> &other);
 
   ac_int<W, false> bits_rep() { return int_val; }
 
@@ -125,12 +125,13 @@ class Int {
   bool operator<(const Int &rhs) const;
   operator float() const { return float(int_val); }
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
-  operator StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>() const {
-    using FloatType = StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>;
-    FloatType f;
-    f.float_val = typename FloatType::ac_float_rep(int_val);
+  operator StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>() const {
+    using std_float_t =
+        StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>;
+    std_float_t f;
+    f.float_val = typename std_float_t::ac_float_rep(int_val);
     return f;
   }
 
@@ -162,10 +163,10 @@ Int<W, S>::Int(const Int<W2, S2> &other) {
 }
 
 template <int W, bool S>
-template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
           ac_q_mode Q>
 Int<W, S>::Int(
-    const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &other) {
+    const StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q> &other) {
   int_val = other.float_val.template convert_to_ac_int<W, S>();
 }
 

@@ -4,11 +4,11 @@
 #include <string>
 
 // forward declarations
-template <int mantissa, int exp, bool useDWImpl = false,
+template <int mantissa, int exp, bool use_dw_impl = false,
           bool ieee_compliance = true, ac_q_mode Q = AC_RND_CONV>
 class StdFloat;
 
-template <int wdth, bool sgnd>
+template <int W, bool S>
 class Int;
 
 // #include "FloatTypes.h"

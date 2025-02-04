@@ -34,9 +34,9 @@ class UFloat {
     d = r.data();
   }
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
-  UFloat(const StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q> &other)
+  UFloat(const StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q> &other)
       : UFloat(other.float_val) {}
 
   ac_float_rep to_ac_float() const {
@@ -73,9 +73,9 @@ class UFloat {
   operator float() const { return to_ac_float().to_float(); }
 #endif
 
-  template <int mantissa, int exp, bool useDWImpl, bool ieee_compliance,
+  template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
-  operator StdFloat<mantissa, exp, useDWImpl, ieee_compliance, Q>() const {
+  operator StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>() const {
     return to_ac_float();
   }
 
