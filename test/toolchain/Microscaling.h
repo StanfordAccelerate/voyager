@@ -47,7 +47,7 @@ void MapMXQparam(const codegen::Operator &param,
   }
 
   vector_params->fetch_vector_type_0 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != vector_input.dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == vector_input.dtype();
 
   int output_dim_factors[2];
   factorize_for_address_gen(dim / OC_DIMENSION / block_size,

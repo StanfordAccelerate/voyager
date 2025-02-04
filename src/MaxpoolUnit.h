@@ -45,7 +45,7 @@ SC_MODULE(MaxpoolUnit) {
         }
       }
 
-      if (params.AVGPOOL) {
+      if (params.is_avgpool) {
         loop_bounds[1][params.outputXLoopIndex[1]] = 1;
         loop_bounds[1][params.outputYLoopIndex[1]] = 1;
       }
@@ -136,13 +136,13 @@ SC_MODULE(MaxpoolUnit) {
                   } else {
                     Pack1D<IOType, Width> converted_outputs;
 
-                    if (params.OUTPUT_QUANTIZE) {
+                    if (params.quantize_output) {
                       Vector scale;
-                      scale.set_bits(params.outputQuantizeScale);
+                      scale.set_bits(params.output_scale);
                       vquantize<Vector, IOType, Vector, Width>(
                           outputs, converted_outputs, scale);
 #if SUPPORT_MX
-                    } else if (params.OUTPUT_QUANTIZE_MX) {
+                    } else if (params.quantize_output_mx) {
                       Scale scale = mxScaleIn.Pop();
                       vquantize<Vector, IOType, Scale, Width>(
                           outputs, converted_outputs, scale);

@@ -52,19 +52,19 @@ SC_MODULE(OutputAddressGenerator) {
         }
       }
 
-      // if (params.MAXPOOL) {
+      // if (params.is_maxpool) {
       //   loop_bounds[1][params.outputXLoopIndex[1]] =
       //       loop_bounds[1][params.outputXLoopIndex[1]] / 2;
       //   loop_bounds[1][params.outputYLoopIndex[1]] =
       //       loop_bounds[1][params.outputYLoopIndex[1]] / 2;
       // }
 
-      if (params.AVGPOOL) {
+      if (params.is_avgpool) {
         loop_bounds[1][params.outputXLoopIndex[1]] = 1;
         loop_bounds[1][params.outputYLoopIndex[1]] = 1;
       }
 
-      if (params.SPLIT_OUTPUT) DLOG("splitting heads");
+      if (params.has_attn_head_permute) DLOG("splitting heads");
 
 #pragma hls_pipeline_init_interval 1
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -119,15 +119,15 @@ SC_MODULE(OutputAddressGenerator) {
                     ac_int<16, false> y = y0 + y1 * Y0;
                     ac_int<16, false> Y = Y0 * Y1;
 
-                    ac_int<8, false> headSize = params.headSizeInPowerOfTwo;
-                    ac_int<16, false> mask = (1 << headSize) - 1;
+                    ac_int<8, false> head_size = params.head_size_power_of_two;
+                    ac_int<16, false> mask = (1 << head_size) - 1;
 
-                    if (params.SPLIT_OUTPUT) {
-                      address = (((k >> headSize) * X) << headSize) +
-                                (x << headSize) + (k & mask);
+                    if (params.has_attn_head_permute) {
+                      address = (((k >> head_size) * X) << head_size) +
+                                (x << head_size) + (k & mask);
                     } else if (params.CONCAT_OUTPUT) {
-                      address = ((k >> headSize) * K) + ((y & mask) * K * 4) +
-                                (k & mask) + (y >> headSize * K / 4);
+                      address = ((k >> head_size) * K) + ((y & mask) * K * 4) +
+                                (k & mask) + (y >> head_size * K / 4);
                     } else {
                       address = y * X * K + x * K + k;
                     }

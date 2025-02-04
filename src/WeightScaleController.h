@@ -81,7 +81,7 @@ SC_MODULE(WeightScaleController) {
       }
 
       // int c0_bound = NRows;
-      // if (params.REPLICATION) {
+      // if (params.is_replication) {
       //   c0_bound = 3;
       //   loop_bounds[1][params.fxIndex] = 7;
       // }
@@ -150,14 +150,9 @@ SC_MODULE(WeightScaleController) {
 
                       int address =
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
-                      if (params.WEIGHT_TRANSPOSE) {
+                      if (params.has_weight_tranpose) {
                         C = C1 * NCols;
                         address = (k + c0) * C + c1 * OC_DIMENSION;
-                      } else if (params.CONCAT_HEAD_WEIGHTS) {
-                        address = static_cast<ac_int<32, false>>(
-                                      ((k / 32) * C * 32)) +
-                                  static_cast<ac_int<16, false>>((c * 32)) +
-                                  static_cast<ac_int<32, false>>((k % 32));
                       }
 
                       // CCS_LOG("Fetching from address " << address);
@@ -239,7 +234,7 @@ SC_MODULE(WeightScaleController) {
       loop_bounds[1][params.weightAddressGenReductionLoopIndex[1]] = 1;
 
       // int c0_bound = NRows;
-      // if (params.REPLICATION) {
+      // if (params.is_replication) {
       //   c0_bound = 3;
       //   loop_bounds[1][params.fxIndex] = 7;
       // }
@@ -395,7 +390,7 @@ SC_MODULE(WeightScaleController) {
       // OC_DIMENSION > IC_DIMENSION
       int rep_bound = 1;
       if (OC_DIMENSION > IC_DIMENSION) {
-        if (params.WEIGHT_TRANSPOSE) {
+        if (params.has_weight_tranpose) {
           // we are able to reuse the weights already in the buffer
           loop_bounds[1][0] /= (OC_DIMENSION / IC_DIMENSION);
           rep_bound = (OC_DIMENSION / IC_DIMENSION);
@@ -447,7 +442,7 @@ SC_MODULE(WeightScaleController) {
                             ac_int<8, false> startingC = NRows - 1;
                             ac_int<8, false> endingC = NRows;
 
-                            if (params.REPLICATION) {
+                            if (params.is_replication) {
                               startingC = 3 - 1;
                               endingC = 3;
                               if (IC_DIMENSION == 16) {
@@ -494,7 +489,7 @@ SC_MODULE(WeightScaleController) {
                                 static_cast<ac_int<16, false>>((fy * FX * K1)) +
                                 static_cast<ac_int<16, false>>((fx * K1)) + k1;
 
-                            if (params.WEIGHT_TRANSPOSE &&
+                            if (params.has_weight_tranpose &&
                                 OC_DIMENSION > IC_DIMENSION) {
                               address = static_cast<ac_int<16, false>>(
                                             (fy * FX * 2 * K1)) +
@@ -579,12 +574,12 @@ SC_MODULE(WeightScaleController) {
       loop_bounds[1][params.weightAddressGenReductionLoopIndex[1]] = 1;
 
       // int c0_bound = NRows;
-      // if (params.REPLICATION) {
+      // if (params.is_replication) {
       //   c0_bound = 3;
       //   loop_bounds[1][params.fxIndex] = 7;
       // }
 
-      if (params.WEIGHT_TRANSPOSE && NRows < 64 &&
+      if (params.has_weight_tranpose && NRows < 64 &&
           NCols <
               64) {  // don't support transpose when systolic array is larger
                      // than 32x32, as it will require a very large buffer
@@ -730,7 +725,7 @@ SC_MODULE(WeightScaleController) {
     while (true) {
       const MatrixParams params = paramsIn.Pop();
 
-      if (params.MX) {
+      if (params.is_mx_op) {
         fetcherParams.Push(params);
         writerParams.Push(params);
         readerParams.Push(params);

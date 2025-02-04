@@ -87,19 +87,19 @@ SC_MODULE(VectorFetchUnit) {
         }
       }
 
-      if (params.VECTOR_INPUT0_SLICING) {
-        int slice_dim = params.addressGen0Dim;
+      if (params.has_slicing) {
+        int slice_dim = params.vec0_dim;
         int i = slice_dim >= 3 ? 1 : 0;
         int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
-        loop_starts[i][j] = params.addressGen0Start;
-        loop_ends[i][j] = params.addressGen0End;
-        loop_strides[i][j] = params.addressGen0Stride;
-      } else if (params.VECTOR_INPUT0_RESHAPE) {
+        loop_starts[i][j] = params.vec0_start;
+        loop_ends[i][j] = params.vec0_end;
+        loop_strides[i][j] = params.vec0_stride;
+      } else if (params.has_reshape) {
 #pragma hls_unroll yes
         for (int dim = 0; dim < 6; dim++) {
           int i = dim >= 3 ? 1 : 0;
           int j = dim >= 3 ? dim - 3 : dim;
-          int new_dim = params.addressGen0AxisOrder[dim];
+          int new_dim = params.vec0_dim_order[dim];
           int new_i = new_dim >= 3 ? 1 : 0;
           int new_j = new_dim >= 3 ? new_dim - 3 : new_dim;
           loop_ends[i][j] = loop_bounds[new_i][new_j];
@@ -164,54 +164,53 @@ SC_MODULE(VectorFetchUnit) {
 
                     address = y * X * K + x * K + k;
                   } else if (params.addressGen0Mode == 2) {
-                    ac_int<11, false> loop_0 = params.addressGen0Broadcast[0]
+                    ac_int<11, false> loop_0 = params.vec0_broadcast[0]
                                                    ? ac_int<11, false>(0)
                                                    : loop_counters[0][0];
-                    ac_int<11, false> loop_1 = params.addressGen0Broadcast[1]
+                    ac_int<11, false> loop_1 = params.vec0_broadcast[1]
                                                    ? ac_int<11, false>(0)
                                                    : loop_counters[0][1];
-                    ac_int<11, false> loop_2 = params.addressGen0Broadcast[2]
+                    ac_int<11, false> loop_2 = params.vec0_broadcast[2]
                                                    ? ac_int<11, false>(0)
                                                    : loop_counters[0][2];
-                    ac_int<11, false> loop_3 = params.addressGen0Broadcast[3]
+                    ac_int<11, false> loop_3 = params.vec0_broadcast[3]
                                                    ? ac_int<11, false>(0)
                                                    : loop_counters[1][0];
-                    ac_int<11, false> loop_4 = params.addressGen0Broadcast[4]
+                    ac_int<11, false> loop_4 = params.vec0_broadcast[4]
                                                    ? ac_int<11, false>(0)
                                                    : loop_counters[1][1];
-                    ac_int<11, false> loop_5 = params.addressGen0Broadcast[5]
+                    ac_int<11, false> loop_5 = params.vec0_broadcast[5]
                                                    ? ac_int<11, false>(0)
                                                    : loop_counters[1][2];
 
-                    ac_int<11, false> loop_bound_0 =
-                        params.addressGen0Broadcast[0] ? ac_int<11, false>(1)
-                                                       : loop_bounds[0][0];
-                    ac_int<11, false> loop_bound_1 =
-                        params.addressGen0Broadcast[1] ? ac_int<11, false>(1)
-                                                       : loop_bounds[0][1];
-                    ac_int<11, false> loop_bound_2 =
-                        params.addressGen0Broadcast[2] ? ac_int<11, false>(1)
-                                                       : loop_bounds[0][2];
-                    ac_int<11, false> loop_bound_3 =
-                        params.addressGen0Broadcast[3] ? ac_int<11, false>(1)
-                                                       : loop_bounds[1][0];
-                    ac_int<11, false> loop_bound_4 =
-                        params.addressGen0Broadcast[4] ? ac_int<11, false>(1)
-                                                       : loop_bounds[1][1];
-                    ac_int<11, false> loop_bound_5 =
-                        params.addressGen0Broadcast[5] ? ac_int<11, false>(1)
-                                                       : loop_bounds[1][2];
+                    ac_int<11, false> loop_bound_0 = params.vec0_broadcast[0]
+                                                         ? ac_int<11, false>(1)
+                                                         : loop_bounds[0][0];
+                    ac_int<11, false> loop_bound_1 = params.vec0_broadcast[1]
+                                                         ? ac_int<11, false>(1)
+                                                         : loop_bounds[0][1];
+                    ac_int<11, false> loop_bound_2 = params.vec0_broadcast[2]
+                                                         ? ac_int<11, false>(1)
+                                                         : loop_bounds[0][2];
+                    ac_int<11, false> loop_bound_3 = params.vec0_broadcast[3]
+                                                         ? ac_int<11, false>(1)
+                                                         : loop_bounds[1][0];
+                    ac_int<11, false> loop_bound_4 = params.vec0_broadcast[4]
+                                                         ? ac_int<11, false>(1)
+                                                         : loop_bounds[1][1];
+                    ac_int<11, false> loop_bound_5 = params.vec0_broadcast[5]
+                                                         ? ac_int<11, false>(1)
+                                                         : loop_bounds[1][2];
 
                     // Permute indices
-                    if (params.VECTOR_INPUT0_RESHAPE) {
+                    if (params.has_reshape) {
                       ac_int<11, false> indices[6] = {loop_0, loop_1, loop_2,
                                                       loop_3, loop_4, loop_5};
                       ac_int<11, false> orig_indices[6];
 
 #pragma hls_unroll yes
                       for (int i = 0; i < 6; i++) {
-                        orig_indices[params.addressGen0AxisOrder[i]] =
-                            indices[i];
+                        orig_indices[params.vec0_dim_order[i]] = indices[i];
                       }
 
                       loop_0 = orig_indices[0];
@@ -300,13 +299,13 @@ SC_MODULE(VectorFetchUnit) {
         }
       }
 
-      if (params.VECTOR_INPUT0_SLICING) {
-        int slice_dim = params.addressGen0Dim;
+      if (params.has_slicing) {
+        int slice_dim = params.vec0_dim;
         int i = slice_dim >= 3 ? 1 : 0;
         int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
-        loop_starts[i][j] = params.addressGen0Start;
-        loop_ends[i][j] = params.addressGen0End;
-        loop_strides[i][j] = params.addressGen0Stride;
+        loop_starts[i][j] = params.vec0_start;
+        loop_ends[i][j] = params.vec0_end;
+        loop_strides[i][j] = params.vec0_stride;
       }
 
 #pragma hls_pipeline_init_interval 1
@@ -343,8 +342,7 @@ SC_MODULE(VectorFetchUnit) {
                     Pack1D<Input, Width> response =
                         vectorFetch0DataResponse.Pop();
                     vdequantize<Input, Vector, Width>(
-                        response, converted_response,
-                        params.vec0DequantizeScale);
+                        response, converted_response, params.vec0_dq_scale);
                   }
 
                   vectorFetch0DataResponseBroadcasted.Push(converted_response);
@@ -614,8 +612,7 @@ SC_MODULE(VectorFetchUnit) {
                         vectorFetch1DataResponse.Pop();
 
                     vdequantize<Input, Vector, Width>(
-                        response, converted_response,
-                        params.vec1DequantizeScale);
+                        response, converted_response, params.vec1_dq_scale);
 
                     vectorFetch1DataResponseConverted.Push(converted_response);
                   }
@@ -842,8 +839,7 @@ SC_MODULE(VectorFetchUnit) {
                         vectorFetch2DataResponse.Pop();
 
                     vdequantize<Input, Vector, Width>(
-                        response, converted_response,
-                        params.vec2DequantizeScale);
+                        response, converted_response, params.vec2_dq_scale);
                   }
                   vectorFetch2DataResponseConverted.Push(converted_response);
 

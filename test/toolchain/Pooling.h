@@ -19,9 +19,9 @@ void MapPoolingOperation(const codegen::Operator &param,
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.offset();
   vector_params->addressGen0Mode = 1;
-  // set double precision if the datatype is not the same as the input datatype
   vector_params->fetch_vector_type_0 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != pooling_op.input().dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() ==
+      pooling_op.input().dtype();
 
   for (int i = 0; i < 2; i++) {
     vector_params->addressGen0Loop[i][0] =

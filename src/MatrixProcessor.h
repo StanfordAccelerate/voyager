@@ -355,8 +355,7 @@ SC_MODULE(MatrixProcessor) {
               loop_counters[1][params.fxIndex] == 0 &&
               loop_counters[1][params.fyIndex] == 0;
 
-          if ((!firstAccumulation || params.ACC_FROM_ACC) && step < totalOps &&
-              !stallInputs) {
+          if (!firstAccumulation && step < totalOps && !stallInputs) {
             ac_int<int_log2(BufferSize), false> readAddress =
                 loop_counters[1][params.weightLoopIndex[1]] *
                     params.loops[1][params.inputXLoopIndex[1]] *
@@ -368,7 +367,7 @@ SC_MODULE(MatrixProcessor) {
           READ_ACC_BUFFER:
 #endif
             psum = accumulation_buffer[readAddress];
-          } else if (params.BIAS && step < totalOps && !stallInputs) {
+          } else if (params.has_bias && step < totalOps && !stallInputs) {
             // we need to load in a new bias every time the weight loop index
             // changes
             bool readBias = true;
@@ -411,7 +410,7 @@ SC_MODULE(MatrixProcessor) {
           if constexpr (is_mx) {
             unscaledAccumulationChannel.Push(outputs);
           } else {
-            if (accumulationFinished && !params.STORE_IN_ACC) {
+            if (accumulationFinished) {
               outputsChannel.Push(outputs);
             } else {
               ac_int<int_log2(BufferSize), false> writeAddress =
@@ -497,9 +496,8 @@ SC_MODULE(MatrixProcessor) {
 
           if constexpr (is_mx) {
             unscaledAccumulationChannel.Push(outputs);
-
           } else {
-            if (accumulationFinished && !params.STORE_IN_ACC) {
+            if (accumulationFinished) {
               outputsChannel.Push(outputs);
               DLOG("matrix processor output: " << outputs);
             } else {
@@ -613,7 +611,7 @@ SC_MODULE(MatrixProcessor) {
           }
 
           if (firstAccumulation) {
-            if (params.BIAS) {
+            if (params.has_bias) {
               bool readBias = true;
 #pragma hls_unroll yes
               for (int i = 0; i < 4; i++) {
@@ -647,7 +645,7 @@ SC_MODULE(MatrixProcessor) {
           // CCS_LOG("outputs: " << outputs);
 
           Pack1D<ScaleT, 1> inputScale;
-          if (params.MX) {
+          if (params.is_mx_op) {
             inputScale = inputScaleChannel.Pop();
           }
 
@@ -661,7 +659,7 @@ SC_MODULE(MatrixProcessor) {
                 (loop_counters[1][params.weightReuseIndex[1]] == 0);
           }
           readNewWeights = readNewWeights || step == 0;
-          if (readNewWeights && params.MX) {
+          if (readNewWeights && params.is_mx_op) {
             weightScales = weightScaleChannel.Pop();
           }
 
@@ -672,7 +670,7 @@ SC_MODULE(MatrixProcessor) {
             BufferT scale = static_cast<BufferT>(inputScale[0]) *
                             static_cast<BufferT>(weightScales[i]);
             scaled_outputs[i] = static_cast<BufferT>(outputs[i]);
-            if (params.MX) {
+            if (params.is_mx_op) {
               scaled_outputs[i] = scaled_outputs[i] * scale;
             }
             previous_accumulation.value[i] += scaled_outputs[i];

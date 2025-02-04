@@ -71,7 +71,7 @@ SC_MODULE(InputScaleController) {
       const MatrixParams params = fetcherParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.REPLICATION) {
+      if (params.is_replication) {
         FX = 7;
       }
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
@@ -130,7 +130,7 @@ SC_MODULE(InputScaleController) {
                   params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
             }
 
-            if (params.REPLICATION) {
+            if (params.is_replication) {
               loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
             }
 
@@ -139,7 +139,7 @@ SC_MODULE(InputScaleController) {
             ac_int<4, false> y_min_offset = 0;
             ac_int<4, false> y_max_offset = 0;
 
-            if (params.REPLICATION) {
+            if (params.is_replication) {
               if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                 x_min_offset = (FX - 1) / 2;
                 loop_bounds[1][params.inputXLoopIndex[1]] += 1;
@@ -225,7 +225,7 @@ SC_MODULE(InputScaleController) {
                           y0 = y0 * STRIDE;
                         }
 
-                        if (params.REPLICATION) {
+                        if (params.is_replication) {
                           if (x0 != 0 && x_min_offset == 3) {
                             x0 = x_min_offset + (x0 - 1) * packingFactor;
                           } else {
@@ -241,19 +241,20 @@ SC_MODULE(InputScaleController) {
 
                         ac_int<32, false> address = y * X * C + x * C + c;
 
-                        if (params.REPLICATION) {
+                        if (params.is_replication) {
                           address = y * (X / packingFactor) * IC_DIMENSION +
                                     (x / packingFactor) * IC_DIMENSION + c;
                         }
 
-                        ac_int<8, false> headSize = params.headSizeInPowerOfTwo;
-                        if (params.CONCAT_INPUT) {
+                        ac_int<8, false> headSize =
+                            params.head_size_power_of_two;
+                        if (params.has_attn_output_permute) {
                           ac_int<16, false> mask = (1 << headSize) - 1;
                           address = (((c >> headSize) * X) << headSize) +
                                     (x << headSize) + (c & mask);
                         }
 
-                        if (params.TRANPOSE_INPUTS) {
+                        if (params.has_input_tranpose) {
                           address =
                               (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
                         }
@@ -320,7 +321,7 @@ SC_MODULE(InputScaleController) {
       const MatrixParams params = writerParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.REPLICATION) {
+      if (params.is_replication) {
         FX = 7;
       }
 
@@ -393,7 +394,7 @@ SC_MODULE(InputScaleController) {
 
             ac_int<4, false> x_min_offset = fx_bound;
             ac_int<4, false> y_min_offset = fy_bound;
-            if (params.REPLICATION) {
+            if (params.is_replication) {
               // make sure to grab border pixels
               loop_bounds[1][params.inputXLoopIndex[1]] =
                   STRIDE * X0 / packingFactor + 2;
@@ -411,7 +412,7 @@ SC_MODULE(InputScaleController) {
                  loop_counters[1][0]++) {
               // TODO: make this dynamic
               ac_int<32, false> total_writes;
-              if (!params.REPLICATION) {
+              if (!params.is_replication) {
                 total_writes = (loop_bounds[1][1] * loop_bounds[1][2] *
                                 loop_bounds[1][3] * loop_bounds[1][4]) *
                                loop_bounds[1][5];
@@ -449,7 +450,7 @@ SC_MODULE(InputScaleController) {
                         ac_int<LOOP_WIDTH, true> y1 =
                             loop_counters[0][params.inputYLoopIndex[0]];
 
-                        if (params.REPLICATION) {
+                        if (params.is_replication) {
                           if (x0 != 0) {
                             x0 = x_min_offset +
                                  (x0 - boundaryWords) * packingFactor;
@@ -483,7 +484,7 @@ SC_MODULE(InputScaleController) {
                         ac_int<32, false> address =
                             y0 * (STRIDE * X0 + FX - 1) + x0;
 
-                        if (params.REPLICATION) {
+                        if (params.is_replication) {
                           address = y0 * (STRIDE * X0 / packingFactor +
                                           2 * boundaryWords) +
                                     loop_counters[1][params.inputXLoopIndex[1]];
@@ -586,12 +587,12 @@ SC_MODULE(InputScaleController) {
         }
       }
 
-      if (params.REPLICATION && IC_DIMENSION >= 16) {
+      if (params.is_replication && IC_DIMENSION >= 16) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
             2;
-      } else if (params.REPLICATION && IC_DIMENSION == 8) {
+      } else if (params.is_replication && IC_DIMENSION == 8) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
@@ -654,7 +655,7 @@ SC_MODULE(InputScaleController) {
                           ac_int<16, false> x = STRIDE * x0 + fx;
                           ac_int<16, false> y = STRIDE * y0 + fy;
                           ac_int<16, false> address;
-                          if (params.REPLICATION && IC_DIMENSION >= 8) {
+                          if (params.is_replication && IC_DIMENSION >= 8) {
                             address = y * (((STRIDE * X0) / packingFactor) +
                                            2 * boundaryWords) +
                                       x0 + fx;
@@ -721,7 +722,7 @@ SC_MODULE(InputScaleController) {
       const MatrixParams params = transposerParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.REPLICATION) {
+      if (params.is_replication) {
         FX = 7;
       }
 
@@ -765,7 +766,7 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.reductionLoopIndex[1]] =
           loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NRows);
 
-      if (params.TRANPOSE_INPUTS) {
+      if (params.has_input_tranpose) {
         Scale transposeBuffer[NRows][NRows];
 
 #pragma hls_pipeline_init_interval 1
@@ -834,7 +835,7 @@ SC_MODULE(InputScaleController) {
                     params.loops[1][params.inputYLoopIndex[1]] * params.STRIDE;
               }
 
-              if (params.REPLICATION) {
+              if (params.is_replication) {
                 loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
               }
 
@@ -843,7 +844,7 @@ SC_MODULE(InputScaleController) {
               ac_int<4, false> y_min_offset = 0;
               ac_int<4, false> y_max_offset = 0;
 
-              if (params.REPLICATION) {
+              if (params.is_replication) {
                 if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                   x_min_offset = (FX - 1) / 2;
                   loop_bounds[1][params.inputXLoopIndex[1]] += 1;
@@ -969,7 +970,7 @@ SC_MODULE(InputScaleController) {
     while (true) {
       const MatrixParams params = paramsIn.Pop();
 
-      if (params.MX) {
+      if (params.is_mx_op) {
         fetcherParams.Push(params);
         writerParams.Push(params);
         readerParams.Push(params);

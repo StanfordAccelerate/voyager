@@ -60,8 +60,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   }
 
   vector_params->fetch_vector_type_1 =
-      (DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype()) &&
-      ((DataTypes::TypeName<SCALE_DATATYPE>::name() != tensor.dtype()));
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == tensor.dtype();
 
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen1Loops[0][i] = 1;
@@ -90,7 +89,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->vec1DequantizeScale = scale.bits_rep();
+  vector_params->vec1_dq_scale = scale.bits_rep();
 }
 
 void set_vector_addr_gen2(const codegen::Tensor &tensor,
@@ -115,8 +114,7 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
   }
 
   vector_params->fetch_vector_type_2 =
-      (DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype()) &&
-      ((DataTypes::TypeName<SCALE_DATATYPE>::name() != tensor.dtype()));
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == tensor.dtype();
 
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen2Loops[0][i] = 1;
@@ -145,7 +143,7 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->vec2DequantizeScale = scale.bits_rep();
+  vector_params->vec2_dq_scale = scale.bits_rep();
 }
 
 void MapVectorOperations(const codegen::Operator &param,
@@ -192,24 +190,24 @@ void MapVectorOperations(const codegen::Operator &param,
   if (param.has_slicing_op() || vector_input.has_slicing()) {
     const auto &slicing =
         param.has_slicing_op() ? param.slicing_op() : vector_input.slicing();
-    vector_params->VECTOR_INPUT0_SLICING = true;
-    vector_params->addressGen0Dim = slicing.dim() + num_extra_dims;
-    vector_params->addressGen0Start = slicing.start();
-    vector_params->addressGen0End = slicing.end();
-    vector_params->addressGen0Stride = slicing.step();
+    vector_params->has_slicing = true;
+    vector_params->vec0_dim = slicing.dim() + num_extra_dims;
+    vector_params->vec0_start = slicing.start();
+    vector_params->vec0_end = slicing.end();
+    vector_params->vec0_stride = slicing.step();
 
     // Last dimension needs to be scaled by OC_DIMENSION
-    if (vector_params->addressGen0Dim == 5) {
-      vector_params->addressGen0Start /= OC_DIMENSION;
-      vector_params->addressGen0End /= OC_DIMENSION;
+    if (vector_params->vec0_dim == 5) {
+      vector_params->vec0_start /= OC_DIMENSION;
+      vector_params->vec0_end /= OC_DIMENSION;
     }
   } else if (param.has_reshape_op() || vector_input.has_reshape()) {
     const auto &reshape =
         param.has_reshape_op() ? param.reshape_op() : vector_input.reshape();
-    vector_params->VECTOR_INPUT0_RESHAPE = true;
+    vector_params->has_reshape = true;
     if (reshape.opcode() == "permute") {
       for (int i = 0; i < reshape.dims_size(); i++) {
-        vector_params->addressGen0AxisOrder[i + num_extra_dims] =
+        vector_params->vec0_dim_order[i + num_extra_dims] =
             reshape.dims(i) + num_extra_dims;
       }
     } else {
@@ -217,9 +215,12 @@ void MapVectorOperations(const codegen::Operator &param,
     }
   }
 
+  VECTOR_DATATYPE scale = 1.0;
+  vector_params->vec0_dq_scale = scale.bits_rep();
+
   // set double precision if the datatype is not the same as the input datatype
   vector_params->fetch_vector_type_0 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != vector_input.dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == vector_input.dtype();
 
   const auto output_memory = vector_output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -250,7 +251,7 @@ void MapVectorOperations(const codegen::Operator &param,
       DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
 
   if (param.output().has_reshape()) {
-    vector_params->SPLIT_OUTPUT =
+    vector_params->has_attn_head_permute =
         param.output().shape(1) < param.output().shape(2);
     vector_params->CONCAT_OUTPUT =
         param.output().shape(1) > param.output().shape(2);
@@ -290,8 +291,8 @@ void MapVectorOperations(const codegen::Operator &param,
         if (opcode.rfind("dequantize", 0) == 0) {
           vinst.immediate0 = immediate.bits_rep();
         } else if (opcode.rfind("quantize", 0) == 0) {
-          vector_params->OUTPUT_QUANTIZE = true;
-          vector_params->outputQuantizeScale = immediate.bits_rep();
+          vector_params->quantize_output = true;
+          vector_params->output_scale = immediate.bits_rep();
         }
       } else {  // microscaling
         auto other_shape = get_tensor_shape(it->other());
@@ -313,7 +314,7 @@ void MapVectorOperations(const codegen::Operator &param,
 
         vector_params->fetch_scale_type_1 = true;
         vector_params->mx_block_size = numel / size / OC_DIMENSION;
-        vector_params->OUTPUT_QUANTIZE_MX = true;
+        vector_params->quantize_output_mx = true;
       }
 
     } else {

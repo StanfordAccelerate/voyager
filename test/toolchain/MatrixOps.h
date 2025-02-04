@@ -15,7 +15,7 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
   vector_params->ADDRESS_GEN1_OFFSET = memory.offset();
   vector_params->addressGen1Mode = nonzero_dims == 1 ? 3 : 1;
   vector_params->fetch_vector_type_1 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == tensor.dtype();
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
@@ -45,7 +45,7 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->vec1DequantizeScale = scale.bits_rep();
+  vector_params->vec1_dq_scale = scale.bits_rep();
 }
 
 void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
@@ -61,7 +61,7 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
   vector_params->ADDRESS_GEN2_OFFSET = memory.offset();
   vector_params->addressGen2Mode = nonzero_dims == 1 ? 3 : 1;
   vector_params->fetch_vector_type_2 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == tensor.dtype();
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
@@ -91,7 +91,7 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->vec2DequantizeScale = scale.bits_rep();
+  vector_params->vec2_dq_scale = scale.bits_rep();
 }
 
 void MapMatrixOperation(const codegen::Operator &param,
@@ -168,8 +168,8 @@ void MapMatrixOperation(const codegen::Operator &param,
 
   // set outer loop values
   const auto weight = matrix_op.weight();
-  matrix_params->WEIGHT_TRANSPOSE = weight.reshape().opcode() == "transpose";
-  if (matrix_params->WEIGHT_TRANSPOSE) {
+  matrix_params->has_weight_tranpose = weight.reshape().opcode() == "transpose";
+  if (matrix_params->has_weight_tranpose) {
     // for tranpose, we need to enforce that the innermost loop is the
     // unrolled reduction loop
     // we can just use the following loop nest:
@@ -263,10 +263,7 @@ void MapMatrixOperation(const codegen::Operator &param,
   }
 
   matrix_params->STRIDE = tiling.stride;
-  matrix_params->REPLICATION = tiling.replication;
-  // TODO:
-  matrix_params->STORE_IN_ACC = false;
-  matrix_params->ACC_FROM_ACC = false;
+  matrix_params->is_replication = tiling.replication;
 
   // Permute input for transformer attention outputs
   const auto input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
@@ -279,30 +276,30 @@ void MapMatrixOperation(const codegen::Operator &param,
                                   [](int x) { return x == 1 || x == 2; });
 
     if (reshape_op.opcode() == "permute" || is_permute) {
-      matrix_params->CONCAT_INPUT = true;
+      matrix_params->has_attn_output_permute = true;
     } else if (reshape_op.opcode() == "transpose") {
-      matrix_params->TRANPOSE_INPUTS = true;
+      matrix_params->has_input_tranpose = true;
     }
 
-    if (matrix_params->CONCAT_INPUT) {
+    if (matrix_params->has_attn_output_permute) {
       const auto input_shape = input.shape();
       double result = std::log2(input_shape[input_shape.size() - 1]);
       if (std::fmod(result, 1.0) != 0.0) {
         throw std::runtime_error("Result is not an integer!");
       }
-      matrix_params->headSizeInPowerOfTwo = result;
+      matrix_params->head_size_power_of_two = result;
     }
   }
 
   // bias
   const auto bias_memory = matrix_op.bias().memory();
-  matrix_params->BIAS = matrix_op.has_bias();
+  matrix_params->has_bias = matrix_op.has_bias();
   matrix_params->BIAS_OFFSET = bias_memory.offset();
   accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
 
-  matrix_params->MX = matrix_op.opcode() == "conv2d_mx" ||
-                      matrix_op.opcode() == "linear_mx" ||
-                      matrix_op.opcode() == "matmul_mx";
+  matrix_params->is_mx_op = matrix_op.opcode() == "conv2d_mx" ||
+                            matrix_op.opcode() == "linear_mx" ||
+                            matrix_op.opcode() == "matmul_mx";
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
@@ -343,13 +340,13 @@ void MapMatrixOperation(const codegen::Operator &param,
 
   // Transformer head permutation
   if (param.output().has_reshape()) {
-    vector_params->SPLIT_OUTPUT = true;
+    vector_params->has_attn_head_permute = true;
     const auto permuted_shape = param.output().reshape().output_sizes();
     double result = std::log2(permuted_shape[permuted_shape.size() - 1]);
     if (std::fmod(result, 1.0) != 0.0) {
       throw std::runtime_error("Result is not an integer!");
     }
-    vector_params->headSizeInPowerOfTwo = result;
+    vector_params->head_size_power_of_two = result;
   }
 
   VectorInstructions vinst;
@@ -378,8 +375,8 @@ void MapMatrixOperation(const codegen::Operator &param,
         vinst.vDequantize = true;
         vinst.vDequantizeScale = immediate.bits_rep();
       } else if (opcode.rfind("quantize", 0) == 0) {
-        vector_params->OUTPUT_QUANTIZE = true;
-        vector_params->outputQuantizeScale = immediate.bits_rep();
+        vector_params->quantize_output = true;
+        vector_params->output_scale = immediate.bits_rep();
       }
     } else {
       if (vectorStage == 5) {

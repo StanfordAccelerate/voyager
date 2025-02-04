@@ -31,7 +31,7 @@ void MapSoftmax(const codegen::Operator &param,
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.offset();
   vector_params->addressGen0Mode = 2;
-  vector_params->addressGen0Broadcast = 0b010000;
+  vector_params->vec0_broadcast = 0b010000;
 
   vector_params->addressGen0Loop[0][0] = non_reduction_loops[0];
   vector_params->addressGen0Loop[0][1] = non_reduction_loops[1];
@@ -41,7 +41,7 @@ void MapSoftmax(const codegen::Operator &param,
   vector_params->addressGen0Loop[1][2] = outer_dim / OC_DIMENSION;
 
   vector_params->fetch_vector_type_0 =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != input.dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == input.dtype();
 
   // output
   const auto output_mem = param.output().memory();
