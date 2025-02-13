@@ -790,7 +790,7 @@ SC_MODULE(InputController) {
         shiftFactor = 2;
       }
 
-      if (params.REPLICATION && IC_DIMENSION >= 16) {
+      if (params.REPLICATION && (IC_DIMENSION == 16 || IC_DIMENSION == 32)) {
         // #pragma hls_pipeline_init_interval 1
         // #pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -1013,7 +1013,7 @@ SC_MODULE(InputController) {
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
-      if (params.TRANPOSE_INPUTS) {
+      if (params.TRANPOSE_INPUTS && IC_DIMENSION <= 32) {
         Input transposeBuffer[NRows][NRows];
 
 #pragma hls_pipeline_init_interval 1
