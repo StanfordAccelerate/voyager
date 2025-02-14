@@ -14,131 +14,64 @@
 #include "test/common/operations/Microscaling.h"
 #include "test/common/operations/Pooling.h"
 #include "test/common/operations/QuantizeOps.h"
-#include "test/common/operations/ReduceOps.h"
 #include "test/common/operations/ReshapeOps.h"
 #include "test/common/operations/SlicingOp.h"
+#include "test/common/operations/Softmax.h"
 #include "test/common/operations/VectorOps.h"
-
-template <typename T>
-void save_tensor(char *output_bytes, std::any output_tensor, int size) {
-  T *output_tensor_casted = std::any_cast<T *>(output_tensor);
-
-  for (int i = 0; i < size; i++) {
-    auto bits = static_cast<T>(output_tensor_casted[i]).bits_rep();
-    constexpr int num_bytes = T::width / 8;
-    for (int j = 0; j < num_bytes; j++) {
-      output_bytes[i * num_bytes + j] = bits.template slc<8>(j * 8);
-    }
-  }
-
-  delete[] output_tensor_casted;
-}
 
 template <typename Input, typename Psum, typename AccumBuffer, typename Scale,
           typename Vector>
-std::any run_operation(const codegen::Operator param,
-                       std::vector<std::any> args) {
-  int arg_index = 0;
-  std::any output_tensor;
+std::any run_operation(const codegen::Operation param,
+                       std::map<std::string, std::any> kwargs) {
+  std::any output_ptr;
 
-  if (param.has_reduce_op()) {
-    const auto &reduce_op = param.reduce_op();
-    if (reduce_op.opcode() == "softmax") {
-      const auto &input = reduce_op.input();
-      const auto input_shape = get_shape(input);
-      output_tensor = softmax<Vector>(args[arg_index++], input_shape);
-    } else if (reduce_op.opcode() == "sum") {
-      const auto &input = reduce_op.input();
-      const auto input_shape = get_shape(input);
+  auto op_list = get_op_list(param);
 
-      std::vector<int> dims;
-      for (int dim : reduce_op.dim()) {
-        dims.push_back(dim);
-      }
+  const auto first_op = op_list.front();
+  LOG("Running operation: " << first_op.target());
 
-      output_tensor = sum<Vector>(args[arg_index++], input_shape, dims);
-    } else if (reduce_op.opcode() == "calculate_mx_qparam") {
-      if constexpr (std::is_same<Vector, CFloat>::value) {
-        std::cerr
-            << "No calculate_mx_param operation should be emitted for CFloat"
-            << std::endl;
-        std::abort();
-      } else {
-        output_tensor = calculate_mx_qparam<Vector, Scale, Input>(
-            args[arg_index++], reduce_op);
-      }
-    } else {
-      std::cerr << "Unsupported reduce instruction: " << reduce_op.opcode()
-                << std::endl;
-      exit(1);
-    }
-  }
-
-  if (param.has_pooling_op()) {
-    const auto input = param.pooling_op().input();
-    output_tensor = pooling<Vector>(args[arg_index++], param);
-  }
-
-  if (param.has_reshape_op()) {
-    const auto &reshape_op = param.reshape_op();
-    if (reshape_op.input().dtype() ==
-        DataTypes::TypeName<INPUT_DATATYPE>::name()) {
-      output_tensor = permute<INPUT_DATATYPE>(args[arg_index++], reshape_op);
-    } else {
-      output_tensor = permute<Vector>(args[arg_index++], reshape_op);
-    }
-  }
-
-  if (param.has_slicing_op()) {
-    const auto &slicing_op = param.slicing_op();
-    if (DataTypes::TypeName<INPUT_DATATYPE>::name() ==
-        slicing_op.input().dtype()) {
-      output_tensor = slice<INPUT_DATATYPE>(args[arg_index++], slicing_op);
-    } else {
-      output_tensor = slice<Vector>(args[arg_index++], slicing_op);
-    }
-  }
-
-  if (param.matrix_op().opcode() == "layer_norm") {
-    const auto &matrix_op = param.matrix_op();
-    output_tensor = layer_norm<Vector>(args[0], args[1], args[2], matrix_op);
-  } else if (param.has_matrix_op()) {
-    const auto &matrix_op = param.matrix_op();
-
-    if (matrix_op.opcode() == "conv2d" && matrix_op.groups() != 1) {
+  if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
+    if (first_op.target() == "conv2d" &&
+        first_op.kwargs().at("groups").int_value() > 1) {
       std::cerr << "Grouped convolution is not supported" << std::endl;
       std::abort();
     }
 
-    // Permute input tensor
-    const auto &input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
-                                                 : matrix_op.input();
+    const auto input = first_op.kwargs().at("input").tensor();
+    std::any input_ptr = kwargs[input.node()];
 
-    std::any input_tensor = args[arg_index++];
-    std::any input_scale = nullptr;
-    if (matrix_op.has_mx_input()) {
-      input_scale = args[arg_index++];
+    bool is_matmul = first_op.target().find("matmul") != std::string::npos;
+    std::string weight_key = is_matmul ? "other" : "weight";
+    const auto weight = first_op.kwargs().at(weight_key).tensor();
+    std::any weight_ptr = kwargs[weight.node()];
+
+    std::any input_scale_ptr = static_cast<Scale *>(nullptr);
+    std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
+
+    bool is_mx_op = first_op.target().find("mx") != std::string::npos;
+    if (is_mx_op) {
+      const auto input_scale = first_op.kwargs().at("input_scale").tensor();
+      input_scale_ptr = kwargs[input_scale.node()];
+
+      const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
+      weight_scale_ptr = kwargs[weight_scale.node()];
     }
+
+    std::any bias_ptr = static_cast<AccumBuffer *>(nullptr);
+
+    if (first_op.kwargs().contains("bias")) {
+      const auto bias = first_op.kwargs().at("bias").tensor();
+      bias_ptr = kwargs[bias.node()];
+    }
+
     if (input.has_reshape()) {
-      input_tensor = permute<Input>(input_tensor, input);
-    } else if (input.has_slicing()) {
-      input_tensor = slice<Input>(input_tensor, input);
+      input_ptr = transpose<Input>(input_ptr, input.reshape());
+      input_ptr = permute<Input>(input_ptr, input.reshape());
     }
 
-    // Permute weight tensor
-    const auto &weight = matrix_op.has_mx_weight()
-                             ? matrix_op.mx_weight().input()
-                             : matrix_op.weight();
-
-    std::any weight_tensor = args[arg_index++];
-    std::any weight_scale = nullptr;
-    if (matrix_op.has_mx_weight()) {
-      weight_scale = args[arg_index++];
-    }
     if (weight.has_reshape()) {
-      weight_tensor = permute<Input>(weight_tensor, weight);
-    } else if (weight.has_slicing()) {
-      weight_tensor = slice<Input>(weight_tensor, weight);
+      weight_ptr = transpose<Input>(weight_ptr, weight.reshape());
+      weight_ptr = permute<Input>(weight_ptr, weight.reshape());
     }
 
     int dim = 1;
@@ -147,50 +80,108 @@ std::any run_operation(const codegen::Operator param,
     }
 
     if (dim == 1) {
-      output_tensor = matrix_vector_multiply<Input, Psum, Vector>(
-          input_tensor, weight_tensor, args[arg_index++], matrix_op);
+      output_ptr = matrix_vector_multiply<Input, Psum, Vector>(
+          input_ptr, weight_ptr, bias_ptr, get_shape(weight));
     } else {
-      output_tensor = gemm<Input, Psum, AccumBuffer, Scale>(
-          input_tensor, input_scale, weight_tensor, weight_scale,
-          args[arg_index++], param);
-    }
-  } else if (param.vector_ops_size() > 0) {
-    // fetch the input of the first vector instruction
-    output_tensor = args[arg_index++];
-
-    const auto vector_input = param.vector_ops(0).input();
-    if (vector_input.has_reshape()) {
-      output_tensor = permute<Vector>(output_tensor, vector_input);
-    } else if (vector_input.has_slicing()) {
-      output_tensor = slice<Vector>(output_tensor, vector_input);
+      output_ptr = gemm<Input, Psum, AccumBuffer, Scale>(
+          input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
+          first_op);
     }
   }
 
-  for (const auto &vector_param : param.vector_ops()) {
-    LOG("Performing vector operation: " << vector_param.opcode());
+  if (first_op.target() == "layer_norm") {
+    output_ptr = layer_norm<Vector>(kwargs, first_op);
+  }
 
-    if (unary_ops.find(vector_param.opcode()) != unary_ops.end()) {
-      Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
-      output_tensor = perform_unary_operation(input_tensor, vector_param);
+  if (first_op.target() == "softmax") {
+    output_ptr = softmax<Vector>(kwargs, first_op);
+  }
 
-    } else if (arithmetics.find(vector_param.opcode()) != arithmetics.end()) {
-      const bool use_input =
-          !vector_param.has_other() || vector_param.other().has_memory();
-      const auto &input =
-          use_input ? vector_param.input() : vector_param.other();
-      const auto &other =
-          use_input ? vector_param.other() : vector_param.input();
+  if (first_op.target() == "calculate_mx_qparam") {
+    if constexpr (std::is_same<Vector, CFloat>::value) {
+      std::cerr
+          << "No calculate_mx_param operation should be emitted for CFloat"
+          << std::endl;
+      std::abort();
+    } else {
+      output_ptr = calculate_mx_qparam<Vector, Scale, Input>(kwargs, first_op);
+    }
+  }
 
-      Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
-      auto input_shape = get_shape(input);
+  if (first_op.target() == "max_pool2d") {
+    output_ptr = max_pool2d<Vector>(kwargs, first_op);
+  }
 
-      Vector *other_tensor;
-      auto other_shape = get_shape(other);
-      if (vector_param.has_other_scalar()) {
-        other_tensor = new Vector[1];
-        other_tensor[0] = vector_param.other_scalar();
-        other_shape = {1};
-      } else if (other.dtype() != input.dtype()) {
+  if (first_op.target() == "adaptive_avg_pool2d") {
+    output_ptr = adaptive_avg_pool2d<Vector>(kwargs, first_op);
+  }
+
+  if (first_op.target() == "transpose") {
+    const auto input = first_op.kwargs().at("input").tensor();
+    if (input.dtype() == DataTypes::TypeName<Input>::name()) {
+      output_ptr = transpose<Input>(kwargs[input.node()], first_op);
+    } else {
+      output_ptr = transpose<Vector>(kwargs[input.node()], first_op);
+    }
+  }
+
+  if (first_op.target() == "permute") {
+    const auto input = first_op.kwargs().at("input").tensor();
+    if (input.dtype() == DataTypes::TypeName<Input>::name()) {
+      output_ptr = permute<Input>(kwargs[input.node()], first_op);
+    } else {
+      output_ptr = permute<Vector>(kwargs[input.node()], first_op);
+    }
+  }
+
+  if (first_op.target() == "slice") {
+    const auto input = first_op.kwargs().at("input").tensor();
+    if (input.dtype() == DataTypes::TypeName<Input>::name()) {
+      output_ptr = slice<Input>(kwargs[input.node()], first_op);
+    } else {
+      output_ptr = slice<Vector>(kwargs[input.node()], first_op);
+    }
+  }
+
+  if (output_ptr.has_value()) {
+    op_list.erase(op_list.begin());
+  } else {
+    // fetch the input of the first vector instruction
+    const auto input = first_op.kwargs().at("input").tensor();
+    output_ptr = kwargs[input.node()];
+
+    if (input.has_reshape()) {
+      const auto reshape_op = input.reshape();
+      output_ptr = permute<Vector>(output_ptr, reshape_op);
+      output_ptr = slice<Vector>(output_ptr, reshape_op);
+    }
+  }
+
+  for (const auto &op : op_list) {
+    LOG("Performing fused operation: " << op.target());
+
+    if (unary_ops.find(op.target()) != unary_ops.end()) {
+      const auto input = op.kwargs().at("input").tensor();
+      const auto input_shape = get_shape(input);
+
+      Vector *input_ptr = std::any_cast<Vector *>(output_ptr);
+      output_ptr = perform_unary_operation(input_ptr, input_shape, op.target());
+    } else if (arithmetics.find(op.target()) != arithmetics.end()) {
+      auto operand1 = op.kwargs().at("input").tensor();
+      auto operand2 = op.kwargs().at("other").tensor();
+
+      // input comes from outputs of previous operations
+      auto input = operand2.has_memory() ? operand1 : operand2;
+      auto other = operand2.has_memory() ? operand2 : operand1;
+
+      Vector *input_ptr = std::any_cast<Vector *>(output_ptr);
+      const auto input_shape = get_shape(input);
+
+      Vector *other_ptr;
+
+      if (input.dtype() == other.dtype()) {
+        other_ptr = std::any_cast<Vector *>(kwargs[other.node()]);
+      } else {
         if constexpr (std::is_same<Vector, CFloat>::value) {
           std::cerr << "No quantization operations should be emitted for CFloat"
                     << std::endl;
@@ -198,90 +189,92 @@ std::any run_operation(const codegen::Operator param,
         } else {
           Vector *scale = new Vector[1];
           scale[0] = other.scale() != 0 ? other.scale() : 1.0;
-          other_tensor =
-              dequantize_tensor<Vector>(args[arg_index++], scale, other);
+          other_ptr =
+              dequantize_tensor<Vector>(kwargs[other.node()], scale, other);
         }
-      } else {
-        other_tensor = std::any_cast<Vector *>(args[arg_index++]);
       }
+
+      const auto other_shape = get_shape(other);
 
       if (other.has_reshape()) {
-        other_tensor = permute<Vector>(other_tensor, other);
-      } else if (other.has_slicing()) {
-        other_tensor = slice<Vector>(other_tensor, other);
+        other_ptr = permute<Vector>(other_ptr, other.reshape());
+        other_ptr = slice<Vector>(other_ptr, other.reshape());
       }
 
-      output_tensor =
-          perform_vector_operation(input_tensor, input_shape, other_tensor,
-                                   other_shape, vector_param.opcode());
-
-    } else if (vector_param.opcode().rfind("quantize", 0) == 0) {
+      output_ptr = perform_vector_operation(input_ptr, input_shape, other_ptr,
+                                            other_shape, op.target());
+    } else if (op.target().rfind("quantize", 0) == 0) {
       if constexpr (std::is_same<Vector, CFloat>::value) {
         std::cerr << "No quantization operations should be emitted for CFloat"
                   << std::endl;
         std::abort();
       } else {
-        if (vector_param.other().shape_size() == 1) {
-          output_tensor = quantize<Vector, Input, Vector>(
-              output_tensor, args[arg_index++], get_size(vector_param.input()));
-        } else if (vector_param.other().shape_size() > 1) {
-          output_tensor = quantize_mx<Vector, Input, Scale>(
-              output_tensor, args[arg_index++], vector_param);
+        const auto input = op.kwargs().at("input").tensor();
+        const auto input_shape = get_shape(input);
+
+        const auto scale = op.kwargs().at("scale").tensor();
+        std::any scale_ptr = kwargs[scale.node()];
+        const auto scale_shape = get_shape(scale);
+
+        if (scale.shape_size() == 1) {
+          output_ptr = quantize<Vector, Input, Vector>(output_ptr, scale_ptr,
+                                                       input_shape);
         } else {
-          std::cerr << "No quantization operation for dtype: "
-                    << vector_param.other().dtype() << std::endl;
+          output_ptr = quantize_mx<Vector, Input, Scale>(
+              output_ptr, scale_ptr, input_shape, scale_shape);
         }
       }
-    } else if (vector_param.opcode().rfind("dequantize", 0) == 0) {
-      // perform dequantization operation
+    } else if (op.target().rfind("dequantize", 0) == 0) {
       if constexpr (std::is_same<Vector, CFloat>::value) {
         std::cerr << "No quantization operations should be emitted for CFloat"
                   << std::endl;
         std::abort();
       } else {
-        output_tensor = dequantize_tensor<Vector>(
-            output_tensor, args[arg_index++], vector_param.input());
+        const auto input = op.kwargs().at("input").tensor();
+        const auto scale = op.kwargs().at("scale").tensor();
+        std::any scale_ptr = kwargs[scale.node()];
+        output_ptr = dequantize_tensor<Vector>(output_ptr, scale_ptr, input);
       }
-    } else if (vector_param.opcode().rfind("vmap", 0) == 0) {
-      const auto &input = vector_param.input();
+    } else if (op.target().rfind("vmap", 0) == 0) {
+      const auto input = op.kwargs().at("input").tensor();
       const int size = get_size(input);
 
-      Vector *input_tensor = std::any_cast<Vector *>(output_tensor);
+      Vector *input_ptr = std::any_cast<Vector *>(output_ptr);
 
+      const auto other = op.kwargs().at("code").tensor();
       DataTypes::bfloat16 *value_map =
-          std::any_cast<DataTypes::bfloat16 *>(args[arg_index++]);
+          std::any_cast<DataTypes::bfloat16 *>(kwargs[other.node()]);
 
       for (int i = 0; i < size; i++) {
         DataTypes::bfloat16 value =
-            static_cast<DataTypes::bfloat16>(input_tensor[i]);
+            static_cast<DataTypes::bfloat16>(input_ptr[i]);
         unsigned int index = value.bits_rep().to_uint();
-        input_tensor[i] = static_cast<Vector>(value_map[index]);
+        input_ptr[i] = static_cast<Vector>(value_map[index]);
       }
 
-      output_tensor = input_tensor;
+      output_ptr = input_ptr;
     } else {
-      std::cerr << "Unsupported vector instruction: " << vector_param.opcode()
-                << std::endl;
+      std::cerr << "Unsupported instruction: " << op.target() << std::endl;
       std::abort();
     }
   }
 
-  int output_size = get_size(param.output());
   if (param.output().has_reshape()) {
-    if (param.output().dtype() == "bfloat16") {
-      output_tensor = permute<DataTypes::bfloat16>(
-          std::any_cast<DataTypes::bfloat16 *>(output_tensor), param.output());
+    const auto reshape_op = param.output().reshape();
+    if (param.output().dtype() == DataTypes::TypeName<Vector>::name()) {
+      output_ptr = transpose<Vector>(output_ptr, reshape_op);
+      output_ptr = permute<Vector>(output_ptr, reshape_op);
     } else {
-      // assume Input if the output tensor is not bfloat16
-      output_tensor = permute<Input>(output_tensor, param.output());
+      output_ptr = transpose<Input>(output_ptr, reshape_op);
+      output_ptr = permute<Input>(output_ptr, reshape_op);
     }
   }
 
-  return output_tensor;
+  return output_ptr;
 }
 
-std::any run_gold_model(const codegen::Operator &param,
-                        std::vector<std::any> args) {
+std::any run_gold_model(const codegen::Operation &op,
+                        std::map<std::string, std::any> kwargs) {
   return run_operation<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                       SCALE_DATATYPE, VECTOR_DATATYPE>(param, args);
+                       SCALE_DATATYPE, VECTOR_DATATYPE>(op, kwargs);
 }

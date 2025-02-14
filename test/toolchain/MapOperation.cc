@@ -10,21 +10,18 @@
 #include "test/toolchain/Softmax.h"
 #include "test/toolchain/VectorOps.h"
 
-void MapOperation(const codegen::Operator &param,
+void MapOperation(const codegen::Operation &param,
                   std::deque<BaseParams *> &mappedParams,
                   std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
-  if (param.has_matrix_op()) {
-    const auto matrix_op = param.matrix_op();
-    if (matrix_op.opcode() == "layer_norm") {
-      MapLayerNorm(param, mappedParams, opMemoryMaps);
-      return;
-    }
+  const auto op_list = get_op_list(param);
+  const auto first_op = op_list[0];
 
-    const auto &inputs = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
-                                                  : matrix_op.input();
+  if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
+    const auto &input = first_op.kwargs().at("input").tensor();
+
     int dim = 1;
-    for (int i = 0; i < inputs.shape_size() - 1; i++) {
-      dim *= inputs.shape(i);
+    for (int i = 0; i < input.shape_size() - 1; i++) {
+      dim *= input.shape(i);
     }
 
     if (dim == 1) {
@@ -32,21 +29,16 @@ void MapOperation(const codegen::Operator &param,
     } else {
       MapMatrixOperation(param, mappedParams, opMemoryMaps);
     }
-  } else if (param.has_reduce_op()) {
-    const auto &reduce_op = param.reduce_op();
-    if (reduce_op.opcode() == "softmax") {
-      MapSoftmax(param, mappedParams, opMemoryMaps);
-    } else if (reduce_op.opcode() == "calculate_mx_qparam") {
-      MapMXQparam(param, mappedParams, opMemoryMaps);
-    } else {
-      std::cerr << "Unsupported reduce instruction: " << reduce_op.opcode()
-                << std::endl;
-      exit(1);
-    }
-  } else if (param.has_pooling_op()) {
+  } else if (first_op.target() == "layer_norm") {
+    MapLayerNorm(param, mappedParams, opMemoryMaps);
+  } else if (first_op.target() == "softmax") {
+    MapSoftmax(param, mappedParams, opMemoryMaps);
+  } else if (first_op.target() == "calculate_mx_qparam") {
+    MapMXQparam(param, mappedParams, opMemoryMaps);
+  } else if (first_op.target() == "max_pool2d" ||
+             first_op.target() == "adaptive_avg_pool2d") {
     MapPoolingOperation(param, mappedParams, opMemoryMaps);
-  } else if (param.has_slicing_op() || param.has_reshape_op() ||
-             param.vector_ops_size() > 0) {
+  } else {
     MapVectorOperations(param, mappedParams, opMemoryMaps);
   }
 }

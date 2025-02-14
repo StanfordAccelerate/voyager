@@ -44,7 +44,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
                           VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = memory.offset();
+  vector_params->ADDRESS_GEN1_OFFSET = memory.address();
 
   int nonzero_dims = 0;
   for (const int &dim : tensor.shape()) {
@@ -98,7 +98,7 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
                           VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN2_OFFSET = memory.offset();
+  vector_params->ADDRESS_GEN2_OFFSET = memory.address();
 
   int nonzero_dims = 0;
   for (const int &dim : tensor.shape()) {
@@ -146,27 +146,43 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
   vector_params->vec2_dq_scale = scale.bits_rep();
 }
 
-void MapVectorOperations(const codegen::Operator &param,
+void set_vector_immediate(const float scalar, const int stage,
+                          const std::string opcode, VectorInstructions &inst) {
+  std::cerr << "immediate: " << scalar << std::endl;
+
+  VECTOR_DATATYPE immediate = scalar;
+
+  if (opcode == "div" || opcode == "div_") {
+    immediate = 1.0 / immediate;
+  }
+
+  if (stage == 0) {
+    inst.vOp0Src1 = VectorInstructions::op0immediate;
+    inst.immediate0 = immediate.bits_rep();
+  } else if (stage == 3) {
+    inst.vOp3Src1 = VectorInstructions::op3immediate;
+    inst.immediate1 = immediate.bits_rep();
+  } else if (stage == 5) {
+    inst.immediate1 = immediate.bits_rep();
+  }
+}
+
+void MapVectorOperations(const codegen::Operation &param,
                          std::deque<BaseParams *> &mappedParams,
                          std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   VectorParams *vector_params = new VectorParams;
   AcceleratorMemoryMap accelerator_memory_map;
 
-  codegen::Tensor vector_input;
-  if (param.has_slicing_op()) {
-    vector_input = param.slicing_op().input();
-  } else if (param.has_reshape_op()) {
-    vector_input = param.reshape_op().input();
-  } else {
-    vector_input = param.vector_ops(0).input();
-  }
+  const auto op_list = get_op_list(param);
 
+  const auto vector_input = op_list[0].kwargs().at("input").tensor();
   const auto vector_output = param.output();
+
   const int numel = get_size(vector_output);
 
   const auto input_memory = vector_input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OFFSET = input_memory.offset();
+  vector_params->VECTOR_OFFSET = input_memory.address();
   vector_params->addressGen0Mode = 2;
 
   auto loop_bounds = get_tensor_shape(vector_input);
@@ -187,31 +203,38 @@ void MapVectorOperations(const codegen::Operator &param,
   vector_params->addressGen0Loop[1][1] = loop_bounds[4];
   vector_params->addressGen0Loop[1][2] = loop_bounds[5] / OC_DIMENSION;
 
-  if (param.has_slicing_op() || vector_input.has_slicing()) {
-    const auto &slicing =
-        param.has_slicing_op() ? param.slicing_op() : vector_input.slicing();
+  auto reshape_op = op_list[0];
+
+  const auto input = op_list[0].kwargs().at("input").tensor();
+  if (input.has_reshape()) {
+    reshape_op = input.reshape();
+  }
+
+  const auto kwargs = reshape_op.kwargs();
+
+  if (reshape_op.target() == "slice") {
     vector_params->has_slicing = true;
-    vector_params->vec0_dim = slicing.dim() + num_extra_dims;
-    vector_params->vec0_start = slicing.start();
-    vector_params->vec0_end = slicing.end();
-    vector_params->vec0_stride = slicing.step();
+    vector_params->vec0_dim =
+        reshape_op.kwargs().at("dim").int_value() + num_extra_dims;
+    vector_params->vec0_start = kwargs.at("start").int_value();
+    vector_params->vec0_end = kwargs.at("end").int_value();
+    vector_params->vec0_stride = kwargs.at("step").int_value();
 
     // Last dimension needs to be scaled by OC_DIMENSION
     if (vector_params->vec0_dim == 5) {
       vector_params->vec0_start /= OC_DIMENSION;
       vector_params->vec0_end /= OC_DIMENSION;
     }
-  } else if (param.has_reshape_op() || vector_input.has_reshape()) {
-    const auto &reshape =
-        param.has_reshape_op() ? param.reshape_op() : vector_input.reshape();
+  }
+
+  if (reshape_op.target() == "permute") {
     vector_params->has_reshape = true;
-    if (reshape.opcode() == "permute") {
-      for (int i = 0; i < reshape.dims_size(); i++) {
-        vector_params->vec0_dim_order[i + num_extra_dims] =
-            reshape.dims(i) + num_extra_dims;
-      }
-    } else {
-      throw std::invalid_argument("Unsupported reshape operation!");
+
+    const auto dims = kwargs.at("dims").int_list().values();
+
+    for (int i = 0; i < dims.size(); i++) {
+      vector_params->vec0_dim_order[i + num_extra_dims] =
+          dims[i] + num_extra_dims;
     }
   }
 
@@ -224,7 +247,7 @@ void MapVectorOperations(const codegen::Operator &param,
 
   const auto output_memory = vector_output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.offset();
+  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
   vector_params->outputAddressMode = 2;
 
   auto output_shape = get_tensor_shape(vector_output);
@@ -263,142 +286,119 @@ void MapVectorOperations(const codegen::Operator &param,
         param.output().shape(2) * param.output().shape(3) / OC_DIMENSION;
   }
 
-  VectorInstructions vinst;
-  memset(&vinst, 0, sizeof(vinst));
-  vinst.instType = VectorInstructions::vector;
-  vinst.vInput = VectorInstructions::readFromVectorFetch;
-  vinst.vAccumulatePush = VectorInstructions::nop;
-  vinst.vDest = VectorInstructions::vWriteOut;
+  VectorInstructions inst;
+  memset(&inst, 0, sizeof(inst));
+  inst.instType = VectorInstructions::vector;
+  inst.vInput = VectorInstructions::readFromVectorFetch;
+  inst.vAccumulatePush = VectorInstructions::nop;
+  inst.vDest = VectorInstructions::vWriteOut;
 
-  auto vinst_mappings = get_vector_instruction_mapping();
-  auto it = param.vector_ops().begin();
-  bool has_vector_params = it != param.vector_ops().end();
-  std::string output_node = "";
+  auto inst_map = get_vector_instruction_mapping();
 
-  int vectorStage = 0;
-  while (has_vector_params) {
-    const auto opcode = it->opcode();
+  int curr_stage = 0;
+
+  for (int i = 0; i < op_list.size(); i++) {
+    const auto op = op_list[i];
+    const std::string opcode = op.target();
 
     if (opcode.rfind("dequantize", 0) == 0 ||
         opcode.rfind("quantize", 0) == 0) {
-      const auto tensor_to_load =
-          output_node == it->other().node() ? it->input() : it->other();
-      const int size = get_size(tensor_to_load);
+      const auto input = op.kwargs().at("input").tensor();
+      const auto scale = op.kwargs().at("scale").tensor();
+      const int size = get_size(scale);
 
-      if (size == 1) {  // scalar scale factor
-        VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
+      if (size == 1) {
+        // scalar scale factor
+        VECTOR_DATATYPE immediate = read_constant_param(scale);
 
         if (opcode.rfind("dequantize", 0) == 0) {
-          vinst.immediate0 = immediate.bits_rep();
+          inst.immediate0 = immediate.bits_rep();
         } else if (opcode.rfind("quantize", 0) == 0) {
           vector_params->quantize_output = true;
           vector_params->output_scale = immediate.bits_rep();
         }
-      } else {  // microscaling
-        auto other_shape = get_tensor_shape(it->other());
+      } else {
+        // microscaling
+        auto scale_shape = get_tensor_shape(scale);
 
-        // change other_shape to 2D tensor
-        int total_size = 1;
-        for (int i = 0; i < other_shape.size(); i++) {
-          total_size *= other_shape[i];
-        }
-
+        // change scale_shape to 2D tensor
         int other_dim_factors[2];
-        factorize_for_address_gen(total_size / OC_DIMENSION, other_dim_factors);
+        factorize_for_address_gen(size / OC_DIMENSION, other_dim_factors);
 
         other_dim_factors[1] *= OC_DIMENSION;
-        other_shape = {other_dim_factors[0], other_dim_factors[1]};
+        scale_shape = {other_dim_factors[0], other_dim_factors[1]};
 
-        set_vector_addr_gen1(tensor_to_load, other_shape,
-                             accelerator_memory_map, vector_params);
-
+        set_vector_addr_gen1(scale, scale_shape, accelerator_memory_map,
+                             vector_params);
         vector_params->fetch_scale_type_1 = true;
+
         vector_params->mx_block_size = numel / size / OC_DIMENSION;
         vector_params->quantize_output_mx = true;
       }
-
     } else {
-      if (vectorStage == 5) {
+      if (curr_stage == 5) {
         // we have already processed all the stages
+        assert(i == op_list.size() - 1);
         break;
       }
 
-      for (int stage = vectorStage; stage < 5; stage++) {
+      for (int stage = curr_stage; stage < 5; stage++) {
         bool matched = vector_unit_stages[stage].find(opcode) !=
                        vector_unit_stages[stage].end();
+
         std::cerr << "stage: " << stage << "  opcode: " << opcode
                   << "  matched: " << matched << std::endl;
+
         if (matched) {
-          unsigned int vop = vinst_mappings[opcode];
+          unsigned int vop = inst_map[opcode];
 
           if (stage == 0) {
-            vinst.vOp0 = vop;
+            inst.vOp0 = vop;
           } else if (stage == 1) {
-            vinst.vOp1 = vop;
+            inst.vOp1 = vop;
           } else if (stage == 2) {
-            vinst.vOp2 = vop;
+            inst.vOp2 = vop;
           } else if (stage == 3) {
-            vinst.vOp3 = vop;
+            inst.vOp3 = vop;
           } else if (stage == 4) {
-            vinst.vOp4 = vop;
+            inst.vOp4 = vop;
           }
 
-          vectorStage = stage + 1;
-          if (it->opcode() == "vmap") {
-            vinst.vmapOffset = it->other().memory().offset();
-          } else if (it->has_other_scalar()) {
-            std::cerr << "immediate: " << it->other_scalar() << std::endl;
-            VECTOR_DATATYPE immediate = it->other_scalar();
+          curr_stage = stage + 1;
+          if (opcode == "vmap") {
+            const auto other = op.kwargs().at("code").tensor();
+            inst.vmapOffset = other.memory().address();
+          } else if (op.kwargs().contains("other")) {
+            const auto other = op.kwargs().at("other");
 
-            if (it->opcode() == "div" || it->opcode() == "div_") {
-              immediate = 1.0 / immediate;
-            }
+            if (other.has_float_value() || other.has_int_value()) {
+              float scalar = other.has_float_value() ? other.float_value()
+                                                     : other.int_value();
+              set_immediate(scalar, stage, opcode, inst);
+            } else if (other.has_tensor()) {
+              const auto tensor = other.tensor();
 
-            if (stage == 0) {
-              vinst.vOp0Src1 = VectorInstructions::op0immediate;
-              vinst.immediate0 = immediate.bits_rep();
-            } else if (stage == 3) {
-              vinst.vOp3Src1 = VectorInstructions::op3immediate;
-              vinst.immediate1 = immediate.bits_rep();
-            } else if (stage == 5) {
-              vinst.immediate1 = immediate.bits_rep();
-            }
-          } else if (it->has_other()) {
-            const auto tensor_to_load =
-                output_node == it->other().node() ? it->input() : it->other();
-            const int size = get_size(tensor_to_load);
-            if (size == 1) {
-              VECTOR_DATATYPE immediate = read_constant_param(tensor_to_load);
+              if (get_size(tensor) == 1) {
+                float scalar = read_constant_param(tensor);
+                set_immediate(scalar, stage, opcode, inst);
+              } else {
+                const auto self = op.kwargs().at("input").tensor();
+                const auto tensor_to_load = tensor.has_memory() ? tensor : self;
 
-              if (it->opcode() == "div" || it->opcode() == "div_") {
-                immediate = 1.0 / immediate;
-              }
+                const auto input_shape = get_shape_after_reshape(self);
+                const auto other_shape = get_shape_after_reshape(tensor);
+                const auto output_shape =
+                    squeeze_shape(broadcast_shape(input_shape, other_shape));
 
-              if (stage == 0) {
-                vinst.vOp0Src1 = VectorInstructions::op0immediate;
-                vinst.immediate0 = immediate.bits_rep();
-              } else if (stage == 3) {
-                vinst.vOp3Src1 = VectorInstructions::op3immediate;
-                vinst.immediate1 = immediate.bits_rep();
-              } else if (stage == 5) {
-                vinst.immediate1 = immediate.bits_rep();
-              }
-            } else {
-              const auto input_shape =
-                  get_shape_after_fused_reshape_or_slicing(it->input());
-              const auto other_shape =
-                  get_shape_after_fused_reshape_or_slicing(it->other());
-              const auto output_shape =
-                  squeeze_shape(broadcast_shape(input_shape, other_shape));
-
-              if (stage == 0) {
-                vinst.vOp0Src1 = VectorInstructions::readInterface;
-                set_vector_addr_gen1(tensor_to_load, output_shape,
-                                     accelerator_memory_map, vector_params);
-              } else if (stage == 3) {
-                vinst.vOp3Src1 = VectorInstructions::readNormalInterface;
-                set_vector_addr_gen2(tensor_to_load, output_shape,
-                                     accelerator_memory_map, vector_params);
+                if (stage == 0) {
+                  inst.vOp0Src1 = VectorInstructions::readInterface;
+                  set_vector_addr_gen1(tensor_to_load, output_shape,
+                                       accelerator_memory_map, vector_params);
+                } else if (stage == 3) {
+                  inst.vOp3Src1 = VectorInstructions::readNormalInterface;
+                  set_vector_addr_gen2(tensor_to_load, output_shape,
+                                       accelerator_memory_map, vector_params);
+                }
               }
             }
           }
@@ -407,22 +407,12 @@ void MapVectorOperations(const codegen::Operator &param,
         }
       }
     }
-
-    output_node = it->name();
-    ++it;
-    has_vector_params = it != param.vector_ops().end();
-  }
-
-  // check that no more vector instructions are present
-  if (it != param.vector_ops().end()) {
-    std::cerr << "Error: unsupported vector fusion pattern" << std::endl;
-    exit(1);
   }
 
   // total output count
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
-  vector_instruction_config->inst[0] = vinst;
+  vector_instruction_config->inst[0] = inst;
   vector_instruction_config->instCount[0] = numel / OC_DIMENSION;
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;

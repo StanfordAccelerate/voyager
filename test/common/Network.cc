@@ -29,29 +29,29 @@ Network::Network(std::string& model_path) {
   }
 }
 
-std::vector<codegen::Operator> Network::get_params(bool filter_nop) {
+std::vector<codegen::Operation> Network::get_params(bool filter_nop) {
   if (!filter_nop) {
     return {model.ops().begin(), model.ops().end()};
   }
 
-  std::vector<codegen::Operator> params;
-  for (const auto& param : model.ops()) {
-    if (!param.has_nop()) {
-      params.push_back(param);
+  std::vector<codegen::Operation> params;
+  for (const auto& op : model.ops()) {
+    if (op.op().target() != "nop") {
+      params.push_back(op);
     }
   }
   return params;
 }
 
-std::vector<codegen::Operator> Network::get_params(
+std::vector<codegen::Operation> Network::get_params(
     const std::vector<std::string>& names, bool filter_nop) {
   const auto all_params = get_params(filter_nop);
 
-  std::vector<codegen::Operator> params;
+  std::vector<codegen::Operation> params;
 
   if (names.size() == 1) {
     for (const auto& param : all_params) {
-      if (param.name() == names[0]) {
+      if (get_op_name(param) == names[0]) {
         params.push_back(param);
         break;
       }
@@ -60,13 +60,13 @@ std::vector<codegen::Operator> Network::get_params(
     bool found_first = false;
     bool found_second = false;
     for (const auto& param : all_params) {
-      if (param.name() == names[0]) {
+      if (get_op_name(param) == names[0]) {
         found_first = true;
       }
       if (found_first) {
         params.push_back(param);
       }
-      if (param.name() == names[1]) {
+      if (get_op_name(param) == names[1]) {
         found_second = true;
         break;
       }

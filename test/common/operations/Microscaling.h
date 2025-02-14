@@ -3,20 +3,11 @@
 #include "test/common/operations/Common.h"
 
 template <typename Vector, typename Scale, typename Input>
-Scale* calculate_mx_qparam(std::any input_tensor,
-                           const codegen::ReduceOp& param) {
+Scale* calculate_mx_qparam(std::any input_tensor, const std::vector<int>& shape,
+                           const int block_size = 32) {
   Vector* inputs = std::any_cast<Vector*>(input_tensor);
 
-  const auto& shape = get_shape(param.input());
-
-  int mx_axis = param.dim(0);
-  if (mx_axis < 0) {
-    mx_axis += shape.size();
-  }
-
-  // FIXME: 32 is hardcoded for microscaling
-  int block_size = 32;
-  int input_size = get_size(param.input());
+  int input_size = get_size(shape);
   int result_size = (input_size + block_size - 1) / block_size;
 
   Scale* outputs = new Scale[result_size];
@@ -42,6 +33,15 @@ Scale* calculate_mx_qparam(std::any input_tensor,
 
   delete[] inputs;
   return outputs;
+}
+
+template <typename Vector, typename Scale, typename Input>
+Scale* calculate_mx_qparam(std::map<std::string, std::any>& kwargs,
+                           const codegen::OpOverload op) {
+  const auto input = op.kwargs().at("input").tensor();
+  std::any input_ptr = kwargs[input.node()];
+  const auto input_shape = get_shape(input);
+  return calculate_mx_qparam<Vector, Scale, Input>(input_ptr, input_shape);
 }
 
 // template <typename Vector, typename Scale, typename Input>

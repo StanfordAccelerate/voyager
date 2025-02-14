@@ -18,11 +18,9 @@ class DataLoader {
  public:
   DataLoader(ArrayMemory*, bool, bool);
 
-  void load_inputs(const codegen::Operator param, std::string data_dir,
+  void load_inputs(const codegen::Operation operation, std::string data_dir,
                    bool random_data = false);
-  void load_weights(const codegen::Operator param, std::string data_dir,
-                    bool random_data = false);
-  void load_outputs(const codegen::Operator param, std::string data_dir);
+  void load_outputs(const codegen::Operation operation, std::string data_dir);
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
                    bool transpose = false, bool replication = false);
 

@@ -254,7 +254,7 @@ SC_MODULE(InputScaleController) {
                                     (x << headSize) + (c & mask);
                         }
 
-                        if (params.has_input_tranpose) {
+                        if (params.has_input_transpose) {
                           address =
                               (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
                         }
@@ -766,7 +766,7 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.reductionLoopIndex[1]] =
           loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NRows);
 
-      if (params.has_input_tranpose) {
+      if (params.has_input_transpose) {
         Scale transposeBuffer[NRows][NRows];
 
 #pragma hls_pipeline_init_interval 1

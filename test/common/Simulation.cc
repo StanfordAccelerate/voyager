@@ -105,42 +105,59 @@ void Simulation::load_data() {
 
   const auto params_to_load = network->get_params(tests, false);
 
-  for (const auto& [key, dataLoader] : dataLoaders) {
-    dataLoader->load_inputs(params_to_load.front(), data_dir);
-    dataLoader->load_outputs(params_to_load.back(), data_dir);
-    for (const auto& param : params_to_load) {
-      dataLoader->load_weights(param, data_dir);
+  // Fully connected layer, or linear ops with input of a 1D tensor, is run on
+  // the vector unit. Its weight does not need to be transposed. We check if an
+  // op is a FC by checking its output dimension. This should be improved in the
+  // future.
+  int num_classes;
+  if (model == "mobilebert" || model == "bert") {
+    num_classes = 2;
+  } else if (model == "resnet18" || model == "resnet50") {
+    num_classes = 1000;
+  }
+
+  for (const auto& [key, dataloader] : dataLoaders) {
+    dataloader->load_inputs(params_to_load.front(), data_dir);
+    dataloader->load_outputs(params_to_load.back(), data_dir);
+
+    for (const auto& tensor : network->model.parameters()) {
+      bool has_tranpose = tensor.shape(0) != num_classes;
+      dataloader->load_tensor(tensor, data_dir, has_tranpose);
     }
   }
 
   std::cout << "Data loaded successfully" << std::endl;
 }
 
-void Simulation::print_ideal_runtime(const codegen::Operator& param) {
+void Simulation::print_ideal_runtime(const codegen::Operation& param) {
+  const auto op_list = get_op_list(param);
+  const auto first_op = op_list.front();
+
   long cycles;
-  if (param.has_matrix_op()) {
+
+  if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
     // the total number of operations is X*Y*C*FX*FY*K.
     long num_ops = 1;
 
     for (const auto& dim : param.output().shape()) num_ops *= dim;  // X * Y * K
 
+    bool is_matmul = first_op.target().find("matmul") != std::string::npos;
+    std::string weight_key = is_matmul ? "other" : "weight";
+    const auto weight = first_op.kwargs().at(weight_key).tensor();
+
     // skip the first dimension (K) since it is already accounted for
-    const auto& matrix_op = param.matrix_op();
-    const auto weight_shape = matrix_op.has_mx_weight()
-                                  ? matrix_op.mx_weight().input().shape()
-                                  : matrix_op.weight().shape();
-    for (int i = 1; i < weight_shape.size(); i++) {
-      num_ops *= weight_shape[i];  // FX * FY * C
+    for (int i = 1; i < weight.shape_size(); i++) {
+      num_ops *= weight.shape(i);  // FX * FY * C
     }
 
     cycles = num_ops / (IC_DIMENSION * OC_DIMENSION);
-    std::cout << param.name() << ", matrix unit ideal runtime: ";
+    std::cout << get_op_name(param) << ", matrix unit ideal runtime: ";
   } else {
     long num_ops = 1;
     for (const auto& dim : param.output().shape()) num_ops *= dim;
 
     cycles = num_ops / OC_DIMENSION;
-    std::cout << param.name() << ", vector unit ideal runtime: ";
+    std::cout << get_op_name(param) << ", vector unit ideal runtime: ";
   }
   // read CLOCK_PERIOD from environment
   int clock_period =
@@ -150,14 +167,14 @@ void Simulation::print_ideal_runtime(const codegen::Operator& param) {
 
 void Simulation::run() {
   // Run gold models
-  for (const auto& param : params) {
-    print_ideal_runtime(param);
+  for (const auto& op : params) {
+    print_ideal_runtime(op);
 
     if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
       auto memory = (ArrayMemory*)(memories["gold"]);
-      auto args = memory->get_args(param);
-      std::any outputs = run_gold_model(param, args);
-      memory->write_tensor(param.output(), outputs);
+      auto kwargs = memory->get_args(op);
+      std::any outputs = run_gold_model(op, kwargs);
+      memory->write_tensor(op.output(), outputs);
     }
   }
 
@@ -171,10 +188,10 @@ void Simulation::run() {
 int Simulation::check_outputs() {
   std::string prefix;
   if (params.size() == 1) {
-    prefix = out_dir + model + '.' + params.front().name() + '.';
+    prefix = out_dir + model + '.' + get_op_name(params.front()) + '.';
   } else {
-    prefix = out_dir + model + '.' + params.front().name() + "_to_" +
-             params.back().name() + '.';
+    prefix = out_dir + model + '.' + get_op_name(params.front()) + "_to_" +
+             get_op_name(params.back()) + '.';
   }
 
   bool has_valid_comp = false;
@@ -241,8 +258,8 @@ int Simulation::check_outputs() {
       rel_err += compare_arrays<DataTypes::int8, DataTypes::int8>(
           output1, output_names[0], output2, output_names[1], size, filename,
           false);
-    } else if (param.output().dtype() == "e8m0") {
-      rel_err += compare_arrays<DataTypes::e8m0, DataTypes::e8m0>(
+    } else if (param.output().dtype() == "fp8_e8m0") {
+      rel_err += compare_arrays<DataTypes::fp8_e8m0, DataTypes::fp8_e8m0>(
           output1, output_names[0], output2, output_names[1], size, filename,
           false);
     } else if (param.output().dtype() == "bfloat16") {

@@ -88,9 +88,9 @@ endif
 # We need to work with multiple C++ standards, as the SystemC lib is only
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
-LDFLAGS += -lsystemc -lstdc++fs -labsl_log_internal_message -labsl_log_internal_check_op -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
+LDFLAGS += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS += -L/cad/mentor/2024.2_1/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
-LDFLAGS_NO_SYSC += -lstdc++fs -labsl_log_internal_message -labsl_log_internal_check_op -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
+LDFLAGS_NO_SYSC += -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 
 ###########################################################

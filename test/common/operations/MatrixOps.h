@@ -14,57 +14,33 @@ inline void fused_multiply_add(T1 a, T1 b, T2 &c) {
 }
 
 template <typename Input, typename Psum, typename Buffer, typename Scale>
-inline Buffer *gemm(std::any input_tensor, std::any input_scale,
-                    std::any weight_tensor, std::any weight_scale,
-                    std::any bias_tensor, const codegen::Operator &param) {
+inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
+                    std::any weight_ptr, std::any weight_scale_ptr,
+                    std::any bias_ptr, const Tiling &tiling) {
   LOG("Performing GEMM");
 
-  const auto matrix_op = param.matrix_op();
+  Input *inputs = std::any_cast<Input *>(input_ptr);
+  Scale *input_scales = std::any_cast<Scale *>(input_scale_ptr);
 
-  Input *inputs = std::any_cast<Input *>(input_tensor);
-  Scale *input_scales;
-  if (matrix_op.has_mx_input()) {
-    input_scales = std::any_cast<Scale *>(input_scale);
-  }
+  Input *weights = std::any_cast<Input *>(weight_ptr);
+  Scale *weight_scales = std::any_cast<Scale *>(weight_scale_ptr);
 
-  Input *weights = std::any_cast<Input *>(weight_tensor);
-  Scale *weight_scales;
-  if (matrix_op.has_mx_weight()) {
-    weight_scales = std::any_cast<Scale *>(weight_scale);
-  }
+  Buffer *biases = std::any_cast<Buffer *>(bias_ptr);
 
-  // bias is assumed to be in Buffer
-  Buffer *bias = nullptr;
-  if (matrix_op.has_bias()) {
-    bias = std::any_cast<Buffer *>(bias_tensor);
-  }
-
-  Tiling tiling;
-  if (matrix_op.opcode() == "conv2d" || matrix_op.opcode() == "conv2d_mx") {
-    tiling = get_conv2d_tiling(param);
-  } else {
-    tiling = get_linear_tiling(param);
-  }
-
-  adjust_tiling_for_dimension(tiling);
-
-  int IC_unroll = IC_DIMENSION;
-  int FX_UNROLL = 1;
+  int ic_unroll = IC_DIMENSION;
+  int fx_unroll = 1;
 
   if (tiling.replication) {
-    // tiling.loops[1][tiling.fx_index] = 7;
-    tiling.loops[1][tiling.fx_index] = tiling.loops[1][tiling.fy_index];
-    IC_unroll = 3;
-    tiling.loops[1][tiling.reduction_loop_index[1]] = 1;
+    ic_unroll = 3;
 
     if (IC_DIMENSION == 4) {
-      FX_UNROLL = 1;
+      fx_unroll = 1;
     } else if (IC_DIMENSION == 8) {
-      FX_UNROLL = 2;
+      fx_unroll = 2;
     } else if (IC_DIMENSION == 16) {
-      FX_UNROLL = 4;
+      fx_unroll = 4;
     } else if (IC_DIMENSION == 32) {
-      FX_UNROLL = 7;
+      fx_unroll = 7;
     }
   }
 
@@ -106,11 +82,11 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
   }
 #endif
 
-  // initialize to bias
+  // Store biases in the accumulation buffer
   for (int i = 0; i < X * Y; i++) {
     for (int k = 0; k < K; k++) {
-      if (matrix_op.has_bias()) {
-        outputs[i * K + k] = bias[k];
+      if (biases != nullptr) {
+        outputs[i * K + k] = biases[k];
       } else {
         outputs[i * K + k] = Buffer(0.0);
       }
@@ -159,8 +135,8 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                       Psum psum = outputs[output_addr];
 #endif
 
-                      for (int ic0 = 0; ic0 < IC_unroll; ic0++) {
-                        int c = c0 * IC_unroll + ic0;
+                      for (int ic0 = 0; ic0 < ic_unroll; ic0++) {
+                        int c = c0 * ic_unroll + ic0;
                         int input_addr = (STRIDE * y + fy) * STRIDE * X * C +
                                          (STRIDE * x + fx) * C + c;
                         int weight_addr = (fy + (FY - 1) / 2) * FX * C * K +
@@ -177,8 +153,8 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                           if (tiling.replication) {
                             pe_num =
                                 ic0 * OC_DIMENSION +
-                                (counters[1][tiling.fx_index] % FX_UNROLL) *
-                                    IC_unroll * OC_DIMENSION +
+                                (counters[1][tiling.fx_index] % fx_unroll) *
+                                    ic_unroll * OC_DIMENSION +
                                 oc0;
                           }
                           pe_checker.addReference(pe_num, input, weight,
@@ -191,8 +167,8 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                           if (tiling.replication) {
                             pe_num =
                                 ic0 * OC_DIMENSION +
-                                (counters[1][tiling.fx_index] % FX_UNROLL) *
-                                    IC_unroll * OC_DIMENSION +
+                                (counters[1][tiling.fx_index] % fx_unroll) *
+                                    ic_unroll * OC_DIMENSION +
                                 oc0;
                           }
                           Input input;
@@ -205,8 +181,7 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                       }
 
 #if SUPPORT_MX
-                      if (matrix_op.has_mx_input() &&
-                          matrix_op.has_mx_weight()) {
+                      if (input_scales && weight_scales) {
                         // only perform scaling if within bounds
                         if (STRIDE * x + fx >= 0 &&
                             STRIDE * x + fx < STRIDE * X &&
@@ -309,32 +284,56 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
   LOG("GEMM done");
 
   delete[] inputs;
-  if (matrix_op.has_mx_input()) {
+  delete[] weights;
+
+  if (input_scales != nullptr) {
     delete[] input_scales;
   }
-  delete[] weights;
-  if (matrix_op.has_mx_weight()) {
+
+  if (weight_scales != nullptr) {
     delete[] weight_scales;
   }
-  if (matrix_op.has_bias()) {
-    delete[] bias;
+
+  if (biases != nullptr) {
+    delete[] biases;
   }
 
   return outputs;
 }
 
-template <typename Input, typename Psum, typename Vector>
-inline Vector *matrix_vector_multiply(std::any input_tensor,
-                                      std::any weight_tensor,
-                                      std::any bias_tensor,
-                                      const codegen::MatrixOp &param) {
-  const auto weight = param.weight();
-  int K = weight.shape(0);
-  int C = weight.shape(1);
+template <typename Input, typename Psum, typename Buffer, typename Scale>
+inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
+                    std::any weight_ptr, std::any weight_scale_ptr,
+                    std::any bias_ptr, const codegen::OpOverload &op) {
+  Tiling tiling;
+  if (op.target() == "conv2d" || op.target() == "conv2d_mx") {
+    tiling = get_conv2d_tiling(op);
+  } else {
+    tiling = get_linear_tiling(op);
+  }
 
-  Vector *inputs = std::any_cast<Vector *>(input_tensor);
-  Vector *weights = std::any_cast<Vector *>(weight_tensor);
-  Vector *bias = std::any_cast<Vector *>(bias_tensor);
+  adjust_tiling_for_dimension(tiling);
+
+  if (tiling.replication) {
+    tiling.loops[1][tiling.fx_index] = tiling.loops[1][tiling.fy_index];
+    tiling.loops[1][tiling.reduction_loop_index[1]] = 1;
+  }
+
+  return gemm<Input, Psum, Buffer, Scale>(input_ptr, input_scale_ptr,
+                                          weight_ptr, weight_scale_ptr,
+                                          bias_ptr, tiling);
+}
+
+template <typename Input, typename Psum, typename Vector>
+inline Vector *matrix_vector_multiply(std::any input_ptr, std::any weight_ptr,
+                                      std::any bias_ptr,
+                                      const std::vector<int> &weight_shape) {
+  const int K = weight_shape[0];
+  const int C = weight_shape[1];
+
+  Vector *inputs = std::any_cast<Vector *>(input_ptr);
+  Vector *weights = std::any_cast<Vector *>(weight_ptr);
+  Vector *biases = std::any_cast<Vector *>(bias_ptr);
 
   Vector *outputs = new Vector[K];
   for (int i = 0; i < K; i++) {
@@ -366,14 +365,17 @@ inline Vector *matrix_vector_multiply(std::any input_tensor,
       outputs[k] = static_cast<Vector>(outputs[k] + buffer[0]);
     }
 
-    if (param.has_bias()) {
-      outputs[k] += bias[k];
+    if (biases != nullptr) {
+      outputs[k] += biases[k];
     }
   }
 
   delete[] inputs;
   delete[] weights;
-  delete[] bias;
+
+  if (biases != nullptr) {
+    delete[] biases;
+  }
 
   return outputs;
 }

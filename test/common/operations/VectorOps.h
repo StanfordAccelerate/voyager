@@ -30,28 +30,29 @@ inline T silu(T i) {
 }
 
 template <typename T>
-inline T *perform_unary_operation(T *tensor, const codegen::VectorOp op) {
-  int result_size = get_size(op.input());
+inline T *perform_unary_operation(T *input, const std::vector<int> shape,
+                                  const std::string opcode) {
+  int result_size = get_size(shape);
   T *result = new T[result_size];
 
   for (int i = 0; i < result_size; ++i) {
-    if (op.opcode() == "relu" || op.opcode() == "relu_") {
+    if (opcode == "relu" || opcode == "relu_") {
       T zero = T(0);
-      result[i] = tensor[i] < zero ? zero : tensor[i];
-    } else if (op.opcode() == "gelu" || op.opcode() == "gelu_") {
-      result[i] = gelu(tensor[i]);
-    } else if (op.opcode() == "silu" || op.opcode() == "silu_") {
-      result[i] = silu(tensor[i]);
-    } else if (op.opcode() == "sqrt" || op.opcode() == "sqrt_") {
-      result[i] = tensor[i].sqrt();
+      result[i] = input[i] < zero ? zero : input[i];
+    } else if (opcode == "gelu" || opcode == "gelu_") {
+      result[i] = gelu(input[i]);
+    } else if (opcode == "silu" || opcode == "silu_") {
+      result[i] = silu(input[i]);
+    } else if (opcode == "sqrt" || opcode == "sqrt_") {
+      result[i] = input[i].sqrt();
     } else {
-      std::cerr << "Unsupported vector instruction: " << op.opcode()
-                << std::endl;
+      std::cerr << "Unsupported vector instruction: " << opcode << std::endl;
       std::abort();
     }
   }
 
-  delete[] tensor;
+  delete[] input;
+
   return result;
 }
 
@@ -111,9 +112,9 @@ inline std::vector<int> pad_shape(const std::vector<int> &shape, size_t size) {
 }
 
 template <typename T>
-inline T *perform_vector_operation(const T *tensor1,
+inline T *perform_vector_operation(const T *input1,
                                    const std::vector<int> &shape1,
-                                   const T *tensor2,
+                                   const T *input2,
                                    const std::vector<int> &shape2,
                                    std::string opcode) {
   auto result_shape = broadcast_shape(shape1, shape2);
@@ -157,21 +158,21 @@ inline T *perform_vector_operation(const T *tensor1,
     int flat_idx_b = get_flat_index(indices_b, shape_b);
 
     if (opcode == "add" || opcode == "add_") {
-      result[i] = tensor1[flat_idx_a] + tensor2[flat_idx_b];
+      result[i] = input1[flat_idx_a] + input2[flat_idx_b];
     } else if (opcode == "sub" || opcode == "sub_") {
-      result[i] = tensor1[flat_idx_a] - tensor2[flat_idx_b];
+      result[i] = input1[flat_idx_a] - input2[flat_idx_b];
     } else if (opcode == "mul" || opcode == "mul_") {
-      result[i] = tensor1[flat_idx_a] * tensor2[flat_idx_b];
+      result[i] = input1[flat_idx_a] * input2[flat_idx_b];
     } else if (opcode == "div" || opcode == "div_") {
-      T immediate = 1.0 / tensor2[flat_idx_b];
-      result[i] = tensor1[flat_idx_a] * immediate;
+      T immediate = 1.0 / input2[flat_idx_b];
+      result[i] = input1[flat_idx_a] * immediate;
     } else {
       throw std::invalid_argument("Invalid opcode: " + opcode);
     }
   }
 
-  delete[] tensor1;
-  delete[] tensor2;
+  delete[] input1;
+  delete[] input2;
 
   return result;
 }

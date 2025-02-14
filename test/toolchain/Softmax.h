@@ -2,17 +2,19 @@
 
 #include "test/toolchain/Common.h"
 
-void MapSoftmax(const codegen::Operator &param,
+void MapSoftmax(const codegen::Operation &param,
                 std::deque<BaseParams *> &mappedParams,
                 std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+  const auto op_list = get_op_list(param);
+  const auto softmax_op = op_list[0];
+
+  const auto input = softmax_op.kwargs().at("input").tensor();
+  const auto input_shape = squeeze_shape(get_tensor_shape(input));
+
   VectorParams *vector_params = new VectorParams;
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
   AcceleratorMemoryMap accelerator_memory_map;
-
-  const auto &reduce_op = param.reduce_op();
-  const auto &input = reduce_op.input();
-  const auto input_shape = squeeze_shape(get_tensor_shape(input));
 
   const int outer_dim = input_shape.back();
   int inner_dim = 1;
@@ -29,7 +31,7 @@ void MapSoftmax(const codegen::Operator &param,
   // inputs
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OFFSET = input_memory.offset();
+  vector_params->VECTOR_OFFSET = input_memory.address();
   vector_params->addressGen0Mode = 2;
   vector_params->vec0_broadcast = 0b010000;
 
@@ -46,7 +48,7 @@ void MapSoftmax(const codegen::Operator &param,
   // output
   const auto output_mem = param.output().memory();
   accelerator_memory_map["outputs"] = get_partition(output_mem.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_mem.offset();
+  vector_params->VECTOR_OUTPUT_OFFSET = output_mem.address();
   vector_params->outputAddressMode = 2;
 
   vector_params->outputLoops[0][0] = 1;
@@ -59,7 +61,7 @@ void MapSoftmax(const codegen::Operator &param,
   vector_params->output_vector_type =
       DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
 
-  // inst 0 - start reduction engine to calculate max
+  // Instruction 0 - start reduction engine to calculate max
   VectorInstructions vinst0;
   vinst0.instType = VectorInstructions::reduction;
   vinst0.rCount = outer_dim / OC_DIMENSION;
@@ -74,7 +76,7 @@ void MapSoftmax(const codegen::Operator &param,
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
-  // inst 1 - send to max
+  // Instruction 1 - send to max
   VectorInstructions vinst1;
   vinst1.instType = VectorInstructions::vector;
   vinst1.vInput = VectorInstructions::readFromVectorFetch;
@@ -90,7 +92,7 @@ void MapSoftmax(const codegen::Operator &param,
   vector_instruction_config->inst[1] = vinst1;
   vector_instruction_config->instCount[1] = outer_dim / OC_DIMENSION;
 
-  // inst 2 - start reduction engine to calculate sum
+  // Instruction 2 - start reduction engine to calculate sum
   VectorInstructions vinst2;
   vinst2.instType = VectorInstructions::reduction;
   vinst2.rCount = outer_dim / OC_DIMENSION;
@@ -98,13 +100,12 @@ void MapSoftmax(const codegen::Operator &param,
   vinst2.rDuplicate = 1;
   vinst2.rDest = VectorInstructions::toVectorOp3Src1;
   vinst2.rBroadcast = 1;
-  // broadcast max over entire array
   vinst2.immediate0 = outer_dim / OC_DIMENSION;
   vinst2.rReciprocal = true;
   vector_instruction_config->inst[2] = vinst2;
   vector_instruction_config->instCount[2] = 1;
 
-  // inst 3 - subtract max and exp, and reduce sum
+  // Instruction 3 - subtract max and exp, and reduce sum
   VectorInstructions vinst3;
   vinst3.instType = VectorInstructions::vector;
   vinst3.vInput = VectorInstructions::readFromVectorFetch;
@@ -120,21 +121,54 @@ void MapSoftmax(const codegen::Operator &param,
   vector_instruction_config->inst[3] = vinst3;
   vector_instruction_config->instCount[3] = outer_dim / OC_DIMENSION;
 
-  // inst 4 - subtract max and exp, and divide by reduced value
-  VectorInstructions vinst4;
-  vinst4.instType = VectorInstructions::vector;
-  vinst4.vInput = VectorInstructions::readFromVectorFetch;
-  vinst4.vAccumulatePush = VectorInstructions::nop;
-  vinst4.vOp0Src1 = VectorInstructions::readFromReduce;
-  vinst4.vOp0 = VectorInstructions::vsub;
-  vinst4.vOp1 = VectorInstructions::vexp;
-  vinst4.vOp2 = VectorInstructions::nop;
-  vinst4.vOp3Src1 = VectorInstructions::readReduceInterface;
-  vinst4.vOp3 = VectorInstructions::vmult;
-  vinst4.vOp4 = VectorInstructions::nop;
-  vinst4.vDest = VectorInstructions::vWriteOut;
-  vector_instruction_config->inst[4] = vinst4;
+  // Instruction 4 - subtract max and exp, and divide by reduced value
+  VectorInstructions inst4;
+  inst4.instType = VectorInstructions::vector;
+  inst4.vInput = VectorInstructions::readFromVectorFetch;
+  inst4.vAccumulatePush = VectorInstructions::nop;
+  inst4.vOp0Src1 = VectorInstructions::readFromReduce;
+  inst4.vOp0 = VectorInstructions::vsub;
+  inst4.vOp1 = VectorInstructions::vexp;
+  inst4.vOp2 = VectorInstructions::nop;
+  inst4.vOp3Src1 = VectorInstructions::readReduceInterface;
+  inst4.vOp3 = VectorInstructions::vmult;
+  inst4.vOp4 = VectorInstructions::nop;
+  inst4.vDest = VectorInstructions::vWriteOut;
+  vector_instruction_config->inst[4] = inst4;
   vector_instruction_config->instCount[4] = outer_dim / OC_DIMENSION;
+
+  if (op_list.size() > 1) {
+    const auto quantize_op = op_list[1];
+    std::cerr << quantize_op.target() << std::endl;
+
+    const auto input = quantize_op.kwargs().at("input").tensor();
+    const auto scale = quantize_op.kwargs().at("scale").tensor();
+    const int size = get_size(scale);
+
+    if (size == 1) {
+      // scalar scale factor
+      VECTOR_DATATYPE immediate = read_constant_param(scale);
+      vector_params->quantize_output = true;
+      vector_params->output_scale = immediate.bits_rep();
+    } else {
+      // // microscaling
+      // auto scale_shape = get_tensor_shape(scale);
+
+      // // change scale_shape to 2D tensor
+      // int other_dim_factors[2];
+      // factorize_for_address_gen(size / OC_DIMENSION, other_dim_factors);
+
+      // other_dim_factors[1] *= OC_DIMENSION;
+      // scale_shape = {other_dim_factors[0], other_dim_factors[1]};
+
+      // vector_params->fetch_scale_type_1 = true;
+      // set_vector_addr_gen1(scale, scale_shape, accelerator_memory_map,
+      //                      vector_params);
+
+      // vector_params->mx_block_size = OC_DIMENSION;
+      // vector_params->quantize_output_mx = true;
+    }
+  }
 
   vector_instruction_config->instLen = 5;
   vector_instruction_config->instLoopCount = inner_dim;

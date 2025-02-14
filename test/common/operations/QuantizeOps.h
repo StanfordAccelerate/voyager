@@ -12,9 +12,12 @@
 #include "test/compiler/proto/param.pb.h"
 
 template <typename Input, typename Output, typename Scale>
-Output* quantize(std::any input, std::any scale, int size) {
+Output* quantize(std::any input, std::any scale, std::vector<int> shape) {
+  const int size = get_size(shape);
+
   Input* inputs = std::any_cast<Input*>(input);
   Scale* scales = std::any_cast<Scale*>(scale);
+
   Output* outputs = new Output[size];
 
   for (int i = 0; i < size; i++) {
@@ -29,14 +32,15 @@ Output* quantize(std::any input, std::any scale, int size) {
 
 template <typename Input, typename Output, typename Scale>
 Output* quantize_mx(std::any input, std::any scale,
-                    const codegen::VectorOp& op) {
+                    const std::vector<int> input_shape,
+                    const std::vector<int> scale_shape) {
   LOG("Performing microscaling quantization operation");
 
   Input* inputs = std::any_cast<Input*>(input);
   Scale* scales = std::any_cast<Scale*>(scale);
 
-  const int input_size = get_size(op.input());
-  const int scale_size = get_size(op.other());
+  const int input_size = get_size(input_shape);
+  const int scale_size = get_size(scale_shape);
 
   Output* outputs = new Output[input_size];
 
@@ -109,6 +113,7 @@ template <typename Input, typename Output>
 Output* dequantize(std::any input, std::any scale, int size) {
   Input* inputs = std::any_cast<Input*>(input);
   Output* scales = std::any_cast<Output*>(scale);
+
   Output* outputs = new Output[size];
 
   for (int i = 0; i < size; i++) {

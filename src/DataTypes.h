@@ -37,7 +37,7 @@ typedef Posit<8, 1> posit8;
 
 typedef NormalFloat4 nf4;
 
-typedef UFloat<8, 8> e8m0;
+typedef UFloat<8, 8> fp8_e8m0;
 typedef UFloat<8, 5> fp8_e5m3;
 
 template <typename T>
@@ -86,8 +86,8 @@ struct TypeName<fp32> {
 };
 
 template <>
-struct TypeName<e8m0> {
-  static std::string name() { return "e8m0"; }
+struct TypeName<fp8_e8m0> {
+  static std::string name() { return "fp8_e8m0"; }
 };
 
 template <>

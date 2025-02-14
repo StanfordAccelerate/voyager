@@ -16,7 +16,7 @@
 #include "test/common/operations/Common.h"
 #include "test/compiler/proto/param.pb.h"
 
-void run_accelerator(std::vector<codegen::Operator> params, char *memory);
+void run_accelerator(std::vector<codegen::Operation> params, char *memory);
 
 class Simulation {
  public:
@@ -27,7 +27,7 @@ class Simulation {
   void run();
   int check_outputs();
   void print_help();
-  void print_ideal_runtime(const codegen::Operator &param);
+  void print_ideal_runtime(const codegen::Operation &op);
 
  protected:
   std::string model;
@@ -37,7 +37,7 @@ class Simulation {
   std::vector<std::string> sims;
 
   Network *network;
-  std::vector<codegen::Operator> params;
+  std::vector<codegen::Operation> params;
   std::map<std::string, ArrayMemory *> memories;
   std::map<std::string, DataLoader *> dataLoaders;
 

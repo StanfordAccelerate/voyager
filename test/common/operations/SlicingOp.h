@@ -3,20 +3,14 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T* slice(std::any input_tensor, const codegen::SlicingOp param,
-                const codegen::Tensor input) {
-  const auto repeated_field = input.shape();
-  const std::vector<int> shape(repeated_field.begin(), repeated_field.end());
+inline T* slice(std::any input_ptr, const std::vector<int> shape, int dim,
+                int start, int end, int step) {
+  dim = dim < 0 ? dim + shape.size() : dim;
+  int num_elements = (end - start) / step;
 
-  const int dim = param.dim() < 0 ? param.dim() + shape.size() : param.dim();
-  const int start = param.start();
-  const int end = param.end();
-  const int step = param.step();
-  const int num_elements = (end - start) / step;
+  const auto inputs = std::any_cast<T*>(input_ptr);
 
-  const auto inputs = std::any_cast<T*>(input_tensor);
-
-  const int size = get_size(input);
+  const int size = get_size(shape);
   T* outputs = new T[size];
 
   for (int i = 0; i < size; i++) {
@@ -40,11 +34,18 @@ inline T* slice(std::any input_tensor, const codegen::SlicingOp param,
 }
 
 template <typename T>
-inline T* slice(std::any input_tensor, const codegen::SlicingOp param) {
-  return slice<T>(input_tensor, param, param.input());
-}
+inline T* slice(std::any input_ptr, const codegen::OpOverload op) {
+  if (op.target() != "slice") {
+    return std::any_cast<T*>(input_ptr);
+  }
 
-template <typename T>
-inline T* slice(std::any input_tensor, const codegen::Tensor input) {
-  return slice<T>(input_tensor, input.slicing(), input);
+  const auto& input = op.kwargs().at("input").tensor();
+  const auto shape = get_shape(input);
+
+  const int start = op.kwargs().at("start").int_value();
+  const int end = op.kwargs().at("end").int_value();
+  const int step = op.kwargs().at("step").int_value();
+  const int dim = op.kwargs().at("dim").int_value();
+
+  return slice<T>(input_ptr, shape, dim, start, end, step);
 }

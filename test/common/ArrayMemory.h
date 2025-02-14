@@ -30,9 +30,9 @@ class ArrayMemory {
   std::any read_tensor(const codegen::Tensor& tensor);
   void write_tensor(const codegen::Tensor& tensor, const std::any data);
 
-  std::vector<std::any> get_args(const codegen::Operator& param);
-  std::any get_output(const codegen::Operator& param);
-  std::any get_reference_output(const codegen::Operator& param);
+  std::map<std::string, std::any> get_args(const codegen::Operation& operation);
+  std::any get_output(const codegen::Operation& operation);
+  std::any get_reference_output(const codegen::Operation& operation);
 };
 
 template <typename T>

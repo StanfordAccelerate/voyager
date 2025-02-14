@@ -51,8 +51,8 @@ struct MatrixParams : BaseParams {
     head_size_power_of_two = 0;
 
     has_bias = false;
-    has_input_tranpose = false;
-    has_weight_tranpose = false;
+    has_input_transpose = false;
+    has_weight_transpose = false;
     is_replication = false;
     has_attn_output_permute = false;
     is_mx_op = false;
@@ -89,8 +89,8 @@ struct MatrixParams : BaseParams {
   ac_int<8, false> head_size_power_of_two;
 
   bool has_bias;
-  bool has_input_tranpose;
-  bool has_weight_tranpose;
+  bool has_input_transpose;
+  bool has_weight_transpose;
   bool is_replication;
   bool has_attn_output_permute;
   bool is_mx_op;
@@ -147,8 +147,8 @@ struct MatrixParams : BaseParams {
     m & head_size_power_of_two;
 
     m & has_bias;
-    m & has_input_tranpose;
-    m & has_weight_tranpose;
+    m & has_input_transpose;
+    m & has_weight_transpose;
     m & is_replication;
     m & has_attn_output_permute;
     m & is_mx_op;
@@ -219,8 +219,8 @@ struct MatrixParams : BaseParams {
        << std::endl;
 
     os << "has_bias: " << params.has_bias << std::endl;
-    os << "has_input_tranpose: " << params.has_input_tranpose << std::endl;
-    os << "has_weight_tranpose: " << params.has_weight_tranpose << std::endl;
+    os << "has_input_transpose: " << params.has_input_transpose << std::endl;
+    os << "has_weight_transpose: " << params.has_weight_transpose << std::endl;
     os << "is_replication: " << params.is_replication << std::endl;
     os << "has_attn_output_permute: " << params.has_attn_output_permute
        << std::endl;
@@ -269,8 +269,8 @@ struct MatrixParams : BaseParams {
     // Compare boolean values
     if (lhs.has_bias != rhs.has_bias || lhs.BIAS_OFFSET != rhs.BIAS_OFFSET)
       return false;
-    if (lhs.has_input_tranpose != rhs.has_input_tranpose) return false;
-    if (lhs.has_weight_tranpose != rhs.has_weight_tranpose) return false;
+    if (lhs.has_input_transpose != rhs.has_input_transpose) return false;
+    if (lhs.has_weight_transpose != rhs.has_weight_transpose) return false;
     if (lhs.is_replication != rhs.is_replication) return false;
     if (lhs.has_attn_output_permute != rhs.has_attn_output_permute)
       return false;

@@ -3,35 +3,17 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-T *pooling(std::any input_tensor, const codegen::Operator &param) {
-  const auto &pooling_op = param.pooling_op();
-  int input_height = pooling_op.input().shape(2);
-  int input_width = pooling_op.input().shape(3);
-  int input_depth = pooling_op.input().shape(1);
+T *pooling(std::any input_ptr, const std::vector<int> &input_shape,
+           const std::vector<int> &output_shape, int stride, int kernel_size,
+           int padding, const bool is_max_pool) {
+  int input_height = input_shape[2];
+  int input_width = input_shape[3];
+  int input_depth = input_shape[1];
 
-  T *inputs = std::any_cast<T *>(input_tensor);
+  int output_height = output_shape[0];
+  int output_width = output_shape[1];
 
-  int stride;
-  int kernel_size;
-  int padding;
-  int output_height;
-  int output_width;
-  // Adaptive pooling has output_size set
-  if (pooling_op.output_size_size() > 0) {
-    output_height = pooling_op.output_size(0);
-    output_width = pooling_op.output_size(1);
-    stride = input_height / output_height;
-    kernel_size = input_height - (output_height - 1) * stride;
-    padding = 0;
-  } else {
-    stride = pooling_op.stride(0);
-    kernel_size = pooling_op.kernel_size(0);
-    padding = pooling_op.padding(0);
-    output_height = (input_height + 2 * padding - kernel_size) / stride + 1;
-    output_width = (input_width + 2 * padding - kernel_size) / stride + 1;
-  }
-
-  bool is_max_pool = pooling_op.opcode().find("max") != std::string::npos;
+  T *inputs = std::any_cast<T *>(input_ptr);
 
   T *output = new T[output_height * output_width * input_depth];
 
@@ -68,4 +50,53 @@ T *pooling(std::any input_tensor, const codegen::Operator &param) {
   delete[] inputs;
 
   return output;
+}
+
+template <typename T>
+T *adaptive_avg_pool2d(std::map<std::string, std::any> &kwargs,
+                       const codegen::OpOverload op) {
+  assert(op.target() == "adaptive_avg_pool2d");
+
+  const auto input = op.kwargs().at("input").tensor();
+  std::any input_ptr = kwargs[input.node()];
+  const auto input_shape = get_shape(input);
+
+  const auto output_size = op.kwargs().at("output_size").int_list().values();
+  std::vector<int> output_shape{output_size[0], output_size[1]};
+
+  int input_height = input_shape[2];
+  int output_height = output_shape[0];
+
+  int stride = input_height / output_height;
+  int kernel_size = input_height - (output_height - 1) * stride;
+  int padding = 0;
+
+  return pooling<T>(input_ptr, input_shape, output_shape, stride, kernel_size,
+                    padding, false);
+}
+
+template <typename T>
+T *max_pool2d(std::map<std::string, std::any> &kwargs,
+              const codegen::OpOverload op) {
+  assert(op.target() == "max_pool2d");
+
+  const auto op_kwargs = op.kwargs();
+
+  const auto input = op_kwargs.at("input").tensor();
+  std::any input_ptr = kwargs[input.node()];
+  const auto input_shape = get_shape(input);
+
+  const auto stride = op_kwargs.at("stride").int_list().values()[0];
+  const auto kernel_size = op_kwargs.at("kernel_size").int_list().values()[0];
+  const auto padding = op_kwargs.at("padding").int_list().values()[0];
+
+  int input_height = input_shape[2];
+  int input_width = input_shape[3];
+
+  int output_height = (input_height + 2 * padding - kernel_size) / stride + 1;
+  int output_width = (input_width + 2 * padding - kernel_size) / stride + 1;
+  std::vector<int> output_shape = {output_height, output_width};
+
+  return pooling<T>(input_ptr, input_shape, output_shape, stride, kernel_size,
+                    padding, true);
 }

@@ -3,33 +3,13 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T* permute(std::any input_tensor, const codegen::ReshapeOp param) {
-  const std::vector<int> shape{param.input_sizes().begin(),
-                               param.input_sizes().end()};
-  const std::vector<int> dims{param.dims().begin(), param.dims().end()};
+inline T* permute(std::any input_ptr, const std::vector<int>& shape,
+                  const std::vector<int> dims) {
+  T* inputs = std::any_cast<T*>(input_ptr);
 
-  T* inputs = std::any_cast<T*>(input_tensor);
-
-  std::vector<int> order;
-  if (param.opcode() == "permute") {
-    order.insert(order.end(), dims.begin(), dims.end());
-  } else if (param.opcode() == "transpose") {
-    const int ndim = shape.size();
-    const int dim1 = dims[0] < 0 ? dims[0] + ndim : dims[0];
-    const int dim2 = dims[1] < 0 ? dims[1] + ndim : dims[1];
-    for (int i = 0; i < ndim; ++i) {
-      order.push_back(i);
-    }
-    std::swap(order[dim1], order[dim2]);
-  } else {
-    std::cerr << "Unsupported reshape instruction: " << param.opcode()
-              << std::endl;
-    exit(1);
-  }
-
-  std::vector<int> permuted_shape(order.size());
-  for (size_t i = 0; i < order.size(); ++i) {
-    permuted_shape[i] = shape[order[i]];
+  std::vector<int> permuted_shape(dims.size());
+  for (size_t i = 0; i < dims.size(); ++i) {
+    permuted_shape[i] = shape[dims[i]];
   }
 
   const int size = get_size(shape);
@@ -38,9 +18,9 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeOp param) {
   for (int i = 0; i < size; ++i) {
     std::vector<int> indices = get_indices(i, shape);
 
-    std::vector<int> permuted_indices(order.size());
-    for (size_t j = 0; j < order.size(); ++j) {
-      permuted_indices[j] = indices[order[j]];
+    std::vector<int> permuted_indices(dims.size());
+    for (size_t j = 0; j < dims.size(); ++j) {
+      permuted_indices[j] = indices[dims[j]];
     }
 
     int permuted_index = get_flat_index(permuted_indices, permuted_shape);
@@ -53,6 +33,47 @@ inline T* permute(std::any input_tensor, const codegen::ReshapeOp param) {
 }
 
 template <typename T>
-inline T* permute(std::any input_tensor, const codegen::Tensor& input) {
-  return permute<T>(input_tensor, input.reshape());
+inline T* permute(std::any input_ptr, const codegen::OpOverload op) {
+  if (op.target() != "permute") {
+    return std::any_cast<T*>(input_ptr);
+  }
+
+  const auto input = op.kwargs().at("input").tensor();
+  const auto input_shape = get_shape(input);
+
+  const auto dims = op.kwargs().at("dims").int_list().values();
+  std::vector<int> dims_vector(dims.begin(), dims.end());
+
+  return permute<T>(input_ptr, input_shape, dims_vector);
+}
+
+template <typename T>
+inline T* transpose(std::any input_ptr, const std::vector<int>& shape, int dim0,
+                    int dim1) {
+  const int ndim = shape.size();
+  dim0 = dim0 < 0 ? dim0 + ndim : dim0;
+  dim1 = dim1 < 0 ? dim1 + ndim : dim1;
+
+  std::vector<int> dims;
+  for (int i = 0; i < ndim; ++i) {
+    dims.push_back(i);
+  }
+
+  std::swap(dims[dim0], dims[dim1]);
+
+  return permute<T>(input_ptr, shape, dims);
+}
+
+template <typename T>
+inline T* transpose(std::any input_ptr, const codegen::OpOverload op) {
+  if (op.target() != "transpose") {
+    return std::any_cast<T*>(input_ptr);
+  }
+
+  const auto input = op.kwargs().at("input").tensor();
+  const auto input_shape = get_shape(input);
+  const int dim0 = op.kwargs().at("dim0").int_value();
+  const int dim1 = op.kwargs().at("dim1").int_value();
+
+  return transpose<T>(input_ptr, input_shape, dim0, dim1);
 }

@@ -62,9 +62,9 @@ bool run_sample(std::string model_name, std::string data_dir,
 
   // Run inference
   for (const auto& param : model.ops()) {
-    if (!param.has_nop()) {
-      auto args = memory->get_args(param);
-      std::any outputs = run_gold_model(param, args);
+    if (param.op().op() != "nop") {
+      auto kwargs = memory->get_args(param);
+      std::any outputs = run_gold_model(param, kwargs);
       memory->write_tensor(param.output(), outputs);
     }
   }

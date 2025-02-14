@@ -37,11 +37,11 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   }
 
   int partition = tensor.memory().partition();
-  uint64_t offset = tensor.memory().offset();
+  uint64_t offset = tensor.memory().address();
 
   std::cerr << "Loading tensor file " << filename << std::endl;
   std::cerr << "Datatype: " << tensor.dtype() << std::endl;
-  std::cerr << "Offset: " << offset << std::endl;
+  std::cerr << "Address: " << offset << std::endl;
   std::cerr << "transpose: " << transpose << std::endl;
 
   // number of elements packed into a single word for replication
@@ -64,9 +64,9 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
     } else if (tensor.dtype() == "int32") {
       memory->write_data_to_memory<DataTypes::int32>(offset, partition, address,
                                                      *it);
-    } else if (tensor.dtype() == "e8m0") {
-      memory->write_data_to_memory<DataTypes::e8m0>(offset, partition, address,
-                                                    *it);
+    } else if (tensor.dtype() == "fp8_e8m0") {
+      memory->write_data_to_memory<DataTypes::fp8_e8m0>(offset, partition,
+                                                        address, *it);
     } else if (tensor.dtype() == "fp8_e5m3") {
       memory->write_data_to_memory<DataTypes::fp8_e5m3>(offset, partition,
                                                         address, *it);
@@ -85,134 +85,36 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   delete[] array_ptr;
 }
 
-void DataLoader::load_inputs(const codegen::Operator param,
+void DataLoader::load_inputs(const codegen::Operation operation,
                              std::string data_dir, bool random_data) {
   // convolution layer inputs/outputs need to be permuted. If the matrix
   // operation is a convolution, the following fused vector operations will
   // need to be permuted as well. This logic should be refined in the future.
-  std::string output_node = "";
-  if (param.has_matrix_op()) {
-    const auto& matrix_op = param.matrix_op();
-    const auto& input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
-                                                 : matrix_op.input();
+  const auto op_list = get_op_list(operation);
 
-    bool is_conv2d =
-        matrix_op.opcode() == "conv2d" || matrix_op.opcode() == "conv2d_mx";
-
-    bool replication = input.shape(1) == 3 && is_dut;
-
-    load_tensor(input, data_dir, is_conv2d, replication);
-
-    if (matrix_op.has_mx_input()) {
-      load_tensor(matrix_op.mx_input().scale(), data_dir, is_conv2d);
-    }
-
-    if (matrix_op.opcode() == "matmul" || matrix_op.opcode() == "matmul_mx") {
-      const auto& weight = matrix_op.has_mx_weight()
-                               ? matrix_op.mx_weight().input()
-                               : matrix_op.weight();
-      load_tensor(weight, data_dir);
-
-      if (matrix_op.has_mx_weight()) {
-        load_tensor(matrix_op.mx_weight().scale(), data_dir);
-      }
-    }
-    output_node = matrix_op.name();
-  } else if (param.has_pooling_op()) {
-    const auto& pooling_op = param.pooling_op();
-    load_tensor(pooling_op.input(), data_dir, is_cnn);
-  } else if (param.has_reduce_op()) {
-    const auto& reduce_op = param.reduce_op();
-    load_tensor(reduce_op.input(), data_dir, is_cnn);
-  } else if (param.has_reshape_op()) {
-    const auto& reshape_op = param.reshape_op();
-    load_tensor(reshape_op.input(), data_dir);
-  } else if (param.has_slicing_op()) {
-    const auto& slicing_op = param.slicing_op();
-    load_tensor(slicing_op.input(), data_dir);
-  } else if (param.vector_ops_size() > 0) {
-    const auto vector_op = param.vector_ops(0);
-    load_tensor(vector_op.input(), data_dir, is_cnn);
-  }
-
-  for (const auto& vector_op : param.vector_ops()) {
-    if (vector_op.has_other()) {
-      // Load the other tensor if it is not the output of last operation and
-      // it is a constant tensor. Might fail if input or other tensor is a nop.
-      const auto input = vector_op.input();
-      const auto other = vector_op.other();
-      const auto tensor_to_load = other.node() == output_node ? input : other;
-      if (tensor_to_load.node().find("constant") == std::string::npos) {
-        load_tensor(tensor_to_load, data_dir, is_cnn);
-      }
-    }
-    output_node = vector_op.name();
-  }
-}
-
-void DataLoader::load_weights(const codegen::Operator param,
-                              std::string data_dir, bool random_data) {
-  if (param.has_matrix_op() && param.matrix_op().opcode() != "matmul" &&
-      param.matrix_op().opcode() != "matmul_mx") {
-    const auto matrix_op = param.matrix_op();
-    const auto input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
-                                                : matrix_op.input();
-    const auto weight = matrix_op.has_mx_weight()
-                            ? matrix_op.mx_weight().input()
-                            : matrix_op.weight();
-
-    // Transpose linear weights except for matrix vector multiply
-    int dim = 1;
-    for (int i = 0; i < input.shape_size() - 1; i++) {
-      dim *= input.shape(i);
-    }
-    bool transpose = dim > 1;
-    load_tensor(weight, data_dir, transpose);
-
-    if (matrix_op.has_mx_weight()) {
-      load_tensor(matrix_op.mx_weight().scale(), data_dir, transpose);
-    }
-
-    if (matrix_op.has_bias()) {
-      // bias is hardcoded to double precision right now
-      load_tensor(matrix_op.bias(), data_dir);
-    }
-  }
-
-  if (param.has_nop()) {
-    for (const auto& input : param.nop().inputs()) {
-      if (input.node().find("constant") != std::string::npos ||
-          input.node().find("arg") != std::string::npos) {
-        load_tensor(input, data_dir);
-      }
-    }
-  }
-
-  for (const auto& vector_op : param.vector_ops()) {
-    if (vector_op.has_other()) {
-      // Check both input and other tensors to see if they are parameters.
-      const auto input = vector_op.input();
-      if (input.node().find("constant") != std::string::npos ||
-          input.node().find("arg") != std::string::npos) {
-        load_tensor(input, data_dir);
-      }
-      const auto other = vector_op.other();
-      if (other.node().find("constant") != std::string::npos ||
-          other.node().find("arg") != std::string::npos) {
-        load_tensor(other, data_dir);
+  for (const auto& op : op_list) {
+    for (const auto [key, value] : op.kwargs()) {
+      const auto& tensor = value.tensor();
+      if (value.has_tensor() && tensor.has_memory() &&
+          tensor.node().find("constant") == std::string::npos) {
+        bool is_conv2d = op.target().find("conv2d") != std::string::npos;
+        bool has_replication = is_conv2d && tensor.shape(1) == 3 && is_dut;
+        load_tensor(value.tensor(), data_dir, is_cnn, has_replication);
       }
     }
   }
 }
 
-void DataLoader::load_outputs(const codegen::Operator param,
+void DataLoader::load_outputs(const codegen::Operation operation,
                               std::string data_dir) {
   codegen::Tensor output_tensor;
-  output_tensor.CopyFrom(param.output());
+  output_tensor.CopyFrom(operation.output());
   // always store output in the last memory partition with 0 offset
   output_tensor.mutable_memory()->set_partition(-1);
-  output_tensor.mutable_memory()->set_offset(0);
-  std::string opcode = param.matrix_op().opcode();
+  output_tensor.mutable_memory()->set_address(0);
+
+  const auto op_list = get_op_list(operation);
+  std::string opcode = op_list[0].target();
   bool transpose = is_cnn && opcode != "linear" && opcode != "linear_mx";
   load_tensor(output_tensor, data_dir, transpose);
 }

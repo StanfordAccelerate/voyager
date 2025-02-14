@@ -3,16 +3,16 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T *layer_norm(std::any input_tensor, std::any weight_tensor,
-                     std::any bias_tensor, const codegen::MatrixOp &param) {
-  T *inputs = std::any_cast<T *>(input_tensor);
-  T *weights = param.has_weight() ? std::any_cast<T *>(weight_tensor) : nullptr;
-  T *bias = param.has_bias() ? std::any_cast<T *>(bias_tensor) : nullptr;
-  T *output = new T[get_size(param.input())];
+inline T *layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
+                     const std::vector<int> input_shape,
+                     const std::vector<int> normalized_shape) {
+  T *inputs = std::any_cast<T *>(input_ptr);
+  T *weights = std::any_cast<T *>(weight_ptr);
+  T *bias = std::any_cast<T *>(bias_ptr);
 
-  const auto &input = param.input();
-  const auto input_shape = get_shape(input);
-  const int outer_dim = input_shape.back();
+  T *output = new T[get_size(input_shape)];
+
+  const int outer_dim = get_size(normalized_shape);
   const int inner_dim = get_size(input_shape) / outer_dim;
 
   T size_inv(1.0 / outer_dim);
@@ -69,13 +69,6 @@ inline T *layer_norm(std::any input_tensor, std::any weight_tensor,
       variance += buffer[0];
     }
 
-    // We skipped dividing the variance by outer_dim and adding eps to it
-    // T norm_dim(outer_dim);
-    // T eps(1e-05);
-
-    // variance /= norm_dim;
-    // variance += eps;
-
     T stddev_inv = variance.inv_sqrt();
     T divisor = sqrt(outer_dim);
 
@@ -95,4 +88,36 @@ inline T *layer_norm(std::any input_tensor, std::any weight_tensor,
   }
 
   return output;
+}
+
+template <typename T>
+inline T *layer_norm(std::map<std::string, std::any> &kwargs,
+                     const codegen::OpOverload op) {
+  assert(op.target() == "layer_norm");
+
+  const auto input = op.kwargs().at("input").tensor();
+  std::any input_ptr = kwargs[input.node()];
+
+  std::any weight_ptr = static_cast<T *>(nullptr);
+
+  if (op.kwargs().contains("weight")) {
+    const auto weight = op.kwargs().at("weight").tensor();
+    weight_ptr = kwargs[weight.node()];
+  }
+
+  std::any bias_ptr = static_cast<T *>(nullptr);
+
+  if (op.kwargs().contains("bias")) {
+    const auto bias = op.kwargs().at("bias").tensor();
+    bias_ptr = kwargs[bias.node()];
+  }
+
+  const auto input_shape = get_shape(input);
+
+  const auto normalized_shape = op.kwargs().at("normalized_shape").int_list();
+  std::vector<int> norm_shape(normalized_shape.values().begin(),
+                              normalized_shape.values().end());
+
+  return layer_norm<T>(input_ptr, weight_ptr, bias_ptr, input_shape,
+                       norm_shape);
 }

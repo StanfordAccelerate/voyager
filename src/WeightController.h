@@ -167,7 +167,7 @@ SC_MODULE(WeightController) {
 
                       ac_int<32, false> address =
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
-                      if (params.has_weight_tranpose) {
+                      if (params.has_weight_transpose) {
                         C = C1 * NCols;
                         address = (k + c0) * C + c1 * OC_DIMENSION;
                       }
@@ -391,7 +391,7 @@ SC_MODULE(WeightController) {
       // OC_DIMENSION > IC_DIMENSION
       int rep_bound = 1;
       if (OC_DIMENSION > IC_DIMENSION) {
-        if (params.has_weight_tranpose) {
+        if (params.has_weight_transpose) {
           // we are able to reuse the weights already in the buffer
           loop_bounds[1][0] /= (OC_DIMENSION / IC_DIMENSION);
           rep_bound = (OC_DIMENSION / IC_DIMENSION);
@@ -535,7 +535,7 @@ SC_MODULE(WeightController) {
                                                           (fx * C * K1) +
                                                           (c * K1) + k1;
 
-                              if (params.has_weight_tranpose &&
+                              if (params.has_weight_transpose &&
                                   OC_DIMENSION > IC_DIMENSION) {
                                 address = (fy * FX * C * 2 * K1) +
                                           (fx * C * 2 * K1) +
@@ -613,7 +613,7 @@ SC_MODULE(WeightController) {
       //   loop_bounds[1][params.fxIndex] = 7;
       // }
 
-      if (params.has_weight_tranpose && NRows < 64 &&
+      if (params.has_weight_transpose && NRows < 64 &&
           NCols <
               64) {  // don't support transpose when systolic array is larger
                      // than 32x32, as it will require a very large buffer

@@ -2,36 +2,35 @@
 
 #include "test/toolchain/Common.h"
 
-void MapMXQparam(const codegen::Operator &param,
+void MapMXQparam(const codegen::Operation &param,
                  std::deque<BaseParams *> &mappedParams,
                  std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+  const auto op_list = get_op_list(param);
+  const auto mx_qparam_op = op_list[0];
+
+  const auto input = mx_qparam_op.kwargs().at("input").tensor();
+  const auto output = param.output();
+
+  // Not used
+  int mx_axis = mx_qparam_op.kwargs().at("axis").int_value();
+
   // send to reduce unit, configure to calculate max exponent value
   VectorParams *vector_params = new VectorParams;
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
   AcceleratorMemoryMap accelerator_memory_map;
 
-  const auto &reduce_op = param.reduce_op();
-  const auto &vector_input = reduce_op.input();
-  const auto &input_shape = get_tensor_shape(vector_input);
-
-  int mx_axis = reduce_op.dim(0);
-  if (mx_axis < 0) {
-    mx_axis += reduce_op.input().shape_size();
-  }
-  int reduction_dim_size = input_shape[mx_axis];
-
   // assume block size of 32
   int block_size = 32;
 
-  int dim = get_size(vector_input);
+  int dim = get_size(input);
   int dim_factors[2];
   factorize_for_address_gen(dim / OC_DIMENSION, dim_factors);
 
   // inputs
-  const auto input_memory = vector_input.memory();
+  const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OFFSET = input_memory.offset();
+  vector_params->VECTOR_OFFSET = input_memory.address();
   vector_params->addressGen0Mode = 1;
   vector_params->addressGen0Loop[0][0] = 1;
   vector_params->addressGen0Loop[0][1] = 1;
@@ -47,16 +46,16 @@ void MapMXQparam(const codegen::Operator &param,
   }
 
   vector_params->fetch_vector_type_0 =
-      DataTypes::TypeName<VECTOR_DATATYPE>::name() == vector_input.dtype();
+      DataTypes::TypeName<VECTOR_DATATYPE>::name() == input.dtype();
 
   int output_dim_factors[2];
   factorize_for_address_gen(dim / OC_DIMENSION / block_size,
                             output_dim_factors);
 
   // output
-  const auto output_mem = param.output().memory();
+  const auto output_mem = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_mem.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_mem.offset();
+  vector_params->VECTOR_OUTPUT_OFFSET = output_mem.address();
   for (int i = 0; i < 3; i++) {
     vector_params->outputLoops[0][i] = 1;
   }

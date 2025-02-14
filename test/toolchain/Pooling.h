@@ -2,7 +2,7 @@
 
 #include "test/toolchain/Common.h"
 
-void MapPoolingOperation(const codegen::Operator &param,
+void MapPoolingOperation(const codegen::Operation &param,
                          std::deque<BaseParams *> &mappedParams,
                          std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   VectorParams *vector_params = new VectorParams;
@@ -10,18 +10,23 @@ void MapPoolingOperation(const codegen::Operator &param,
       new VectorInstructionConfig;
   AcceleratorMemoryMap accelerator_memory_map;
 
-  const auto pooling_op = param.pooling_op();
-  const auto tiling = get_pooling_tiling(param);
-  int output_dim = param.output().shape(1);
+  const auto op_list = get_op_list(param);
+  const auto pooling_op = op_list[0];
+
+  const auto tiling = get_pool2d_tiling(pooling_op);
+
+  const auto input = pooling_op.kwargs().at("input").tensor();
+  const auto output = param.output();
+
+  const int output_dim = output.shape(1);
 
   // input
-  const auto input_memory = pooling_op.input().memory();
+  const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OFFSET = input_memory.offset();
+  vector_params->VECTOR_OFFSET = input_memory.address();
   vector_params->addressGen0Mode = 1;
   vector_params->fetch_vector_type_0 =
-      DataTypes::TypeName<VECTOR_DATATYPE>::name() ==
-      pooling_op.input().dtype();
+      input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
 
   for (int i = 0; i < 2; i++) {
     vector_params->addressGen0Loop[i][0] =
@@ -37,9 +42,9 @@ void MapPoolingOperation(const codegen::Operator &param,
   }
 
   // output
-  const auto output_memory = param.output().memory();
+  const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.offset();
+  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
 
   for (int i = 0; i < 3; i++) {
     vector_params->outputLoops[0][i] = 1;
@@ -54,12 +59,12 @@ void MapPoolingOperation(const codegen::Operator &param,
     vector_params->outputWeightLoopIndex[i] = 2;
   }
   vector_params->output_vector_type =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != param.output().dtype();
+      output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
 
   const int inst_count = tiling.loops[1][tiling.y_loop_index[1]] *
                          tiling.loops[1][tiling.x_loop_index[1]];
 
-  bool is_max_pool = pooling_op.opcode().find("max") != std::string::npos;
+  bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
 
   // perform max/sum reduction
   VectorInstructions vinst0;

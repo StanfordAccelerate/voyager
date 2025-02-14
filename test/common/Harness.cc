@@ -45,7 +45,7 @@ void register_interface(
 // void copy_output(void *sram, int size, int data_size);
 #endif
 
-Harness::Harness(sc_module_name name, std::vector<codegen::Operator> params,
+Harness::Harness(sc_module_name name, std::vector<codegen::Operation> params,
                  char *memory)
     : sc_module(name),
       clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS,
@@ -401,7 +401,7 @@ void Harness::sendParams() {
       }
 
       sc_time start = sc_time_stamp();
-      CCS_LOG("----- Accelerator Layer '" << currentParams.name()
+      CCS_LOG("----- Accelerator Layer '" << get_op_name(currentParams)
                                           << "' Started. -----");
 
       if (vectorParamsValid) {
@@ -412,7 +412,7 @@ void Harness::sendParams() {
         vectorUnitStartSignal.SyncPop();
       }
 
-      CCS_LOG("----- Accelerator Layer '" << currentParams.name()
+      CCS_LOG("----- Accelerator Layer '" << get_op_name(currentParams)
                                           << "' Started. -----");
 
       if (matrixParamsValid) {
@@ -421,7 +421,7 @@ void Harness::sendParams() {
       if (vectorParamsValid) {
         vectorUnitDoneSignal.SyncPop();
       }
-      CCS_LOG("----- Accelerator Layer '" << currentParams.name()
+      CCS_LOG("----- Accelerator Layer '" << get_op_name(currentParams)
                                           << "' Finished. -----");
       sc_time end = sc_time_stamp();
 
@@ -487,7 +487,7 @@ void Harness::storeVectorOutputs() {
 }
 #endif
 
-void run_accelerator(std::vector<codegen::Operator> params, char *memory) {
+void run_accelerator(std::vector<codegen::Operation> params, char *memory) {
 #ifdef CFLOAT
   std::cerr
       << "The SystemC model does not support the CFloat datatype. Only the "

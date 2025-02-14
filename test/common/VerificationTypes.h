@@ -21,6 +21,10 @@
 // Should be at least as large as the SRAM memory
 #define REFERENCE_MEMORY_SIZE (1024 * 1024 * 8)
 
+static const std::unordered_set<std::string> GEMM_OPS = {
+    "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx",
+};
+
 enum MemorySource { SRAM, RRAM };
 
 inline std::ostream& operator<<(std::ostream& os, MemorySource& memory) {
@@ -73,19 +77,60 @@ inline std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   return os;
 }
 
-inline Tiling get_conv2d_tiling(codegen::Operator param) {
-  const auto matrix_op = param.matrix_op();
+inline std::vector<int> get_shape(const codegen::Tensor& tensor) {
+  std::vector<int> shape(tensor.shape().begin(), tensor.shape().end());
+  if (tensor.has_reshape()) {
+    const auto new_shape =
+        tensor.reshape().kwargs().at("output_shape").int_list().values();
+    shape.assign(new_shape.begin(), new_shape.end());
+  }
+  return shape;
+}
 
-  const auto input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
-                                              : matrix_op.input();
-  const auto input_shape =
-      input.has_reshape() ? input.reshape().output_sizes() : input.shape();
+inline std::vector<codegen::OpOverload> get_op_list(
+    const codegen::Operation& param) {
+  std::vector<codegen::OpOverload> ops;
+  if (param.has_op()) {
+    ops.push_back(param.op());
+  } else {
+    const auto op_list = param.fused_op().op_list();
+    ops.insert(ops.end(), op_list.begin(), op_list.end());
+  }
+  return ops;
+}
 
-  const auto weight_shape = matrix_op.has_mx_weight()
-                                ? matrix_op.mx_weight().input().shape()
-                                : matrix_op.weight().shape();
+inline std::string get_op_name(const codegen::Operation& param) {
+  if (param.has_op()) {
+    return param.op().name();
+  } else {
+    return param.fused_op().name();
+  }
+}
 
-  const auto output_shape = param.output().shape();
+inline Tiling get_conv2d_tiling(const codegen::OpOverload op) {
+  if (op.target() != "conv2d" && op.target() != "conv2d_mx") {
+    throw std::runtime_error("Invalid target for get_conv2d_tiling: " +
+                             op.target());
+  }
+
+  const auto kwargs = op.kwargs();
+  const auto input_shape = get_shape(kwargs.at("input").tensor());
+  const auto weight_shape = get_shape(kwargs.at("weight").tensor());
+  const auto padding = kwargs.at("padding").int_list().values();
+  const auto dilation = kwargs.at("dilation").int_list().values();
+  const auto strides = kwargs.at("stride").int_list().values();
+
+  const int output_height = (input_shape[2] + 2 * padding[0] -
+                             dilation[0] * (weight_shape[2] - 1) - 1) /
+                                strides[0] +
+                            1;
+  const int output_width = (input_shape[3] + 2 * padding[1] -
+                            dilation[1] * (weight_shape[3] - 1) - 1) /
+                               strides[1] +
+                           1;
+
+  std::vector<int> output_shape = {input_shape[0], weight_shape[0],
+                                   output_height, output_width};
 
   // input shape = (B, C, H, W)
   // weight shape = (OC, IC, KH, KW)
@@ -95,6 +140,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
   int OC = weight_shape[0];
   int KH = weight_shape[2];
   int KW = weight_shape[3];
+  int stride = strides[0];
 
   // TODO: we should use OC_DIMENSION and IC_DIMENSION instead
   const int oc_dim = 16;
@@ -127,7 +173,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = true};
   } else if (IH == 224 && IW == 224 && IC == 3 && KH == 16 && KW == 16 &&
              OC == 768) {  // ViT embeddings
@@ -154,7 +200,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = true};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
@@ -167,7 +213,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
@@ -180,7 +226,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
              OC == 256) {  // layer1_x_conv3
@@ -192,7 +238,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 256 && KH == 1 && KW == 1 &&
@@ -206,7 +252,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 1 && KW == 1 &&
@@ -219,7 +265,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
   } else if (IH == 56 && IW == 56 && IC == 256 && KH == 1 && KW == 1 &&
              OC == 512) {  // layer2_0_downsample (resnet50)
@@ -231,11 +277,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 64 && KH == 3 && KW == 3 &&
-             OC == 128 && matrix_op.stride(0) == 2) {  // layer2_0_conv1
+             OC == 128 && stride == 2) {  // layer2_0_conv1
 
     tiling = {.loops = {{4, 4, 4, 1, 1, 1}, {4, 3, 3, 2, 7, 7}},
               .x_loop_index = {0, 5},
@@ -245,7 +291,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 &&
@@ -259,11 +305,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 256 && KH == 1 && KW == 1 &&
-             OC == 128 && matrix_op.stride(0) == 1) {  // layer2_0_conv1
+             OC == 128 && stride == 1) {  // layer2_0_conv1
 
     tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {16, 1, 1, 1, 28, 28}},
               .x_loop_index = {0, 5},
@@ -273,7 +319,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 512 && KH == 1 && KW == 1 &&
@@ -287,7 +333,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 56 && IW == 56 && IC == 128 && KH == 3 && KW == 3 &&
@@ -301,7 +347,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 1 && KW == 1 &&
@@ -315,7 +361,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 3,
               .fy_index = 2,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 1 && KW == 1 &&
@@ -329,12 +375,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 512 && KH == 1 && KW == 1 &&
-             OC == 1024 &&
-             matrix_op.stride(0) == 2) {  // layer3_0_downsample (resnet50)
+             OC == 1024 && stride == 2) {  // layer3_0_downsample (resnet50)
 
     tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {32, 1, 1, 8, 7, 7}},
               .x_loop_index = {0, 5},
@@ -344,11 +389,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 128 && KH == 3 && KW == 3 &&
-             OC == 256 && matrix_op.stride(0) == 2) {  // layer3_0_conv1
+             OC == 256 && stride == 2) {  // layer3_0_conv1
 
     tiling = {.loops = {{2, 2, 4, 1, 1, 1}, {8, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
@@ -358,7 +403,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 3 && KW == 3 &&
@@ -372,7 +417,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 512 && KH == 1 && KW == 1 &&
@@ -386,7 +431,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 1024 && KH == 1 && KW == 1 &&
@@ -400,7 +445,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 256 && KH == 3 && KW == 3 &&
@@ -414,7 +459,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 1 && KW == 1 &&
@@ -428,7 +473,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 28 && IW == 28 && IC == 64 && KH == 3 && KW == 3 &&
@@ -442,12 +487,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 1 && KW == 1 &&
-             OC == 512 &&
-             matrix_op.stride(0) == 2) {  // layer4_0_downsample (resnet18)
+             OC == 512 && stride == 2) {  // layer4_0_downsample (resnet18)
 
     tiling = {.loops = {{1, 1, 2, 1, 1, 1}, {16, 1, 1, 16, 7, 7}},
               .x_loop_index = {0, 5},
@@ -457,12 +501,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 1024 && KH == 1 && KW == 1 &&
-             OC == 2048 &&
-             matrix_op.stride(0) == 2) {  // layer4_0_downsample (resnet50)
+             OC == 2048 && stride == 2) {  // layer4_0_downsample (resnet50)
 
     tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {64, 1, 1, 16, 7, 7}},
               .x_loop_index = {0, 5},
@@ -472,11 +515,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 256 && KH == 3 && KW == 3 &&
-             OC == 512 && matrix_op.stride(0) == 2) {  // layer4_0_conv1
+             OC == 512 && stride == 2) {  // layer4_0_conv1
 
     tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {16, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
@@ -486,11 +529,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 1024 && KH == 1 && KW == 1 &&
-             OC == 512 && matrix_op.stride(0) == 1) {  // layer4_0_conv1
+             OC == 512 && stride == 1) {  // layer4_0_conv1
 
     tiling = {.loops = {{2, 2, 8, 1, 1, 1}, {64, 1, 1, 4, 7, 7}},
               .x_loop_index = {0, 5},
@@ -500,11 +543,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 7 && IW == 7 && IC == 2048 && KH == 1 && KW == 1 &&
-             OC == 512 && matrix_op.stride(0) == 1) {  // layer4_x_conv1
+             OC == 512 && stride == 1) {  // layer4_x_conv1
 
     tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {128, 1, 1, 4, 7, 7}},
               .x_loop_index = {0, 5},
@@ -514,11 +557,11 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 14 && IW == 14 && IC == 512 && KH == 3 && KW == 3 &&
-             OC == 512 && matrix_op.stride(0) == 2) {  // layer4_x_conv2
+             OC == 512 && stride == 2) {  // layer4_x_conv2
 
     tiling = {.loops = {{1, 1, 8, 1, 1, 1}, {32, 3, 3, 4, 7, 7}},
               .x_loop_index = {0, 5},
@@ -528,7 +571,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 7 && IW == 7 && IC == 512 && KH == 1 && KW == 1 &&
@@ -542,7 +585,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else if (IH == 7 && IW == 7 && IC == 512 && KH == 3 && KW == 3 &&
@@ -556,7 +599,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
               .fx_index = 2,
               .fy_index = 1,
               .weight_reuse_index = {4, 5},
-              .stride = matrix_op.stride(0),
+              .stride = stride,
               .replication = false};
 
   } else {
@@ -583,7 +626,6 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
 
     // Reduce X0 and Y0 to meet input buffer constraint. We are not counting
     // stride here because of the hardware implementation
-    const int stride = matrix_op.stride(0);
     while (true) {
       int ix = x0 * stride + fx - 1;
       int iy = y0 * stride + fy - 1;
@@ -633,7 +675,7 @@ inline Tiling get_conv2d_tiling(codegen::Operator param) {
         .fx_index = 3,
         .fy_index = 2,
         .weight_reuse_index = {4, 5},
-        .stride = matrix_op.stride(0),
+        .stride = stride,
     };
   }
 
@@ -676,20 +718,16 @@ inline void adjust_tiling_for_dimension(Tiling& tiling) {
   }
 }
 
-inline Tiling get_linear_tiling(codegen::Operator param) {
-  const auto matrix_op = param.matrix_op();
+inline Tiling get_linear_tiling(codegen::OpOverload op) {
+  const auto kwargs = op.kwargs();
 
-  const auto input = matrix_op.has_mx_input() ? matrix_op.mx_input().input()
-                                              : matrix_op.input();
-  const auto input_shape =
-      input.has_reshape() ? input.reshape().output_sizes() : input.shape();
+  const auto input_shape = get_shape(kwargs.at("input").tensor());
 
-  const auto weight = matrix_op.has_mx_weight() ? matrix_op.mx_weight().input()
-                                                : matrix_op.weight();
-  const auto weight_shape =
-      weight.has_reshape() ? weight.reshape().output_sizes() : weight.shape();
+  bool is_matmul = op.target().find("matmul") != std::string::npos;
+  std::string weight_key = is_matmul ? "other" : "weight";
+  const auto weight_shape = get_shape(kwargs.at(weight_key).tensor());
 
-  // TODO: we should use OC_DIMENSION and IC_DIMENSION instead
+  // Generate tiling using unroll factor of 16
   const int oc_dim = 16;
   const int ic_dim = 16;
 
@@ -704,7 +742,7 @@ inline Tiling get_linear_tiling(codegen::Operator param) {
   int c0 = weight_shape[1] / ic_dim;
 
   // torch.matmul weight is also an activation
-  if (matrix_op.opcode() == "matmul" || matrix_op.opcode() == "matmul_mx") {
+  if (op.target() == "matmul" || op.target() == "matmul_mx") {
     int size = weight_shape.size();
     c0 = weight_shape[size - 2] / ic_dim;
     k0 = weight_shape[size - 1] / oc_dim;
@@ -762,33 +800,37 @@ inline Tiling get_linear_tiling(codegen::Operator param) {
   return tiling;
 }
 
-inline Tiling get_pooling_tiling(codegen::Operator param) {
-  const auto pooling_op = param.pooling_op();
-  const auto input_shape = pooling_op.input().shape();
-  const auto output_shape = param.output().shape();
+inline Tiling get_pool2d_tiling(codegen::OpOverload op) {
+  const auto kwargs = op.kwargs();
+  const auto input_shape = get_shape(kwargs.at("input").tensor());
 
   int X = input_shape[2];
   int Y = input_shape[3];
-  int C = pooling_op.input().shape(1);
-  int K = param.output().shape(1);
+  int C = input_shape[1];
 
   int x0, y0, stride;
-  if (pooling_op.output_size_size() > 0) {
-    int output_h = pooling_op.output_size(0);
-    int output_w = pooling_op.output_size(1);
+
+  if (kwargs.contains("output_size")) {
+    const auto output_size = kwargs.at("output_size").int_list().values();
+    int output_h = output_size[0];
+    int output_w = output_size[1];
+
     stride = X / output_h;
     x0 = X - (output_h - 1) * stride;
     y0 = Y - (output_w - 1) * stride;
   } else {
-    x0 = pooling_op.kernel_size(0);
-    y0 = pooling_op.kernel_size(1);
-    stride = pooling_op.stride(0);
+    const auto kernel_size = kwargs.at("kernel_size").int_list().values();
+    const auto strides = kwargs.at("stride").int_list().values();
+
+    x0 = kernel_size[0];
+    y0 = kernel_size[1];
+    stride = strides[0];
   }
 
   int x1 = X / x0;
   int y1 = Y / y0;
   int c0 = C / IC_DIMENSION;
-  int k0 = K / OC_DIMENSION;
+  int k0 = C / OC_DIMENSION;
 
   return {
       .loops = {{x1, y1, 1, 1, 1, 1}, {c0, k0, 1, 1, y0, x0}},

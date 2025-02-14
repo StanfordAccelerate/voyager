@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "src/ArchitectureParams.h"
+#include "test/common/VerificationTypes.h"
 
 ArrayMemory::ArrayMemory(std::vector<long long> sizes) {
   memories.reserve(sizes.size());
@@ -44,85 +45,39 @@ char* ArrayMemory::get_memory(int partition) {
   return memories[partition];
 }
 
-std::vector<std::any> ArrayMemory::get_args(const codegen::Operator& param) {
-  std::vector<std::any> args;
-  std::string output_node = "";
-  if (param.has_matrix_op()) {
-    const auto& matrix_op = param.matrix_op();
+std::map<std::string, std::any> ArrayMemory::get_args(
+    const codegen::Operation& param) {
+  std::map<std::string, std::any> kwargs;
 
-    if (matrix_op.has_mx_input()) {
-      args.push_back(read_tensor(matrix_op.mx_input().input()));
-      args.push_back(read_tensor(matrix_op.mx_input().scale()));
-    } else {
-      args.push_back(read_tensor(matrix_op.input()));
-    }
+  const auto op_list = get_op_list(param);
 
-    if (matrix_op.has_mx_weight()) {
-      args.push_back(read_tensor(matrix_op.mx_weight().input()));
-      args.push_back(read_tensor(matrix_op.mx_weight().scale()));
-    } else {
-      args.push_back(read_tensor(matrix_op.weight()));
+  for (const auto op : op_list) {
+    for (const auto [key, value] : op.kwargs()) {
+      if (value.has_tensor() && value.tensor().has_memory()) {
+        kwargs[value.tensor().node()] = read_tensor(value.tensor());
+      }
     }
-
-    if (matrix_op.has_bias()) {
-      args.push_back(read_tensor(matrix_op.bias()));
-    } else {
-      args.push_back(nullptr);
-    }
-    output_node = matrix_op.name();
-  } else if (param.has_pooling_op()) {
-    const auto& pooling_op = param.pooling_op();
-    args.push_back(read_tensor(pooling_op.input()));
-  } else if (param.has_reduce_op()) {
-    const auto& reduce_op = param.reduce_op();
-    args.push_back(read_tensor(reduce_op.input()));
-  } else if (param.has_reshape_op()) {
-    const auto& reshape_op = param.reshape_op();
-    args.push_back(read_tensor(reshape_op.input()));
-  } else if (param.has_slicing_op()) {
-    const auto& slicing_op = param.slicing_op();
-    args.push_back(read_tensor(slicing_op.input()));
-  } else if (param.vector_ops_size() > 0) {
-    const auto vector_op = param.vector_ops(0);
-    args.push_back(read_tensor(vector_op.input()));
   }
 
-  for (auto& vector_op : param.vector_ops()) {
-    if (vector_op.has_other()) {
-      // Check whether input or other is the output of the last operation.
-      const auto input = vector_op.input();
-      const auto other = vector_op.other();
-      const auto tensor_to_load = other.node() == output_node ? input : other;
-      args.push_back(read_tensor(tensor_to_load));
-    }
-    output_node = vector_op.name();
-  }
+  return kwargs;
+}
 
-  // Add the output tensor to the list of arguments
-  const codegen::Tensor& output = param.output();
-  char* outputPtr =
-      get_memory(output.memory().partition()) + output.memory().offset();
-  args.push_back(outputPtr);
-
-  return args;
+std::any ArrayMemory::get_output(const codegen::Operation& param) {
+  codegen::Tensor output_tensor = param.output();
+  return read_tensor(output_tensor);
 }
 
 /**
  * Retrieves the reference output tensor from the given accelerator parameter.
- * The reference output tensor is stored at the last partition with an offset of
+ * The reference output tensor is stored at the last partition at address of
  * 0.
  */
-std::any ArrayMemory::get_reference_output(const codegen::Operator& param) {
+std::any ArrayMemory::get_reference_output(const codegen::Operation& param) {
   codegen::Tensor output_tensor;
   output_tensor.CopyFrom(param.output());
   auto memory = output_tensor.mutable_memory();
   memory->set_partition(-1);
-  memory->set_offset(0);
-  return read_tensor(output_tensor);
-}
-
-std::any ArrayMemory::get_output(const codegen::Operator& param) {
-  codegen::Tensor output_tensor = param.output();
+  memory->set_address(0);
   return read_tensor(output_tensor);
 }
 
@@ -160,38 +115,38 @@ std::any ArrayMemory::read_tensor(const codegen::Tensor& tensor) {
 
   if (tensor.dtype() == "bfloat16") {
     DataTypes::bfloat16* data = new DataTypes::bfloat16[size];
-    read_tensor_from_memory<DataTypes::bfloat16>(tensor.memory().offset(),
+    read_tensor_from_memory<DataTypes::bfloat16>(tensor.memory().address(),
                                                  partition, size, data);
     return data;
   } else if (tensor.dtype() == "int8") {
     DataTypes::int8* data = new DataTypes::int8[size];
-    read_tensor_from_memory<DataTypes::int8>(tensor.memory().offset(),
+    read_tensor_from_memory<DataTypes::int8>(tensor.memory().address(),
                                              partition, size, data);
     return data;
   } else if (tensor.dtype() == "int24") {
     DataTypes::int24* data = new DataTypes::int24[size];
-    read_tensor_from_memory<DataTypes::int24>(tensor.memory().offset(),
+    read_tensor_from_memory<DataTypes::int24>(tensor.memory().address(),
                                               partition, size, data);
     return data;
   } else if (tensor.dtype() == "int32") {
     DataTypes::int32* data = new DataTypes::int32[size];
-    read_tensor_from_memory<DataTypes::int32>(tensor.memory().offset(),
+    read_tensor_from_memory<DataTypes::int32>(tensor.memory().address(),
                                               partition, size, data);
     return data;
-  } else if (tensor.dtype() == "e8m0") {
-    DataTypes::e8m0* data = new DataTypes::e8m0[size];
-    read_tensor_from_memory<DataTypes::e8m0>(tensor.memory().offset(),
+  } else if (tensor.dtype() == "fp8_e8m0") {
+    DataTypes::fp8_e8m0* data = new DataTypes::fp8_e8m0[size];
+    read_tensor_from_memory<DataTypes::fp8_e8m0>(tensor.memory().address(),
                                              partition, size, data);
     return data;
   } else if (tensor.dtype() == "fp8_e5m3") {
     DataTypes::fp8_e5m3* data = new DataTypes::fp8_e5m3[size];
-    read_tensor_from_memory<DataTypes::fp8_e5m3>(tensor.memory().offset(),
+    read_tensor_from_memory<DataTypes::fp8_e5m3>(tensor.memory().address(),
                                                  partition, size, data);
     return data;
   } else {
     INPUT_DATATYPE* data = new INPUT_DATATYPE[size];
-    read_tensor_from_memory<INPUT_DATATYPE>(tensor.memory().offset(), partition,
-                                            size, data);
+    read_tensor_from_memory<INPUT_DATATYPE>(tensor.memory().address(),
+                                            partition, size, data);
     return data;
   }
 }
@@ -199,7 +154,7 @@ std::any ArrayMemory::read_tensor(const codegen::Tensor& tensor) {
 void ArrayMemory::write_tensor(const codegen::Tensor& tensor,
                                const std::any data) {
   const auto& tensor_memory = tensor.memory();
-  const uint64_t address = tensor_memory.offset();
+  const uint64_t address = tensor_memory.address();
   const int partition = tensor_memory.partition();
 
   int size = 1;
@@ -220,9 +175,9 @@ void ArrayMemory::write_tensor(const codegen::Tensor& tensor,
   } else if (dtype == "int32") {
     write_tensor_to_memory<DataTypes::int32>(
         address, partition, size, std::any_cast<DataTypes::int32*>(data));
-  } else if (dtype == "e8m0") {
-    write_tensor_to_memory<DataTypes::e8m0>(
-        address, partition, size, std::any_cast<DataTypes::e8m0*>(data));
+  } else if (dtype == "fp8_e8m0") {
+    write_tensor_to_memory<DataTypes::fp8_e8m0>(
+        address, partition, size, std::any_cast<DataTypes::fp8_e8m0*>(data));
   } else if (dtype == "fp8_e5m3") {
     write_tensor_to_memory<DataTypes::fp8_e5m3>(
         address, partition, size, std::any_cast<DataTypes::fp8_e5m3*>(data));
