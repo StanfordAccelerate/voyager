@@ -560,8 +560,8 @@ SC_MODULE(MatrixProcessor) {
         CCS_LOG("start");
 
         const MatrixParams params = accumulationBufferParams.Pop();
-        ac_int<8, false> loop_counters[2][6];
-        ac_int<8, false> loop_bounds[2][6];
+        ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+        ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 #pragma hls_unroll yes
         for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes

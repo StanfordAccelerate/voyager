@@ -256,7 +256,7 @@ std::any run_operation(const codegen::Operation param,
 
       Vector *input_ptr = std::any_cast<Vector *>(output_ptr);
 
-      const auto other = op.kwargs().at("code").tensor();
+      const auto other = op.kwargs().at("other").tensor();
       DataTypes::bfloat16 *value_map =
           std::any_cast<DataTypes::bfloat16 *>(kwargs[other.node()]);
 
