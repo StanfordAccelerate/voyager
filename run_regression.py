@@ -153,7 +153,7 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=1 * 60 * 60,
+                timeout=10 * 60 if fast else 1 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{layer} timed out")
