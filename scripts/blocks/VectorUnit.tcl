@@ -6,6 +6,7 @@ proc pre_libraries {} {
   solution library add {[Block] VectorFetchUnit.v1}
   solution library add {[Block] OutputAddressGenerator.v1}
   solution library add {[Block] VectorOpUnit.v1}
+  solution library add {[Block] VectorParamsDeserializer.v1}
 }
 
 proc pre_assembly {} {
@@ -26,4 +27,5 @@ proc pre_assembly {} {
   directive set /$full_block_name_stripped/$vector_fetch_name_stripped -MAP_TO_MODULE {[Block] VectorFetchUnit.v1}
   directive set /$full_block_name_stripped/$output_address_name_stripped -MAP_TO_MODULE {[Block] OutputAddressGenerator.v1}
   directive set /$full_block_name_stripped/$vector_op_name_stripped -MAP_TO_MODULE {[Block] VectorOpUnit.v1}
+  directive set /$full_block_name_stripped/VectorParamsDeserializer -MAP_TO_MODULE {[Block] VectorParamsDeserializer.v1}
 }

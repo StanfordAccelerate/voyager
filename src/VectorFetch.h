@@ -579,7 +579,7 @@ SC_MODULE(VectorFetchUnit) {
                     Pack1D<IO_DTYPE, WIDTH> response =
                         vectorFetch1DataResponse.Pop();
 
-#ifdef SUPPORT_MX
+#if SUPPORT_MX
                     if (params.BROADCAST_VEC1_SCALE) {
 #pragma hls_unroll yes
                       for (int i = 0; i < WIDTH; i++) {
@@ -591,12 +591,12 @@ SC_MODULE(VectorFetchUnit) {
                       vdequantize<IO_DTYPE, VEC_DTYPE, WIDTH>(
                           response, fullPrecisionDataResponse,
                           params.vec1DequantizeScale);
-#ifdef SUPPORT_MX
+#if SUPPORT_MX
                     }
 #endif
                   }
 
-#ifdef SUPPORT_MX
+#if SUPPORT_MX
                   if (params.BROADCAST_VEC1_SCALE) {
                     for (int i = 0; i < WIDTH; i++) {
                       for (int count = 0; count < params.vec1BroadcastCount;
@@ -610,7 +610,7 @@ SC_MODULE(VectorFetchUnit) {
 #endif
                     vectorFetch1DataResponseConverted.Push(
                         fullPrecisionDataResponse);
-#ifdef SUPPORT_MX
+#if SUPPORT_MX
                   }
 #endif
 
