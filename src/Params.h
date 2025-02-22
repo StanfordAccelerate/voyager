@@ -570,16 +570,14 @@ struct VectorParams : BaseParams {
     vec0_dim = 0;
     vec0_start = 0;
     vec0_end = 0;
-    vec0_stride = 0;
+    vec0_step = 0;
 
     has_reshape = false;
     for (int i = 0; i < 6; i++) {
       vec0_dim_order[i] = i;
     }
 
-    fetch_scale_type_1 = false;
-    output_scale_type = false;
-    mx_block_size = 0;
+    has_transpose = false;
 
     head_size_power_of_two = 32;
     has_attn_head_permute = false;
@@ -588,9 +586,6 @@ struct VectorParams : BaseParams {
     quantize_output = false;
     quantize_output_mx = false;
     SCALE_OFFSET = 0;
-
-    is_maxpool = false;
-    is_avgpool = false;
   }
 #endif
 
@@ -642,15 +637,12 @@ struct VectorParams : BaseParams {
   ac_int<3, false> vec0_dim;
   ac_int<11, false> vec0_start;
   ac_int<11, false> vec0_end;
-  ac_int<11, false> vec0_stride;
+  ac_int<11, false> vec0_step;
 
   bool has_reshape;
   ac_int<3, false> vec0_dim_order[6];
 
-  // Microscaling flags
-  bool fetch_scale_type_1;
-  bool output_scale_type;
-  ac_int<8, false> mx_block_size;
+  bool has_transpose;
 
   // Transformer head permutation
   ac_int<4, false> head_size_power_of_two;
@@ -661,9 +653,6 @@ struct VectorParams : BaseParams {
   bool quantize_output_mx;
   uint64_t SCALE_OFFSET;
 
-  bool is_maxpool;
-  bool is_avgpool;
-
   // Each address generator has a 2-bit mode flag, 64-bit address, 6 11-bit loop
   // boundaries, 6 3-bit loop indices, a 16-bit dequantize scale and a vector
   // type output boolean flag
@@ -671,10 +660,10 @@ struct VectorParams : BaseParams {
       2 + 64 + 6 * 11 + 6 * 3 + 16 + 1;
 
   // There are 4 address generators in total + 6-bit broadcasting flag + 36-bit
-  // slicing params + 18-bit reshape params + 8-bit mx block size + 4-bit head
-  // size + 10 boolean flags
+  // slicing params + 18-bit reshape params + 4-bit head size + 7 boolean flags
+  // + 64-bit scale offset
   static const unsigned int width =
-      4 * address_gen_width + 6 + 36 + 18 + 8 + 4 + 10 + 64;
+      4 * address_gen_width + 6 + 36 + 18 + 4 + 7 + 64;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -766,17 +755,14 @@ struct VectorParams : BaseParams {
     m & vec0_dim;
     m & vec0_start;
     m & vec0_end;
-    m & vec0_stride;
+    m & vec0_step;
 
     m & has_reshape;
     for (int i = 0; i < 6; i++) {
       m& vec0_dim_order[i];
     }
 
-    // Microscaling flags
-    m & fetch_scale_type_1;
-    m & output_scale_type;
-    m & mx_block_size;
+    m & has_transpose;
 
     // Transformer head permutation flags
     m & head_size_power_of_two;
@@ -786,9 +772,6 @@ struct VectorParams : BaseParams {
     m & quantize_output;
     m & quantize_output_mx;
     m & SCALE_OFFSET;
-
-    m & is_maxpool;
-    m & is_avgpool;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const VectorParams& params,
@@ -897,7 +880,7 @@ struct VectorParams : BaseParams {
     os << "vec0_dim: " << params.vec0_dim << std::endl;
     os << "vec0_start: " << params.vec0_start << std::endl;
     os << "vec0_end: " << params.vec0_end << std::endl;
-    os << "vec0_stride: " << params.vec0_stride << std::endl;
+    os << "vec0_step: " << params.vec0_step << std::endl;
 
     os << "has_reshape: " << params.has_reshape << std::endl;
     for (int i = 0; i < 6; i++) {
@@ -905,9 +888,7 @@ struct VectorParams : BaseParams {
          << std::endl;
     }
 
-    os << "fetch_scale_type_1: " << params.fetch_scale_type_1 << std::endl;
-    os << "output_scale_type: " << params.output_scale_type << std::endl;
-    os << "mx_block_size: " << params.mx_block_size << std::endl;
+    os << "has_transpose: " << params.has_transpose << std::endl;
 
     os << "head_size_power_of_two: " << params.head_size_power_of_two
        << std::endl;
@@ -919,8 +900,6 @@ struct VectorParams : BaseParams {
     os << "quantize_output_mx: " << params.quantize_output_mx << std::endl;
     os << "SCALE_OFFSET: " << params.SCALE_OFFSET << std::endl;
 
-    os << "is_maxpool: " << params.is_maxpool << std::endl;
-    os << "is_avgpool: " << params.is_avgpool << std::endl;
     return os;
   }
 
@@ -1014,16 +993,14 @@ struct VectorParams : BaseParams {
     if (lhs.vec0_dim != rhs.vec0_dim) return false;
     if (lhs.vec0_start != rhs.vec0_start) return false;
     if (lhs.vec0_end != rhs.vec0_end) return false;
-    if (lhs.vec0_stride != rhs.vec0_stride) return false;
+    if (lhs.vec0_step != rhs.vec0_step) return false;
 
     if (lhs.has_reshape != rhs.has_reshape) return false;
     for (int i = 0; i < 6; i++) {
       if (lhs.vec0_dim_order[i] != rhs.vec0_dim_order[i]) return false;
     }
 
-    if (lhs.fetch_scale_type_1 != rhs.fetch_scale_type_1) return false;
-    if (lhs.output_scale_type != rhs.output_scale_type) return false;
-    if (lhs.mx_block_size != rhs.mx_block_size) return false;
+    if (lhs.has_transpose != rhs.has_transpose) return false;
 
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
     if (lhs.has_attn_head_permute != rhs.has_attn_head_permute) return false;
@@ -1037,8 +1014,6 @@ struct VectorParams : BaseParams {
     if (lhs.addressGen1Mode != rhs.addressGen1Mode) return false;
     if (lhs.addressGen2Mode != rhs.addressGen2Mode) return false;
     if (lhs.outputAddressMode != rhs.outputAddressMode) return false;
-    if (lhs.is_maxpool != rhs.is_maxpool) return false;
-    if (lhs.is_avgpool != rhs.is_avgpool) return false;
 
     // If all members are equal, return true
     return true;

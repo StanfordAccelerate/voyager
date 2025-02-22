@@ -13,6 +13,7 @@ template <int W, bool S>
 class Int {
  public:
   static constexpr unsigned int width = W;
+  static constexpr int emax = W - 2;  // max normal exponent
 
   typedef ac_int<W, S> ac_int_rep;
   typedef ac_fixed<2 * W, W, true> ac_int_to_fixed_rep;

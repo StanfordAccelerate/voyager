@@ -155,16 +155,14 @@ SC_MODULE(WeightController) {
 
                       ac_int<16, false> c = c1 * C0 + c0;
                       ac_int<16, false> C = C1 * C0;
-                      ac_int<16, false> k =
-                          k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
-                      ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
+                      ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
+                      ac_int<16, false> K = K2 * K1 * NCols;
 
                       ac_int<32, false> address =
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
 
                       if (params.has_weight_transpose) {
-                        C = C1 * NCols;
-                        address = (k + c0) * C + c1 * OC_DIMENSION;
+                        address = (k + c0) * C1 * NRows + c1 * NRows;
                       }
 
                       MemoryRequest request = {
@@ -292,9 +290,8 @@ SC_MODULE(WeightController) {
                           loop_counters[1][params.weightAddressGenFyIndex];
 
                       ac_int<16, false> C = C0;
-                      ac_int<16, false> k =
-                          k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
-                      ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
+                      ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
+                      ac_int<16, false> K = K2 * K1 * NCols;
 
                       Pack1D<Weight, NCols> data = transposeOut.Pop();
 
@@ -372,13 +369,13 @@ SC_MODULE(WeightController) {
       loop_bounds[1][params.weightReuseIndex[1]] = 1;
 
       // extra loop to control reuse which only occurs during transpose and when
-      // OC_DIMENSION > IC_DIMENSION
+      // NCols > NRows
       int rep_bound = 1;
-      if (OC_DIMENSION > IC_DIMENSION) {
+      if (NCols > NRows) {
         if (params.has_weight_transpose) {
           // we are able to reuse the weights already in the buffer
-          loop_bounds[1][0] /= (OC_DIMENSION / IC_DIMENSION);
-          rep_bound = (OC_DIMENSION / IC_DIMENSION);
+          loop_bounds[1][0] /= (NCols / NRows);
+          rep_bound = (NCols / NRows);
         }
       }
 
@@ -425,19 +422,19 @@ SC_MODULE(WeightController) {
                           if (params.is_replication) {
                             startingC = 3 - 1;
                             endingC = 3;
-                            if (IC_DIMENSION == 4) {
+                            if (NRows == 4) {
                               numPadding = NRows - 3;
                               replicationBound = 1;
-                            } else if (IC_DIMENSION == 8) {
-                              if (loop_counters[1][params.fxIndex] ==
-                                  3) {  // last iteration only unrolls 1 fx
+                            } else if (NRows == 8) {
+                              // last iteration only unrolls 1 fx
+                              if (loop_counters[1][params.fxIndex] == 3) {
                                 numPadding = NRows - 3;
                                 replicationBound = 1;
                               } else {
                                 numPadding = NRows - 6;
                                 replicationBound = 2;
                               }
-                            } else if (IC_DIMENSION == 16) {
+                            } else if (NRows == 16) {
                               if (loop_counters[1][params.fxIndex] == 0) {
                                 numPadding = NRows - 12;
                                 replicationBound = 4;
@@ -445,7 +442,7 @@ SC_MODULE(WeightController) {
                                 numPadding = NRows - 9;
                                 replicationBound = 3;
                               }
-                            } else if (IC_DIMENSION == 32) {
+                            } else if (NRows == 32) {
                               replicationBound = 7;
                               numPadding = NRows - replicationBound * 3;
                             }
@@ -476,23 +473,22 @@ SC_MODULE(WeightController) {
                             ac_int<LOOP_WIDTH, false> FY =
                                 params.loops[1][params.fyIndex];
 
-                            ac_int<16, false> k =
-                                k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
-                            ac_int<16, false> K = K2 * K1 * OC_DIMENSION;
+                            ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
+                            ac_int<16, false> K = K2 * K1 * NCols;
 
-                            ac_int<LOOP_WIDTH, false> C = IC_DIMENSION;
+                            ac_int<LOOP_WIDTH, false> C = NRows;
 
                             if (params.is_replication) {
                               C = 3;
-                              if (IC_DIMENSION == 4) {
+                              if (NRows == 4) {
                                 fx = loop_counters[1][params.fxIndex];
-                              } else if (IC_DIMENSION == 8) {
+                              } else if (NRows == 8) {
                                 fx = loop_counters[1][params.fxIndex] * 2 +
                                      fx_repl;
-                              } else if (IC_DIMENSION == 16) {
+                              } else if (NRows == 16) {
                                 fx = loop_counters[1][params.fxIndex] * 4 +
                                      fx_repl;
-                              } else if (IC_DIMENSION == 32) {
+                              } else if (NRows == 32) {
                                 fx = fx_repl;
                               }
                               FX = 7;
@@ -520,7 +516,7 @@ SC_MODULE(WeightController) {
                                                           (c * K1) + k1;
 
                               if (params.has_weight_transpose &&
-                                  OC_DIMENSION > IC_DIMENSION) {
+                                  NCols > NRows) {
                                 address = (fy * FX * C * 2 * K1) +
                                           (fx * C * 2 * K1) +
                                           (c + rep * NRows) * K1 + k1;
@@ -640,7 +636,7 @@ SC_MODULE(WeightController) {
                         }
                       }
 
-                      // Write out from tranposeBuffer
+                      // Write out from transposeBuffer
                       for (int c0 = 0; c0 < NCols; c0++) {
                         Pack1D<Weight, NCols> transposedValue;
 
@@ -757,11 +753,11 @@ SC_MODULE(WeightController) {
                             loop_bounds[0][params.weightLoopIndex[0]];
 
                         ac_int<16, false> address =
-                            k2 * K1 * OC_DIMENSION + k1 * OC_DIMENSION;
+                            k2 * K1 * NCols + k1 * NCols;
 
                         MemoryRequest request = {
                             params.BIAS_OFFSET + address * Bias::width / 8,
-                            OC_DIMENSION * Bias::width / 8};
+                            NCols * Bias::width / 8};
 
                         biasAddressRequest.Push(request);
 

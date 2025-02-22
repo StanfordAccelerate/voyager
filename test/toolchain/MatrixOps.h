@@ -197,18 +197,21 @@ void MapMatrixOperation(const codegen::Operation &param,
   matrix_params->has_weight_transpose =
       weight.reshape().target() == "transpose";
   if (matrix_params->has_weight_transpose) {
-    // for tranpose, we need to enforce that the innermost loop is the
+    // for transpose, we need to enforce that the innermost loop is the
     // unrolled reduction loop
     // we can just use the following loop nest:
     // C1, K, FY, FX, C0
     matrix_params->weightAddressGenLoops[1][4] = OC_DIMENSION;
     matrix_params->weightAddressGenReductionLoopIndex[1] = 4;
+
     matrix_params->weightAddressGenLoops[1][3] =
         tiling.loops[1][tiling.fx_index];
     matrix_params->weightAddressGenFxIndex = 3;
+
     matrix_params->weightAddressGenLoops[1][2] =
         tiling.loops[1][tiling.fy_index];
     matrix_params->weightAddressGenFyIndex = 2;
+
     matrix_params->weightAddressGenLoops[1][1] =
         tiling.loops[1][tiling.weight_loop_index[1]];
 
@@ -224,7 +227,7 @@ void MapMatrixOperation(const codegen::Operation &param,
           (OC_DIMENSION / IC_DIMENSION);
     }
     matrix_params->weightAddressGenReductionLoopIndex[0] = 0;
-  } else {  // if not tranpose, then we have freedom to pick any loop order
+  } else {  // if not transpose, then we have freedom to pick any loop order
     matrix_params->weightAddressGenLoops[1][4] =
         tiling.loops[1][tiling.weight_loop_index[1]];
     matrix_params->weightAddressGenWeightLoopIndex[1] = 4;

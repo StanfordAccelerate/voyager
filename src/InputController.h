@@ -87,16 +87,16 @@ SC_MODULE(InputController) {
       int packingFactor;  // num x values packed in a word
       int boundaryWords;  // num words needed to store the boundary pixels.
                           // essentially ceil(3/packingFactor)
-      if (IC_DIMENSION == 4) {
+      if (NRows == 4) {
         packingFactor = 1;
         boundaryWords = 3;
-      } else if (IC_DIMENSION == 8) {
+      } else if (NRows == 8) {
         packingFactor = 2;
         boundaryWords = 2;
-      } else if (IC_DIMENSION == 16) {
+      } else if (NRows == 16) {
         packingFactor = 4;
         boundaryWords = 1;
-      } else if (IC_DIMENSION == 32) {
+      } else if (NRows == 32) {
         packingFactor = 8;
         boundaryWords = 1;
       }
@@ -255,21 +255,21 @@ SC_MODULE(InputController) {
                         ac_int<32, false> address = y * X * C + x * C + c;
 
                         if (params.is_replication) {
-                          address = y * (X / packingFactor) * IC_DIMENSION +
-                                    (x / packingFactor) * IC_DIMENSION + c;
+                          address = y * (X / packingFactor) * NRows +
+                                    (x / packingFactor) * NRows + c;
                         }
 
-                        ac_int<8, false> head_size =
-                            params.head_size_power_of_two;
                         if (params.has_attn_output_permute) {
+                          ac_int<8, false> head_size =
+                              params.head_size_power_of_two;
                           ac_int<16, false> mask = (1 << head_size) - 1;
                           address = (((c >> head_size) * X) << head_size) +
                                     (x << head_size) + (c & mask);
                         }
 
+                        // FIXME: is this correct?
                         if (params.has_input_transpose) {
-                          address =
-                              (c + (x % 16)) * X + (x / 16) * IC_DIMENSION;
+                          address = (c + (x % 16)) * X + (x / 16) * NRows;
                         }
 
                         MemoryRequest request = {
@@ -340,16 +340,16 @@ SC_MODULE(InputController) {
       // replication packing factor
       int packingFactor;
       int boundaryWords;
-      if (IC_DIMENSION == 4) {
+      if (NRows == 4) {
         packingFactor = 1;
         boundaryWords = 3;
-      } else if (IC_DIMENSION == 8) {
+      } else if (NRows == 8) {
         packingFactor = 2;
         boundaryWords = 2;
-      } else if (IC_DIMENSION == 16) {
+      } else if (NRows == 16) {
         packingFactor = 4;
         boundaryWords = 1;
-      } else if (IC_DIMENSION == 32) {
+      } else if (NRows == 32) {
         packingFactor = 8;
         boundaryWords = 1;
       }
@@ -561,16 +561,16 @@ SC_MODULE(InputController) {
       // replication packing factor
       int packingFactor;
       int boundaryWords;
-      if (IC_DIMENSION == 4) {
+      if (NRows == 4) {
         packingFactor = 1;
         boundaryWords = 3;
-      } else if (IC_DIMENSION == 8) {
+      } else if (NRows == 8) {
         packingFactor = 2;
         boundaryWords = 2;
-      } else if (IC_DIMENSION == 16) {
+      } else if (NRows == 16) {
         packingFactor = 4;
         boundaryWords = 1;
-      } else if (IC_DIMENSION == 32) {
+      } else if (NRows == 32) {
         packingFactor = 8;
         boundaryWords = 1;
       }
@@ -592,12 +592,12 @@ SC_MODULE(InputController) {
         }
       }
 
-      if (params.is_replication && IC_DIMENSION >= 16) {
+      if (params.is_replication && NRows >= 16) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
             2;
-      } else if (params.is_replication && IC_DIMENSION == 8) {
+      } else if (params.is_replication && NRows == 8) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
@@ -653,7 +653,7 @@ SC_MODULE(InputController) {
                         ac_int<16, false> x = STRIDE * x0 + fx;
                         ac_int<16, false> y = STRIDE * y0 + fy;
                         ac_int<16, false> address;
-                        if (params.is_replication && IC_DIMENSION >= 8) {
+                        if (params.is_replication && NRows >= 8) {
                           address = y * (((STRIDE * X0) / packingFactor) +
                                          2 * boundaryWords) +
                                     x0 + fx;
@@ -737,31 +737,31 @@ SC_MODULE(InputController) {
       int additionalUnrollingFactor;  // additional x values packed in a word
                                       // sent to the systolic array, but are
                                       // unused by the systolic array
-      constexpr int initialReuseFactor = (IC_DIMENSION == 8) ? 1 : 3;
+      constexpr int initialReuseFactor = (NRows == 8) ? 1 : 3;
       int shiftFactor;
 
-      if (IC_DIMENSION == 4) {
+      if (NRows == 4) {
         packingFactor = 1;
         unrollingFactor = 1;
         additionalUnrollingFactor = 0;
-      } else if (IC_DIMENSION == 8) {
+      } else if (NRows == 8) {
         packingFactor = 2;
         unrollingFactor = 2;
         additionalUnrollingFactor = 0;
         shiftFactor = 1;
-      } else if (IC_DIMENSION == 16) {
+      } else if (NRows == 16) {
         packingFactor = 4;
         unrollingFactor = 4;
         additionalUnrollingFactor = 1;
         shiftFactor = 2;
-      } else if (IC_DIMENSION == 32) {
+      } else if (NRows == 32) {
         packingFactor = 8;
         unrollingFactor = 7;
         additionalUnrollingFactor = 0;
         shiftFactor = 2;
       }
 
-      if (params.is_replication && IC_DIMENSION >= 16) {
+      if (params.is_replication && NRows >= 16) {
         // #pragma hls_pipeline_init_interval 1
         // #pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -864,7 +864,7 @@ SC_MODULE(InputController) {
             }
           }
         }
-      } else if (params.is_replication && IC_DIMENSION == 8) {
+      } else if (params.is_replication && NRows == 8) {
         // no window buffer reuse, but need to combine multiple words together
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
              loop_counters[0][0]++) {
@@ -950,16 +950,16 @@ SC_MODULE(InputController) {
       int packingFactor;  // num x values packed in a word
       int boundaryWords;  // num words needed to store the boundary pixels.
                           // essentially ceil(3/packingFactor)
-      if (IC_DIMENSION == 4) {
+      if (NRows == 4) {
         packingFactor = 1;
         boundaryWords = 3;
-      } else if (IC_DIMENSION == 8) {
+      } else if (NRows == 8) {
         packingFactor = 2;
         boundaryWords = 2;
-      } else if (IC_DIMENSION == 16) {
+      } else if (NRows == 16) {
         packingFactor = 4;
         boundaryWords = 1;
-      } else if (IC_DIMENSION == 32) {
+      } else if (NRows == 32) {
         packingFactor = 8;
         boundaryWords = 1;
       }
@@ -1025,7 +1025,7 @@ SC_MODULE(InputController) {
                             }
                           }
 
-                          // Write out from tranposeBuffer
+                          // Write out from transposeBuffer
                           for (int c0 = 0; c0 < NRows; c0++) {
                             Pack1D<Input, NRows> transposedValue;
 

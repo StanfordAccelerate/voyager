@@ -10,7 +10,7 @@ template <int W, int E>
 class UFloat {
  public:
   static constexpr unsigned int width = W;
-  static constexpr unsigned int exponent_width = E;
+  static constexpr unsigned int e_width = E;
 
   typedef ac_int<W, false> ac_int_rep;
   typedef ac_std_float<W + 1, E> ac_float_rep;

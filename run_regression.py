@@ -444,9 +444,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         quantization_args = [
             "--force_scale_power_of_two",
             "--activation",
-            "int8,qs=microscaling,bs=32",
+            "int8,qs=microscaling,bs=" + os.environ['OC_DIMENSION'],
             "--weight",
-            "int8,qs=microscaling,bs=32",
+            "int8,qs=microscaling,bs=" + os.environ['IC_DIMENSION'],
             "--bf16",
         ]
     else:

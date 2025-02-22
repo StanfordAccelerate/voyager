@@ -9,7 +9,7 @@ class Network {
 
   std::vector<codegen::Operation> get_params(bool filter_nop = true);
   std::vector<codegen::Operation> get_params(
-      const std::vector<std::string>& names, bool filter_nop = true);
+      const std::vector<std::string>& names);
 
   std::string project_root;
   codegen::Model model;

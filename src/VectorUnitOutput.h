@@ -44,11 +44,6 @@ SC_MODULE(VectorUnitOutput) {
         }
       }
 
-      if (params.is_avgpool) {
-        loop_bounds[1][params.outputXLoopIndex[1]] = 1;
-        loop_bounds[1][params.outputYLoopIndex[1]] = 1;
-      }
-
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];

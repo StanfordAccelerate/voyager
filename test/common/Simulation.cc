@@ -103,7 +103,7 @@ void Simulation::load_data() {
                          std::string(getenv("CODEGEN_DIR")) + "/networks/" +
                          model + "/" + datatype + "/tensor_files";
 
-  const auto params_to_load = network->get_params(tests, false);
+  const auto params_to_load = network->get_params(tests);
 
   // Fully connected layer, or linear ops with input of a 1D tensor, is run on
   // the vector unit. Its weight does not need to be transposed. We check if an
@@ -121,8 +121,8 @@ void Simulation::load_data() {
     dataloader->load_outputs(params_to_load.back(), data_dir);
 
     for (const auto& tensor : network->model.parameters()) {
-      bool has_tranpose = tensor.shape(0) != num_classes;
-      dataloader->load_tensor(tensor, data_dir, has_tranpose);
+      bool has_transpose = tensor.shape(0) != num_classes;
+      dataloader->load_tensor(tensor, data_dir, has_transpose);
     }
   }
 
@@ -160,10 +160,10 @@ void Simulation::print_ideal_runtime(const codegen::Operation& param) {
     cycles = num_ops / OC_DIMENSION;
     std::cout << get_op_name(param) << ", vector unit ideal runtime: ";
   }
-  // read CLOCK_PERIOD from environment
-  int clock_period =
-      std::getenv("CLOCK_PERIOD") ? std::stoi(std::getenv("CLOCK_PERIOD")) : 1;
-  std::cout << cycles * clock_period << " ns" << std::endl;
+
+  char* clock_period = std::getenv("CLOCK_PERIOD");
+  long clock_period_ns = clock_period ? std::stoi(clock_period) : 1;
+  std::cout << cycles * clock_period_ns << " ns" << std::endl;
 }
 
 void Simulation::run() {

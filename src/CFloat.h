@@ -30,14 +30,13 @@ class CFloat {
   }
 
   ac_int<width, false> bits_rep() {
-    uint32_t float_bits = *reinterpret_cast<uint32_t *>(&float_val);
+    uint32_t float_bits;
+    std::memcpy(&float_bits, &float_val, sizeof(float_bits));
     ac_int<width, false> bits = float_bits;
     return bits;
   }
 
-  void set_bits(uint32_t bits) {
-    float_val = *reinterpret_cast<float *>(&bits);
-  }
+  void set_bits(uint32_t bits) { std::memcpy(&float_val, &bits, sizeof(bits)); }
 
   void set_zero() { float_val = 0; }
 

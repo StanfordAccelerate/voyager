@@ -231,7 +231,7 @@ void MapVectorOperations(const codegen::Operation &param,
     vector_params->vec0_dim = dim + num_extra_dims;
     vector_params->vec0_start = start;
     vector_params->vec0_end = end;
-    vector_params->vec0_stride = step;
+    vector_params->vec0_step = step;
 
     // Last dimension needs to be scaled by OC_DIMENSION
     if (vector_params->vec0_dim == 5) {
@@ -249,6 +249,18 @@ void MapVectorOperations(const codegen::Operation &param,
       vector_params->vec0_dim_order[i + num_extra_dims] =
           dims[i] + num_extra_dims;
     }
+  }
+
+  Tiling tiling;
+  if (reshape_op.target() == "transpose") {
+    vector_params->has_transpose = true;
+
+    // Only support a buffer size of 32
+    const int BUFFER_SIZE = 32;
+    std::vector<int> input_shape(input.shape().begin(), input.shape().end());
+    int last_dim = input_shape.back();
+    input_shape.pop_back();
+    input_shape.push_back(last_dim / BUFFER_SIZE);
   }
 
   VECTOR_DATATYPE scale = 1.0;

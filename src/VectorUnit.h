@@ -456,7 +456,7 @@ SC_MODULE(VectorUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
   Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch0DataResponse);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vectorFetch0DataResponseBroadcasted);
+      vectorFetch0DataResponseConverted);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
   Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch1DataResponse);
@@ -520,8 +520,8 @@ SC_MODULE(VectorUnit) {
     vector_fetch.paramsIn(vectorFetchParams);
     vector_fetch.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
     vector_fetch.vectorFetch0DataResponse(vectorFetch0DataResponse);
-    vector_fetch.vectorFetch0DataResponseBroadcasted(
-        vectorFetch0DataResponseBroadcasted);
+    vector_fetch.vectorFetch0DataResponseConverted(
+        vectorFetch0DataResponseConverted);
     vector_fetch.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
     vector_fetch.vectorFetch1DataResponse(vectorFetch1DataResponse);
     vector_fetch.vectorFetch1DataResponseConverted(
@@ -538,7 +538,7 @@ SC_MODULE(VectorUnit) {
     vector_op_unit.accumulationOpUnitInstructions(accumulationOpInstructions);
     vector_op_unit.reductionOpUnitInstructions(reduceOpInstructions);
     vector_op_unit.systolicArrayOutput(systolicArrayOutput);
-    vector_op_unit.vectorFetch0Output(vectorFetch0DataResponseBroadcasted);
+    vector_op_unit.vectorFetch0Output(vectorFetch0DataResponseConverted);
     vector_op_unit.vectorFetch1Output(vectorFetch1DataResponseConverted);
     vector_op_unit.vectorFetch2Output(vectorFetch2DataResponseConverted);
     vector_op_unit.vectorOpUnitOutput(vectorOpUnitOutput);

@@ -597,7 +597,7 @@ SC_MODULE(WeightScaleController) {
                         }
                       }
 
-                      // Write out from tranposeBuffer
+                      // Write out from transposeBuffer
                       for (int c0 = 0; c0 < NCols; c0++) {
                         Pack1D<Scale, NCols> transposedValue;
 

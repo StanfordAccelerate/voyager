@@ -14,8 +14,10 @@ template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
 class StdFloat {
  public:
   static constexpr unsigned int width = mantissa + exp + 1;
-  static constexpr unsigned int exponent_width = exp;
-  static constexpr unsigned int mantissa_width = mantissa;
+  static constexpr unsigned int e_width = exp;
+  static constexpr unsigned int mant_bits = mantissa;
+  static constexpr int emax =
+      (1 << (e_width - 1)) - 1;  // IEEE-754 maximum normal exponent
 
   typedef ac_std_float<width, exp> ac_float_rep;
   typedef ac_fixed<2 * mantissa, mantissa, true> ac_float_to_fixed_rep;
@@ -91,15 +93,15 @@ class StdFloat {
   template <int width, bool sign>
   void scale_exp(ac_int<width, sign> offset) {
     if (float_val == float_val.zero()) return;
-    // TODO: handle subnormal numbers
-    ac_int<exponent_width, true> exp_bits =
-        float_val.d.template slc<exponent_width>(mantissa_width);
+    // TODO handle subnormal numbers
+    ac_int<e_width, true> exp_bits =
+        float_val.d.template slc<e_width>(mant_bits);
     exp_bits += offset;
-    float_val.d.set_slc(mantissa_width, exp_bits);
+    float_val.d.set_slc(mant_bits, exp_bits);
   }
 
-  ac_int<exponent_width, false> unbiased_exponent() const {
-    return float_val.d.template slc<exponent_width>(mantissa_width);
+  ac_int<e_width, false> unbiased_exponent() const {
+    return float_val.d.template slc<e_width>(mant_bits);
   }
 
   template <int mantissa2, int exp2, bool use_dw_impl2, bool ieee_compliance2,

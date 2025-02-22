@@ -7,6 +7,7 @@
 class NormalFloat4 {
  public:
   static constexpr unsigned int width = 4;
+  static constexpr int emax = 3;  // max normal exponent
 
   typedef ac_int<4, false> ac_int_rep;
   typedef Int<6, true> decoded;

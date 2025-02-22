@@ -88,13 +88,13 @@ inline std::vector<int> get_shape(const codegen::Tensor& tensor) {
   return {repeated_field.begin(), repeated_field.end()};
 }
 
-inline int get_size(const std::vector<int>& shape) {
-  int size = 1;
+inline long get_size(const std::vector<int>& shape) {
+  long size = 1;
   for (const auto& dim : shape) size *= dim;
   return size;
 }
 
-inline int get_size(const codegen::Tensor& tensor) {
+inline long get_size(const codegen::Tensor& tensor) {
   const auto shape = get_shape(tensor);
   return get_size(shape);
 }

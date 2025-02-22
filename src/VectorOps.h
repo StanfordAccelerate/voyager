@@ -176,8 +176,8 @@ template <typename InputType, typename OutputType, typename ScaleType,
           int Width>
 void vquantize_mx(const Pack1D<InputType, Width>& op0,
                   Pack1D<OutputType, Width>& res, ScaleType& scale) {
-  if constexpr (ScaleType::width == ScaleType::exponent_width) {
-    using exp_t = ac_int<InputType::exponent_width, false>;
+  if constexpr (ScaleType::width == ScaleType::e_width) {
+    using exp_t = ac_int<InputType::e_width, false>;
 
     Pack1D<exp_t, Width> exponents;
 #pragma hls_unroll yes
@@ -187,12 +187,11 @@ void vquantize_mx(const Pack1D<InputType, Width>& op0,
 
     exp_t max_exp = treemax(exponents);
 
-    const int offset = floor(log2(OutputType::max()));
-    ac_int<InputType::exponent_width, true> scaled_exp;
+    ac_int<InputType::e_width, true> scaled_exp;
     if (max_exp == 0) {
       scaled_exp = 127;
     } else {
-      scaled_exp = max_exp - offset;
+      scaled_exp = max_exp - OutputType::emax;
     }
 
     scale.set_bits(scaled_exp);

@@ -36,7 +36,7 @@ std::vector<codegen::Operation> Network::get_params(bool filter_nop) {
 
   std::vector<codegen::Operation> params;
   for (const auto& op : model.ops()) {
-    if (op.op().target() != "nop") {
+    if (op.op().op() != "nop") {
       params.push_back(op);
     }
   }
@@ -44,8 +44,8 @@ std::vector<codegen::Operation> Network::get_params(bool filter_nop) {
 }
 
 std::vector<codegen::Operation> Network::get_params(
-    const std::vector<std::string>& names, bool filter_nop) {
-  const auto all_params = get_params(filter_nop);
+    const std::vector<std::string>& names) {
+  const auto all_params = get_params(true);
 
   std::vector<codegen::Operation> params;
 

@@ -20,7 +20,7 @@ Scale* calculate_mx_qparam(std::any input_tensor, const std::vector<int>& shape,
       max_value = std::max(max_value, Vector(abs(inputs[index])));
     }
 
-    if constexpr (Scale::width == Scale::exponent_width) {
+    if constexpr (Scale::width == Scale::e_width) {
       scales[i] = pow(2, floor(log2(max_value)) - floor(log2(Input::max())));
     } else {
       scales[i] = max_value / Input::max();
@@ -78,7 +78,7 @@ Scale* calculate_mx_qparam(std::map<std::string, std::any>& kwargs,
 //   Scale* scales = new Scale[*result_size];
 
 //   for (int i = 0; i < result_size; i++) {
-//     if constexpr (Scale::width == Scale::exponent_width) {
+//     if constexpr (Scale::width == Scale::e_width) {
 //       int power_of_two = floor(log2(amax_arr[i])) -
 //       floor(log2(Input::max())); scales[i] = pow(2, power_of_two);
 //     } else {
