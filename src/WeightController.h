@@ -162,7 +162,7 @@ SC_MODULE(WeightController) {
                           (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
 
                       if (params.has_weight_transpose) {
-                        address = (k + c0) * C1 * NRows + c1 * NRows;
+                        address = (k + c0) * C1 * NCols + c1 * NCols;
                       }
 
                       MemoryRequest request = {

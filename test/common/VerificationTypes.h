@@ -77,8 +77,9 @@ inline std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   return os;
 }
 
-inline std::vector<int> get_shape(const codegen::Tensor& tensor) {
-  if (tensor.has_reshape()) {
+inline std::vector<int> get_shape(const codegen::Tensor& tensor,
+                                  bool reshape = true) {
+  if (tensor.has_reshape() && reshape) {
     const auto output_shape =
         tensor.reshape().kwargs().at("output_shape").int_list().values();
     return {output_shape.begin(), output_shape.end()};

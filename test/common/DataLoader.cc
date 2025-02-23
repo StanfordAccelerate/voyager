@@ -9,8 +9,16 @@ DataLoader::DataLoader(ArrayMemory* memory, bool is_dut, bool is_cnn)
 void DataLoader::load_tensor(const codegen::Tensor& tensor,
                              std::string data_dir, bool transpose,
                              bool replication) {
-  const auto shape = get_shape(tensor);
-  const int size = get_size(tensor);
+  const auto shape = get_shape(tensor, false);
+  const int size = get_size(shape);
+
+  std::cerr << "Loading tensor: " << tensor.node() << std::endl;
+  std::cerr << "Shape: ";
+  print_shape(shape);
+  std::cerr << "Datatype: " << tensor.dtype() << std::endl;
+  std::cerr << "Address: " << tensor.memory().address() << std::endl;
+  std::cerr << "Transposed: " << transpose << std::endl;
+  std::cerr << "Replication: " << replication << std::endl;
 
   // if size is 1, then it is a scalar, so it should not be
   // written to memory
@@ -33,11 +41,6 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
 
   int partition = tensor.memory().partition();
   uint64_t offset = tensor.memory().address();
-
-  std::cerr << "Loading tensor file " << filename << std::endl;
-  std::cerr << "Datatype: " << tensor.dtype() << std::endl;
-  std::cerr << "Address: " << offset << std::endl;
-  std::cerr << "transpose: " << transpose << std::endl;
 
   // number of elements packed into a single word for replication
   const int packing_factor = IC_DIMENSION / 4 * 3;

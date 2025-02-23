@@ -207,7 +207,7 @@ void MapVectorOperations(const codegen::Operation &param,
   vector_params->addressGen0Mode = 2;
 
   // Use the original shape without permute/slice
-  std::vector<int> input_shape(input.shape().begin(), input.shape().end());
+  auto input_shape = get_shape(input, false);
 
   // TODO: how to handle reshape operation loop bound adjustment?
   if (!input.has_reshape()) {
