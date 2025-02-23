@@ -167,6 +167,22 @@ void set_vector_immediate(const float scalar, const int stage,
   }
 }
 
+bool is_transpose(const std::vector<int> &dims) {
+  int n = dims.size();
+  // If there are fewer than 2 axes, there's nothing to swap.
+  if (n < 2) return false;
+
+  // Check that all axes except the last two are in their natural order.
+  for (int i = 0; i < n - 2; ++i) {
+    if (dims[i] != i) {
+      return false;
+    }
+  }
+
+  // Check that the last two axes are swapped.
+  return (dims[n - 2] == n - 1 && dims[n - 1] == n - 2);
+}
+
 void MapVectorOperations(const codegen::Operation &param,
                          std::deque<BaseParams *> &mappedParams,
                          std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
@@ -200,7 +216,7 @@ void MapVectorOperations(const codegen::Operation &param,
   }
 
   // Pad the shape to 6 dimensions with 1s
-  const int num_extra_dims = pad_shape_to_ndim(input_shape, 6);
+  int padded_dims = pad_shape_to_ndim(input_shape, 6);
 
   vector_params->addressGen0Loop[0][0] = input_shape[0];
   vector_params->addressGen0Loop[0][1] = input_shape[1];
@@ -214,21 +230,22 @@ void MapVectorOperations(const codegen::Operation &param,
     reshape_op = input.reshape();
   }
 
+  const auto reshape_kwargs = reshape_op.kwargs();
+
   if (reshape_op.target() == "slice") {
     vector_params->has_slicing = true;
 
-    const auto kwargs = reshape_op.kwargs();
-    uint64_t start = kwargs.at("start").int_value();
-    uint64_t end = kwargs.at("end").int_value();
-    uint64_t step = kwargs.at("step").int_value();
-    uint64_t dim = kwargs.at("dim").int_value();
+    uint64_t start = reshape_kwargs.at("start").int_value();
+    uint64_t end = reshape_kwargs.at("end").int_value();
+    uint64_t step = reshape_kwargs.at("step").int_value();
+    uint64_t dim = reshape_kwargs.at("dim").int_value();
 
     std::vector<int> shape(input.shape().begin(), input.shape().end());
 
     dim = dim < 0 ? dim + shape.size() : dim;
     end = end > shape[dim] ? shape[dim] : end;
 
-    vector_params->vec0_dim = dim + num_extra_dims;
+    vector_params->vec0_dim = dim + padded_dims;
     vector_params->vec0_start = start;
     vector_params->vec0_end = end;
     vector_params->vec0_step = step;
@@ -241,26 +258,107 @@ void MapVectorOperations(const codegen::Operation &param,
   }
 
   if (reshape_op.target() == "permute") {
-    vector_params->has_reshape = true;
+    const auto int_list = reshape_kwargs.at("dims").int_list().values();
+    std::vector<int> dims(int_list.begin(), int_list.end());
+    const int ndim = input.shape_size();
 
-    const auto dims = reshape_op.kwargs().at("dims").int_list().values();
+    if (is_transpose(dims)) {
+      vector_params->has_transpose = true;
+    } else if (dims[ndim - 1] == ndim - 1) {
+      vector_params->has_permute = true;
+    } else {
+      throw std::invalid_argument("Unsupported permute operation!");
+    }
+  } else if (reshape_op.target() == "transpose") {
+    int dim0 = reshape_kwargs.at("dim0").int_value();
+    int dim1 = reshape_kwargs.at("dim1").int_value();
+    if (dim0 > dim1) {
+      std::swap(dim0, dim1);
+    }
 
-    for (int i = 0; i < dims.size(); i++) {
-      vector_params->vec0_dim_order[i + num_extra_dims] =
-          dims[i] + num_extra_dims;
+    if (dim0 == input.shape_size() - 2 && dim1 == input.shape_size() - 1) {
+      vector_params->has_transpose = true;
+    } else if (dim1 != input.shape_size() - 1) {
+      vector_params->has_permute = true;
+    } else {
+      throw std::invalid_argument("Unsupported transpose operation!");
     }
   }
 
-  Tiling tiling;
-  if (reshape_op.target() == "transpose") {
-    vector_params->has_transpose = true;
+  if (vector_params->has_permute) {
+    std::vector<int> dims;
+    if (reshape_kwargs.contains("dims")) {
+      auto int_list = reshape_op.kwargs().at("dims").int_list().values();
+      dims = std::vector<int>(int_list.begin(), int_list.end());
 
+      for (int i = 0; i < dims.size(); i++) {
+        vector_params->vec0_dim_order[i + padded_dims] = dims[i] + padded_dims;
+      }
+    } else if (reshape_kwargs.contains("dim0") &&
+               reshape_kwargs.contains("dim1")) {
+      int dim0 = reshape_kwargs.at("dim0").int_value();
+      int dim1 = reshape_kwargs.at("dim1").int_value();
+      std::swap(vector_params->vec0_dim_order[dim0 + padded_dims],
+                vector_params->vec0_dim_order[dim1 + padded_dims]);
+    } else {
+      throw std::invalid_argument("Invalid permute arguments!");
+    }
+  }
+
+  // TODO: use tiling to set address generator
+  Tiling tiling;
+
+  if (vector_params->has_transpose) {
     // Only support a buffer size of 32
-    const int BUFFER_SIZE = 32;
+    const int BUFSIZE = 32;
     std::vector<int> input_shape(input.shape().begin(), input.shape().end());
-    int last_dim = input_shape.back();
-    input_shape.pop_back();
-    input_shape.push_back(last_dim / BUFFER_SIZE);
+    input_shape = squeeze_shape(input_shape);
+    int padded_dims = pad_shape_to_ndim(input_shape, 3);
+
+    // Transpose the input shape
+    std::swap(input_shape[1], input_shape[2]);
+
+    // Tiled access
+    vector_params->addressGen0Mode = 1;
+
+    int Y1 = input_shape[0];
+    int K1 = input_shape[2] / OC_DIMENSION;
+    int X1 = input_shape[1] / BUFSIZE;
+    int X0 = OC_DIMENSION;
+
+    tiling = {
+        .loops = {{Y1, X1, K1, 1, 1, 1}, {1, 1, 1, 1, 1, X0}},
+        .x_loop_index = {1, 5},
+        .y_loop_index = {0, 4},
+        .weight_loop_index = {2, 1},
+    };
+
+    for (int i = 0; i < 3; i++) {
+      vector_params->addressGen0Loop[0][i] = tiling.loops[0][i];
+    }
+    vector_params->addressGen0InputYLoopIndex[0] = tiling.y_loop_index[0];
+    vector_params->addressGen0InputXLoopIndex[0] = tiling.x_loop_index[0];
+    vector_params->addressGen0WeightLoopIndex[0] = tiling.weight_loop_index[0];
+
+    int loop_index = 0;
+    for (int i = 0; i < 6; i++) {
+      // ignore the loops not present in outputs (reduction, fx, fy)
+      if (i == tiling.y_loop_index[1]) {
+        vector_params->addressGen0Loop[1][loop_index] = tiling.loops[1][i];
+        vector_params->addressGen0InputYLoopIndex[1] = loop_index++;
+      }
+      if (i == tiling.x_loop_index[1]) {
+        vector_params->addressGen0Loop[1][loop_index] = tiling.loops[1][i];
+        vector_params->addressGen0InputXLoopIndex[1] = loop_index++;
+      }
+      if (i == tiling.weight_loop_index[1]) {
+        vector_params->addressGen0Loop[1][loop_index] = tiling.loops[1][i];
+        vector_params->addressGen0WeightLoopIndex[1] = loop_index++;
+      }
+    }
+
+    // Adjust for output loops
+    tiling.loops[1][5] = BUFSIZE;
   }
 
   VECTOR_DATATYPE scale = 1.0;
@@ -294,6 +392,35 @@ void MapVectorOperations(const codegen::Operation &param,
   vector_params->outputLoops[1][0] = output_shape[3];
   vector_params->outputLoops[1][1] = output_shape[4];
   vector_params->outputLoops[1][2] = output_shape[5] / OC_DIMENSION;
+
+  if (vector_params->has_transpose) {
+    vector_params->outputAddressMode = 1;
+
+    // Set outer loops
+    for (int i = 0; i < 3; i++) {
+      vector_params->outputLoops[0][i] = tiling.loops[0][i];
+    }
+    vector_params->outputYLoopIndex[0] = tiling.y_loop_index[0];
+    vector_params->outputXLoopIndex[0] = tiling.x_loop_index[0];
+    vector_params->outputWeightLoopIndex[0] = tiling.weight_loop_index[0];
+
+    // Set inner loops
+    int loop_index = 0;
+    for (int i = 0; i < 6; i++) {
+      if (i == tiling.y_loop_index[1]) {
+        vector_params->outputLoops[1][loop_index] = tiling.loops[1][i];
+        vector_params->outputYLoopIndex[1] = loop_index++;
+      }
+      if (i == tiling.x_loop_index[1]) {
+        vector_params->outputLoops[1][loop_index] = tiling.loops[1][i];
+        vector_params->outputXLoopIndex[1] = loop_index++;
+      }
+      if (i == tiling.weight_loop_index[1]) {
+        vector_params->outputLoops[1][loop_index] = tiling.loops[1][i];
+        vector_params->outputWeightLoopIndex[1] = loop_index++;
+      }
+    }
+  }
 
   vector_params->output_vector_type =
       output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();

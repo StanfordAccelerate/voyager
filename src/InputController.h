@@ -267,9 +267,8 @@ SC_MODULE(InputController) {
                                     (x << head_size) + (c & mask);
                         }
 
-                        // FIXME: is this correct?
                         if (params.has_input_transpose) {
-                          address = (c + (x % 16)) * X + (x / 16) * NRows;
+                          address = (c + (x % NRows)) * X + (x / NRows) * NRows;
                         }
 
                         MemoryRequest request = {

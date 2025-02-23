@@ -306,24 +306,26 @@ void MapMatrixOperation(const codegen::Operation &param,
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
 
+  // Set outer loops
   for (int i = 0; i < 3; i++) {
     vector_params->outputLoops[0][i] = tiling.loops[0][i];
   }
-  vector_params->outputXLoopIndex[0] = tiling.x_loop_index[0];
   vector_params->outputYLoopIndex[0] = tiling.y_loop_index[0];
+  vector_params->outputXLoopIndex[0] = tiling.x_loop_index[0];
   vector_params->outputWeightLoopIndex[0] = tiling.weight_loop_index[0];
 
+  // Set inner loops
   int outputLoopIndex = 0;
   for (int i = 0; i < 6; i++) {
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
         i == tiling.y_loop_index[1]) {
       vector_params->outputLoops[1][outputLoopIndex] = tiling.loops[1][i];
-      if (i == tiling.x_loop_index[1]) {
-        vector_params->outputXLoopIndex[1] = outputLoopIndex;
-      }
       if (i == tiling.y_loop_index[1]) {
         vector_params->outputYLoopIndex[1] = outputLoopIndex;
+      }
+      if (i == tiling.x_loop_index[1]) {
+        vector_params->outputXLoopIndex[1] = outputLoopIndex;
       }
       if (i == tiling.weight_loop_index[1]) {
         vector_params->outputWeightLoopIndex[1] = outputLoopIndex;

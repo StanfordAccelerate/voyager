@@ -31,9 +31,6 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse2Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse1Params);
 
-  Connections::Combinational<VectorParams> CCS_INIT_S1(transposer_params);
-  Connections::Combinational<Pack1D<Vector, Width>> CCS_INIT_S1(transposer_out);
-
   static constexpr int BUFSIZE = Width < 32 ? Width : 32;
 
   SC_CTOR(VectorFetchUnit) {
@@ -62,10 +59,6 @@ SC_MODULE(VectorFetchUnit) {
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(feed_data_response_2);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
-    SC_THREAD(transposer);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -101,7 +94,7 @@ SC_MODULE(VectorFetchUnit) {
         loop_starts[i][j] = params.vec0_start;
         loop_ends[i][j] = params.vec0_end;
         loop_steps[i][j] = params.vec0_step;
-      } else if (params.has_reshape) {
+      } else if (params.has_permute) {
 #pragma hls_unroll yes
         for (int dim = 0; dim < 6; dim++) {
           int i = dim >= 3 ? 1 : 0;
@@ -176,7 +169,9 @@ SC_MODULE(VectorFetchUnit) {
                     ac_int<16, false> Y = Y1 * Y0;
 
                     if (params.has_transpose) {
-                      address = y * K * X + (k + x0) * X + x1 * X0;
+                      // address = y * K * X + (k + x0) * X + x1 * X0;
+                      address = y * K * X + (k + x % BUFSIZE) * X +
+                                (x / BUFSIZE) * Width;
                     } else {
                       address = y * X * K + x * K + k;
                     }
@@ -202,7 +197,7 @@ SC_MODULE(VectorFetchUnit) {
                       }
                     }
 
-                    if (params.has_reshape) {
+                    if (params.has_permute) {
                       ac_int<11, false> permuted_indices[6];
 #pragma hls_unroll yes
                       for (int i = 0; i < 6; i++) {
@@ -302,50 +297,92 @@ SC_MODULE(VectorFetchUnit) {
         loop_steps[i][j] = params.vec0_step;
       }
 
-#pragma hls_pipeline_init_interval 1
-      for (loop_counters[0][0] = loop_starts[0][0];
-           loop_counters[0][0] < loop_ends[0][0];
-           loop_counters[0][0] += loop_steps[0][0]) {
-        for (loop_counters[0][1] = loop_starts[0][1];
-             loop_counters[0][1] < loop_ends[0][1];
-             loop_counters[0][1] += loop_steps[0][1]) {
-          for (loop_counters[0][2] = loop_starts[0][2];
-               loop_counters[0][2] < loop_ends[0][2];
-               loop_counters[0][2] += loop_steps[0][2]) {
-            for (loop_counters[1][0] = loop_starts[1][0];
-                 loop_counters[1][0] < loop_ends[1][0];
-                 loop_counters[1][0] += loop_steps[1][0]) {
-              for (loop_counters[1][1] = loop_starts[1][1];
-                   loop_counters[1][1] < loop_ends[1][1];
-                   loop_counters[1][1] += loop_steps[1][1]) {
-                for (loop_counters[1][2] = loop_starts[1][2];
-                     loop_counters[1][2] < loop_ends[1][2];
-                     loop_counters[1][2] += loop_steps[1][2]) {
-                  vectorFetch0DataResponseConverted.Push(transposer_out.Pop());
+      if (params.has_transpose) {
+        Vector buffer[BUFSIZE][Width];
 
-                  if (loop_counters[1][2] >=
-                      loop_ends[1][2] - loop_steps[1][2]) {
-                    break;
+        assert(loop_ends[1][2] == BUFSIZE);
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_ends[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_ends[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_ends[0][2];
+                 loop_counters[0][2]++) {
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_ends[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_ends[1][1];
+                     loop_counters[1][1]++) {
+                  for (int col = 0; col < Width; col++) {
+                    Pack1D<Vector, Width> converted_response;
+                    if (params.fetch_vector_type_0) {
+                      constexpr int num_words = Vector::width / Input::width;
+
+                      Pack1D<Input, Width> response[num_words];
+
+                      for (int i = 0; i < num_words; i++) {
+                        response[i] = vectorFetch0DataResponse.Pop();
+                      }
+                      convertPack1D<Input, Vector, Width>(response,
+                                                          converted_response);
+                    } else {
+                      Pack1D<Input, Width> response =
+                          vectorFetch0DataResponse.Pop();
+                      vdequantize<Input, Vector, Width>(
+                          response, converted_response, params.vec0_dq_scale);
+                    }
+
+                    // We may not use all the data in the response
+#pragma hls_unroll yes
+                    for (int row = 0; row < BUFSIZE; row++) {
+                      buffer[row][col] = converted_response[row];
+                    }
+                  }
+
+                  // Write out from transpose buffer
+                  for (int row = 0; row < BUFSIZE; row++) {
+                    Pack1D<Vector, Width> transposed;
+#pragma hls_unroll yes
+                    for (int col = 0; col < Width; col++) {
+                      transposed[col] = buffer[row][col];
+                    }
+
+                    vectorFetch0DataResponseConverted.Push(transposed);
                   }
                 }
-                if (loop_counters[1][1] >= loop_ends[1][1] - loop_steps[1][1]) {
-                  break;
-                }
-              }
-              if (loop_counters[1][0] >= loop_ends[1][0] - loop_steps[1][0]) {
-                break;
               }
             }
-            if (loop_counters[0][2] >= loop_ends[0][2] - loop_steps[0][2]) {
-              break;
-            }
-          }
-          if (loop_counters[0][1] >= loop_ends[0][1] - loop_steps[0][1]) {
-            break;
           }
         }
-        if (loop_counters[0][0] >= loop_ends[0][0] - loop_steps[0][0]) {
-          break;
+      } else {
+        // passthrough
+        ac_int<32, false> num_writes = loop_ends[0][0] * loop_ends[0][1] *
+                                       loop_ends[0][2] * loop_ends[1][0] *
+                                       loop_ends[1][1] * loop_ends[1][2];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (int i = 0; i < num_writes; i++) {
+          Pack1D<Vector, Width> converted_response;
+          if (params.fetch_vector_type_0) {
+            constexpr int num_words = Vector::width / Input::width;
+
+            Pack1D<Input, Width> response[num_words];
+
+            for (int i = 0; i < num_words; i++) {
+              response[i] = vectorFetch0DataResponse.Pop();
+            }
+            convertPack1D<Input, Vector, Width>(response, converted_response);
+          } else {
+            Pack1D<Input, Width> response = vectorFetch0DataResponse.Pop();
+            vdequantize<Input, Vector, Width>(response, converted_response,
+                                              params.vec0_dq_scale);
+          }
+
+          vectorFetch0DataResponseConverted.Push(converted_response);
         }
       }
     }
@@ -808,127 +845,6 @@ SC_MODULE(VectorFetchUnit) {
     }
   }
 
-  void transposer() {
-    transposer_params.ResetRead();
-    vectorFetch0DataResponse.Reset();
-    transposer_out.ResetWrite();
-
-    wait();
-
-    while (true) {
-      VectorParams params = transposer_params.Pop();
-
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_bounds[2][3];
-
-#pragma hls_unroll yes
-      for (int i = 0; i < 2; i++) {
-#pragma hls_unroll yes
-        for (int j = 0; j < 3; j++) {
-          loop_bounds[i][j] = params.addressGen0Loop[i][j];
-        }
-      }
-
-      // FIXME: do not use division
-      if (params.has_slicing) {
-        int slice_dim = params.vec0_dim;
-        int i = slice_dim >= 3 ? 1 : 0;
-        int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
-        loop_bounds[i][j] =
-            (params.vec0_end - params.vec0_start) / params.vec0_step;
-      }
-
-      if (params.has_transpose) {
-        Vector buffer[BUFSIZE][Width];
-
-        assert(loop_bounds[1][2] == BUFSIZE);
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (int col = 0; col < Width; col++) {
-                    Pack1D<Vector, Width> converted_response;
-                    if (params.fetch_vector_type_0) {
-                      constexpr int num_words = Vector::width / Input::width;
-
-                      Pack1D<Input, Width> response[num_words];
-
-                      for (int i = 0; i < num_words; i++) {
-                        response[i] = vectorFetch0DataResponse.Pop();
-                      }
-                      convertPack1D<Input, Vector, Width>(response,
-                                                          converted_response);
-                    } else {
-                      Pack1D<Input, Width> response =
-                          vectorFetch0DataResponse.Pop();
-                      vdequantize<Input, Vector, Width>(
-                          response, converted_response, params.vec0_dq_scale);
-                    }
-
-                    // We are wasting some data here
-#pragma hls_unroll yes
-                    for (int row = 0; row < BUFSIZE; row++) {
-                      buffer[row][col] = converted_response[row];
-                    }
-                  }
-
-                  // Write out from transpose buffer
-                  for (int row = 0; row < BUFSIZE; row++) {
-                    Pack1D<Vector, Width> transposed;
-#pragma hls_unroll yes
-                    for (int dim = 0; dim < Width; dim++) {
-                      transposed[dim] = buffer[row][dim];
-                    }
-                    transposer_out.Push(transposed);
-                  }
-                }
-              }
-            }
-          }
-        }
-      } else {
-        // passthrough
-        ac_int<32, false> num_writes = loop_bounds[0][0] * loop_bounds[0][1] *
-                                       loop_bounds[0][2] * loop_bounds[1][0] *
-                                       loop_bounds[1][1] * loop_bounds[1][2];
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < num_writes; i++) {
-          Pack1D<Vector, Width> converted_response;
-          if (params.fetch_vector_type_0) {
-            constexpr int num_words = Vector::width / Input::width;
-
-            Pack1D<Input, Width> response[num_words];
-
-            for (int i = 0; i < num_words; i++) {
-              response[i] = vectorFetch0DataResponse.Pop();
-            }
-            convertPack1D<Input, Vector, Width>(response, converted_response);
-          } else {
-            Pack1D<Input, Width> response = vectorFetch0DataResponse.Pop();
-            vdequantize<Input, Vector, Width>(response, converted_response,
-                                              params.vec0_dq_scale);
-          }
-
-          transposer_out.Push(converted_response);
-        }
-      }
-    }
-  }
-
   void read_params() {
     paramsIn.Reset();
 
@@ -940,8 +856,6 @@ SC_MODULE(VectorFetchUnit) {
     dataResponse1Params.ResetWrite();
     dataResponse2Params.ResetWrite();
 
-    transposer_params.ResetWrite();
-
     wait();
 
     while (true) {
@@ -950,7 +864,6 @@ SC_MODULE(VectorFetchUnit) {
       if (params.addressGen0Mode != 0) {
         addressGen0Params.Push(params);
         dataResponse0Params.Push(params);
-        transposer_params.Push(params);
       }
 
       if (params.addressGen1Mode != 0) {

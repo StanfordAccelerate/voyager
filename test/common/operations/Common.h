@@ -33,11 +33,3 @@ inline int get_flat_index(const std::vector<int> &indices,
   }
   return flat_idx;
 }
-
-inline void print_shape(const std::vector<int> &shape) {
-  std::cerr << "(";
-  for (size_t i = 0; i < shape.size(); ++i) {
-    std::cerr << shape[i] << (i + 1 < shape.size() ? ", " : ")");
-  }
-  std::cerr << std::endl;
-}

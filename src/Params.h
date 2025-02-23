@@ -572,7 +572,7 @@ struct VectorParams : BaseParams {
     vec0_end = 0;
     vec0_step = 0;
 
-    has_reshape = false;
+    has_permute = false;
     for (int i = 0; i < 6; i++) {
       vec0_dim_order[i] = i;
     }
@@ -639,7 +639,7 @@ struct VectorParams : BaseParams {
   ac_int<11, false> vec0_end;
   ac_int<11, false> vec0_step;
 
-  bool has_reshape;
+  bool has_permute;
   ac_int<3, false> vec0_dim_order[6];
 
   bool has_transpose;
@@ -757,7 +757,7 @@ struct VectorParams : BaseParams {
     m & vec0_end;
     m & vec0_step;
 
-    m & has_reshape;
+    m & has_permute;
     for (int i = 0; i < 6; i++) {
       m& vec0_dim_order[i];
     }
@@ -882,7 +882,7 @@ struct VectorParams : BaseParams {
     os << "vec0_end: " << params.vec0_end << std::endl;
     os << "vec0_step: " << params.vec0_step << std::endl;
 
-    os << "has_reshape: " << params.has_reshape << std::endl;
+    os << "has_permute: " << params.has_permute << std::endl;
     for (int i = 0; i < 6; i++) {
       os << "vec0_dim_order[" << i << "]: " << params.vec0_dim_order[i]
          << std::endl;
@@ -995,7 +995,7 @@ struct VectorParams : BaseParams {
     if (lhs.vec0_end != rhs.vec0_end) return false;
     if (lhs.vec0_step != rhs.vec0_step) return false;
 
-    if (lhs.has_reshape != rhs.has_reshape) return false;
+    if (lhs.has_permute != rhs.has_permute) return false;
     for (int i = 0; i < 6; i++) {
       if (lhs.vec0_dim_order[i] != rhs.vec0_dim_order[i]) return false;
     }

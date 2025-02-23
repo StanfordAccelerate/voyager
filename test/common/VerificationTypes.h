@@ -99,6 +99,14 @@ inline long get_size(const codegen::Tensor& tensor) {
   return get_size(shape);
 }
 
+inline void print_shape(const std::vector<int>& shape) {
+  std::cerr << "(";
+  for (size_t i = 0; i < shape.size(); ++i) {
+    std::cerr << shape[i] << (i + 1 < shape.size() ? ", " : ")");
+  }
+  std::cerr << std::endl;
+}
+
 inline std::vector<codegen::OpOverload> get_op_list(
     const codegen::Operation& param) {
   std::vector<codegen::OpOverload> ops;
