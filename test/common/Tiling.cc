@@ -273,12 +273,21 @@ Tiling get_conv2d_tiling(codegen::Operator param) {
   if (IH == 224 && IW == 224 && IC == 3 && KH == 7 && KW == 7 &&
       OC == 64) {  // conv1
 
-    tiling = {.loops = {{7, 7, 2, 1, 1, 1},
-                        {1, 2, 7,
-                         (IC_DIMENSION == 16   ? 2
-                          : IC_DIMENSION == 32 ? 1
-                                               : 7),
-                         16, 16}},
+    int fx;
+    if (IC_DIMENSION == 4) {
+      fx = 7;
+    } else if (IC_DIMENSION == 8) {
+      fx = 4;
+    } else if (IC_DIMENSION == 16) {
+      fx = 2;
+    } else if (IC_DIMENSION == 32) {
+      fx = 1;
+    } else {
+      throw std::runtime_error("replication not supported for IC_DIMENSION=" +
+                               std::to_string(IC_DIMENSION));
+    }
+
+    tiling = {.loops = {{7, 7, 2, 1, 1, 1}, {1, 2, 7, fx, 16, 16}},
               .x_loop_index = {0, 5},
               .y_loop_index = {1, 4},
               .reduction_loop_index = {3, 0},
@@ -710,19 +719,19 @@ Tiling get_conv2d_tiling(codegen::Operator param) {
 
 void adjust_tiling_for_dimension(Tiling& tiling) {
   // adjust loop counters for dimension != 16
-  if (IC_DIMENSION < 16) {
-    tiling.loops[0][tiling.reduction_loop_index[0]] *= (16 / IC_DIMENSION);
-  } else if (IC_DIMENSION > 16) {
-    if (!tiling.replication) {
-      tiling.loops[0][tiling.reduction_loop_index[0]] /= (IC_DIMENSION / 16);
-    }
-  }
-
   if (!tiling.replication) {
+    if (IC_DIMENSION < 16) {
+      tiling.loops[1][tiling.reduction_loop_index[1]] *= (16 / IC_DIMENSION);
+    } else if (IC_DIMENSION > 16) {
+      tiling.loops[1][tiling.reduction_loop_index[1]] /= (IC_DIMENSION / 16);
+    }
+
     // adjust loop counters for weight buffer constraint
-    while (tiling.loops[1][tiling.fx_index] * tiling.loops[1][tiling.fy_index] *
-               tiling.loops[1][tiling.weight_loop_index[1]] * IC_DIMENSION >
-           WEIGHT_BUFFER_SIZE) {
+    const int buffer_depth = tiling.loops[1][tiling.fx_index] *
+                             tiling.loops[1][tiling.fy_index] * IC_DIMENSION;
+    while (buffer_depth * tiling.loops[1][tiling.weight_loop_index[1]] >
+               WEIGHT_BUFFER_SIZE &&
+           tiling.loops[1][tiling.weight_loop_index[1]] > 1) {
       tiling.loops[1][tiling.weight_loop_index[1]] /= 2;
       tiling.loops[0][tiling.weight_loop_index[0]] *= 2;
     }
