@@ -6,7 +6,7 @@
 #include "AccelTypes.h"
 #include "ParamsDeserializer.h"
 
-template <typename DTYPE, int NROWS>
+template <typename Input, int NRows>
 SC_MODULE(InputController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -14,19 +14,19 @@ SC_MODULE(InputController) {
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(dataResponse);
+  Connections::In<Pack1D<Input, NRows> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<DTYPE, NROWS> > writeRequest[2];
+  Connections::Out<BufferWriteRequest<Input, NRows> > writeRequest[2];
   Connections::Out<ac_int<32, false> > writeControl[2];
   Connections::Out<ac_int<16, false> > readAddress[2];
   Connections::Out<ac_int<32, false> > readControl[2];
 
-  Connections::In<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferIn);
+  Connections::In<Pack1D<Input, NRows> > CCS_INIT_S1(windowBufferIn);
 
 #ifdef HYBRID_FP8
-  Connections::Out<Pack1D<HYBRID_TYPE, NROWS> > CCS_INIT_S1(windowBufferOut);
+  Connections::Out<Pack1D<HYBRID_TYPE, NRows> > CCS_INIT_S1(windowBufferOut);
 #else
-  Connections::Out<Pack1D<DTYPE, NROWS> > CCS_INIT_S1(windowBufferOut);
+  Connections::Out<Pack1D<Input, NRows> > CCS_INIT_S1(windowBufferOut);
 #endif
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
@@ -36,7 +36,7 @@ SC_MODULE(InputController) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(windowBufferParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
 
-  Connections::Combinational<Pack1D<DTYPE, NROWS> > transposeOut;
+  Connections::Combinational<Pack1D<Input, NRows> > transposeOut;
 
   MatrixParamsDeserializer<0> CCS_INIT_S1(paramsDeserializer);
 
@@ -247,8 +247,8 @@ SC_MODULE(InputController) {
                           ac_int<LOOP_WIDTH, false> C2 =
                               params.loops[0][params.reductionLoopIndex[0]];
 
-                          ac_int<16, false> c = c2 * C1 * NROWS + c1 * NROWS;
-                          ac_int<16, false> C = C2 * C1 * NROWS;
+                          ac_int<16, false> c = c2 * C1 * NRows + c1 * NRows;
+                          ac_int<16, false> C = C2 * C1 * NRows;
 
                           if (isDownsample) {
                             // adjust address for stride
@@ -272,7 +272,7 @@ SC_MODULE(InputController) {
                           ac_int<16, false> Y = Y0 * Y1;
 
                           ac_int<32, false> baseAddress = y * X * C + x * C + c;
-                          int burstSize = NROWS;
+                          int burstSize = NRows;
 
                           if (params.REPLICATION) {
                             baseAddress =
@@ -295,8 +295,8 @@ SC_MODULE(InputController) {
 
                           MemoryRequest memRequest;
                           memRequest = {params.INPUT_OFFSET +
-                                            baseAddress * (DTYPE::width / 8),
-                                        burstSize * (DTYPE::width / 8)};
+                                            baseAddress * (Input::width / 8),
+                                        burstSize * (Input::width / 8)};
 
                           addressRequest.Push(memRequest);
 
@@ -512,14 +512,14 @@ SC_MODULE(InputController) {
                             full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
                           }
 
-                          Pack1D<DTYPE, NROWS> data;
+                          Pack1D<Input, NRows> data;
 
                           if ((full_x < 0) || (full_y < 0) ||
                               (full_x >= STRIDE * X0 * X1) ||
                               (full_y >= STRIDE * Y0 * Y1)) {
 #pragma hls_unroll yes
-                            for (int dims = 0; dims < NROWS; dims++) {
-                              data[dims].setZero();
+                            for (int dims = 0; dims < NRows; dims++) {
+                              data[dims].set_zero();
                             }
                           } else {
                             data = transposeOut.Pop();
@@ -548,7 +548,7 @@ SC_MODULE(InputController) {
                               (loop_counters[1][4] == loop_bounds[1][4] - 1) &&
                               (loop_counters[1][5] == loop_bounds[1][5] - 1);
                           // writeControl[bankSel].Push(!swapBank);
-                          BufferWriteRequest<DTYPE, NROWS> req;
+                          BufferWriteRequest<Input, NRows> req;
                           req.address = address;
                           req.data = data;
                           writeRequest[bankSel].Push(req);
@@ -839,7 +839,7 @@ SC_MODULE(InputController) {
         shiftFactor = 2;
       }
 
-      if (params.REPLICATION && IC_DIMENSION >= 16) {
+      if (params.REPLICATION && (IC_DIMENSION == 16 || IC_DIMENSION == 32)) {
         // #pragma hls_pipeline_init_interval 1
         // #pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -868,9 +868,9 @@ SC_MODULE(InputController) {
                         for (loop_counters[1][4] = 0;
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
-                          Pack1D<DTYPE, NROWS> data;
+                          Pack1D<Input, NRows> data;
 
-                          Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
+                          Pack1D<Input, NRows> buffer = windowBufferIn.Pop();
 #pragma hls_unroll yes
                           for (int x = 0; x < 3; x++) {
 #pragma hls_unroll yes
@@ -976,14 +976,14 @@ SC_MODULE(InputController) {
                         for (loop_counters[1][4] = 0;
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
-                          Pack1D<DTYPE, NROWS> buffer = windowBufferIn.Pop();
+                          Pack1D<Input, NRows> buffer = windowBufferIn.Pop();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
                           for (loop_counters[1][5] = 0;
                                loop_counters[1][5] < loop_bounds[1][5];
                                loop_counters[1][5]++) {
-                            Pack1D<DTYPE, NROWS> data;
+                            Pack1D<Input, NRows> data;
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
                               data[dim] = buffer[3 + dim];
@@ -1073,8 +1073,8 @@ SC_MODULE(InputController) {
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
-      if (params.TRANPOSE_INPUTS) {
-        INPUT_DATATYPE transposeBuffer[NROWS][NROWS];
+      if (params.TRANPOSE_INPUTS && IC_DIMENSION <= 32) {
+        Input transposeBuffer[NRows][NRows];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -1105,25 +1105,25 @@ SC_MODULE(InputController) {
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
                           // innermost loop must be X0, and must be a multiple
-                          // of NROWS
+                          // of NRows
                           for (loop_counters[1][5] = 0;
-                               loop_counters[1][5] < loop_bounds[1][5] / NROWS;
+                               loop_counters[1][5] < loop_bounds[1][5] / NRows;
                                loop_counters[1][5]++) {
-                            for (int c0 = 0; c0 < NROWS; c0++) {
-                              Pack1D<DTYPE, NROWS> originalValue =
+                            for (int c0 = 0; c0 < NRows; c0++) {
+                              Pack1D<Input, NRows> originalValue =
                                   dataResponse.Pop();
 #pragma hls_unroll yes
-                              for (int dim = 0; dim < NROWS; dim++) {
+                              for (int dim = 0; dim < NRows; dim++) {
                                 transposeBuffer[dim][c0] = originalValue[dim];
                               }
                             }
 
                             // Write out from tranposeBuffer
-                            for (int c0 = 0; c0 < NROWS; c0++) {
-                              Pack1D<DTYPE, NROWS> transposedValue;
+                            for (int c0 = 0; c0 < NRows; c0++) {
+                              Pack1D<Input, NRows> transposedValue;
 
 #pragma hls_unroll yes
-                              for (int dim = 0; dim < NROWS; dim++) {
+                              for (int dim = 0; dim < NRows; dim++) {
                                 transposedValue[dim] = transposeBuffer[c0][dim];
                               }
                               transposeOut.Push(transposedValue);

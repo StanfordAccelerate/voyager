@@ -76,8 +76,8 @@ SC_MODULE(Harness) {
 #if SUPPORT_MX
   Connections::ConditionalCombinational<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
       inputScaleAddressRequest);
-  sc_fifo<Pack1D<INPUT_DATATYPE, 1> > inputScaleDataResponse_fifo;
-  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, 1>, SUPPORT_MX>
+  sc_fifo<Pack1D<SCALE_DATATYPE, 1> > inputScaleDataResponse_fifo;
+  Connections::ConditionalCombinational<Pack1D<SCALE_DATATYPE, 1>, SUPPORT_MX>
       CCS_INIT_S1(inputScaleDataResponse);
 #endif
 
@@ -89,8 +89,8 @@ SC_MODULE(Harness) {
 #if SUPPORT_MX
   Connections::ConditionalCombinational<MemoryRequest, SUPPORT_MX> CCS_INIT_S1(
       weightScaleAddressRequest);
-  sc_fifo<Pack1D<INPUT_DATATYPE, OC_DIMENSION> > weightScaleDataResponse_fifo;
-  Connections::ConditionalCombinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION>,
+  sc_fifo<Pack1D<SCALE_DATATYPE, OC_DIMENSION> > weightScaleDataResponse_fifo;
+  Connections::ConditionalCombinational<Pack1D<SCALE_DATATYPE, OC_DIMENSION>,
                                         SUPPORT_MX>
       CCS_INIT_S1(weightScaleDataResponse);
 #endif
@@ -142,15 +142,13 @@ SC_MODULE(Harness) {
   Accelerator CCS_INIT_S1(accelerator);
 #endif
 
-  template <long unsigned int DIMENSION>
-  void readMemoryRequest(
-      CombinationalInterface<MemoryRequest> * addressRequest,
-      sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse_fifo);
-  template <long unsigned int DIMENSION>
+  template <typename Input, long unsigned int Dim>
+  void readMemoryRequest(CombinationalInterface<MemoryRequest> * addressRequest,
+                         sc_fifo<Pack1D<Input, Dim> > * dataResponse_fifo);
+  template <typename Input, long unsigned int Dim>
   void sendMemoryResponse(
-      sc_fifo<Pack1D<INPUT_DATATYPE, DIMENSION> > * dataResponse_fifo,
-      CombinationalInterface<Pack1D<INPUT_DATATYPE, DIMENSION> > *
-          dataResponse);
+      sc_fifo<Pack1D<Input, Dim> > * dataResponse_fifo,
+      CombinationalInterface<Pack1D<Input, Dim> > * dataResponse);
 
   void readSingleMemoryRequest(
       CombinationalInterface<MemoryRequest> * addressRequest,

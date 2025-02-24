@@ -3,17 +3,16 @@
 /*
  * Performs bias, residual, maxpool and avgpool operations
  */
-template <typename VEC_DTYPE, typename IO_DTYPE, typename MX_DTYPE, int WIDTH>
+template <typename VEC_DTYPE, typename IO_DTYPE, typename Scale, int WIDTH>
 SC_MODULE(MaxpoolUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(paramsIn);
-  Connections::In<Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH> >
-      CCS_INIT_S1(tensorIn);
+  Connections::In<Pack1D<VEC_DTYPE, WIDTH> > CCS_INIT_S1(tensorIn);
   Connections::Out<Pack1D<IO_DTYPE, WIDTH> > CCS_INIT_S1(tensorOut);
 
-  Connections::In<MX_DTYPE> CCS_INIT_S1(mxScaleIn);
+  Connections::In<Scale> CCS_INIT_S1(mxScaleIn);
 
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
@@ -51,63 +50,61 @@ SC_MODULE(MaxpoolUnit) {
         loop_bounds[1][params.outputYLoopIndex[1]] = 1;
       }
 
-      if (params.DP_OUTPUT) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    ac_int<11, false> x0 =
-                        loop_counters[1][params.outputXLoopIndex[1]];
-                    ac_int<11, false> x1 =
-                        loop_counters[0][params.outputXLoopIndex[0]];
-                    ac_int<11, false> y0 =
-                        loop_counters[1][params.outputYLoopIndex[1]];
-                    ac_int<11, false> y1 =
-                        loop_counters[0][params.outputYLoopIndex[0]];
-                    ac_int<11, false> k1 =
-                        loop_counters[1][params.outputWeightLoopIndex[1]];
-                    ac_int<11, false> k2 =
-                        loop_counters[0][params.outputWeightLoopIndex[0]];
+      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
+           loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
+             loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
+               loop_counters[0][2]++) {
+            for (loop_counters[1][0] = 0;
+                 loop_counters[1][0] < loop_bounds[1][0];
+                 loop_counters[1][0]++) {
+              for (loop_counters[1][1] = 0;
+                   loop_counters[1][1] < loop_bounds[1][1];
+                   loop_counters[1][1]++) {
+                for (loop_counters[1][2] = 0;
+                     loop_counters[1][2] < loop_bounds[1][2];
+                     loop_counters[1][2]++) {
+                  ac_int<11, false> x0 =
+                      loop_counters[1][params.outputXLoopIndex[1]];
+                  ac_int<11, false> x1 =
+                      loop_counters[0][params.outputXLoopIndex[0]];
+                  ac_int<11, false> y0 =
+                      loop_counters[1][params.outputYLoopIndex[1]];
+                  ac_int<11, false> y1 =
+                      loop_counters[0][params.outputYLoopIndex[0]];
+                  ac_int<11, false> k1 =
+                      loop_counters[1][params.outputWeightLoopIndex[1]];
+                  ac_int<11, false> k2 =
+                      loop_counters[0][params.outputWeightLoopIndex[0]];
 
-                    ac_int<11, false> X0 =
-                        params.outputLoops[1][params.outputXLoopIndex[1]];
-                    ac_int<11, false> X1 =
-                        params.outputLoops[0][params.outputXLoopIndex[0]];
-                    ac_int<11, false> Y0 =
-                        params.outputLoops[1][params.outputYLoopIndex[1]];
-                    ac_int<11, false> Y1 =
-                        params.outputLoops[0][params.outputYLoopIndex[0]];
-                    ac_int<11, false> K1 =
-                        params.outputLoops[1][params.outputWeightLoopIndex[1]];
-                    ac_int<11, false> K2 =
-                        params.outputLoops[0][params.outputWeightLoopIndex[0]];
+                  ac_int<11, false> X0 =
+                      params.outputLoops[1][params.outputXLoopIndex[1]];
+                  ac_int<11, false> X1 =
+                      params.outputLoops[0][params.outputXLoopIndex[0]];
+                  ac_int<11, false> Y0 =
+                      params.outputLoops[1][params.outputYLoopIndex[1]];
+                  ac_int<11, false> Y1 =
+                      params.outputLoops[0][params.outputYLoopIndex[0]];
+                  ac_int<11, false> K1 =
+                      params.outputLoops[1][params.outputWeightLoopIndex[1]];
+                  ac_int<11, false> K2 =
+                      params.outputLoops[0][params.outputWeightLoopIndex[0]];
 
-                    ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
-                    ac_int<16, false> K = K2 * K1 * WIDTH;
+                  ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
+                  ac_int<16, false> K = K2 * K1 * WIDTH;
 
-                    ac_int<16, false> x = x0 + x1 * X0;
-                    ac_int<16, false> X = X0 * X1;
+                  ac_int<16, false> x = x0 + x1 * X0;
+                  ac_int<16, false> X = X0 * X1;
 
-                    ac_int<16, false> y = y0 + y1 * Y0;
-                    ac_int<16, false> Y = Y0 * Y1;
+                  ac_int<16, false> y = y0 + y1 * Y0;
+                  ac_int<16, false> Y = Y0 * Y1;
 
-                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
-                        uncastedOutputPixel = tensorIn.Pop();
+                  Pack1D<VEC_DTYPE, WIDTH> uncastedOutputPixel = tensorIn.Pop();
 
+                  if (params.DP_OUTPUT) {
                     constexpr int num_words =
                         VEC_DTYPE::width / IO_DTYPE::width;
                     Pack1D<IO_DTYPE, WIDTH> outputPixel[num_words];
@@ -118,157 +115,51 @@ SC_MODULE(MaxpoolUnit) {
                     for (int word = 0; word < num_words; word++) {
                       tensorOut.Push(outputPixel[word]);
                     }
-
-                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
-                      break;
-                    }
-                  }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
-                    break;
-                  }
-                }
-                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
-                  break;
-                }
-              }
-              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
-                break;
-              }
-            }
-            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
-              break;
-            }
-          }
-          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
-            break;
-          }
-        }
-      } else {
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    ac_int<11, false> x0 =
-                        loop_counters[1][params.outputXLoopIndex[1]];
-                    ac_int<11, false> x1 =
-                        loop_counters[0][params.outputXLoopIndex[0]];
-                    ac_int<11, false> X0 =
-                        params.outputLoops[1][params.outputXLoopIndex[1]];
-                    ac_int<11, false> X1 =
-                        params.outputLoops[0][params.outputXLoopIndex[0]];
-                    ac_int<11, false> y0 =
-                        loop_counters[1][params.outputYLoopIndex[1]];
-                    ac_int<11, false> y1 =
-                        loop_counters[0][params.outputYLoopIndex[0]];
-                    ac_int<11, false> Y0 =
-                        params.outputLoops[1][params.outputYLoopIndex[1]];
-                    ac_int<11, false> Y1 =
-                        params.outputLoops[0][params.outputYLoopIndex[0]];
-                    ac_int<11, false> k2 =
-                        loop_counters[0][params.outputWeightLoopIndex[0]];
-                    ac_int<11, false> K2 =
-                        params.outputLoops[0][params.outputWeightLoopIndex[0]];
-                    ac_int<11, false> k1 =
-                        loop_counters[1][params.outputWeightLoopIndex[1]];
-                    ac_int<11, false> K1 =
-                        params.outputLoops[1][params.outputWeightLoopIndex[1]];
-                    ac_int<16, false> k = k2 * K1 * WIDTH + k1 * WIDTH;
-                    ac_int<16, false> K = K2 * K1 * WIDTH;
-
-                    ac_int<16, false> x = x0 + x1 * X0;
-                    ac_int<16, false> X = X0 * X1;
-
-                    ac_int<16, false> y = y0 + y1 * Y0;
-                    ac_int<16, false> Y = Y0 * Y1;
-
-                    Pack1D<typename VEC_DTYPE::AccumulationDatatype, WIDTH>
-                        uncastedOutputPixel = tensorIn.Pop();
+                  } else {
                     Pack1D<IO_DTYPE, WIDTH> outputPixel;
 
-                    if constexpr (VEC_DTYPE::is_floating_point &&
-                                  IO_DTYPE::is_floating_point) {
-                    // static cast to VEC_DTYPE
+                    if (params.OUTPUT_QUANTIZE_MX) {
+                      Scale scale = mxScaleIn.Pop();
+                      vquantize<VEC_DTYPE, IO_DTYPE, Scale, WIDTH>(
+                          uncastedOutputPixel, outputPixel, scale);
+                    } else if (params.OUTPUT_QUANTIZE) {
+                      VEC_DTYPE scale;
+                      scale.set_bits(params.outputQuantizeScale);
+                      vquantize<VEC_DTYPE, IO_DTYPE, VEC_DTYPE, WIDTH>(
+                          uncastedOutputPixel, outputPixel, scale);
+                    } else {
 #pragma hls_unroll yes
                       for (int i = 0; i < WIDTH; i++) {
-                        outputPixel[i] =
-                            static_cast<IO_DTYPE>(uncastedOutputPixel[i]);
-                      }
-
-                    } else {
-                      if constexpr (!std::is_same<MX_DTYPE, IO_DTYPE>::value) {
-                        // supports microscaling
-                        if (params.OUTPUT_QUANTIZE_MX) {
-                          MX_DTYPE scale = mxScaleIn.Pop();
-                          // quantize VEC_DTYPE to IO_DTYPE using microscale
-                          vmxquantize<VEC_DTYPE, IO_DTYPE, MX_DTYPE, WIDTH>(
-                              uncastedOutputPixel, outputPixel, scale);
-                        } else if (params.OUTPUT_QUANTIZE) {
-                          // quantize VEC_DTYPE to IO_DTYPE
-                          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                              uncastedOutputPixel, outputPixel,
-                              params.outputQuantizeScale);
-                        } else {
-#pragma hls_unroll yes
-                          for (int i = 0; i < WIDTH; i++) {
-                            outputPixel[i].setbits(
-                                uncastedOutputPixel[i].bits_rep());
-                          }
-                        }
-                      } else {
-                        if (params.OUTPUT_QUANTIZE) {
-                          // quantize VEC_DTYPE to IO_DTYPE
-                          vquantize<VEC_DTYPE, IO_DTYPE, WIDTH>(
-                              uncastedOutputPixel, outputPixel,
-                              params.outputQuantizeScale);
-                        } else {
-#pragma hls_unroll yes
-                          for (int i = 0; i < WIDTH; i++) {
-                            outputPixel[i].setbits(
-                                uncastedOutputPixel[i].bits_rep());
-                          }
-                        }
+                        outputPixel[i].set_bits(
+                            uncastedOutputPixel[i].bits_rep());
                       }
                     }
 
                     tensorOut.Push(outputPixel);
-
-                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
-                      break;
-                    }
                   }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+
+                  if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                   break;
                 }
               }
-              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
+              if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                 break;
               }
             }
-            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+            if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
               break;
             }
           }
-          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
             break;
           }
+        }
+        if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
+          break;
         }
       }
 

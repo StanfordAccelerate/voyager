@@ -1,10 +1,10 @@
 set block "MatrixProcessor"
-set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SUPPORT_MX, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
+set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $SUPPORT_MX, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
 set full_block_name_stripped [string map {" " ""} $full_block_name]
 
 
 proc pre_analyze {} {
-  global CATAPULT_BUILD_DIR ROOT 
+  global CATAPULT_BUILD_DIR ROOT
 
   set path $ROOT/$CATAPULT_BUILD_DIR/ProcessingElement.log
   puts $path
@@ -13,7 +13,7 @@ proc pre_analyze {} {
             puts "$res"
             regexp {Latency = (\d+),} $res temp pe_latency
             puts "PE Latency: $pe_latency"
-            
+
             solution options set Input/CompilerFlags  "[solution options get Input/CompilerFlags] -DPE_LATENCY=$pe_latency"
         } else {
             puts "\033\[31mERROR: PE latency not found\033\[0m"
@@ -21,7 +21,7 @@ proc pre_analyze {} {
   } else {
     puts "\033\[31mERROR: $path not found\033\[0m"
   }
- 
+
 }
 
 proc pre_compile {} {
@@ -43,7 +43,7 @@ proc pre_assembly {} {
 }
 
 proc pre_architect {} {
-  global full_block_name_stripped ACC_BUF_C_DATA_REP_NAME ACCUM_DATATYPE_WIDTH OC_DIMENSION TECHNOLOGY memories SUPPORT_MX
+  global full_block_name_stripped ACC_BUF_C_DATA_REP_NAME ACCUM_DATATYPE_WIDTH OC_DIMENSION TECHNOLOGY memories SUPPORT_MX ACCUM_BUFFER_SIZE
 
   if {$SUPPORT_MX == true} {
     set accumulation_buffer_path "/$full_block_name_stripped/$full_block_name_stripped:process_accumulation/process_accumulation/constexpr_if.if:while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME"
@@ -52,9 +52,9 @@ proc pre_architect {} {
   }
   directive set $accumulation_buffer_path -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
 
-  if {$TECHNOLOGY != "generic"} {
+  if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
     set memory_width [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
-    directive set $accumulation_buffer_path:rsc -MAP_TO_MODULE $memories(1r1w)
+    directive set $accumulation_buffer_path:rsc -MAP_TO_MODULE [get_memory_name 0 $ACCUM_BUFFER_SIZE $memory_width]
   }
 }
 

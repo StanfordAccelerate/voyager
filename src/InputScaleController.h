@@ -6,7 +6,7 @@
 #include "AccelTypes.h"
 #include "ParamsDeserializer.h"
 
-template <typename DTYPE, int NROWS>
+template <typename Scale, int NRows>
 SC_MODULE(InputScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -14,9 +14,9 @@ SC_MODULE(InputScaleController) {
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<DTYPE, 1> > CCS_INIT_S1(dataResponse);
+  Connections::In<Pack1D<Scale, 1> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<DTYPE, 1> > writeRequest[2];
+  Connections::Out<BufferWriteRequest<Scale, 1> > writeRequest[2];
   Connections::Out<ac_int<32, false> > writeControl[2];
   Connections::Out<ac_int<16, false> > readAddress[2];
   Connections::Out<ac_int<32, false> > readControl[2];
@@ -28,7 +28,7 @@ SC_MODULE(InputScaleController) {
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
 
-  Connections::Combinational<Pack1D<DTYPE, 1> > transposeOut;
+  Connections::Combinational<Pack1D<Scale, 1> > transposeOut;
 
   MatrixParamsDeserializer<3> CCS_INIT_S1(paramsDeserializer);
 
@@ -101,9 +101,9 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.fyIndex] = 1;
 
       // microscaling batch size of 32 along C dimension
-      if (loop_bounds[1][params.reductionLoopIndex[1]] >= (32 / NROWS)) {
+      if (loop_bounds[1][params.reductionLoopIndex[1]] >= (32 / NRows)) {
         loop_bounds[1][params.reductionLoopIndex[1]] =
-            loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+            loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NRows);
       }
 
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -230,9 +230,9 @@ SC_MODULE(InputScaleController) {
                           // adjust the C dimension for microscaling if it
                           // hasn't already been adjusted
                           if (params.loops[1][params.reductionLoopIndex[1]] <
-                              (32 / NROWS)) {
-                            c = c / (32 / NROWS);
-                            C = C / (32 / NROWS);
+                              (32 / NRows)) {
+                            c = c / (32 / NRows);
+                            C = C / (32 / NRows);
                           }
 
                           if (isDownsample) {
@@ -391,9 +391,9 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.fyIndex] = 1;
 
       // microscaling batch size of 32 along C dimension
-      if (loop_bounds[1][params.reductionLoopIndex[1]] >= (32 / NROWS)) {
+      if (loop_bounds[1][params.reductionLoopIndex[1]] >= (32 / NRows)) {
         loop_bounds[1][params.reductionLoopIndex[1]] =
-            loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+            loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NRows);
       }
 
       ac_int<8, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
@@ -505,14 +505,14 @@ SC_MODULE(InputScaleController) {
                             full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
                           }
 
-                          Pack1D<DTYPE, 1> data;
+                          Pack1D<Scale, 1> data;
 
                           if ((full_x < 0) || (full_y < 0) ||
                               (full_x >= STRIDE * X0 * X1) ||
                               (full_y >= STRIDE * Y0 * Y1)) {
 #pragma hls_unroll yes
                             for (int dims = 0; dims < 1; dims++) {
-                              data[dims].setZero();
+                              data[dims].set_zero();
                             }
                           } else {
                             data = transposeOut.Pop();
@@ -531,7 +531,7 @@ SC_MODULE(InputScaleController) {
                                 c1;
                           }
 
-                          BufferWriteRequest<DTYPE, 1> req;
+                          BufferWriteRequest<Scale, 1> req;
                           req.address = address;
                           req.data = data;
                           writeRequest[bankSel].Push(req);
@@ -684,9 +684,9 @@ SC_MODULE(InputScaleController) {
                               params.loops[1][params.reductionLoopIndex[1]];
 
                           if (params.loops[1][params.reductionLoopIndex[1]] >=
-                              (32 / NROWS)) {
-                            C1 = C1 / (32 / NROWS);
-                            c1 = c1 / (32 / NROWS);
+                              (32 / NRows)) {
+                            C1 = C1 / (32 / NRows);
+                            c1 = c1 / (32 / NRows);
                           }
 
                           ac_int<16, false> x = STRIDE * x0 + fx;
@@ -764,6 +764,8 @@ SC_MODULE(InputScaleController) {
       const MatrixParams params = transposerParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      ac_int<4, false> FY = params.loops[1][params.fyIndex];
+
       if (params.REPLICATION) {
         FX = 7;
       }
@@ -775,8 +777,6 @@ SC_MODULE(InputScaleController) {
       } else if (IC_DIMENSION == 32) {
         packingFactor = 8;
       }
-
-      ac_int<4, false> FY = params.loops[1][params.fyIndex];
 
       bool isDownsample = FX == 1 && FY == 1;
 
@@ -796,13 +796,13 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.fyIndex] = 1;
 
       // microscaling batch size of 32 along C dimension
-      if (loop_bounds[1][params.reductionLoopIndex[1]] >= (32 / NROWS)) {
+      if (loop_bounds[1][params.reductionLoopIndex[1]] >= (32 / NRows)) {
         loop_bounds[1][params.reductionLoopIndex[1]] =
-            loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NROWS);
+            loop_bounds[1][params.reductionLoopIndex[1]] / (32 / NRows);
       }
 
       if (params.TRANPOSE_INPUTS) {
-        INPUT_DATATYPE transposeBuffer[NROWS][NROWS];
+        Scale transposeBuffer[NRows][NRows];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -833,43 +833,11 @@ SC_MODULE(InputScaleController) {
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
                           // innermost loop must be X0, and must be a multiple
-                          // of NROWS
+                          // of NRows
                           for (loop_counters[1][5] = 0;
-                               loop_counters[1][5] < loop_bounds[1][5] / NROWS;
+                               loop_counters[1][5] < loop_bounds[1][5] / NRows;
                                loop_counters[1][5]++) {
                             // TODO: figure out transpose logic
-                            //                           for (int c0 = 0; c0 <
-                            //                           NROWS; c0++) {
-
-                            //                             Pack1D<DTYPE, 1>
-                            //                             originalValue =
-                            //                             dataResponse.Pop();
-                            // #pragma hls_unroll yes
-                            //                             for (int dim = 0; dim
-                            //                             < NROWS; dim++) {
-                            //                               transposeBuffer[dim][c0]
-                            //                               =
-                            //                               originalValue[dim];
-                            //                             }
-                            //                           }
-
-                            //                           // Write out from
-                            //                           tranposeBuffer for (int
-                            //                           c0 = 0; c0 < NROWS;
-                            //                           c0++)
-                            //                           {
-                            //                             Pack1D<DTYPE, 1>
-                            //                             transposedValue;
-
-                            // #pragma hls_unroll yes
-                            //                             for (int dim = 0; dim
-                            //                             < NROWS; dim++) {
-                            //                               transposedValue[dim]
-                            //                               =
-                            //                               transposeBuffer[c0][dim];
-                            //                             }
-                            //                             transposeOut.Push(transposedValue);
-                            //                           }
                           }
                         }
                       }

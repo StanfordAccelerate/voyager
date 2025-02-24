@@ -61,7 +61,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
 
   vector_params->DP_VEC1 =
       (DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype()) &&
-      ((DataTypes::TypeName<MX_DATATYPE>::name() != tensor.dtype()));
+      ((DataTypes::TypeName<SCALE_DATATYPE>::name() != tensor.dtype()));
 
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen1Loops[0][i] = 1;
@@ -116,7 +116,7 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
 
   vector_params->DP_VEC2 =
       (DataTypes::TypeName<INPUT_DATATYPE>::name() != tensor.dtype()) &&
-      ((DataTypes::TypeName<MX_DATATYPE>::name() != tensor.dtype()));
+      ((DataTypes::TypeName<SCALE_DATATYPE>::name() != tensor.dtype()));
 
   for (int i = 0; i < 3; i++) {
     vector_params->addressGen2Loops[0][i] = 1;

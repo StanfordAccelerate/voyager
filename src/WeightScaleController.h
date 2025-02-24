@@ -7,7 +7,7 @@
 #include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
 
-template <typename DTYPE, typename ACC_DTYPE, int NROWS, int NCOLS>
+template <typename DTYPE, int NROWS, int NCOLS>
 SC_MODULE(WeightScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -633,8 +633,8 @@ SC_MODULE(WeightScaleController) {
               64) {  // don't support transpose when systolic array is larger
                      // than 32x32, as it will require a very large buffer
         // we need a square buffer to store the transpose
-        INPUT_DATATYPE transposeBuffer[NROWS > NCOLS ? NROWS : NCOLS]
-                                      [NROWS > NCOLS ? NROWS : NCOLS];
+        DTYPE transposeBuffer[NROWS > NCOLS ? NROWS : NCOLS]
+                             [NROWS > NCOLS ? NROWS : NCOLS];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush

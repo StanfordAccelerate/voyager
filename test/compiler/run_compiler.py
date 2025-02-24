@@ -372,13 +372,13 @@ if __name__ == "__main__":
 
         gm = prepare_pt2e(MobileBertEncoder(), quantizer, example_args)
 
-        # Generate a random scale, otherwise a scale of 1 will be optimized away.
+        # Calibration
+        gm(*example_args)
+        gm(*example_args)
+
         for name, module in gm.named_modules():
             if hasattr(module, "scale"):
-                module.scale = torch.randn_like(module.scale)
-
-        for name, param in gm.named_parameters():
-            param.data.div_(100.0)
+                print(module.scale)
 
         convert_pt2e(gm, args.bias)
 

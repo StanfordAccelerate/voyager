@@ -25,5 +25,6 @@ class ArrayMemory : public MemoryInterface {
                                const int size, T* tensor);
 
   void write_bytes_to_memory(const long long address, const int partition,
-                             const int size, const char* bytes) override;
+                             const int size, const char* bytes,
+                             const char* masks) override;
 };

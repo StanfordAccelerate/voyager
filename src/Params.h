@@ -383,10 +383,12 @@ struct VectorInstructions {
   static const unsigned int vsquare = 3;
 
   // Stage 4: relu
-  ac_int<2, false> vOp4;
+  ac_int<3, false> vOp4;
   static const unsigned int vrelu = 1;
   static const unsigned int vrelumask = 2;
   static const unsigned int vmap = 3;
+  static const unsigned int vgelu = 4;
+  static const unsigned int vsilu = 5;
   ac_int<64, false> vmapOffset;
 
   // Stage 5: quantize
@@ -422,7 +424,7 @@ struct VectorInstructions {
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
 
-  static const unsigned int width = 159;
+  static const unsigned int width = 160;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -466,6 +468,8 @@ struct VectorInstructions {
                                          const VectorInstructions& params) {
     os << "instType: " << params.instType << std::endl;
     os << "vInput: " << params.vInput << std::endl;
+    os << "vDequantize: " << params.vDequantize << std::endl;
+    os << "vDequantizeScale: " << params.vDequantizeScale << std::endl;
     os << "vOp0Src1: " << params.vOp0Src1 << std::endl;
     os << "vOp0: " << params.vOp0 << std::endl;
     os << "vOp1: " << params.vOp1 << std::endl;
@@ -880,14 +884,6 @@ struct VectorParams : BaseParams {
     os << "DP_VEC2: " << params.DP_VEC2 << std::endl;
     os << "addressGen2Mode: " << params.addressGen2Mode << std::endl;
 
-    // os << "addressGen2Reshape: " << params.addressGen2Reshape << std::endl;
-    // os << "addressGen2Dim: " << params.addressGen2Dim << std::endl;
-    // os << "addressGen2Start: " << params.addressGen2Start << std::endl;
-    // os << "addressGen2End: " << params.addressGen2End << std::endl;
-    // os << "addressGen2Stride: " << params.addressGen2Stride << std::endl;
-    // os << "addressGen2Broadcast: " << params.addressGen2Broadcast <<
-    // std::endl;
-
     os << "VECTOR_OUTPUT_OFFSET: " << params.VECTOR_OUTPUT_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -913,6 +909,9 @@ struct VectorParams : BaseParams {
     os << "headSizeInPowerOfTwo: " << params.headSizeInPowerOfTwo << std::endl;
     os << "SPLIT_OUTPUT: " << params.SPLIT_OUTPUT << std::endl;
     os << "CONCAT_OUTPUT: " << params.CONCAT_OUTPUT << std::endl;
+
+    os << "OUTPUT_QUANTIZE: " << params.OUTPUT_QUANTIZE << std::endl;
+    os << "OUTPUT_QUANTIZE_MX: " << params.OUTPUT_QUANTIZE_MX << std::endl;
 
     os << "MAXPOOL: " << params.MAXPOOL << std::endl;
     os << "AVGPOOL: " << params.AVGPOOL << std::endl;

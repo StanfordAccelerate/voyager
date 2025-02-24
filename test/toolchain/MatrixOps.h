@@ -358,13 +358,8 @@ void MapMatrixOperation(const Operation &operation,
       assert(size == 1);
       VECTOR_DATATYPE immediate = read_constant_param(it->other());
       if (opcode.rfind("dequantize", 0) == 0) {
+        vinst.vDequantize = true;
         vinst.vDequantizeScale = immediate.bits_rep();
-
-        bool is_mx_based_design = ACCUM_DATATYPE::is_floating_point !=
-                                  ACCUM_BUFFER_DATATYPE::is_floating_point;
-        if (is_mx_based_design && !matrix_op.has_mx_input()) {
-          vinst.vDequantize = true;
-        }
       } else if (opcode.rfind("quantize", 0) == 0) {
         vector_params->OUTPUT_QUANTIZE = true;
         vector_params->outputQuantizeScale = immediate.bits_rep();
