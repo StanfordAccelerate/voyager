@@ -241,7 +241,7 @@ inline Buffer *gemm(std::any input_tensor, std::any input_scale,
                             Scale input_scale = input_scales[input_scale_addr];
                             Scale weight_scale =
                                 weight_scales[weight_scale_addr];
-                            Scale scale = input_scale + weight_scale;
+                            Scale scale = input_scale * weight_scale;
 
                             Buffer scaled_psum = static_cast<Buffer>(psum) *
                                                  static_cast<Buffer>(scale);
