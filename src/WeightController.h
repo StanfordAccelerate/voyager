@@ -181,8 +181,9 @@ SC_MODULE(WeightController) {
                         int baseAddress =
                             (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
                         if (params.WEIGHT_TRANSPOSE) {
-                          C = C1 * NCols;
-                          baseAddress = (k + c0) * C + c1 * OC_DIMENSION;
+                          C = C2 * C1 * NCols;
+                          baseAddress = (k + c0) * C + c1 * OC_DIMENSION +
+                                        c2 * C1 * OC_DIMENSION;
                         } else if (params.CONCAT_HEAD_WEIGHTS) {
                           baseAddress =
                               static_cast<ac_int<32, false> >(
