@@ -374,13 +374,23 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         print(f"Only testing accuracy for the first model: {model[0]}")
     model = model[0]
 
+    env_vars = os.environ.copy()
+    env_vars["NETWORK"] = model
+
+    if "INPUT_BUFFER_SIZE" not in env_vars:
+        env_vars["INPUT_BUFFER_SIZE"] = "1024"
+    if "WEIGHT_BUFFER_SIZE" not in env_vars:
+        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
+    if "ACCUM_BUFFER_SIZE" not in env_vars:
+        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
+
     # Build AccuracyTester binary
-    subprocess.run(["make", "clean"], env=os.environ)
+    subprocess.run(["make", "clean"], env=env_vars)
 
     with open(f"{output_folder}/build.log", "w") as stdout_file:
         subprocess.run(
             ["make", "-j", "AccuracyTester"],
-            env=os.environ,
+            env=env_vars,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
         )
@@ -444,7 +454,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid model")
 
-    if os.environ["DATATYPE"] == "E4M3":
+    if env_vars["DATATYPE"] == "E4M3":
         quantization_args = [
             "--activation",
             "fp8_e4m3",
@@ -452,7 +462,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "fp8_e4m3",
             "--bf16",
         ]
-    elif os.environ["DATATYPE"] == "INT8":
+    elif env_vars["DATATYPE"] == "INT8":
         quantization_args = [
             "--activation",
             "int8,qs=per_tensor_symmetric",
@@ -462,7 +472,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "int24",
             "--bf16",
         ]
-    elif os.environ["DATATYPE"] == "P8_1":
+    elif env_vars["DATATYPE"] == "P8_1":
         quantization_args = [
             "--activation",
             "posit8_1",
@@ -470,9 +480,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "posit8_1",
             "--bf16",
         ]
-    elif os.environ["DATATYPE"] == "CFLOAT":
+    elif env_vars["DATATYPE"] == "CFLOAT":
         quantization_args = []
-    elif os.environ["DATATYPE"] == "MXINT8":
+    elif env_vars["DATATYPE"] == "MXINT8":
         quantization_args = [
             "--force_scale_power_of_two",
             "--activation",
@@ -484,34 +494,49 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid datatype")
 
-    subprocess.run(
-        [
-            "python",
-            "test/compiler/run_compiler.py",
-            model,
-            "--model_name_or_path",
-            model_path,
-            *quantization_args,
-            "--output_dir",
-            "test/compiler/networks/" + model + "/" + os.environ["DATATYPE"],
-        ]
-    )
+    with open(f"{output_folder}/{model}_{dataset}_compiler.log", "w") as stdout_file:
+        subprocess.run(
+            [
+                "python",
+                "test/compiler/run_compiler.py",
+                model,
+                "--model_name_or_path",
+                model_path,
+                *quantization_args,
+                "--output_dir",
+                "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
+            ],
+            stdout=stdout_file,
+            stderr=subprocess.STDOUT,
+        )
+
+    with open(f"{output_folder}/{model}_{dataset}_tiler.log", "w") as stdout_file:
+        subprocess.run(
+            [
+                "python",
+                "test/compiler/run_tiler.py",
+                "--codegen_dir",
+                f"test/compiler/networks/{model}/{env_vars['DATATYPE']}",
+                "--IC_dimension",
+                env_vars["IC_DIMENSION"],
+                "--OC_dimension",
+                env_vars["OC_DIMENSION"],
+                "--input_buffer_size",
+                env_vars["INPUT_BUFFER_SIZE"],
+                "--weight_buffer_size",
+                env_vars["WEIGHT_BUFFER_SIZE"],
+                "--accum_buffer_size",
+                env_vars["ACCUM_BUFFER_SIZE"],
+            ],
+            stdout=stdout_file,
+            stderr=subprocess.STDOUT,
+        )
 
     # Run accuracy test
     additional_args = []
     if dataset == "squad":
         additional_args = ["1000"]  # limit number of samples to 1000 for squad dataset
     with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
-        env_vars = os.environ.copy()
-        env_vars["NETWORK"] = model
-
-        if "INPUT_BUFFER_SIZE" not in env_vars:
-            env_vars["INPUT_BUFFER_SIZE"] = "1024"
-        if "WEIGHT_BUFFER_SIZE" not in env_vars:
-            env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-        if "ACCUM_BUFFER_SIZE" not in env_vars:
-            env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-
         try:
             subprocess.run(
                 [
