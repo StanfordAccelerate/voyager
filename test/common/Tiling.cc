@@ -74,33 +74,60 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
     accelerator_tiling.weight_loop_index[i] = -1;
   }
 
+  int loop_index = 5;
   // L1 level
   for (int i = 0; i < tiling.level_tilings(0).loop_bounds_size(); i++) {
-    accelerator_tiling.loops[1][5 - i] =
-        tiling.level_tilings(0).loop_bounds(i).bound();
-    if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::Loop::FX) {
-      accelerator_tiling.fx_index = 5 - i;
-    } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-               voyager::Loop::FY) {
-      accelerator_tiling.fy_index = 5 - i;
-    } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-               voyager::Loop::OC) {
-      accelerator_tiling.weight_loop_index[1] = 5 - i;
-    } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-               voyager::Loop::OX) {
-      accelerator_tiling.x_loop_index[1] = 5 - i;
-    } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-               voyager::Loop::OY) {
-      accelerator_tiling.y_loop_index[1] = 5 - i;
-    } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-               voyager::Loop::IC) {
-      accelerator_tiling.reduction_loop_index[1] = 5 - i;
+    if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::Loop::IC) {
+      // set this later
+      accelerator_tiling.loops[1][0] =
+          tiling.level_tilings(0).loop_bounds(i).bound();
+      accelerator_tiling.reduction_loop_index[1] = 0;
+    } else {
+      // all other loops need to be set in reverse order
+      accelerator_tiling.loops[1][loop_index] =
+          tiling.level_tilings(0).loop_bounds(i).bound();
+      if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::Loop::FX) {
+        accelerator_tiling.fx_index = loop_index;
+      } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
+                 voyager::Loop::FY) {
+        accelerator_tiling.fy_index = loop_index;
+      } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
+                 voyager::Loop::OC) {
+        accelerator_tiling.weight_loop_index[1] = loop_index;
+      } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
+                 voyager::Loop::OX) {
+        accelerator_tiling.x_loop_index[1] = loop_index;
+      } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
+                 voyager::Loop::OY) {
+        accelerator_tiling.y_loop_index[1] = loop_index;
+      }
+
+      loop_index--;
     }
   }
 
   // set any unset loop indices
-  for (int i = tiling.level_tilings(0).loop_bounds_size(); i < 6; i++) {
-    accelerator_tiling.loops[1][5 - i] = 1;
+  while (loop_index >= 1) {
+    if (accelerator_tiling.fx_index == -1) {
+      accelerator_tiling.fx_index = loop_index;
+    } else if (accelerator_tiling.fy_index == -1) {
+      accelerator_tiling.fy_index = loop_index;
+    } else if (accelerator_tiling.weight_loop_index[1] == -1) {
+      accelerator_tiling.weight_loop_index[1] = loop_index;
+    } else if (accelerator_tiling.x_loop_index[1] == -1) {
+      accelerator_tiling.x_loop_index[1] = loop_index;
+    } else if (accelerator_tiling.y_loop_index[1] == -1) {
+      accelerator_tiling.y_loop_index[1] = loop_index;
+    }
+    loop_index--;
+  }
+
+  // if reduction loop is not set, set it to 0
+  if (accelerator_tiling.reduction_loop_index[1] == -1) {
+    accelerator_tiling.reduction_loop_index[1] = 0;
+  }
+
+  for (int i = loop_index; i < 6; i++) {
     if (accelerator_tiling.fx_index == -1) {
       accelerator_tiling.fx_index = 5 - i;
     } else if (accelerator_tiling.fy_index == -1) {
