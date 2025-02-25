@@ -466,12 +466,12 @@ def main():
 
             tilings.tilings.append(tiling)
 
-        # write the tilings to a file
-        with open(
-            f"{args.codegen_dir}/{args.IC_dimension}x{args.OC_dimension}_{args.input_buffer_size}x{args.weight_buffer_size}x{args.accum_buffer_size}/tilings.txtpb",
-            "w",
-        ) as f:
-            f.write(text_format.MessageToString(tilings))
+    # write the tilings to a file
+    with open(
+        f"{args.codegen_dir}/{args.IC_dimension}x{args.OC_dimension}_{args.input_buffer_size}x{args.weight_buffer_size}x{args.accum_buffer_size}/tilings.txtpb",
+        "w",
+    ) as f:
+        f.write(text_format.MessageToString(tilings))
 
 
 if __name__ == "__main__":
