@@ -362,11 +362,25 @@ def main():
 
             output_shape = param.output.shape
             if len(output_shape) == 4:
-                height = output_shape[2]
-                width = output_shape[3]
+                if output_shape[0] == 1 and output_shape[1] == 1:
+                    width = output_shape[2]
+                    if output_shape[3] != output_channels:
+                        # the input channels and output channels need to be switched.
+                        # not sure why this the compiler produces this shape.
+                        input_channels = output_channels
+                        output_channels = output_shape[3]
+                else:
+                    height = output_shape[2]
+                    width = output_shape[3]
             elif len(output_shape) == 3:
                 assert output_shape[0] == 1
                 width = output_shape[1]
+
+                if output_shape[2] != output_channels:
+                    # the input channels and output channels need to be switched.
+                    # not sure why this the compiler produces this shape.
+                    input_channels = output_channels
+                    output_channels = output_shape[2]
                 height = 1
             elif len(output_shape) == 2:
                 width = output_shape[0]
