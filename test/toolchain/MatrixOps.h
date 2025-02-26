@@ -216,6 +216,11 @@ void MapMatrixOperation(const Operation &operation,
             ->weightAddressGenLoops[0][tiling.reduction_loop_index[0]] =
             tiling.loops[0][tiling.reduction_loop_index[0]] /
             (OC_DIMENSION / IC_DIMENSION);
+      } else {
+        matrix_params
+            ->weightAddressGenLoops[1][tiling.reduction_loop_index[1]] =
+            tiling.loops[1][tiling.reduction_loop_index[1]] /
+            (OC_DIMENSION / IC_DIMENSION);
       }
     }
     matrix_params->weightAddressGenReductionLoopIndex[1] = 0;

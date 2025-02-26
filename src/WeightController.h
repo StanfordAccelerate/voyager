@@ -425,9 +425,11 @@ SC_MODULE(WeightController) {
       int rep_bound = 1;
       if (OC_DIMENSION > IC_DIMENSION) {
         if (params.WEIGHT_TRANSPOSE) {
-          if (loop_bounds[1][0] > (OC_DIMENSION / IC_DIMENSION)) {
+          if (loop_bounds[0][params.reductionLoopIndex[0]] >
+              (OC_DIMENSION / IC_DIMENSION)) {
             // we are able to reuse the weights already in the buffer
-            loop_bounds[1][0] /= (OC_DIMENSION / IC_DIMENSION);
+            loop_bounds[0][params.reductionLoopIndex[0]] /=
+                (OC_DIMENSION / IC_DIMENSION);
             rep_bound = (OC_DIMENSION / IC_DIMENSION);
           }
         }
@@ -470,10 +472,10 @@ SC_MODULE(WeightController) {
                   static_cast<ac_int<16, false> >(loop_bounds[1][5] * NRows *
                                                   rep_bound * buffer_reuse));
               for (int reuse = 0; reuse < buffer_reuse; reuse++) {
-                for (loop_counters[1][0] = 0;
-                     loop_counters[1][0] < loop_bounds[1][0];
-                     loop_counters[1][0]++) {
-                  for (int rep = 0; rep < rep_bound; rep++) {
+                for (int rep = 0; rep < rep_bound; rep++) {
+                  for (loop_counters[1][0] = 0;
+                       loop_counters[1][0] < loop_bounds[1][0];
+                       loop_counters[1][0]++) {
                     for (loop_counters[1][1] = 0;
                          loop_counters[1][1] < loop_bounds[1][1];
                          loop_counters[1][1]++) {
@@ -600,10 +602,12 @@ SC_MODULE(WeightController) {
 
                                   if (params.WEIGHT_TRANSPOSE &&
                                       OC_DIMENSION > IC_DIMENSION) {
-                                    address =
-                                        (fy * FX * C * 2 * K1) +
-                                        (fx * C * 2 * K1) +
-                                        ((c + rep * NRows) + c1 * C0) * K1 + k1;
+                                    address = (fy * FX * C * rep_bound * K1) +
+                                              (fx * C * rep_bound * K1) +
+                                              ((c + rep * NRows) +
+                                               c1 * C0 * rep_bound) *
+                                                  K1 +
+                                              k1;
                                   }
                                   readAddress[bankSel].Push(address);
                                 }
@@ -630,11 +634,11 @@ SC_MODULE(WeightController) {
                         break;
                       }
                     }
-                  }
 
-                  // writeControl[bankSel].Push(0);
-                  if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
-                    break;
+                    // writeControl[bankSel].Push(0);
+                    if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                      break;
+                    }
                   }
                 }
                 if (reuse == buffer_reuse - 1) {
