@@ -75,28 +75,17 @@ void MapSoftmax(const codegen::Operation &param,
   vinst0.rCount = outer_dim / OC_DIMENSION;
   vinst0.rOp = VectorInstructions::rmax;
   vinst0.rDuplicate = 1;
-  vinst0.rDest = VectorInstructions::toVectorOp0Src1;
-  vinst0.rBroadcast = 1;
   // broadcast max over entire array, for 2 passes
+  vinst0.rBroadcast = 1;
   vinst0.immediate0 = 2 * outer_dim / OC_DIMENSION;
-  vinst0.rSqrt = false;
-  vinst0.rReciprocal = false;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
-  // Instruction 1 - send to max
+  // Instruction 1 - send to reduction engine to calculate max
   VectorInstructions vinst1;
   vinst1.instType = VectorInstructions::vector;
-  vinst1.vInput = VectorInstructions::readFromVectorFetch;
-  vinst1.vAccumulatePush = VectorInstructions::nop;
-  vinst1.vOp0Src1 = VectorInstructions::nop;
-  vinst1.vOp0 = VectorInstructions::nop;
-  vinst1.vOp1 = VectorInstructions::nop;
-  vinst1.vOp2 = VectorInstructions::toReduce;
-  vinst1.vOp3Src1 = VectorInstructions::nop;
-  vinst1.vOp3 = VectorInstructions::nop;
-  vinst1.vOp4 = VectorInstructions::nop;
-  vinst1.vDest = VectorInstructions::nop;
+  vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  vinst1.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst1;
   vector_instruction_config->instCount[1] = outer_dim / OC_DIMENSION;
 
@@ -105,43 +94,35 @@ void MapSoftmax(const codegen::Operation &param,
   vinst2.instType = VectorInstructions::reduction;
   vinst2.rCount = outer_dim / OC_DIMENSION;
   vinst2.rOp = VectorInstructions::radd;
+  vinst2.rReciprocal = 1;
   vinst2.rDuplicate = 1;
-  vinst2.rDest = VectorInstructions::toVectorOp3Src1;
   vinst2.rBroadcast = 1;
   vinst2.immediate0 = outer_dim / OC_DIMENSION;
-  vinst2.rReciprocal = true;
+  vinst2.rdest = VectorInstructions::to_op2;
   vector_instruction_config->inst[2] = vinst2;
   vector_instruction_config->instCount[2] = 1;
 
   // Instruction 3 - subtract max and exp, and reduce sum
   VectorInstructions vinst3;
   vinst3.instType = VectorInstructions::vector;
-  vinst3.vInput = VectorInstructions::readFromVectorFetch;
-  vinst3.vAccumulatePush = VectorInstructions::nop;
-  vinst3.vOp0Src1 = VectorInstructions::readFromReduce;
-  vinst3.vOp0 = VectorInstructions::vsub;
-  vinst3.vOp1 = VectorInstructions::vexp;
-  vinst3.vOp2 = VectorInstructions::toReduce;
-  vinst3.vOp3Src1 = VectorInstructions::nop;
-  vinst3.vOp3 = VectorInstructions::nop;
-  vinst3.vOp4 = VectorInstructions::nop;
-  vinst3.vDest = VectorInstructions::nop;
+  vinst3.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  vinst3.vector_op0_src1 = VectorInstructions::from_reduction_0;
+  vinst3.vector_op0 = VectorInstructions::vsub;
+  vinst3.vector_op1 = VectorInstructions::vexp;
+  vinst3.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[3] = vinst3;
   vector_instruction_config->instCount[3] = outer_dim / OC_DIMENSION;
 
   // Instruction 4 - subtract max and exp, and divide by reduced value
   VectorInstructions inst4;
   inst4.instType = VectorInstructions::vector;
-  inst4.vInput = VectorInstructions::readFromVectorFetch;
-  inst4.vAccumulatePush = VectorInstructions::nop;
-  inst4.vOp0Src1 = VectorInstructions::readFromReduce;
-  inst4.vOp0 = VectorInstructions::vsub;
-  inst4.vOp1 = VectorInstructions::vexp;
-  inst4.vOp2 = VectorInstructions::nop;
-  inst4.vOp3Src1 = VectorInstructions::readReduceInterface;
-  inst4.vOp3 = VectorInstructions::vmult;
-  inst4.vOp4 = VectorInstructions::nop;
-  inst4.vDest = VectorInstructions::vWriteOut;
+  inst4.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  inst4.vector_op0_src1 = VectorInstructions::from_reduction_0;
+  inst4.vector_op2_src1 = VectorInstructions::from_reduction_1;
+  inst4.vector_op0 = VectorInstructions::vsub;
+  inst4.vector_op1 = VectorInstructions::vexp;
+  inst4.vector_op2 = VectorInstructions::vmult;
+  inst4.vdest = VectorInstructions::to_output;
   vector_instruction_config->inst[4] = inst4;
   vector_instruction_config->instCount[4] = outer_dim / OC_DIMENSION;
 

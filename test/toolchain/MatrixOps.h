@@ -105,10 +105,10 @@ void set_immediate(const float scalar, const int stage,
   }
 
   if (stage == 0) {
-    inst.vOp0Src1 = VectorInstructions::op0immediate;
+    inst.vector_op0_src1 = VectorInstructions::from_immediate_0;
     inst.immediate0 = immediate.bits_rep();
   } else if (stage == 3) {
-    inst.vOp3Src1 = VectorInstructions::op3immediate;
+    inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
   } else if (stage == 5) {
     inst.immediate1 = immediate.bits_rep();
@@ -272,14 +272,34 @@ void MapMatrixOperation(const codegen::Operation &param,
   // Permute input for transformer attention outputs
   if (input.has_reshape()) {
     const auto reshape_op = input.reshape();
-    const auto dims = reshape_op.kwargs().at("dims").int_list().values();
-    bool is_permute = std::all_of(dims.begin(), dims.end(),
-                                  [](int x) { return x == 1 || x == 2; });
+    const auto reshape_kwargs = reshape_op.kwargs();
 
-    if (reshape_op.target() == "permute" || is_permute) {
-      matrix_params->has_attn_output_permute = true;
+    if (reshape_op.target() == "permute") {
+      const auto int_list = reshape_kwargs.at("dims").int_list().values();
+      std::vector<int> dims(int_list.begin(), int_list.end());
+      const int ndim = input.shape_size();
+
+      if (is_transpose(dims)) {
+        matrix_params->has_input_transpose = true;
+      } else if (dims[ndim - 1] == ndim - 1) {
+        matrix_params->has_attn_output_permute = true;
+      } else {
+        throw std::invalid_argument("Unsupported permute operation!");
+      }
     } else if (reshape_op.target() == "transpose") {
-      matrix_params->has_input_transpose = true;
+      int dim0 = reshape_kwargs.at("dim0").int_value();
+      int dim1 = reshape_kwargs.at("dim1").int_value();
+      if (dim0 > dim1) {
+        std::swap(dim0, dim1);
+      }
+
+      if (dim0 == input.shape_size() - 2 && dim1 == input.shape_size() - 1) {
+        matrix_params->has_input_transpose = true;
+      } else if (dim1 != input.shape_size() - 1) {
+        matrix_params->has_attn_output_permute = true;
+      } else {
+        throw std::invalid_argument("Unsupported transpose operation!");
+      }
     }
 
     if (matrix_params->has_attn_output_permute) {
@@ -363,9 +383,8 @@ void MapMatrixOperation(const codegen::Operation &param,
   VectorInstructions inst;
   memset(&inst, 0, sizeof(inst));
   inst.instType = VectorInstructions::vector;
-  inst.vInput = VectorInstructions::readFromSystolicArray;
-  inst.vAccumulatePush = VectorInstructions::nop;
-  inst.vDest = VectorInstructions::vWriteOut;
+  inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
+  inst.vdest = VectorInstructions::to_output;
 
   auto inst_map = get_vector_instruction_mapping();
 
@@ -386,15 +405,15 @@ void MapMatrixOperation(const codegen::Operation &param,
         vector_params->quantize_output = true;
         vector_params->output_scale = immediate.bits_rep();
       } else {
-        inst.vDequantize = true;
-        inst.vDequantizeScale = immediate.bits_rep();
+        inst.vdequantize = true;
+        inst.vector_dq_scale = immediate.bits_rep();
       }
     } else if (opcode == "quantize_mx") {
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
           param.outputs().tensors(0).memory().address();
     } else {
-      if (curr_stage == 5) {
+      if (curr_stage == 4) {
         // we have already processed all the stages
         assert(i == op_list.size() - 1);
         break;
@@ -410,22 +429,18 @@ void MapMatrixOperation(const codegen::Operation &param,
         if (matched) {
           unsigned int vop = inst_map[opcode];
           if (stage == 0) {
-            inst.vOp0 = vop;
+            inst.vector_op0 = vop;
           } else if (stage == 1) {
-            inst.vOp1 = vop;
+            inst.vector_op1 = vop;
           } else if (stage == 2) {
-            inst.vOp2 = vop;
+            inst.vector_op2 = vop;
           } else if (stage == 3) {
-            inst.vOp3 = vop;
-          } else if (stage == 4) {
-            inst.vOp4 = vop;
+            inst.vector_op3 = vop;
           }
 
-          // increment the stage for the next operation
-          curr_stage = stage + 1;
           if (opcode == "vmap") {
             const auto other = op.kwargs().at("code").tensor();
-            inst.vmapOffset = other.memory().address();
+            inst.VMAP_OFFSET = other.memory().address();
           } else if (op.kwargs().contains("other")) {
             const auto other = op.kwargs().at("other");
 
@@ -444,17 +459,21 @@ void MapMatrixOperation(const codegen::Operation &param,
                 const auto tensor_to_load = tensor.has_memory() ? tensor : self;
 
                 if (stage == 0) {
-                  inst.vOp0Src1 = VectorInstructions::readInterface;
+                  inst.vector_op0_src1 =
+                      VectorInstructions::from_vector_fetch_1;
                   set_addr_gen1(tensor_to_load, tiling, accelerator_memory_map,
                                 vector_params);
-                } else if (stage == 3) {
-                  inst.vOp3Src1 = VectorInstructions::readNormalInterface;
+                } else if (stage == 2) {
+                  inst.vector_op2_src1 =
+                      VectorInstructions::from_vector_fetch_2;
                   set_addr_gen2(tensor_to_load, tiling, accelerator_memory_map,
                                 vector_params);
                 }
               }
             }
           }
+
+          curr_stage = stage + 1;
 
           break;
         }

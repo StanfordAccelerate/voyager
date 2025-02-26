@@ -838,9 +838,9 @@ inline Tiling get_pool2d_tiling(codegen::OpOverload op) {
   const auto kwargs = op.kwargs();
   const auto input_shape = get_shape(kwargs.at("input").tensor());
 
+  int K = input_shape[1];
   int X = input_shape[2];
   int Y = input_shape[3];
-  int C = input_shape[1];
 
   int x0, y0, stride;
 
@@ -863,11 +863,10 @@ inline Tiling get_pool2d_tiling(codegen::OpOverload op) {
 
   int x1 = X / x0;
   int y1 = Y / y0;
-  int c0 = C / IC_DIMENSION;
-  int k0 = C / OC_DIMENSION;
+  int k0 = K / OC_DIMENSION;
 
   return {
-      .loops = {{x1, y1, 1, 1, 1, 1}, {c0, k0, 1, 1, y0, x0}},
+      .loops = {{x1, y1, 1, 1, 1, 1}, {1, k0, 1, 1, y0, x0}},
       .x_loop_index = {0, 5},
       .y_loop_index = {1, 4},
       .reduction_loop_index = {3, 0},

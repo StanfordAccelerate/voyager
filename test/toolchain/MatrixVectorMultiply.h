@@ -109,23 +109,16 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   vinst0.rCount = reduction_dim / OC_DIMENSION;
   vinst0.rOp = VectorInstructions::radd;
   vinst0.rDuplicate = 0;
-  vinst0.rDest = VectorInstructions::toVectorOp0Src0;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
   // inst 1 - input x weight, send to reduce
   VectorInstructions vinst1;
   vinst1.instType = VectorInstructions::vector;
-  vinst1.vInput = VectorInstructions::readFromVectorFetch;
-  vinst1.vAccumulatePush = VectorInstructions::nop;
-  vinst1.vOp0Src1 = VectorInstructions::readInterface;
-  vinst1.vOp0 = VectorInstructions::vmult;
-  vinst1.vOp1 = VectorInstructions::nop;
-  vinst1.vOp2 = VectorInstructions::toReduce;
-  vinst1.vOp3Src1 = VectorInstructions::nop;
-  vinst1.vOp3 = VectorInstructions::nop;
-  vinst1.vOp4 = VectorInstructions::nop;
-  vinst1.vDest = VectorInstructions::nop;
+  vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  vinst1.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
+  vinst1.vector_op0 = VectorInstructions::vmult;
+  vinst1.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst1;
 
   // reduction_dim/DIMENSION to do the complete reduction
@@ -135,16 +128,10 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   // inst2 - add bias, write out
   VectorInstructions vinst2;
   vinst2.instType = VectorInstructions::vector;
-  vinst2.vInput = VectorInstructions::readFromReduce;
-  vinst2.vAccumulatePush = VectorInstructions::nop;
-  vinst2.vOp0Src1 = VectorInstructions::nop;
-  vinst2.vOp0 = VectorInstructions::nop;
-  vinst2.vOp1 = VectorInstructions::nop;
-  vinst2.vOp2 = VectorInstructions::nop;
-  vinst2.vOp3Src1 = VectorInstructions::readNormalInterface;
-  vinst2.vOp3 = VectorInstructions::vadd;
-  vinst2.vOp4 = VectorInstructions::nop;
-  vinst2.vDest = VectorInstructions::vWriteOut;
+  vinst2.vector_op0_src0 = VectorInstructions::from_reduction_0;
+  vinst2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
+  vinst2.vector_op2 = VectorInstructions::vadd;
+  vinst2.vdest = VectorInstructions::to_output;
   vector_instruction_config->inst[2] = vinst2;
   vector_instruction_config->instCount[2] = 1;
 

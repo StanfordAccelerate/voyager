@@ -14,6 +14,7 @@ void MapPoolingOperation(const codegen::Operation &param,
   const auto pooling_op = op_list[0];
 
   const auto tiling = get_pool2d_tiling(pooling_op);
+  std::cerr << "pooling tiling: " << tiling << std::endl;
 
   const auto input = pooling_op.kwargs().at("input").tensor();
   const auto output = param.output();
@@ -66,50 +67,32 @@ void MapPoolingOperation(const codegen::Operation &param,
 
   bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
 
-  // perform max/sum reduction
+  // perform max/sum accumulation
   VectorInstructions vinst0;
   vinst0.instType = VectorInstructions::accumulation;
   vinst0.rOp =
       is_max_pool ? VectorInstructions::rmax : VectorInstructions::radd;
   vinst0.rCount = inst_count;
-  vinst0.rDuplicate = false;
-  vinst0.rSqrt = false;
-  vinst0.rReciprocal = false;
-  vinst0.rBroadcast = false;
-  vinst0.rDest = VectorInstructions::toVectorOp0Src0;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
   // feed accumulator
   VectorInstructions vinst1;
   vinst1.instType = VectorInstructions::vector;
-  vinst1.vInput = VectorInstructions::readFromVectorFetch;
-  vinst1.vOp0Src1 = VectorInstructions::nop;
-  vinst1.vOp0 = VectorInstructions::nop;
-  vinst1.vOp1 = VectorInstructions::nop;
-  vinst1.vOp2 = VectorInstructions::nop;
-  vinst1.vOp3 = VectorInstructions::nop;
-  vinst1.vOp4 = VectorInstructions::nop;
-  vinst1.vDest = VectorInstructions::nop;
-  vinst1.vAccumulatePush = true;
+  vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  vinst1.vdest = VectorInstructions::to_accumulate;
   vector_instruction_config->inst[1] = vinst1;
   vector_instruction_config->instCount[1] = inst_count;
 
-  // read out from max accumulator and write out
+  // read out from the accumulator and write out
   VectorInstructions vinst2;
   vinst2.instType = VectorInstructions::vector;
-  vinst2.vInput = VectorInstructions::readFromAccumulation;
-  vinst2.vOp0Src1 = VectorInstructions::nop;
-  vinst2.vOp0 = VectorInstructions::nop;
-  vinst2.vOp1 = VectorInstructions::nop;
-  vinst2.vOp2 = VectorInstructions::nop;
-  vinst2.vOp3 = VectorInstructions::nop;
-  vinst2.vOp4 = VectorInstructions::nop;
-  vinst2.vDest = VectorInstructions::vWriteOut;
+  vinst2.vector_op0_src0 = VectorInstructions::from_accumulation;
+  vinst2.vdest = VectorInstructions::to_output;
 
   if (!is_max_pool) {
-    vinst2.vOp3 = VectorInstructions::vmult;
-    vinst2.vOp3Src1 = VectorInstructions::op3immediate;
+    vinst2.vector_op2 = VectorInstructions::vmult;
+    vinst2.vector_op2_src1 = VectorInstructions::from_immediate_1;
     int kernel_size = tiling.loops[1][tiling.x_loop_index[1]];
     VECTOR_DATATYPE scale = 1.0 / (kernel_size * kernel_size);
     vinst2.immediate1 = scale.bits_rep();

@@ -294,26 +294,23 @@ struct VectorInstructions {
 #ifndef __SYNTHESIS__
   VectorInstructions() {
     instType = 0;
-    vInput = 0;
-    vOp0Src1 = 0;
-    vOp0 = 0;
-    vOp1 = 0;
-    vOp1Src1 = 0;
-    vOp2 = 0;
-    vOp3Src1 = 0;
-    vOp3 = 0;
-    vOp4 = 0;
-    vmapOffset = 0;
-    vAccumulatePush = 0;
-    vDest = 0;
+    vector_op0_src0 = 0;
+    vector_op0_src1 = 0;
+    vector_op2_src1 = 0;
+    vector_op0 = 0;
+    vector_op1 = 0;
+    vector_op2 = 0;
+    vector_op3 = 0;
+    VMAP_OFFSET = 0;
+    vdest = 0;
     rCount = 0;
     rOp = 0;
     rSqrt = 0;
     rReciprocal = 0;
     rMax1 = 0;
     rDuplicate = 0;
-    rDest = 0;
     rBroadcast = 0;
+    rdest = 0;
     immediate0 = 0;
     immediate1 = 0;
   }
@@ -324,70 +321,49 @@ struct VectorInstructions {
   static const unsigned int reduction = 1;
   static const unsigned int accumulation = 2;
 
-  ac_int<3, false> vInput;
-  static const unsigned int readFromSystolicArray = 1;
-  static const unsigned int readFromVectorFetch = 2;
-  static const unsigned int readFromAccumulation = 3;
-  static const unsigned int readFromReduce = 4;
+  ac_int<4, false> vector_op0_src0;
+  ac_int<4, false> vector_op0_src1;
+  ac_int<4, false> vector_op2_src1;
 
-  ac_int<1, false> vDequantize;
-  ac_int<16, false> vDequantizeScale;
+  static const unsigned int from_matrix_unit = 1;
+  static const unsigned int from_vector_fetch_0 = 2;
+  static const unsigned int from_vector_fetch_1 = 3;
+  static const unsigned int from_vector_fetch_2 = 4;
+  static const unsigned int from_accumulation = 5;
+  static const unsigned int from_reduction_0 = 6;
+  static const unsigned int from_reduction_1 = 7;
+  static const unsigned int from_immediate_0 = 8;
+  static const unsigned int from_immediate_1 = 9;
 
-  // src0 refers to lhs and src1 refers to rhs
+  ac_int<1, false> vdequantize;
+  ac_int<16, false> vector_dq_scale;
 
-  // Stage 0: add, mult
-  ac_int<3, false> vOp0Src1;
-  static const unsigned int readInterface = 1;
-  static const unsigned int op0immediate = 2;
-  // static const unsigned int readFromReduce = 4;
-
-  ac_int<2, false> vOp0;  // add, sub, mult
+  // Stage 0: add, sub, mult
+  ac_int<2, false> vector_op0;
   static const unsigned int nop = 0;
   static const unsigned int vadd = 1;
   static const unsigned int vmult = 2;
   static const unsigned int vsub = 3;
 
   // Stage 1: exp
-  ac_int<2, false> vOp1;
+  ac_int<2, false> vector_op1;
   static const unsigned int vexp = 1;
   static const unsigned int vscaleexp = 2;
 
-  ac_int<1, false> vOp1Src1;
-  static const unsigned int op1immediate = 0;
-
-  // Stage 2: send to reduce unit
-  ac_int<1, false> vOp2;
-  static const unsigned int toReduce = 1;
-
-  // Stage 3: add, div
-  ac_int<3, false> vOp3Src1;  // don't read, read from reduce interface 2, or
-                              // normal interface
-  static const unsigned int readReduceInterface = 1;
-  static const unsigned int readNormalInterface = 2;
-  static const unsigned int op3immediate = 3;
-  ac_int<3, false> vOp3;  // add, mult
+  // Stage 3: add, mult, square
+  ac_int<2, false> vector_op2;
   // static const unsigned int vadd = 1;
   // static const unsigned int vmult = 2;
   static const unsigned int vsquare = 3;
 
-  // Stage 4: relu
-  ac_int<3, false> vOp4;
+  // Stage 4: activations
+  ac_int<3, false> vector_op3;
   static const unsigned int vrelu = 1;
   static const unsigned int vrelumask = 2;
   static const unsigned int vmap = 3;
   static const unsigned int vgelu = 4;
   static const unsigned int vsilu = 5;
-  ac_int<64, false> vmapOffset;
-
-  // Stage 5: quantize
-  ac_int<1, false> vOp5;
-  static const unsigned int vquantize = 1;
-
-  ac_int<1, false> vAccumulatePush;
-
-  // Vector Unit write out
-  ac_int<1, false> vDest;
-  static const unsigned int vWriteOut = 1;
+  ac_int<64, false> VMAP_OFFSET;
 
   ac_int<10, false> rCount;
   ac_int<3, false> rOp;
@@ -398,48 +374,45 @@ struct VectorInstructions {
   ac_int<1, false> rReciprocal;
   ac_int<1, false> rMax1;
   ac_int<1, false> rDuplicate;
+  ac_int<1, false> rBroadcast;  // broadcast by immediate0
 
-  ac_int<3, false> rDest;
-  static const unsigned int toVectorOp0Src0 = 1;
-  static const unsigned int toVectorOp0Src1 = 2;
-  static const unsigned int toVectorOp3Src1 = 3;
-  static const unsigned int sWriteOut = 4;
+  ac_int<1, false> rdest;
+  static const unsigned int to_op0 = 0;
+  static const unsigned int to_op2 = 1;
 
-  // broadcast count comes from {immediate1,immediate0}
-  ac_int<1, false> rBroadcast;
+  ac_int<2, false> vdest;
+  static const unsigned int to_output = 1;
+  static const unsigned int to_reduce = 2;
+  static const unsigned int to_accumulate = 3;
 
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
 
-  static const unsigned int width = 160;
+  static const unsigned int width = 157;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & instType;
-    m & vInput;
-    m & vDequantize;
-    m & vDequantizeScale;
-    m & vOp0Src1;
-    m & vOp0;
-    m & vOp1;
-    m & vOp1Src1;
-    m & vOp2;
-    m & vOp3Src1;
-    m & vOp3;
-    m & vOp4;
-    m & vmapOffset;
-    m & vOp5;
-    m & vAccumulatePush;
-    m & vDest;
+    m & vector_op0_src0;
+    m & vector_op0_src1;
+    m & vector_op2_src1;
+    m & vdequantize;
+    m & vector_dq_scale;
+    m & vector_op0;
+    m & vector_op1;
+    m & vector_op2;
+    m & vector_op3;
+    m & VMAP_OFFSET;
     m & rCount;
     m & rOp;
     m & rSqrt;
     m & rReciprocal;
     m & rMax1;
     m & rDuplicate;
-    m & rDest;
     m & rBroadcast;
+    m & rdest;
+    m & vdest;
     m & immediate0;
     m & immediate1;
   }
@@ -454,28 +427,25 @@ struct VectorInstructions {
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorInstructions& params) {
     os << "instType: " << params.instType << std::endl;
-    os << "vInput: " << params.vInput << std::endl;
-    os << "vDequantize: " << params.vDequantize << std::endl;
-    os << "vDequantizeScale: " << params.vDequantizeScale << std::endl;
-    os << "vOp0Src1: " << params.vOp0Src1 << std::endl;
-    os << "vOp0: " << params.vOp0 << std::endl;
-    os << "vOp1: " << params.vOp1 << std::endl;
-    os << "vOp2: " << params.vOp2 << std::endl;
-    os << "vOp3Src1: " << params.vOp3Src1 << std::endl;
-    os << "vOp3: " << params.vOp3 << std::endl;
-    os << "vOp4: " << params.vOp4 << std::endl;
-    os << "vmapOffset: " << params.vmapOffset << std::endl;
-    os << "vOp5: " << params.vOp5 << std::endl;
-    os << "vAccumulatePush: " << params.vAccumulatePush << std::endl;
-    os << "vDest: " << params.vDest << std::endl;
+    os << "vector_op0_src0: " << params.vector_op0_src0 << std::endl;
+    os << "vector_op0_src1: " << params.vector_op0_src1 << std::endl;
+    os << "vector_op2_src1: " << params.vector_op2_src1 << std::endl;
+    os << "vdequantize: " << params.vdequantize << std::endl;
+    os << "vector_dq_scale: " << params.vector_dq_scale << std::endl;
+    os << "vector_op0: " << params.vector_op0 << std::endl;
+    os << "vector_op1: " << params.vector_op1 << std::endl;
+    os << "vector_op2: " << params.vector_op2 << std::endl;
+    os << "vector_op3: " << params.vector_op3 << std::endl;
+    os << "VMAP_OFFSET: " << params.VMAP_OFFSET << std::endl;
     os << "rCount: " << params.rCount << std::endl;
     os << "rOp: " << params.rOp << std::endl;
     os << "rSqrt: " << params.rSqrt << std::endl;
     os << "rReciprocal: " << params.rReciprocal << std::endl;
     os << "rMax1: " << params.rMax1 << std::endl;
     os << "rDuplicate: " << params.rDuplicate << std::endl;
-    os << "rDest: " << params.rDest << std::endl;
     os << "rBroadcast: " << params.rBroadcast << std::endl;
+    os << "rdest: " << params.rdest << std::endl;
+    os << "vdest: " << params.vdest << std::endl;
     os << "immediate0: " << params.immediate0 << std::endl;
     os << "immediate1: " << params.immediate1 << std::endl;
     return os;
@@ -483,21 +453,22 @@ struct VectorInstructions {
 
   inline friend bool operator==(const VectorInstructions& lhs,
                                 const VectorInstructions& rhs) {
-    if (lhs.instType != rhs.instType || lhs.vInput != rhs.vInput ||
-        lhs.vDequantize != rhs.vDequantize || lhs.vOp0Src1 != rhs.vOp0Src1 ||
-        lhs.vOp0 != rhs.vOp0 || lhs.vOp1 != rhs.vOp1 ||
-        lhs.vOp1Src1 != rhs.vOp1Src1 || lhs.vOp2 != rhs.vOp2 ||
-        lhs.vOp3Src1 != rhs.vOp3Src1 || lhs.vOp3 != rhs.vOp3 ||
-        lhs.vOp4 != rhs.vOp4 || lhs.vOp5 != rhs.vOp5 ||
-        lhs.vAccumulatePush != rhs.vAccumulatePush || lhs.vDest != rhs.vDest ||
-        lhs.rCount != rhs.rCount || lhs.rOp != rhs.rOp ||
-        lhs.rSqrt != rhs.rSqrt || lhs.rReciprocal != rhs.rReciprocal ||
-        lhs.rMax1 != rhs.rMax1 || lhs.rDuplicate != rhs.rDuplicate ||
-        lhs.rDest != rhs.rDest || lhs.rBroadcast != rhs.rBroadcast ||
-        lhs.immediate0 != rhs.immediate0 || lhs.immediate1 != rhs.immediate1)
-      return false;
-
-    return true;
+    return lhs.instType == rhs.instType &&
+           lhs.vector_op0_src0 == rhs.vector_op0_src0 &&
+           lhs.vector_op0_src1 == rhs.vector_op0_src1 &&
+           lhs.vector_op2_src1 == rhs.vector_op2_src1 &&
+           lhs.vector_op0 == rhs.vector_op0 &&
+           lhs.vector_op1 == rhs.vector_op1 &&
+           lhs.vector_op2 == rhs.vector_op2 &&
+           lhs.vector_op3 == rhs.vector_op3 &&
+           lhs.vdequantize == rhs.vdequantize &&
+           lhs.vector_dq_scale == rhs.vector_dq_scale &&
+           lhs.rCount == rhs.rCount && lhs.rOp == rhs.rOp &&
+           lhs.rSqrt == rhs.rSqrt && lhs.rReciprocal == rhs.rReciprocal &&
+           lhs.rMax1 == rhs.rMax1 && lhs.rDuplicate == rhs.rDuplicate &&
+           lhs.rBroadcast == rhs.rBroadcast && lhs.rdest == rhs.rdest &&
+           lhs.vdest == rhs.vdest && lhs.immediate0 == rhs.immediate0 &&
+           lhs.immediate1 == rhs.immediate1;
   }
 };
 
@@ -1046,49 +1017,34 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].instType;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vInput;
+      m& inst[j].vector_op0_src0;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vDequantize;
+      m& inst[j].vector_op0_src1;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vDequantizeScale;
+      m& inst[j].vector_op2_src1;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp0Src1;
+      m& inst[j].vdequantize;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp0;
+      m& inst[j].vector_dq_scale;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp1;
+      m& inst[j].vector_op0;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp1Src1;
+      m& inst[j].vector_op1;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp2;
+      m& inst[j].vector_op2;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp3Src1;
+      m& inst[j].vector_op3;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp3;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp4;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].vmapOffset;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].vOp5;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].vAccumulatePush;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].vDest;
+      m& inst[j].VMAP_OFFSET;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rCount;
@@ -1109,10 +1065,13 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].rDuplicate;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rDest;
+      m& inst[j].rBroadcast;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rBroadcast;
+      m& inst[j].rdest;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].vdest;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].immediate0;

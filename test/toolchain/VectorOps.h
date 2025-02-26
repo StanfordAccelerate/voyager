@@ -157,30 +157,14 @@ void set_vector_immediate(const float scalar, const int stage,
   }
 
   if (stage == 0) {
-    inst.vOp0Src1 = VectorInstructions::op0immediate;
+    inst.vector_op0_src1 = VectorInstructions::from_immediate_0;
     inst.immediate0 = immediate.bits_rep();
   } else if (stage == 3) {
-    inst.vOp3Src1 = VectorInstructions::op3immediate;
+    inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
   } else if (stage == 5) {
     inst.immediate1 = immediate.bits_rep();
   }
-}
-
-bool is_transpose(const std::vector<int> &dims) {
-  int n = dims.size();
-  // If there are fewer than 2 axes, there's nothing to swap.
-  if (n < 2) return false;
-
-  // Check that all axes except the last two are in their natural order.
-  for (int i = 0; i < n - 2; ++i) {
-    if (dims[i] != i) {
-      return false;
-    }
-  }
-
-  // Check that the last two axes are swapped.
-  return (dims[n - 2] == n - 1 && dims[n - 1] == n - 2);
 }
 
 void MapVectorOperations(const codegen::Operation &param,
@@ -439,9 +423,8 @@ void MapVectorOperations(const codegen::Operation &param,
   VectorInstructions inst;
   memset(&inst, 0, sizeof(inst));
   inst.instType = VectorInstructions::vector;
-  inst.vInput = VectorInstructions::readFromVectorFetch;
-  inst.vAccumulatePush = VectorInstructions::nop;
-  inst.vDest = VectorInstructions::vWriteOut;
+  inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  inst.vdest = VectorInstructions::to_output;
 
   auto inst_map = get_vector_instruction_mapping();
 
@@ -463,7 +446,7 @@ void MapVectorOperations(const codegen::Operation &param,
         vector_params->quantize_output = true;
         vector_params->output_scale = immediate.bits_rep();
       } else {
-        inst.vDequantize = true;
+        inst.vdequantize = true;
         inst.immediate0 = immediate.bits_rep();
       }
     } else if (opcode == "quantize_mx") {
@@ -471,7 +454,7 @@ void MapVectorOperations(const codegen::Operation &param,
       vector_params->SCALE_OFFSET =
           param.outputs().tensors(0).memory().address();
     } else {
-      if (curr_stage == 5) {
+      if (curr_stage == 4) {
         // we have already processed all the stages
         assert(i == op_list.size() - 1);
         break;
@@ -487,34 +470,44 @@ void MapVectorOperations(const codegen::Operation &param,
         if (matched) {
           unsigned int vop = inst_map[opcode];
           if (stage == 0) {
-            inst.vOp0 = vop;
+            inst.vector_op0 = vop;
           } else if (stage == 1) {
-            inst.vOp1 = vop;
+            inst.vector_op1 = vop;
           } else if (stage == 2) {
-            inst.vOp2 = vop;
+            inst.vector_op2 = vop;
           } else if (stage == 3) {
-            inst.vOp3 = vop;
-          } else if (stage == 4) {
-            inst.vOp4 = vop;
+            inst.vector_op3 = vop;
           }
 
-          curr_stage = stage + 1;
           if (opcode == "vmap") {
             const auto other = op.kwargs().at("other").tensor();
-            inst.vmapOffset = other.memory().address();
+            inst.VMAP_OFFSET = other.memory().address();
+          } else if (opcode == "neg") {
+            const auto self = op.kwargs().at("input").tensor();
+            const auto output_shape = squeeze_shape(get_shape(self));
+
+            inst.vector_op0_src0 = VectorInstructions::from_immediate_0;
+
+            VECTOR_DATATYPE immediate = 0;
+            inst.immediate0 = immediate.bits_rep();
+
+            inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_0;
+
+            set_vector_addr_gen1(self, output_shape, accelerator_memory_map,
+                                 vector_params);
           } else if (op.kwargs().contains("other")) {
             const auto other = op.kwargs().at("other");
 
             if (other.has_float_value() || other.has_int_value()) {
               float scalar = other.has_float_value() ? other.float_value()
                                                      : other.int_value();
-              set_immediate(scalar, stage, opcode, inst);
+              set_vector_immediate(scalar, stage, opcode, inst);
             } else if (other.has_tensor()) {
               const auto tensor = other.tensor();
 
               if (get_size(tensor) == 1) {
                 float scalar = read_constant_param(tensor);
-                set_immediate(scalar, stage, opcode, inst);
+                set_vector_immediate(scalar, stage, opcode, inst);
               } else {
                 const auto self = op.kwargs().at("input").tensor();
                 const auto tensor_to_load = tensor.has_memory() ? tensor : self;
@@ -525,17 +518,19 @@ void MapVectorOperations(const codegen::Operation &param,
                     squeeze_shape(broadcast_shape(input_shape, other_shape));
 
                 if (stage == 0) {
-                  inst.vOp0Src1 = VectorInstructions::readInterface;
+                  inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
                   set_vector_addr_gen1(tensor_to_load, output_shape,
                                        accelerator_memory_map, vector_params);
-                } else if (stage == 3) {
-                  inst.vOp3Src1 = VectorInstructions::readNormalInterface;
+                } else if (stage == 2) {
+                  inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
                   set_vector_addr_gen2(tensor_to_load, output_shape,
                                        accelerator_memory_map, vector_params);
                 }
               }
             }
           }
+
+          curr_stage = stage + 1;
 
           break;
         }

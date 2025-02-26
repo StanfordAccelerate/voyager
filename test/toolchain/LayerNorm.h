@@ -82,7 +82,6 @@ void MapLayerNorm(const codegen::Operation &param,
   instr0_0.rCount = outer_dim / OC_DIMENSION;
   instr0_0.rOp = VectorInstructions::radd;
   instr0_0.rDuplicate = 1;
-  instr0_0.rDest = VectorInstructions::toVectorOp0Src1;
   instr0_0.rBroadcast = 1;
   instr0_0.immediate0 = outer_dim / OC_DIMENSION;
   vinstr_config->inst[0] = instr0_0;
@@ -91,34 +90,22 @@ void MapLayerNorm(const codegen::Operation &param,
   // Scale inputs by 1 / norm_size and send to the reduction engine
   VectorInstructions instr0_1;
   instr0_1.instType = VectorInstructions::vector;
-  instr0_1.vInput = VectorInstructions::readFromVectorFetch;
-  instr0_1.vAccumulatePush = VectorInstructions::nop;
-  instr0_1.vOp0Src1 = VectorInstructions::op0immediate;
-  instr0_1.vOp0 = VectorInstructions::vmult;
+  instr0_1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  instr0_1.vector_op0_src1 = VectorInstructions::from_immediate_0;
+  instr0_1.vector_op0 = VectorInstructions::vmult;
   VECTOR_DATATYPE immediate = 1.0 / outer_dim;
   instr0_1.immediate0 = immediate.bits_rep();
-  instr0_1.vOp1 = VectorInstructions::nop;
-  instr0_1.vOp2 = VectorInstructions::toReduce;
-  instr0_1.vOp3Src1 = VectorInstructions::nop;
-  instr0_1.vOp3 = VectorInstructions::nop;
-  instr0_1.vOp4 = VectorInstructions::nop;
-  instr0_1.vDest = VectorInstructions::nop;
+  instr0_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = instr0_1;
   vinstr_config->instCount[1] = outer_dim / OC_DIMENSION;
 
   // Subtract mean from tensor
   VectorInstructions instr0_2;
   instr0_2.instType = VectorInstructions::vector;
-  instr0_2.vInput = VectorInstructions::readFromVectorFetch;
-  instr0_2.vAccumulatePush = VectorInstructions::nop;
-  instr0_2.vOp0 = VectorInstructions::vsub;
-  instr0_2.vOp0Src1 = VectorInstructions::readFromReduce;
-  instr0_2.vOp1 = VectorInstructions::nop;
-  instr0_2.vOp2 = VectorInstructions::nop;
-  instr0_2.vOp3Src1 = VectorInstructions::nop;
-  instr0_2.vOp3 = VectorInstructions::nop;
-  instr0_2.vOp4 = VectorInstructions::nop;
-  instr0_2.vDest = VectorInstructions::vWriteOut;
+  instr0_2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  instr0_2.vector_op0_src1 = VectorInstructions::from_reduction_0;
+  instr0_2.vector_op0 = VectorInstructions::vsub;
+  instr0_2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[2] = instr0_2;
   vinstr_config->instCount[2] = outer_dim / OC_DIMENSION;
 
@@ -171,10 +158,9 @@ void MapLayerNorm(const codegen::Operation &param,
   instr1_0.instType = VectorInstructions::reduction;
   instr1_0.rCount = outer_dim / OC_DIMENSION;
   instr1_0.rOp = VectorInstructions::radd;
-  instr1_0.rDuplicate = 1;
   instr1_0.rSqrt = 1;
   instr1_0.rReciprocal = 1;
-  instr1_0.rDest = VectorInstructions::toVectorOp0Src1;
+  instr1_0.rDuplicate = 1;
   instr1_0.rBroadcast = 1;
   instr1_0.immediate0 = outer_dim / OC_DIMENSION;
   vinstr_config->inst[0] = instr1_0;
@@ -183,34 +169,23 @@ void MapLayerNorm(const codegen::Operation &param,
   // Perform squaring and send outputs to reduction engine
   VectorInstructions instr1_1;
   instr1_1.instType = VectorInstructions::vector;
-  instr1_1.vInput = VectorInstructions::readFromVectorFetch;
-  instr1_1.vAccumulatePush = VectorInstructions::nop;
-  instr1_1.vOp0Src1 = VectorInstructions::nop;
-  instr1_1.vOp0 = VectorInstructions::nop;
-  instr1_1.vOp1 = VectorInstructions::nop;
-  instr1_1.vOp2 = VectorInstructions::toReduce;
-  instr1_1.vOp3Src1 = VectorInstructions::nop;
-  instr1_1.vOp3 = VectorInstructions::vsquare;
-  instr1_1.vOp4 = VectorInstructions::nop;
-  instr1_1.vDest = VectorInstructions::nop;
+  instr1_1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  instr1_1.vector_op2 = VectorInstructions::vsquare;
+  instr1_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = instr1_1;
   vinstr_config->instCount[1] = outer_dim / OC_DIMENSION;
 
   // Multiply inputs with the inverse sqrt of the variance
   VectorInstructions instr1_2;
   instr1_2.instType = VectorInstructions::vector;
-  instr1_2.vInput = VectorInstructions::readFromVectorFetch;
-  instr1_2.vAccumulatePush = VectorInstructions::nop;
-  instr1_2.vOp0 = VectorInstructions::vmult;
-  instr1_2.vOp0Src1 = VectorInstructions::readFromReduce;
-  instr1_2.vOp1 = VectorInstructions::nop;
-  instr1_2.vOp2 = VectorInstructions::nop;
-  instr1_2.vOp3Src1 = VectorInstructions::op3immediate;
+  instr1_2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  instr1_2.vector_op0_src1 = VectorInstructions::from_reduction_0;
+  instr1_2.vector_op2_src1 = VectorInstructions::from_immediate_1;
+  instr1_2.vector_op0 = VectorInstructions::vmult;
   VECTOR_DATATYPE divisor = sqrt(outer_dim);
   instr1_2.immediate1 = divisor.bits_rep();
-  instr1_2.vOp3 = VectorInstructions::vmult;
-  instr1_2.vOp4 = VectorInstructions::nop;
-  instr1_2.vDest = VectorInstructions::vWriteOut;
+  instr1_2.vector_op2 = VectorInstructions::vmult;
+  instr1_2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[2] = instr1_2;
   vinstr_config->instCount[2] = outer_dim / OC_DIMENSION;
 
@@ -311,21 +286,14 @@ void MapLayerNorm(const codegen::Operation &param,
   // inputs x weights + bias
   VectorInstructions instr2;
   instr2.instType = VectorInstructions::vector;
-  instr2.vInput = VectorInstructions::readFromVectorFetch;
-  instr2.vAccumulatePush = VectorInstructions::nop;
-  instr2.vOp0Src1 = VectorInstructions::readInterface;
-  instr2.vOp0 = VectorInstructions::vmult;
-  instr2.vOp1 = VectorInstructions::nop;
-  instr2.vOp2 = VectorInstructions::nop;
+  instr2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  instr2.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
+  instr2.vector_op0 = VectorInstructions::vmult;
   if (has_bias) {
-    instr2.vOp3Src1 = VectorInstructions::readNormalInterface;
-    instr2.vOp3 = VectorInstructions::vadd;
-  } else {
-    instr2.vOp3Src1 = VectorInstructions::nop;
-    instr2.vOp3 = VectorInstructions::nop;
+    instr2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
+    instr2.vector_op2 = VectorInstructions::vadd;
   }
-  instr2.vOp4 = VectorInstructions::nop;
-  instr2.vDest = VectorInstructions::vWriteOut;
+  instr2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[0] = instr2;
   vinstr_config->instCount[0] = inner_dim * outer_dim / OC_DIMENSION;
 

@@ -8,7 +8,8 @@
 using namespace ac_math;
 
 const std::set<std::string> unary_ops = {"relu", "relu_", "gelu", "gelu_",
-                                         "silu", "silu_", "sqrt", "sqrt_"};
+                                         "silu", "silu_", "sqrt", "sqrt_",
+                                         "neg",  "neg_"};
 const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
                                            "mul", "mul_", "div", "div_"};
 
@@ -45,6 +46,8 @@ inline T *perform_unary_operation(T *input, const std::vector<int> shape,
       result[i] = silu(input[i]);
     } else if (opcode == "sqrt" || opcode == "sqrt_") {
       result[i] = input[i].sqrt();
+    } else if (opcode == "neg" || opcode == "neg_") {
+      result[i] = -input[i];
     } else {
       std::cerr << "Unsupported vector instruction: " << opcode << std::endl;
       std::abort();
