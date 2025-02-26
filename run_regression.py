@@ -36,16 +36,29 @@ def print_test_results(test_results, layers, output_folder):
         failed = model_df[model_df["Status"] == False]
 
         print("Passed:")
-        print(passed["Layer"].to_string(index=False) if not passed.empty else "None", flush=True)
+        print(
+            passed["Layer"].to_string(index=False) if not passed.empty else "None",
+            flush=True,
+        )
         print("Failed:")
-        print(failed["Layer"].to_string(index=False) if not failed.empty else "None", flush=True)
+        print(
+            failed["Layer"].to_string(index=False) if not failed.empty else "None",
+            flush=True,
+        )
 
         # if runtime column exists, print runtime of each layer
         if "Runtime" in model_df.columns:
             print("Runtime:")
-            print(model_df[["Layer", "Runtime", "Ideal", "RuntimeType"]].to_string(index=False), flush=True)
+            print(
+                model_df[["Layer", "Runtime", "Ideal", "RuntimeType"]].to_string(
+                    index=False
+                ),
+                flush=True,
+            )
             utilization = model_df["Ideal"].sum() / model_df["Runtime"].sum()
-            matrix_runtime = model_df[model_df["RuntimeType"] == "matrix"]["Runtime"].sum()
+            matrix_runtime = model_df[model_df["RuntimeType"] == "matrix"][
+                "Runtime"
+            ].sum()
             matrix_ideal = model_df[model_df["RuntimeType"] == "matrix"]["Ideal"].sum()
             matri_utilization = matrix_ideal / matrix_runtime
             print(f"Utilization: {utilization:.3f}")
@@ -140,7 +153,7 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=1 * 60 * 60,
+                timeout=10 * 60 if fast else 1 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{layer} timed out")
@@ -196,6 +209,12 @@ def run_rtl_test(model, layer, output_folder):
     # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an
     # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
+    if "INPUT_BUFFER_SIZE" not in env_vars:
+        env_vars["INPUT_BUFFER_SIZE"] = "1024"
+    if "WEIGHT_BUFFER_SIZE" not in env_vars:
+        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
+    if "ACCUM_BUFFER_SIZE" not in env_vars:
+        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
 
     # we occasionally see the test fail due to filesystem issues ("no rule to make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
@@ -303,9 +322,9 @@ def run_rtl_tests(layers, num_processes, results_folder, keep_build=False):
     subprocess.run(
         [
             "make",
-            f"{env_vars['CODEGEN_DIR']}/networks/resnet18/{env_vars['DATATYPE']}/model.txt"
+            f"{env_vars['CODEGEN_DIR']}/networks/resnet18/{env_vars['DATATYPE']}/model.txt",
         ],
-        env=os.environ
+        env=os.environ,
     )
 
     # build VCS simulation binary
@@ -314,6 +333,13 @@ def run_rtl_tests(layers, num_processes, results_folder, keep_build=False):
         env_vars["TESTS"] = "submodule_0"
         env_vars["SIMS"] = "gold,accelerator"
         env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
+
+        if "INPUT_BUFFER_SIZE" not in env_vars:
+            env_vars["INPUT_BUFFER_SIZE"] = "1024"
+        if "WEIGHT_BUFFER_SIZE" not in env_vars:
+            env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
+        if "ACCUM_BUFFER_SIZE" not in env_vars:
+            env_vars["ACCUM_BUFFER_SIZE"] = "1024"
 
         subprocess.run(
             ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "build"],
@@ -348,13 +374,23 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         print(f"Only testing accuracy for the first model: {model[0]}")
     model = model[0]
 
+    env_vars = os.environ.copy()
+    env_vars["NETWORK"] = model
+
+    if "INPUT_BUFFER_SIZE" not in env_vars:
+        env_vars["INPUT_BUFFER_SIZE"] = "1024"
+    if "WEIGHT_BUFFER_SIZE" not in env_vars:
+        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
+    if "ACCUM_BUFFER_SIZE" not in env_vars:
+        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
+
     # Build AccuracyTester binary
-    subprocess.run(["make", "clean"], env=os.environ)
+    subprocess.run(["make", "clean"], env=env_vars)
 
     with open(f"{output_folder}/build.log", "w") as stdout_file:
         subprocess.run(
             ["make", "-j", "AccuracyTester"],
-            env=os.environ,
+            env=env_vars,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
         )
@@ -418,7 +454,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid model")
 
-    if os.environ["DATATYPE"] == "E4M3":
+    if env_vars["DATATYPE"] == "E4M3":
         quantization_args = [
             "--activation",
             "fp8_e4m3",
@@ -426,7 +462,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "fp8_e4m3",
             "--bf16",
         ]
-    elif os.environ["DATATYPE"] == "INT8":
+    elif env_vars["DATATYPE"] == "INT8":
         quantization_args = [
             "--activation",
             "int8,qs=per_tensor_symmetric",
@@ -436,7 +472,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "int24",
             "--bf16",
         ]
-    elif os.environ["DATATYPE"] == "P8_1":
+    elif env_vars["DATATYPE"] == "P8_1":
         quantization_args = [
             "--activation",
             "posit8_1",
@@ -444,9 +480,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "posit8_1",
             "--bf16",
         ]
-    elif os.environ["DATATYPE"] == "CFLOAT":
+    elif env_vars["DATATYPE"] == "CFLOAT":
         quantization_args = []
-    elif os.environ["DATATYPE"] == "MXINT8":
+    elif env_vars["DATATYPE"] == "MXINT8":
         quantization_args = [
             "--force_scale_power_of_two",
             "--activation",
@@ -458,27 +494,49 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid datatype")
 
-    subprocess.run(
-        [
-            "python",
-            "test/compiler/run_compiler.py",
-            model,
-            "--model_name_or_path",
-            model_path,
-            *quantization_args,
-            "--output_dir",
-            "test/compiler/networks/" + model + "/" + os.environ["DATATYPE"],
-        ]
-    )
+    with open(f"{output_folder}/{model}_{dataset}_compiler.log", "w") as stdout_file:
+        subprocess.run(
+            [
+                "python",
+                "test/compiler/run_compiler.py",
+                model,
+                "--model_name_or_path",
+                model_path,
+                *quantization_args,
+                "--output_dir",
+                "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
+            ],
+            stdout=stdout_file,
+            stderr=subprocess.STDOUT,
+        )
+
+    with open(f"{output_folder}/{model}_{dataset}_tiler.log", "w") as stdout_file:
+        subprocess.run(
+            [
+                "python",
+                "test/compiler/run_tiler.py",
+                "--codegen_dir",
+                f"test/compiler/networks/{model}/{env_vars['DATATYPE']}",
+                "--IC_dimension",
+                env_vars["IC_DIMENSION"],
+                "--OC_dimension",
+                env_vars["OC_DIMENSION"],
+                "--input_buffer_size",
+                env_vars["INPUT_BUFFER_SIZE"],
+                "--weight_buffer_size",
+                env_vars["WEIGHT_BUFFER_SIZE"],
+                "--accum_buffer_size",
+                env_vars["ACCUM_BUFFER_SIZE"],
+            ],
+            stdout=stdout_file,
+            stderr=subprocess.STDOUT,
+        )
 
     # Run accuracy test
     additional_args = []
     if dataset == "squad":
-        additional_args = ["1000"] # limit number of samples to 1000 for squad dataset
+        additional_args = ["1000"]  # limit number of samples to 1000 for squad dataset
     with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
-        env_vars = os.environ.copy()
-        env_vars["NETWORK"] = model
-
         try:
             subprocess.run(
                 [
@@ -575,7 +633,9 @@ def main():
             ) as f:
                 layers[network] = f.read().splitlines()
     else:
-        assert len(args.models) == 1, "Only one model can be specified when using --tests"
+        assert (
+            len(args.models) == 1
+        ), "Only one model can be specified when using --tests"
         layers[args.models[0]] = args.tests.split(",")
 
     if args.sims == "systemc" or args.sims == "fast-systemc":
@@ -583,7 +643,9 @@ def main():
             layers, args.num_processes, results_folder, args.sims == "fast-systemc"
         )
     elif args.sims == "rtl":
-        success = run_rtl_tests(layers, args.num_processes, results_folder, args.keep_build)
+        success = run_rtl_tests(
+            layers, args.num_processes, results_folder, args.keep_build
+        )
     elif args.sims == "gold_model":
         success = run_gold_model_tests(layers, args.num_processes, results_folder)
     elif args.sims == "accuracy":

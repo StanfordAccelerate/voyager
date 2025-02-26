@@ -231,10 +231,11 @@ SC_MODULE(MatrixProcessor) {
         }
       }
 
-      ac_int<32, false> totalOps =
-          params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
-          params.loops[1][0] * params.loops[1][1] * params.loops[1][2] *
-          params.loops[1][3] * params.loops[1][4] * params.loops[1][5];
+      ac_int<32, false> totalOps = params.loops[0][0] * params.loops[0][1] *
+                                   params.loops[0][2] * params.loops[0][3] *
+                                   params.loops[1][0] * params.loops[1][1] *
+                                   params.loops[1][2] * params.loops[1][3] *
+                                   params.loops[1][4] * params.loops[1][5];
 
 #ifdef __SYNTHESIS__
       Pack1D<AccumBuffer, NCOLS> accumulation_buffer[BUFFER_SIZE];
@@ -301,6 +302,7 @@ SC_MODULE(MatrixProcessor) {
         bool stallInputs = false;
 
         bool isAccumulation =
+            loop_counters[0][params.reductionLoopIndex[0]] != 0 ||
             loop_counters[1][params.reductionLoopIndex[1]] != 0 ||
             loop_counters[1][params.fxIndex] != 0 ||
             loop_counters[1][params.fyIndex] != 0;
@@ -354,6 +356,7 @@ SC_MODULE(MatrixProcessor) {
 
         if constexpr (!IS_MX) {
           bool firstAccumulation =
+              loop_counters[0][params.reductionLoopIndex[0]] == 0 &&
               loop_counters[1][params.reductionLoopIndex[1]] == 0 &&
               loop_counters[1][params.fxIndex] == 0 &&
               loop_counters[1][params.fyIndex] == 0;
@@ -404,6 +407,8 @@ SC_MODULE(MatrixProcessor) {
           outputStep++;
           // CCS_LOG("systolic array output: " << outputs);
           bool accumulationFinished =
+              (loop_counters_out[0][params.reductionLoopIndex[0]] ==
+               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
               (loop_counters_out[1][params.reductionLoopIndex[1]] ==
                params.loops[1][params.reductionLoopIndex[1]] - 1) &&
               (loop_counters_out[1][params.fxIndex] ==
@@ -493,6 +498,8 @@ SC_MODULE(MatrixProcessor) {
 
           DLOG("systolic array output: " << outputs);
           bool accumulationFinished =
+              (loop_counters_out[0][params.reductionLoopIndex[0]] ==
+               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
               (loop_counters_out[1][params.reductionLoopIndex[1]] ==
                params.loops[1][params.reductionLoopIndex[1]] - 1) &&
               (loop_counters_out[1][params.fxIndex] ==
@@ -579,10 +586,11 @@ SC_MODULE(MatrixProcessor) {
           }
         }
 
-        ac_int<32, false> totalOps =
-            params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
-            params.loops[1][0] * params.loops[1][1] * params.loops[1][2] *
-            params.loops[1][3] * params.loops[1][4] * params.loops[1][5];
+        ac_int<32, false> totalOps = params.loops[0][0] * params.loops[0][1] *
+                                     params.loops[0][2] * params.loops[0][3] *
+                                     params.loops[1][0] * params.loops[1][1] *
+                                     params.loops[1][2] * params.loops[1][3] *
+                                     params.loops[1][4] * params.loops[1][5];
 
 #ifdef __SYNTHESIS__
         Pack1D<AccumBuffer, NCOLS> accumulation_buffer[BUFFER_SIZE];
@@ -607,6 +615,7 @@ SC_MODULE(MatrixProcessor) {
         while (step < totalOps) {
           // CCS_LOG("acc step " << step << " out of " << totalOps);
           bool firstAccumulation =
+              loop_counters[0][params.reductionLoopIndex[0]] == 0 &&
               loop_counters[1][params.reductionLoopIndex[1]] == 0 &&
               loop_counters[1][params.fxIndex] == 0 &&
               loop_counters[1][params.fyIndex] == 0;
@@ -695,6 +704,8 @@ SC_MODULE(MatrixProcessor) {
                      loop_counters[1][params.inputXLoopIndex[1]];
 
           bool accumulationFinished =
+              (loop_counters[0][params.reductionLoopIndex[0]] ==
+               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
               (loop_counters[1][params.reductionLoopIndex[1]] ==
                params.loops[1][params.reductionLoopIndex[1]] - 1) &&
               (loop_counters[1][params.fxIndex] ==

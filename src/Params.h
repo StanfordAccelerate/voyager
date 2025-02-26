@@ -79,7 +79,7 @@ struct MatrixParams : BaseParams {
   // in the inner loop, there are actually 2 reduction loops: the
   // standard reduction loop and the reduction that is parallelized in
   // the systolic array
-  ac_int<3, false> weightAddressGenReductionLoopIndex[2];
+  ac_int<3, false> weightAddressGenReductionLoopIndex[3];
   ac_int<3, false> weightAddressGenWeightLoopIndex[2];
   ac_int<3, false> weightAddressGenFxIndex;
   ac_int<3, false> weightAddressGenFyIndex;
@@ -103,7 +103,7 @@ struct MatrixParams : BaseParams {
 
   static const unsigned int width =
       5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
-      (6 + 3) * 2 * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 3 + 8;
+      ((6 + 3) * 2 + 1) * 3 /* Loop indices */ + 8 * 1 /* Bools */ + 3 + 8;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -139,7 +139,7 @@ struct MatrixParams : BaseParams {
         m& weightAddressGenLoops[i][j];
       }
     }
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
       m& weightAddressGenReductionLoopIndex[i];
     }
     for (int i = 0; i < 2; i++) {
@@ -207,7 +207,7 @@ struct MatrixParams : BaseParams {
            << "]: " << params.weightAddressGenLoops[i][j] << std::endl;
       }
     }
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
       os << "weightAddressGenReductionLoopIndex[" << i
          << "]: " << params.weightAddressGenReductionLoopIndex[i] << std::endl;
     }
@@ -247,16 +247,21 @@ struct MatrixParams : BaseParams {
     }
 
     for (int i = 0; i < 2; i++) {
+      if (lhs.reductionLoopIndex[i] != rhs.reductionLoopIndex[i]) return false;
+    }
+
+    for (int i = 0; i < 2; i++) {
       if (lhs.inputXLoopIndex[i] != rhs.inputXLoopIndex[i]) return false;
       if (lhs.inputYLoopIndex[i] != rhs.inputYLoopIndex[i]) return false;
-      if (lhs.reductionLoopIndex[i] != rhs.reductionLoopIndex[i]) return false;
       if (lhs.weightLoopIndex[i] != rhs.weightLoopIndex[i]) return false;
       if (lhs.weightReuseIndex[i] != rhs.weightReuseIndex[i]) return false;
-      if (lhs.weightAddressGenReductionLoopIndex[i] !=
-          rhs.weightAddressGenReductionLoopIndex[i])
-        return false;
       if (lhs.weightAddressGenWeightLoopIndex[i] !=
           rhs.weightAddressGenWeightLoopIndex[i])
+        return false;
+    }
+    for (int i = 0; i < 3; i++) {
+      if (lhs.weightAddressGenReductionLoopIndex[i] !=
+          rhs.weightAddressGenReductionLoopIndex[i])
         return false;
     }
 

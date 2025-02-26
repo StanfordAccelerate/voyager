@@ -10,6 +10,8 @@
 
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
+#include "test/common/AccessCounter.h"
+#include "test/common/Network.h"
 #include "test/common/VerificationTypes.h"
 
 #ifndef CFLOAT
@@ -124,14 +126,15 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(vectorUnitStartSignal);
   Connections::SyncChannel CCS_INIT_S1(vectorUnitDoneSignal);
 
-  Harness(sc_module_name, std::vector<codegen::Operator>, char *);
+  Harness(sc_module_name, std::vector<Operation>, char *);
   SC_HAS_PROCESS(Harness);
 
  private:
-  std::vector<codegen::Operator> params;
-  codegen::Operator currentParams;
+  std::vector<Operation> operations;
+  Operation currentOperation;
   char *memory;
   AcceleratorMemoryMap currentMemoryMap;
+  AccessCounter *accessCounter;
 
 #ifdef SIM_Accelerator
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);

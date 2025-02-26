@@ -41,8 +41,11 @@ solution file add $ROOT/test/common/GoldModel.cc -type C++ -exclude true
 solution file add $ROOT/test/common/Simulation.cc -type C++ -exclude true
 solution file add $ROOT/test/common/ArrayMemory.cc -type C++ -exclude true
 solution file add $ROOT/test/common/DataLoader.cc -type C++ -exclude true
+solution file add $ROOT/test/common/AccessCounter.cc -type C++ -exclude true
 solution file add $ROOT/test/toolchain/MapOperation.cc -type C++ -exclude true
 
 # Add network files
 solution file add $ROOT/test/common/Network.cc -type C++ -exclude true
+solution file add $ROOT/test/common/Tiling.cc -type C++ -exclude true
 solution file add $ROOT/test/compiler/proto/param.pb.cc -type C++ -exclude true
+solution file add $ROOT/test/compiler/proto/tiling.pb.cc -type C++ -exclude true

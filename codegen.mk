@@ -13,7 +13,7 @@ MXINT8_FLAGS := --activation int8,qs=microscaling,bs=32 --weight int8,qs=microsc
 $(CODEGEN_DIR)/networks/resnet18/INT8/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py resnet18 $(INT8_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
- 
+
 $(CODEGEN_DIR)/networks/resnet18/INT8_32/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py resnet18 $(INT8_32_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
@@ -180,3 +180,10 @@ test/compiler/networks/gesture/CFLOAT/model.txt: test/compiler/run_compiler.py
 test/compiler/networks/layertest/CFLOAT/model.txt: test/compiler/run_compiler.py
 	mkdir -p $(dir $@)
 	python test/compiler/run_compiler.py layertest --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+
+################################################################################
+# Tilings
+################################################################################
+$(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)/tilings.txtpb: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/model.txt test/compiler/run_tiler.py
+	mkdir -p $(dir $@)
+	python test/compiler/run_tiler.py --codegen_dir $(dir $<) --IC_dimension $(IC_DIMENSION) --OC_dimension $(OC_DIMENSION) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE) > $(dir $@)/tiler.log 2>&1

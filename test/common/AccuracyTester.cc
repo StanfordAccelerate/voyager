@@ -22,7 +22,7 @@
 
 /* Run inference on a single sample and return correct classification. */
 bool run_sample(std::string model_name, std::string data_dir,
-                std::string sample, codegen::Model model) {
+                std::string sample, Network network) {
   std::vector<long long> memory_sizes{SRAM_MEMORY_SIZE};
   auto memory = std::make_unique<ArrayMemory>(memory_sizes);
   auto data_loader = std::make_unique<DataLoader>(memory.get(), false);
@@ -42,14 +42,14 @@ bool run_sample(std::string model_name, std::string data_dir,
   bool transpose = model_name == "resnet18" || model_name == "resnet50";
 
   std::string inputs_dir = data_dir + "/" + sample;
-  for (const auto& tensor : model.inputs()) {
+  for (const auto& tensor : network.model.inputs()) {
     data_loader->load_tensor(tensor, inputs_dir, transpose);
   }
 
   std::string params_dir = std::string(getenv("CODEGEN_DIR")) + "/networks/" +
                            model_name + "/" + std::getenv("DATATYPE") +
                            "/tensor_files";
-  for (const auto& tensor : model.parameters()) {
+  for (const auto& tensor : network.model.parameters()) {
     // Fully connected layer, or linear ops with input of a 1D tensor, is run
     // on the vector unit. Its weight does not need to be transposed. We check
     // if an op is a FC by checking its output dimension. This should be
@@ -59,15 +59,13 @@ bool run_sample(std::string model_name, std::string data_dir,
   }
 
   // Run inference
-  for (const auto& param : model.ops()) {
-    if (!param.has_nop()) {
-      auto args = memory->get_args(param);
-      run_gold_model(param, args);
-    }
+  for (const auto& operation : network.get_operations()) {
+    auto args = memory->get_args(operation.param);
+    run_gold_model(operation, args);
   }
 
   // Extract final output
-  const auto last_op = model.ops(model.ops_size() - 1);
+  const auto last_op = network.model.ops(network.model.ops_size() - 1);
   const auto output = memory->get_output(last_op);
   if (last_op.output().dtype() == "bfloat16") {
     auto output_ptr = std::any_cast<DataTypes::bfloat16*>(output);
@@ -175,8 +173,7 @@ int main(int argc, char* argv[]) {
         break;
       }
       results.push_back(std::async(std::launch::async, run_sample, model_name,
-                                   data_dir, dataset[sample_index],
-                                   network.model));
+                                   data_dir, dataset[sample_index], network));
     }
 
     for (int i = 0; i < results.size(); i++) {

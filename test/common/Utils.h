@@ -13,6 +13,7 @@
 
 #include "VerificationTypes.h"
 #include "src/ArchitectureParams.h"
+#include "test/common/Tiling.h"
 
 int validateMapping(Tiling tiling);
 

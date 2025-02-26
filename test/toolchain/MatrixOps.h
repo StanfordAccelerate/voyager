@@ -1,5 +1,12 @@
 #pragma once
 
+#include "src/AccelTypes.h"
+#include "src/Params.h"
+#include "test/common/GoldModel.h"
+#include "test/common/Network.h"
+#include "test/common/Tiling.h"
+#include "test/common/VerificationTypes.h"
+#include "test/compiler/proto/param.pb.h"
 #include "test/toolchain/Common.h"
 
 void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
@@ -94,29 +101,27 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
   vector_params->vec2DequantizeScale = scale.bits_rep();
 }
 
-void MapMatrixOperation(const codegen::Operator &param,
+void MapMatrixOperation(const Operation &operation,
                         std::deque<BaseParams *> &mappedParams,
                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
-  Tiling tiling;
+  codegen::Operator param = operation.param;
   const auto matrix_op = param.matrix_op();
-  if (matrix_op.opcode() == "conv2d" || matrix_op.opcode() == "conv2d_mx") {
-    tiling = get_conv2d_tiling(param);
-  } else {
-    tiling = get_linear_tiling(param);
-  }
+
+  Tiling tiling = get_tiling(operation);
 
   int X = tiling.loops[0][tiling.x_loop_index[0]] *
           tiling.loops[1][tiling.x_loop_index[1]];
   int Y = tiling.loops[0][tiling.y_loop_index[0]] *
           tiling.loops[1][tiling.y_loop_index[1]];
-  int C = tiling.loops[1][tiling.reduction_loop_index[1]] * (16);
+  int C = tiling.loops[0][tiling.reduction_loop_index[0]] *
+          tiling.loops[1][tiling.reduction_loop_index[1]] * (IC_DIMENSION);
   int K = tiling.loops[0][tiling.weight_loop_index[0]] *
-          tiling.loops[1][tiling.weight_loop_index[1]] * (16);
+          tiling.loops[1][tiling.weight_loop_index[1]] * (OC_DIMENSION);
   int FX = tiling.loops[1][tiling.fx_index];
   int FY = tiling.loops[1][tiling.fy_index];
   int STRIDE = tiling.stride;
 
-  adjust_tiling_for_dimension(tiling);
+  std::cout << "Using tiling: " << std::endl << tiling << std::endl;
 
   MatrixParams *matrix_params = new MatrixParams;
   AcceleratorMemoryMap accelerator_memory_map;
@@ -165,6 +170,19 @@ void MapMatrixOperation(const codegen::Operator &param,
   // matrix_params->weightAddressGenInputYLoopIndex = tiling.y_loop_index[0];
   matrix_params->weightAddressGenWeightLoopIndex[0] =
       tiling.weight_loop_index[0];
+  matrix_params->weightAddressGenReductionLoopIndex[0] =
+      tiling.reduction_loop_index[0];
+
+  // if OX and OY loops are the innermost L2 loops, they are irrelevant for
+  // weight address generation
+  if (tiling.loops[0][tiling.reduction_loop_index[0]] == 1) {
+    if (tiling.weight_loop_index[0] < tiling.x_loop_index[0]) {
+      matrix_params->weightAddressGenLoops[0][tiling.x_loop_index[0]] = 1;
+    }
+    if (tiling.weight_loop_index[0] < tiling.y_loop_index[0]) {
+      matrix_params->weightAddressGenLoops[0][tiling.y_loop_index[0]] = 1;
+    }
+  }
 
   // set outer loop values
   const auto weight = matrix_op.weight();
@@ -175,7 +193,7 @@ void MapMatrixOperation(const codegen::Operator &param,
     // we can just use the following loop nest:
     // C1, K, FY, FX, C0
     matrix_params->weightAddressGenLoops[1][4] = OC_DIMENSION;
-    matrix_params->weightAddressGenReductionLoopIndex[1] = 4;
+    matrix_params->weightAddressGenReductionLoopIndex[2] = 4;
     matrix_params->weightAddressGenLoops[1][3] =
         tiling.loops[1][tiling.fx_index];
     matrix_params->weightAddressGenFxIndex = 3;
@@ -185,12 +203,6 @@ void MapMatrixOperation(const codegen::Operator &param,
     matrix_params->weightAddressGenLoops[1][1] =
         tiling.loops[1][tiling.weight_loop_index[1]];
 
-    if (OC_DIMENSION > IC_DIMENSION) {
-      // matrix_params->weightAddressGenLoops[1][1] =
-      //     tiling.loops[1][tiling.weight_loop_index[1]] /
-      //     (OC_DIMENSION / IC_DIMENSION);
-    }
-
     matrix_params->weightAddressGenWeightLoopIndex[1] = 1;
     matrix_params->weightAddressGenLoops[1][0] =
         tiling.loops[1][tiling.reduction_loop_index[1]];
@@ -198,43 +210,21 @@ void MapMatrixOperation(const codegen::Operator &param,
     if (OC_DIMENSION > IC_DIMENSION) {
       // we can reduce the number of iterations, since we have already fetched
       // the values
-      matrix_params->weightAddressGenLoops[1][0] =
-          tiling.loops[1][tiling.reduction_loop_index[1]] /
-          (OC_DIMENSION / IC_DIMENSION);
+      if (tiling.loops[0][tiling.reduction_loop_index[0]] >=
+          (OC_DIMENSION / IC_DIMENSION)) {
+        matrix_params
+            ->weightAddressGenLoops[0][tiling.reduction_loop_index[0]] =
+            tiling.loops[0][tiling.reduction_loop_index[0]] /
+            (OC_DIMENSION / IC_DIMENSION);
+      } else {
+        matrix_params
+            ->weightAddressGenLoops[1][tiling.reduction_loop_index[1]] =
+            tiling.loops[1][tiling.reduction_loop_index[1]] /
+            (OC_DIMENSION / IC_DIMENSION);
+      }
     }
-    matrix_params->weightAddressGenReductionLoopIndex[0] = 0;
+    matrix_params->weightAddressGenReductionLoopIndex[1] = 0;
   } else {  // if not tranpose, then we have freedom to pick any loop order
-    // for efficient memory accesses, addresses should be consecutive
-    // or least, not multiples of 4, due to interleaving.
-    // given that weights are arranged as: FY,FX,C,K
-    // the following loop nest should work:
-    // C1, C0, FX, FY, K
-    // int index = 0;
-    // for (int j = 0; j < 6; j++) {
-    //   if (j == matrix_params->inputXLoopIndex[1] ||
-    //       j == matrix_params->inputYLoopIndex[1]) {
-    //     continue;
-    //   }
-    //   matrix_params->weightAddressGenLoops[1][index] = tiling.loops[1][j];
-
-    //   if (j == matrix_params->reductionLoopIndex[1]) {
-    //     matrix_params->weightAddressGenReductionLoopIndex[0] = index;
-    //   }
-    //   if (j == matrix_params->fxIndex) {
-    //     matrix_params->weightAddressGenFxIndex = index;
-    //   }
-    //   if (j == matrix_params->fyIndex) {
-    //     matrix_params->weightAddressGenFyIndex = index;
-    //   }
-    //   if (j == matrix_params->weightLoopIndex[1]) {
-    //     matrix_params->weightAddressGenWeightLoopIndex[1] = index;
-    //   }
-
-    //   index++;
-    // }
-    // matrix_params->weightAddressGenLoops[1][4] = DIMENSION;
-    // matrix_params->weightAddressGenReductionLoopIndex[1] = 4;
-
     matrix_params->weightAddressGenLoops[1][4] =
         tiling.loops[1][tiling.weight_loop_index[1]];
     matrix_params->weightAddressGenWeightLoopIndex[1] = 4;
@@ -252,14 +242,14 @@ void MapMatrixOperation(const codegen::Operator &param,
 
     if (tiling.replication) {
       matrix_params->weightAddressGenLoops[1][1] = 3;
-      matrix_params->weightAddressGenReductionLoopIndex[1] = 1;
+      matrix_params->weightAddressGenReductionLoopIndex[2] = 1;
     } else {
       matrix_params->weightAddressGenLoops[1][1] = IC_DIMENSION;
-      matrix_params->weightAddressGenReductionLoopIndex[1] = 1;
+      matrix_params->weightAddressGenReductionLoopIndex[2] = 1;
     }
     matrix_params->weightAddressGenLoops[1][0] =
         tiling.loops[1][tiling.reduction_loop_index[1]];
-    matrix_params->weightAddressGenReductionLoopIndex[0] = 0;
+    matrix_params->weightAddressGenReductionLoopIndex[1] = 0;
   }
 
   matrix_params->STRIDE = tiling.stride;

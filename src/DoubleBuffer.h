@@ -3,6 +3,10 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#ifndef __SYNTHESIS__
+#include "test/common/AccessCounter.h"
+#endif
+
 template <typename DTYPE, int WIDTH, int BUFFER_SIZE>
 SC_MODULE(DoubleBuffer) {
  private:
@@ -23,6 +27,10 @@ SC_MODULE(DoubleBuffer) {
   Connections::Combinational<ac_int<32, false> > outputControl[2];
   Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(output);
 
+#ifndef __SYNTHESIS__
+  AccessCounter *accessCounter;
+#endif
+
   SC_CTOR(DoubleBuffer) {
     SC_THREAD(mem0Run);
     sensitive << clk.pos();
@@ -35,6 +43,10 @@ SC_MODULE(DoubleBuffer) {
     SC_THREAD(outputData);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+
+#ifndef __SYNTHESIS__
+    accessCounter = new AccessCounter();
+#endif
   }
 
   void mem0Run() {
@@ -75,6 +87,9 @@ SC_MODULE(DoubleBuffer) {
       }
 
       ac_int<32, false> rsize = readControl[0].Pop();
+#ifndef __SYNTHESIS__
+      accessCounter->increment(name(), rsize * WIDTH);
+#endif
       outputControl[0].Push(rsize);
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -130,6 +145,9 @@ SC_MODULE(DoubleBuffer) {
       }
 
       ac_int<32, false> rsize = readControl[1].Pop();
+#ifndef __SYNTHESIS__
+      accessCounter->increment(name(), rsize * WIDTH);
+#endif
       outputControl[1].Push(rsize);
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
