@@ -141,7 +141,6 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
 
                         for (int ic0 = 0; ic0 < IC_UNROLL; ic0++) {
                           int c = c2 * C1 * IC_UNROLL + c1 * IC_UNROLL + ic0;
-
                           int input_addr = (STRIDE * y + fy) * STRIDE * X * C +
                                            (STRIDE * x + fx) * C + c;
                           int weight_addr = (fy + (FY - 1) / 2) * FX * C * K +
@@ -192,21 +191,16 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                               STRIDE * x + fx < STRIDE * X &&
                               STRIDE * y + fy >= 0 &&
                               STRIDE * y + fy < STRIDE * Y) {
-                            int channel_batch =
-                                (c2 * C1 + c1) / (32 / IC_DIMENSION);
-                            int num_channel_batches = C / 32;
-
+                            int c = c2 * C1 + c1;
+                            int num_blocks = C / block_size;
                             int input_scale_addr =
-                                (STRIDE * y + fy) * STRIDE * X *
-                                    num_channel_batches +
-                                (STRIDE * x + fx) * num_channel_batches +
-                                channel_batch;
+                                (y * STRIDE + fy) * X * STRIDE * num_blocks +
+                                (x * STRIDE + fx) * num_blocks + c;
                             assert(input_scale_addr >= 0);
                             int weight_scale_addr =
-                                (fy + (FY - 1) / 2) * FX * num_channel_batches *
-                                    K +
-                                (fx + (FX - 1) / 2) * num_channel_batches * K +
-                                channel_batch * K + k;
+                                (fy + (FY - 1) / 2) * FX * num_blocks * K +
+                                (fx + (FX - 1) / 2) * num_blocks * K + c * K +
+                                k;
                             assert(weight_scale_addr >= 0);
 
                             Scale input_scale = input_scales[input_scale_addr];

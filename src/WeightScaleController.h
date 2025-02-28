@@ -143,16 +143,6 @@ SC_MODULE(WeightScaleController) {
                         ac_int<16, false> c = (c2 * C1 * C0 + c1 * C0 + c0);
                         ac_int<16, false> C = (C2 * C1 * C0);
 
-                        // adjust the C dimension for microscaling if it hasn't
-                        // already been adjusted
-                        if (params.weightAddressGenLoops
-                                [1]
-                                [params.weightAddressGenReductionLoopIndex[1]] <
-                            (32 / NRows)) {
-                          c = c / (32 / NRows);
-                          C = C / (32 / NRows);
-                        }
-
                         ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
                         ac_int<16, false> K = K2 * K1 * NCols;
 
@@ -470,13 +460,6 @@ SC_MODULE(WeightScaleController) {
                               ac_int<16, false> k =
                                   k2 * K1 * NCols + k1 * NCols;
                               ac_int<16, false> K = K2 * K1 * NCols;
-
-                              if (params
-                                      .loops[1][params.reductionLoopIndex[1]] >=
-                                  (32 / NRows)) {
-                                C1 = C1 / (32 / NRows);
-                                c1 = c1 / (32 / NRows);
-                              }
 
                               int address = static_cast<ac_int<16, false>>(
                                                 (fy * FX * C1 * K1)) +
