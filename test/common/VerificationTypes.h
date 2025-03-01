@@ -27,6 +27,12 @@ static const std::unordered_set<std::string> GEMM_OPS = {
     "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx",
 };
 
+static const std::unordered_set<std::string> MEMORY_OPS = {
+    "slice",
+    "permute",
+    "transpose",
+};
+
 enum MemorySource { SRAM, RRAM };
 
 inline std::ostream& operator<<(std::ostream& os, MemorySource& memory) {

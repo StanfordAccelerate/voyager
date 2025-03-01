@@ -76,9 +76,6 @@ proc pre_architect {} {
   if {$SUPPORT_MX == true} {
     global SCALE_DATATYPE SCALE_C_DATA_REP_NAME SCALE_DATATYPE_WIDTH
 
-    set weight_scale_controller "WeightScaleController<$IO_DATATYPE,$SCALE_DATATYPE,$IC_DIMENSION,$OC_DIMENSION>"
-    directive set /Accelerator/$weight_scale_controller/$weight_scale_controller:transposer/transposer/while:if:transposeBuffer.$SCALE_C_DATA_REP_NAME:rsc -MAP_TO_MODULE {[Register]}
-
     set weight_scale_double_buffer "DoubleBuffer<$SCALE_DATATYPE,$OC_DIMENSION,$WEIGHT_BUFFER_SIZE>"
     directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem0Run/mem0Run/mem0.value.$SCALE_C_DATA_REP_NAME -WORD_WIDTH [expr $SCALE_DATATYPE_WIDTH*$OC_DIMENSION]
     directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1Run/mem1Run/mem1.value.$SCALE_C_DATA_REP_NAME -WORD_WIDTH [expr $SCALE_DATATYPE_WIDTH*$OC_DIMENSION]

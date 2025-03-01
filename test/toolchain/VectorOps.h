@@ -193,8 +193,23 @@ void MapVectorOperations(const codegen::Operation &param,
   // Use the original shape without permute/slice
   auto input_shape = get_shape(input, false);
 
-  // TODO: how to handle reshape operation loop bound adjustment?
-  if (!input.has_reshape()) {
+  if (input.has_reshape() ||
+      MEMORY_OPS.find(op_list[0].target()) != MEMORY_OPS.end()) {
+    for (const auto dim : input_shape) {
+      if (dim > 1024) {
+        std::cerr << "ERROR: input shape dimension is greater than 1024: ";
+        print_shape(input_shape);
+        throw std::invalid_argument("Invalid input shape dimension!");
+      }
+    }
+
+    if (input_shape.back() % OC_DIMENSION != 0) {
+      std::cerr << "ERROR: input last dimension is not a multiple of "
+                   "OC_DIMENSION: ";
+      print_shape(input_shape);
+      throw std::invalid_argument("Invalid input shape dimension!");
+    }
+  } else {
     input_shape = split_loops(input_shape, 1024);
     input_shape = adjust_loop_indices(input_shape, OC_DIMENSION);
   }
@@ -236,6 +251,10 @@ void MapVectorOperations(const codegen::Operation &param,
 
     // Last dimension needs to be scaled by OC_DIMENSION
     if (vector_params->vec0_dim == 5) {
+      if (start % OC_DIMENSION != 0 || end % OC_DIMENSION != 0) {
+        throw std::invalid_argument(
+            "Slice start and end must be multiples of OC_DIMENSION!");
+      }
       vector_params->vec0_start /= OC_DIMENSION;
       vector_params->vec0_end /= OC_DIMENSION;
     }
@@ -294,13 +313,19 @@ void MapVectorOperations(const codegen::Operation &param,
 
   if (vector_params->has_transpose) {
     // Only support a buffer size of 32
-    const int BUFSIZE = 32;
+    const int BUFSIZE = OC_DIMENSION < 32 ? OC_DIMENSION : 32;
+
     std::vector<int> input_shape(input.shape().begin(), input.shape().end());
     input_shape = squeeze_shape(input_shape);
     int padded_dims = pad_shape_to_ndim(input_shape, 3);
 
     // Transpose the input shape
     std::swap(input_shape[1], input_shape[2]);
+
+    if (input_shape[2] % OC_DIMENSION != 0) {
+      throw std::invalid_argument(
+          "Transposed dimension is not a multiple of OC_DIMENSION!");
+    }
 
     // Tiled access
     vector_params->addressGen0Mode = 1;
@@ -348,7 +373,8 @@ void MapVectorOperations(const codegen::Operation &param,
   VECTOR_DATATYPE scale = 1.0;
   vector_params->vec0_dq_scale = scale.bits_rep();
 
-  // set double precision if the datatype is not the same as the input datatype
+  // set double precision if the datatype is not the same as the input
+  // datatype
   vector_params->fetch_vector_type_0 =
       input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
 

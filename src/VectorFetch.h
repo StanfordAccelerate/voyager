@@ -83,6 +83,10 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<11, false> K0 =
           params.addressGen0Loop[1][params.addressGen0WeightLoopIndex[1]];
 
+      if (params.has_transpose && BUFSIZE != Width) {
+        X1 = X1 * BUFSIZE / Width;
+      }
+
       ac_int<11, false> loop_counters[2][3];
       ac_int<11, false> loop_starts[2][3];
       ac_int<11, false> loop_ends[2][3];
@@ -161,9 +165,7 @@ SC_MODULE(VectorFetchUnit) {
                     ac_int<16, false> Y = Y1 * Y0;
 
                     if (params.has_transpose) {
-                      // address = y * K * X + (k + x0) * X + x1 * X0;
-                      address = y * K * X + (k + x % BUFSIZE) * X +
-                                (x / BUFSIZE) * Width;
+                      address = y * K * X + (k + x0) * X + x1 * BUFSIZE;
                     } else {
                       address = y * X * K + x * K + k;
                     }
@@ -292,7 +294,7 @@ SC_MODULE(VectorFetchUnit) {
       if (params.has_transpose) {
         Vector buffer[BUFSIZE][Width];
 
-        assert(loop_ends[1][2] == BUFSIZE);
+        assert(loop_ends[1][2] == Width);
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush

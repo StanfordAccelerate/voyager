@@ -383,7 +383,7 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
   const int oc_unroll = OC_DIMENSION;
   const int ic_unroll = IC_DIMENSION;
 
-  int x1 = 1, k1 = 1;
+  int x1 = 1, k1 = 1, c1 = 1;
   int x0 = get_size(input_shape) / input_shape.back();
   int k0 = weight_shape[0] / oc_unroll;
   int c0 = weight_shape[1] / ic_unroll;
@@ -396,21 +396,27 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
     k0 = weight_shape[size - 1] / oc_unroll;
   }
 
-  // Loop indices cannot exceed 1024 (10b)
-  while (x0 >= 1024) {
+  // Loop indices cannot exceed 1024 (10-bit)
+  while (x0 >= 1024 || x0 * c0 > INPUT_BUFFER_SIZE) {
     if (x0 % 2 == 0) {
       x0 /= 2;
       x1 *= 2;
+    } else if (c0 % 2 == 0) {
+      c0 /= 2;
+      c1 *= 2;
     } else {
-      std::cerr << "Input size is not divisible by 2" << std::endl;
+      std::cerr << "Input buffer is too small" << std::endl;
       exit(1);
     }
   }
 
-  while (k0 * ic_unroll > WEIGHT_BUFFER_SIZE) {
+  while (k0 * c0 * ic_unroll > WEIGHT_BUFFER_SIZE) {
     if (k0 % 2 == 0) {
       k0 /= 2;
       k1 *= 2;
+    } else if (c0 % 2 == 0) {
+      c0 /= 2;
+      c1 *= 2;
     } else {
       std::cerr << "Weight buffer is too small" << std::endl;
       exit(1);
@@ -431,7 +437,7 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
   }
 
   return {
-      .loops = {{x1, 1, k1, c0, 1, 1}, {1, k0, 1, 1, 1, x0}},
+      .loops = {{x1, 1, k1, c1, 1, 1}, {c0, k0, 1, 1, 1, x0}},
       .x_loop_index = {0, 5},
       .y_loop_index = {1, 4},
       .reduction_loop_index = {3, 0},
