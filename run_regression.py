@@ -448,6 +448,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid model")
 
+    block_size = max(os.environ['OC_DIMENSION'], os.environ['IC_DIMENSION'])
+
     if env_vars["DATATYPE"] == "E4M3":
         quantization_args = [
             "--activation",
@@ -480,9 +482,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         quantization_args = [
             "--force_scale_power_of_two",
             "--activation",
-            "int8,qs=microscaling,bs=" + os.environ['OC_DIMENSION'],
+            "int8,qs=microscaling,bs=" + block_size,
             "--weight",
-            "int8,qs=microscaling,bs=" + os.environ['IC_DIMENSION'],
+            "int8,qs=microscaling,bs=" + block_size,
             "--bf16",
         ]
     else:

@@ -295,7 +295,6 @@ SC_MODULE(MatrixProcessor) {
         sendWeights = sendWeights || step == 0;
 
         if (sendWeights && step < totalOps - 1) {
-          // CCS_LOG("sendWeights: " << sendWeights);
 #pragma hls_unroll yes
           for (int i = 0; i < NRows; i++) {
             inputs[i].swapWeights = true;

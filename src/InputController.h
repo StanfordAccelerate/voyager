@@ -422,13 +422,11 @@ SC_MODULE(InputController) {
               loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
             }
 
-// inner memory
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              // TODO: make this dynamic
               ac_int<32, false> total_writes;
               if (!params.is_replication) {
                 total_writes =
@@ -444,6 +442,8 @@ SC_MODULE(InputController) {
               }
 
               writeControl[bankSel].Push(total_writes);
+
+              // inner memory
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {

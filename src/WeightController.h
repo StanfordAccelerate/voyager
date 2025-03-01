@@ -385,13 +385,12 @@ SC_MODULE(WeightController) {
       // extra loop to control reuse which only occurs during transpose and when
       // NCols > NRows
       int rep_bound = 1;
-      if (NCols > NRows) {
-        if (params.has_weight_transpose) {
-          if (loop_bounds[0][params.reductionLoopIndex[0]] > (NCols / NRows)) {
-            // we are able to reuse the weights already in the buffer
-            loop_bounds[0][params.reductionLoopIndex[0]] /= (NCols / NRows);
-            rep_bound = (NCols / NRows);
-          }
+
+      if (params.has_weight_transpose && NCols > NRows) {
+        if (loop_bounds[0][params.reductionLoopIndex[0]] >= (NCols / NRows)) {
+          // we are able to reuse the weights already in the buffer
+          loop_bounds[0][params.reductionLoopIndex[0]] /= (NCols / NRows);
+          rep_bound = (NCols / NRows);
         }
       }
 
@@ -423,14 +422,10 @@ SC_MODULE(WeightController) {
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              readControl[bankSel].Push(
-                  static_cast<ac_int<16, false> >(loop_bounds[1][0] *
-                                                  loop_bounds[1][1] *
-                                                  loop_bounds[1][2]) *
-                  static_cast<ac_int<16, false> >(loop_bounds[1][3] *
-                                                  loop_bounds[1][4]) *
-                  static_cast<ac_int<16, false> >(loop_bounds[1][5] * NRows *
-                                                  rep_bound * buffer_reuse));
+              readControl[bankSel].Push(loop_bounds[1][0] * loop_bounds[1][1] *
+                                        loop_bounds[1][2] * loop_bounds[1][3] *
+                                        loop_bounds[1][4] * loop_bounds[1][5] *
+                                        NRows * rep_bound * buffer_reuse);
               for (int reuse = 0; reuse < buffer_reuse; reuse++) {
                 for (int rep = 0; rep < rep_bound; rep++) {
                   for (loop_counters[1][0] = 0;

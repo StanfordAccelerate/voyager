@@ -5,8 +5,9 @@ E4M3_FLAGS := --activation fp8_e4m3 --weight fp8_e4m3 --bf16
 P8_1_FLAGS := --activation posit8_1 --weight posit8_1 --bf16
 INT8_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16
 INT8_32_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int32 --bf16
-MXINT8_FLAGS := --activation int8,qs=microscaling,bs=16 --weight int8,qs=microscaling,bs=16 --force_scale_power_of_two --bf16
-MXNF4_FLAGS := --activation nf4_5,qs=microscaling,bs=32,scale=fp8_e5m3 --weight nf4_5,qs=microscaling,bs=32,scale=fp8_e5m3 --bf16
+BLOCK_SIZE := $(shell [ $(IC_DIMENSION) -gt $(OC_DIMENSION) ] && echo $(IC_DIMENSION) || echo $(OC_DIMENSION))
+MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE) --weight int8,qs=microscaling,bs=$(BLOCK_SIZE) --force_scale_power_of_two --bf16
+MXNF4_FLAGS := --activation nf4_5,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight nf4_5,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16
 
 ################################################################################
 # ResNet18

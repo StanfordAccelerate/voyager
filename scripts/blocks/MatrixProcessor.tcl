@@ -21,7 +21,6 @@ proc pre_analyze {} {
   } else {
     puts "\033\[31mERROR: $path not found\033\[0m"
   }
-
 }
 
 proc pre_compile {} {
@@ -46,7 +45,7 @@ proc pre_architect {} {
   global full_block_name_stripped ACC_BUF_C_DATA_REP_NAME ACCUM_DATATYPE_WIDTH OC_DIMENSION TECHNOLOGY memories SUPPORT_MX ACCUM_BUFFER_SIZE
 
   if {$SUPPORT_MX == true} {
-    set accumulation_buffer_path "/$full_block_name_stripped/$full_block_name_stripped:process_accumulation/process_accumulation/constexpr_if.if:while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME"
+    set accumulation_buffer_path "/$full_block_name_stripped/$full_block_name_stripped:process_accumulation/process_accumulation/while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME"
   } else {
     set accumulation_buffer_path "/$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME"
   }

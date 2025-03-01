@@ -212,8 +212,8 @@ SC_MODULE(InputScaleController) {
                           ac_int<LOOP_WIDTH, false> C2 =
                               params.loops[0][params.reductionLoopIndex[0]];
 
-                          ac_int<16, false> c = (c2 * C1 + c1);
-                          ac_int<16, false> C = (C1 * C2);
+                          ac_int<16, false> c = c2 * C1 + c1;
+                          ac_int<16, false> C = C2 * C1;
 
                           if (isDownsample) {
                             // adjust address for stride
@@ -398,7 +398,8 @@ SC_MODULE(InputScaleController) {
               }
               // CCS_LOG("total_writes: " << total_writes);
               writeControl[bankSel].Push(total_writes);
-// inner memory
+
+              // inner memory
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
               for (loop_counters[1][0] = 0;
@@ -479,11 +480,11 @@ SC_MODULE(InputScaleController) {
                           }
 
                           ac_int<32, false> address =
-                              y0 * (STRIDE * X0 + FX - 1) * C1 + x0 * C1 + c1;
+                              y0 * (X0 * STRIDE + FX - 1) * C1 + x0 * C1 + c1;
 
                           if (params.is_replication) {
                             address =
-                                y0 * (STRIDE * X0 / packingFactor + 2) * C1 +
+                                y0 * (X0 * STRIDE / packingFactor + 2) * C1 +
                                 loop_counters[1][params.inputXLoopIndex[1]] *
                                     C1 +
                                 c1;
@@ -515,8 +516,6 @@ SC_MODULE(InputScaleController) {
                     break;
                   }
                 }
-                // writeControl[bankSel].Push(0);
-                // CCS_LOG("writer bank switching");
                 if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                   break;
                 }
@@ -607,8 +606,6 @@ SC_MODULE(InputScaleController) {
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
-                // CCS_LOG("total_reads: " << total_reads);
-
                 for (loop_counters[1][1] = 0;
                      loop_counters[1][1] < loop_bounds[1][1];
                      loop_counters[1][1]++) {
@@ -658,7 +655,6 @@ SC_MODULE(InputScaleController) {
                           }
 
                           readAddress[bankSel].Push(address);
-                          // CCS_LOG("pushing read address: " << address);
 
                           if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                             break;
@@ -680,7 +676,6 @@ SC_MODULE(InputScaleController) {
                     break;
                   }
                 }
-
                 if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                   break;
                 }
