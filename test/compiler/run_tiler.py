@@ -349,7 +349,7 @@ def main():
         weight_key = "weight" if "matmul" not in matrix_op.target else "other"
         weight = matrix_op.kwargs[weight_key].tensor
         if weight.HasField("reshape"):
-            weights_shape = weight.reshape.output_shape
+            weights_shape = weight.reshape.kwargs["output_shape"].int_list.values
         else:
             weights_shape = weight.shape
 
@@ -413,19 +413,14 @@ def main():
             continue
 
         # for operations with reshape, we can look at the input shape to get height and width
-        if param.output.HasField("reshape"):
-            input_shape = (
-                param.matrix_op.input.shape
-                if not param.matrix_op.HasField("mx_input")
-                else param.matrix_op.mx_input.input.shape
-            )
-            if len(input_shape) == 3:
-                assert input_shape[0] == 1
-                width = input_shape[1]
-                height = 1
-            else:
+        if output.HasField("reshape"):
+            input_shape = matrix_op.kwargs["input"].tensor.shape
+            if len(input_shape) != 3 or input_shape[0] != 1:
                 print("Unsupported input shape for reshape, skipping")
                 continue
+
+            width = input_shape[1]
+            height = 1
 
         layer = interstellar.Layer(
             nifm=input_channels,

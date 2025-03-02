@@ -44,8 +44,12 @@ Tiling get_tiling(const Operation& operation) {
     }
   } else {
     tiling = get_interstellar_tiling(operation.tiling);
-    auto stride = first_op.kwargs().at("stride").int_list().values();
-    tiling.stride = stride[0];
+    if (first_op.kwargs().contains("stride")) {
+      auto stride = first_op.kwargs().at("stride").int_list().values();
+      tiling.stride = stride[0];
+    } else {
+      tiling.stride = 1;
+    }
   }
 
   return tiling;
