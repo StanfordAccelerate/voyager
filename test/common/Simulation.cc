@@ -142,9 +142,16 @@ void Simulation::print_ideal_runtime(const codegen::Operation& param) {
     std::string weight_key = is_matmul ? "other" : "weight";
     const auto weight = first_op.kwargs().at(weight_key).tensor();
     const auto weight_shape = get_shape(weight);
+    const auto output_shape = get_shape(output);
+
+    int K = weight_shape[weight_shape.size() - 1];
+    // sometimes K and C and swapped in the weight tensor
+    if (K != output_shape[output_shape.size() - 1]) {
+      K = weight_shape[weight_shape.size() - 2];
+    }
 
     // the total number of operations is X * Y * C * FX * FY * K.
-    long num_macs = get_size(output) * get_size(weight) / weight_shape[0];
+    long num_macs = get_size(output) * get_size(weight) / K;
     cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
     std::cout << get_op_name(param) << ", matrix unit ideal runtime: ";
   } else {
