@@ -10,6 +10,7 @@ dependencies:
   - torchaudio==2.3.1
   - pip:
       - deepdiff
+      - xonsh
       - pandas
       - matplotlib
       - scipy
