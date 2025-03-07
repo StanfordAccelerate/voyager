@@ -6,6 +6,10 @@
 #include "AccelTypes.h"
 #include "TypeToBits.h"
 
+#ifndef __SYNTHESIS__
+#include "spdlog/spdlog.h"
+#endif
+
 // stupid trick to uniquify it
 // otherwise, this module ends up repeated for each subblock in the final top
 // RTL
