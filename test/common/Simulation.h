@@ -37,7 +37,7 @@ class Simulation {
   std::vector<std::string> sims;
   Network *network;
   std::vector<Operation> operations;
-  std::map<std::string, ArrayMemory *> memories;
+  std::map<std::string, MemoryInterface *> memories;
   std::map<std::string, DataLoader *> dataLoaders;
 
  private:

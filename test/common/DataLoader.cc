@@ -4,8 +4,9 @@
 #include "xtensor/xadapt.hpp"
 #include "xtensor/xarray.hpp"
 
-DataLoader::DataLoader(ArrayMemory* memory, bool is_dut, bool is_cnn)
-    : memory(memory), is_dut(is_dut), is_cnn(is_cnn) {}
+DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut,
+                       bool is_cnn)
+    : memory_interface(memory_interface), is_dut(is_dut), is_cnn(is_cnn) {}
 
 void DataLoader::load_tensor(const codegen::Tensor& tensor,
                              std::string data_dir, bool transpose,
@@ -54,27 +55,27 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
     if (tensor.dtype() == "int8") {
-      memory->write_data_to_memory<DataTypes::int8>(offset, partition, address,
-                                                    *it);
+      memory_interface->write_value_to_memory<DataTypes::int8>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "bfloat16") {
-      memory->write_data_to_memory<DataTypes::bfloat16>(offset, partition,
-                                                        address, *it);
+      memory_interface->write_value_to_memory<DataTypes::bfloat16>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "int24") {
-      memory->write_data_to_memory<DataTypes::int24>(offset, partition, address,
-                                                     *it);
+      memory_interface->write_value_to_memory<DataTypes::int24>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "int32") {
-      memory->write_data_to_memory<DataTypes::int32>(offset, partition, address,
-                                                     *it);
+      memory_interface->write_value_to_memory<DataTypes::int32>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "fp8_e8m0") {
-      memory->write_data_to_memory<DataTypes::fp8_e8m0>(offset, partition,
-                                                        address, *it);
+      memory_interface->write_value_to_memory<DataTypes::fp8_e8m0>(
+          offset, partition, address, *it);
     } else if (tensor.dtype() == "fp8_e5m3") {
-      memory->write_data_to_memory<DataTypes::fp8_e5m3>(offset, partition,
-                                                        address, *it);
+      memory_interface->write_value_to_memory<DataTypes::fp8_e5m3>(
+          offset, partition, address, *it);
     } else {
       // if unspecified, we will assume it's INPUT_DATATYPE
-      memory->write_data_to_memory<INPUT_DATATYPE>(offset, partition, address,
-                                                   *it);
+      memory_interface->write_value_to_memory<INPUT_DATATYPE>(offset, partition,
+                                                              address, *it);
     }
 
     address++;

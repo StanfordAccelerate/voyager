@@ -214,8 +214,8 @@ int Simulation::check_outputs() {
   const auto param = operations.back().param;
 
   bool pytorch = std::find(sims.begin(), sims.end(), "pytorch") != sims.end();
-  auto gold_memory = (ArrayMemory*)memories["gold"];
-  auto accel_memory = (ArrayMemory*)memories["accelerator"];
+  auto gold_memory = memories["gold"];
+  auto accel_memory = memories["accelerator"];
 
   std::string filename;
   std::vector<std::any> outputs1, outputs2;
