@@ -195,8 +195,8 @@ if { $DATATYPE == "P8_1" } {
   set IO_DATATYPE_WIDTH 32
   set ACCUM_DATATYPE_WIDTH 32
 } elseif { $DATATYPE == "INT8" } {
-  set IO_DATATYPE "INT8_"
-  set ACCUM_DATATYPE "INT24"
+  set IO_DATATYPE "DataTypes::int8"
+  set ACCUM_DATATYPE "DataTypes::int24"
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "Int<8, true>::decoded"
   set PE_WEIGHT_DATATYPE "Int<8, true>::decoded"
@@ -207,8 +207,8 @@ if { $DATATYPE == "P8_1" } {
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 24
 } elseif { $DATATYPE == "INT8_32" } {
-  set IO_DATATYPE "INT8_"
-  set ACCUM_DATATYPE "INT32"
+  set IO_DATATYPE "DataTypes::int8"
+  set ACCUM_DATATYPE "DataTypes::int32"
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "Int<8, true>::decoded"
   set PE_WEIGHT_DATATYPE "Int<8, true>::decoded"
@@ -219,14 +219,17 @@ if { $DATATYPE == "P8_1" } {
   set IO_DATATYPE_WIDTH 8
   set ACCUM_DATATYPE_WIDTH 32
 } elseif {$DATATYPE == "MXINT8"} {
-  set IO_DATATYPE "INT8_"
-  set ACCUM_DATATYPE "INT32"
-  set VECTOR_DATATYPE "F16"
+  set IO_DATATYPE "DataTypes::int8"
+  set ACCUM_DATATYPE "DataTypes::int32"
+  set ACCUM_BUFFER_DATATYPE "DataTypes::bfloat16"
+  set VECTOR_DATATYPE "DataTypes::bfloat16"
+  set SCALE_DATATYPE "DataTypes::fp8_e8m0"
+  set OUTPUT_DATATYPES "$IO_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE"
+
   set PE_INPUT_DATATYPE "Int<8, true>::decoded"
   set PE_WEIGHT_DATATYPE "Int<8, true>::decoded"
   set PE_PSUM_DATATYPE "Int<32, true>::decoded"
-  set ACCUM_BUFFER_DATATYPE "F16"
-  set SCALE_DATATYPE "E8M0"
+
   set C_DATA_REP_NAME "int_val"
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
   set SCALE_C_DATA_REP_NAME "d"
@@ -236,14 +239,16 @@ if { $DATATYPE == "P8_1" } {
   set ACCUM_DATATYPE_WIDTH 16
   set SCALE_DATATYPE_WIDTH 8
 } elseif {$DATATYPE == "MXNF4"} {
-  set IO_DATATYPE "NF4"
-  set ACCUM_DATATYPE "INT32"
-  set VECTOR_DATATYPE "F16"
+  set IO_DATATYPE "DataTypes::nf4"
+  set ACCUM_DATATYPE "DataTypes::int32"
+  set ACCUM_BUFFER_DATATYPE "DataTypes::bfloat16"
+  set VECTOR_DATATYPE "DataTypes::bfloat16"
+  set SCALE_DATATYPE "DataTypes::fp8_e5m3"
+  set OUTPUT_DATATYPES "$IO_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE"
+
   set PE_INPUT_DATATYPE "NormalFloat4::decoded"
   set PE_WEIGHT_DATATYPE "NormalFloat4::decoded"
   set PE_PSUM_DATATYPE "Int<32, true>::decoded"
-  set ACCUM_BUFFER_DATATYPE "F16"
-  set SCALE_DATATYPE "E5M3"
 
   set C_DATA_REP_NAME "index"
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
@@ -258,13 +263,16 @@ if { $DATATYPE == "P8_1" } {
     exit 1
 }
 
-
 if {![info exists ACCUM_BUFFER_DATATYPE]} {
   set ACCUM_BUFFER_DATATYPE $ACCUM_DATATYPE
 }
 
 if {![info exists SCALE_DATATYPE]} {
-  set SCALE_DATATYPE "E8M0"
+  set SCALE_DATATYPE "DataTypes::fp8_e8m0"
+}
+
+if {![info exists OUTPUT_DATATYPES]} {
+  set OUTPUT_DATATYPES "$IO_DATATYPE, $VECTOR_DATATYPE"
 }
 
 # if SUPPORT_MX is not defined, set it to 0

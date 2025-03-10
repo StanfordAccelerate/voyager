@@ -2,10 +2,6 @@
 
 #include <ac_int.h>
 
-// Represents a microscaling type used for scaling, e.g., E8M0
-// Currently in this implementation, we don't actually store it according to the
-// E8M0 standard as specified in the OCP MX specification, but instead as a
-// signed unbiased exponent.
 template <int W, int E>
 class UFloat {
  public:

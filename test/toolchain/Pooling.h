@@ -58,8 +58,10 @@ void MapPoolingOperation(const codegen::Operation &param,
     vector_params->outputXLoopIndex[i] = 1;
     vector_params->outputWeightLoopIndex[i] = 2;
   }
-  vector_params->output_vector_type =
-      output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  // vector_params->output_vector_type =
+  //     output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   const int inst_count = tiling.loops[1][tiling.y_loop_index[1]] *
                          tiling.loops[1][tiling.x_loop_index[1]];

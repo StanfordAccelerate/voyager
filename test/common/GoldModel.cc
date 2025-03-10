@@ -244,9 +244,10 @@ std::vector<std::any> run_operation(const Operation &operation,
         const auto input_shape = get_shape(input);
 
         const int block_size = op.kwargs().at("block_size").int_value();
+        const int axis = op.kwargs().at("axis").int_value();
 
         Scale *mx_scale = calculate_mx_qparam<Vector, Scale, Input>(
-            output_ptr, input_shape, block_size);
+            output_ptr, input_shape, block_size, axis);
         output_ptr = quantize_mx<Vector, Input, Scale>(output_ptr, mx_scale,
                                                        input_shape, block_size);
 

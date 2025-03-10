@@ -73,8 +73,8 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->outputLoops[1][1] = non_reduction_loops[3];
   vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_vector_type =
-      input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(input.dtype());
 
   // Configure reduction engine
   VectorInstructions instr0_0;
@@ -150,8 +150,8 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->outputLoops[1][1] = non_reduction_loops[3];
   vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_vector_type =
-      input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(input.dtype());
 
   // Configure reduction unit
   VectorInstructions instr1_0;
@@ -280,8 +280,8 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->outputLoops[1][1] = non_reduction_loops[3];
   vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_vector_type =
-      output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // inputs x weights + bias
   VectorInstructions instr2;
@@ -294,12 +294,9 @@ void MapLayerNorm(const codegen::Operation &param,
     instr2.vector_op2 = VectorInstructions::vadd;
   }
   instr2.vdest = VectorInstructions::to_output;
-  vinstr_config->inst[0] = instr2;
-  vinstr_config->instCount[0] = inner_dim * outer_dim / OC_DIMENSION;
 
   if (op_list.size() > 1) {
     const auto quantize_op = op_list[1];
-    spdlog::debug("Performing: {}\n", quantize_op.target());
 
     if (quantize_op.target() == "quantize") {
       const auto scale = quantize_op.kwargs().at("scale").tensor();
@@ -307,8 +304,9 @@ void MapLayerNorm(const codegen::Operation &param,
 
       // scalar scale factor
       VECTOR_DATATYPE immediate = read_constant_param(scale);
-      vector_params->quantize_output = true;
-      vector_params->output_scale = immediate.bits_rep();
+      instr2.vector_op3 = VectorInstructions::vdiv;
+      instr2.vector_op3_src1 = VectorInstructions::from_immediate_1;
+      instr2.immediate1 = immediate.bits_rep();
     } else if (quantize_op.target() == "quantize_mx") {
       const int block_size = quantize_op.kwargs().at("block_size").int_value();
       assert(block_size == OC_DIMENSION);
@@ -321,6 +319,9 @@ void MapLayerNorm(const codegen::Operation &param,
                                   quantize_op.target());
     }
   }
+
+  vinstr_config->inst[0] = instr2;
+  vinstr_config->instCount[0] = inner_dim * outer_dim / OC_DIMENSION;
 
   vinstr_config->instLen = 1;
   vinstr_config->instLoopCount = 1;

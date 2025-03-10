@@ -7,11 +7,11 @@
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
-std::map<int, std::set<std::string>> vector_unit_stages = {
-    {0, {"add", "add_", "sub", "sub_", "mul", "mul_", "div", "div_", "neg"}},
-    {1, {"exp"}},
-    {2, {"add", "add_", "mul", "mul_", "div", "div_", "square"}},
-    {3, {"relu", "relu_", "gelu", "gelu_", "silu", "silu_", "vmap"}},
+std::vector<std::set<std::string>> vector_unit_stages = {
+    {"add", "add_", "sub", "sub_", "mul", "mul_", "div", "div_", "neg"},
+    {"exp", "abs", "relu", "relu_", "gelu", "gelu_", "silu", "silu_", "vmap"},
+    {"add", "add_", "mul", "mul_", "square", "div", "div_"},
+    {"div", "div_", "quantize"},
 };
 
 std::map<std::string, unsigned int> get_vector_instruction_mapping() {
@@ -22,18 +22,19 @@ std::map<std::string, unsigned int> get_vector_instruction_mapping() {
   mapping["sub_"] = VectorInstructions::vsub;
   mapping["mul"] = VectorInstructions::vmult;
   mapping["mul_"] = VectorInstructions::vmult;
-  mapping["div"] = VectorInstructions::vmult;
-  mapping["div_"] = VectorInstructions::vmult;
+  mapping["div"] = VectorInstructions::vdiv;
+  mapping["div_"] = VectorInstructions::vdiv;
+  mapping["square"] = VectorInstructions::vsquare;
   mapping["neg"] = VectorInstructions::vsub;
+  mapping["exp"] = VectorInstructions::vexp;
   mapping["relu"] = VectorInstructions::vrelu;
   mapping["relu_"] = VectorInstructions::vrelu;
   mapping["gelu"] = VectorInstructions::vgelu;
   mapping["gelu_"] = VectorInstructions::vgelu;
   mapping["silu"] = VectorInstructions::vsilu;
   mapping["silu_"] = VectorInstructions::vsilu;
-  mapping["exp"] = VectorInstructions::vexp;
-  mapping["square"] = VectorInstructions::vsquare;
   mapping["vmap"] = VectorInstructions::vmap;
+  mapping["quantize"] = VectorInstructions::vdiv;
   return mapping;
 }
 

@@ -303,11 +303,11 @@ struct VectorInstructions {
     vector_op0_src0 = 0;
     vector_op0_src1 = 0;
     vector_op2_src1 = 0;
+    vector_op3_src1 = 0;
     vector_op0 = 0;
     vector_op1 = 0;
     vector_op2 = 0;
     vector_op3 = 0;
-    VMAP_OFFSET = 0;
     vdest = 0;
     rCount = 0;
     rOp = 0;
@@ -319,6 +319,7 @@ struct VectorInstructions {
     rdest = 0;
     immediate0 = 0;
     immediate1 = 0;
+    VMAP_OFFSET = 0;
   }
 #endif
 
@@ -330,6 +331,7 @@ struct VectorInstructions {
   ac_int<4, false> vector_op0_src0;
   ac_int<4, false> vector_op0_src1;
   ac_int<4, false> vector_op2_src1;
+  ac_int<4, false> vector_op3_src1;
 
   static const unsigned int from_matrix_unit = 1;
   static const unsigned int from_vector_fetch_0 = 2;
@@ -351,25 +353,23 @@ struct VectorInstructions {
   static const unsigned int vmult = 2;
   static const unsigned int vsub = 3;
 
-  // Stage 1: exp
-  ac_int<2, false> vector_op1;
+  // Stage 1: exp, abs, activations
+  ac_int<3, false> vector_op1;
   static const unsigned int vexp = 1;
-  static const unsigned int vscaleexp = 2;
+  static const unsigned int vabs = 2;
+  static const unsigned int vrelu = 3;
+  static const unsigned int vgelu = 4;
+  static const unsigned int vsilu = 5;
+  static const unsigned int vmap = 6;
 
-  // Stage 3: add, mult, square
+  // Stage 2: add, mult, square, div
   ac_int<2, false> vector_op2;
   // static const unsigned int vadd = 1;
   // static const unsigned int vmult = 2;
   static const unsigned int vsquare = 3;
 
-  // Stage 4: activations
-  ac_int<3, false> vector_op3;
-  static const unsigned int vrelu = 1;
-  static const unsigned int vrelumask = 2;
-  static const unsigned int vmap = 3;
-  static const unsigned int vgelu = 4;
-  static const unsigned int vsilu = 5;
-  ac_int<64, false> VMAP_OFFSET;
+  ac_int<1, false> vector_op3;
+  static const unsigned int vdiv = 1;
 
   ac_int<10, false> rCount;
   ac_int<3, false> rOp;
@@ -393,8 +393,9 @@ struct VectorInstructions {
 
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
+  ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 157;
+  static const unsigned int width = 160;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -403,13 +404,13 @@ struct VectorInstructions {
     m & vector_op0_src0;
     m & vector_op0_src1;
     m & vector_op2_src1;
+    m & vector_op3_src1;
     m & vdequantize;
     m & vector_dq_scale;
     m & vector_op0;
     m & vector_op1;
     m & vector_op2;
     m & vector_op3;
-    m & VMAP_OFFSET;
     m & rCount;
     m & rOp;
     m & rSqrt;
@@ -421,6 +422,7 @@ struct VectorInstructions {
     m & vdest;
     m & immediate0;
     m & immediate1;
+    m & VMAP_OFFSET;
   }
 
   inline friend void sc_trace(sc_trace_file* tf,
@@ -436,13 +438,13 @@ struct VectorInstructions {
     os << "vector_op0_src0: " << params.vector_op0_src0 << std::endl;
     os << "vector_op0_src1: " << params.vector_op0_src1 << std::endl;
     os << "vector_op2_src1: " << params.vector_op2_src1 << std::endl;
+    os << "vector_op3_src1: " << params.vector_op3_src1 << std::endl;
     os << "vdequantize: " << params.vdequantize << std::endl;
     os << "vector_dq_scale: " << params.vector_dq_scale << std::endl;
     os << "vector_op0: " << params.vector_op0 << std::endl;
     os << "vector_op1: " << params.vector_op1 << std::endl;
     os << "vector_op2: " << params.vector_op2 << std::endl;
     os << "vector_op3: " << params.vector_op3 << std::endl;
-    os << "VMAP_OFFSET: " << params.VMAP_OFFSET << std::endl;
     os << "rCount: " << params.rCount << std::endl;
     os << "rOp: " << params.rOp << std::endl;
     os << "rSqrt: " << params.rSqrt << std::endl;
@@ -454,6 +456,7 @@ struct VectorInstructions {
     os << "vdest: " << params.vdest << std::endl;
     os << "immediate0: " << params.immediate0 << std::endl;
     os << "immediate1: " << params.immediate1 << std::endl;
+    os << "VMAP_OFFSET: " << params.VMAP_OFFSET << std::endl;
     return os;
   }
 
@@ -463,6 +466,7 @@ struct VectorInstructions {
            lhs.vector_op0_src0 == rhs.vector_op0_src0 &&
            lhs.vector_op0_src1 == rhs.vector_op0_src1 &&
            lhs.vector_op2_src1 == rhs.vector_op2_src1 &&
+           lhs.vector_op3_src1 == rhs.vector_op3_src1 &&
            lhs.vector_op0 == rhs.vector_op0 &&
            lhs.vector_op1 == rhs.vector_op1 &&
            lhs.vector_op2 == rhs.vector_op2 &&
@@ -474,7 +478,8 @@ struct VectorInstructions {
            lhs.rMax1 == rhs.rMax1 && lhs.rDuplicate == rhs.rDuplicate &&
            lhs.rBroadcast == rhs.rBroadcast && lhs.rdest == rhs.rdest &&
            lhs.vdest == rhs.vdest && lhs.immediate0 == rhs.immediate0 &&
-           lhs.immediate1 == rhs.immediate1;
+           lhs.immediate1 == rhs.immediate1 &&
+           lhs.VMAP_OFFSET == rhs.VMAP_OFFSET;
   }
 };
 
@@ -489,9 +494,9 @@ struct VectorParams : BaseParams {
       }
     }
     for (int i = 0; i < 2; i++) {
-      addressGen0InputXLoopIndex[i] = 0;
       addressGen0InputYLoopIndex[i] = 0;
-      addressGen0WeightLoopIndex[i] = 0;
+      addressGen0InputXLoopIndex[i] = 1;
+      addressGen0WeightLoopIndex[i] = 2;
     }
     vec0_dq_scale = 0;
     fetch_vector_type_0 = false;
@@ -504,9 +509,9 @@ struct VectorParams : BaseParams {
       }
     }
     for (int i = 0; i < 2; i++) {
-      addressGen1InputXLoopIndex[i] = 0;
       addressGen1InputYLoopIndex[i] = 0;
-      addressGen1WeightLoopIndex[i] = 0;
+      addressGen1InputXLoopIndex[i] = 1;
+      addressGen1WeightLoopIndex[i] = 2;
     }
     vec1_dq_scale = 0;
     fetch_vector_type_1 = false;
@@ -519,9 +524,9 @@ struct VectorParams : BaseParams {
       }
     }
     for (int i = 0; i < 2; i++) {
-      addressGen2InputXLoopIndex[i] = 0;
       addressGen2InputYLoopIndex[i] = 0;
-      addressGen2WeightLoopIndex[i] = 0;
+      addressGen2InputXLoopIndex[i] = 1;
+      addressGen2WeightLoopIndex[i] = 2;
     }
     vec2_dq_scale = 0;
     fetch_vector_type_2 = false;
@@ -534,9 +539,9 @@ struct VectorParams : BaseParams {
       }
     }
     for (int i = 0; i < 2; i++) {
-      outputXLoopIndex[i] = 0;
       outputYLoopIndex[i] = 0;
-      outputWeightLoopIndex[i] = 0;
+      outputXLoopIndex[i] = 1;
+      outputWeightLoopIndex[i] = 2;
     }
     output_scale = 0;
     output_vector_type = false;
@@ -606,6 +611,8 @@ struct VectorParams : BaseParams {
   ac_int<16, false> output_scale;
   bool output_vector_type;
 
+  ac_int<2, false> output_types;
+
   // Address generator 0 broadcast
   ac_int<6, false> vec0_broadcast;
 
@@ -640,7 +647,7 @@ struct VectorParams : BaseParams {
   // slicing params + 18-bit reshape params + 4-bit head size + 7 boolean flags
   // + 64-bit scale offset
   static const unsigned int width =
-      4 * address_gen_width + 6 + 36 + 18 + 4 + 7 + 64;
+      4 * address_gen_width + 6 + 36 + 18 + 4 + 7 + 64 + 2;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -724,6 +731,8 @@ struct VectorParams : BaseParams {
     }
     m & output_scale;
     m & output_vector_type;
+
+    m & output_types;
 
     m & vec0_broadcast;
 
@@ -850,6 +859,8 @@ struct VectorParams : BaseParams {
     }
     os << "output_scale: " << params.output_scale << std::endl;
     os << "output_vector_type: " << params.output_vector_type << std::endl;
+
+    os << "output_types: " << params.output_types << std::endl;
 
     os << "vec0_broadcast: " << params.vec0_broadcast << std::endl;
 
@@ -1032,6 +1043,9 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].vector_op2_src1;
     }
     for (int j = 0; j < 8; j++) {
+      m& inst[j].vector_op3_src1;
+    }
+    for (int j = 0; j < 8; j++) {
       m& inst[j].vdequantize;
     }
     for (int j = 0; j < 8; j++) {
@@ -1048,9 +1062,6 @@ struct VectorInstructionConfig : BaseParams {
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vector_op3;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].VMAP_OFFSET;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rCount;
@@ -1084,6 +1095,9 @@ struct VectorInstructionConfig : BaseParams {
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].immediate1;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].VMAP_OFFSET;
     }
 
     for (int i = 0; i < 8; i++) {

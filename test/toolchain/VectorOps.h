@@ -157,11 +157,14 @@ void set_vector_immediate(const float scalar, const int stage,
   if (stage == 0) {
     inst.vector_op0_src1 = VectorInstructions::from_immediate_0;
     inst.immediate0 = immediate.bits_rep();
-  } else if (stage == 3) {
+  } else if (stage == 2) {
     inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
-  } else if (stage == 5) {
+  } else if (inst.vector_op2_src1 != VectorInstructions::from_immediate_1) {
+    inst.vector_op3_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
+  } else {
+    throw std::invalid_argument("All operand slots are used!");
   }
 }
 
@@ -312,8 +315,8 @@ void MapVectorOperations(const codegen::Operation &param,
   Tiling tiling;
 
   if (vector_params->has_transpose) {
-    // Only support a buffer size of 32
-    const int BUFSIZE = OC_DIMENSION < 32 ? OC_DIMENSION : 32;
+    // Support a maximum buffer size of 1024
+    const int BUFSIZE = std::min(1024 / OC_DIMENSION, OC_DIMENSION);
 
     std::vector<int> input_shape(input.shape().begin(), input.shape().end());
     input_shape = squeeze_shape(input_shape);
@@ -432,8 +435,8 @@ void MapVectorOperations(const codegen::Operation &param,
     }
   }
 
-  vector_params->output_vector_type =
-      output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   if (output.has_reshape()) {
     vector_params->has_attn_head_permute = output.shape(1) < output.shape(2);
@@ -460,47 +463,49 @@ void MapVectorOperations(const codegen::Operation &param,
     const auto op = op_list[i];
     const std::string opcode = op.target();
 
-    if (opcode == "quantize" || opcode == "dequantize") {
+    if (opcode == "dequantize") {
       const auto scale = op.kwargs().at("scale").tensor();
 
       assert(get_size(scale) == 1);
 
       // scalar scale factor
       VECTOR_DATATYPE immediate = read_constant_param(scale);
-
-      if (opcode == "quantize") {
-        vector_params->quantize_output = true;
-        vector_params->output_scale = immediate.bits_rep();
-      } else {
-        inst.vdequantize = true;
-        inst.immediate0 = immediate.bits_rep();
-      }
+      inst.vdequantize = true;
+      inst.immediate0 = immediate.bits_rep();
     } else if (opcode == "quantize_mx") {
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
           param.outputs().tensors(0).memory().address();
     } else {
-      if (curr_stage == 4) {
+      if (curr_stage == vector_unit_stages.size()) {
         // we have already processed all the stages
         assert(i == op_list.size() - 1);
         break;
       }
 
-      for (int stage = curr_stage; stage < 4; stage++) {
+      for (int stage = curr_stage; stage < vector_unit_stages.size(); stage++) {
         if (vector_unit_stages[stage].find(opcode) ==
             vector_unit_stages[stage].end()) {
           continue;
+        }
+
+        // Only the last stage has a true divider
+        if (opcode == "div" && stage != 3) {
+          const auto other = op.kwargs().at("other").tensor();
+          if (get_size(other) > 1) {
+            continue;
+          }
         }
 
         spdlog::debug("stage {} target: {}\n", stage, opcode);
 
         unsigned int vop = inst_map[opcode];
         if (stage == 0) {
-          inst.vector_op0 = vop;
+          inst.vector_op0 = opcode == "div" ? VectorInstructions::vmult : vop;
         } else if (stage == 1) {
           inst.vector_op1 = vop;
         } else if (stage == 2) {
-          inst.vector_op2 = vop;
+          inst.vector_op2 = opcode == "div" ? VectorInstructions::vmult : vop;
         } else if (stage == 3) {
           inst.vector_op3 = vop;
         }
@@ -521,8 +526,9 @@ void MapVectorOperations(const codegen::Operation &param,
 
           set_vector_addr_gen1(self, output_shape, accelerator_memory_map,
                                vector_params);
-        } else if (op.kwargs().contains("other")) {
-          const auto other = op.kwargs().at("other");
+        } else if (op.kwargs().contains("other") || opcode == "quantize") {
+          std::string other_key = opcode == "quantize" ? "scale" : "other";
+          const auto other = op.kwargs().at(other_key);
 
           if (other.has_float_value() || other.has_int_value()) {
             float scalar = other.has_float_value() ? other.float_value()
@@ -551,6 +557,14 @@ void MapVectorOperations(const codegen::Operation &param,
                 inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
                 set_vector_addr_gen2(tensor_to_load, output_shape,
                                      accelerator_memory_map, vector_params);
+              } else if (inst.vector_op2_src1 !=
+                         VectorInstructions::from_vector_fetch_2) {
+                inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
+                set_vector_addr_gen2(tensor_to_load, output_shape,
+                                     accelerator_memory_map, vector_params);
+              } else {
+                throw std::invalid_argument(
+                    "Unsupported number of operands for vector operations!");
               }
             }
           }

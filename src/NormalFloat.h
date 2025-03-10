@@ -17,11 +17,11 @@ class NormalFloat4 {
 
   ac_int_rep index;
 
-  NormalFloat4() {}
-  NormalFloat4(const ac_int_rep &other) { index = other; }
+  NormalFloat4() : index(7) {}
+  NormalFloat4(const ac_int_rep &other) : index(other) {}
 
 #ifndef __SYNTHESIS__
-  NormalFloat4(const float other) { index = other; }
+  NormalFloat4(const float other) : index(other) {}
 #endif
 
   template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
@@ -40,12 +40,14 @@ class NormalFloat4 {
     return decoded(r);
   }
 
+#ifndef __SYNTHESIS__
+  operator float() const { return code[index]; }
+#endif
+
   template <int W, bool S>
   operator Int<W, S>() const {
     return code[index];
   }
-
-  operator float() const { return code[index]; }
 
   template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
             ac_q_mode Q>
@@ -55,6 +57,11 @@ class NormalFloat4 {
     std_float_t f;
     f.float_val = typename std_float_t::ac_float_rep(code[index]);
     return f;
+  }
+
+  friend std::ostream &operator<<(std::ostream &os, const NormalFloat4 &nf) {
+    os << NormalFloat4::code[nf.index];
+    return os;
   }
 
 #ifndef NO_SYSC

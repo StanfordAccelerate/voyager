@@ -1,12 +1,5 @@
 #pragma once
 
-using INT8_ = Int<8, true>;
-using INT24 = Int<24, true>;
-using INT32 = Int<32, true>;
-
-using E8M0 = UFloat<8, 8>;
-using E5M3 = UFloat<8, 5>;
-
 #if defined(P8_1)
 
 using P8 = Posit<8, 1>;
@@ -110,48 +103,49 @@ using F32 = StdFloat<23, 8, false, true, AC_RND_CONV>;
 
 using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
-#define INPUT_DATATYPE INT8_
-#define WEIGHT_DATATYPE INT8_
-#define ACCUM_DATATYPE INT24
-#define OUTPUT_DATATYPE INT8_
+#define INPUT_DATATYPE DataTypes::int8
+#define WEIGHT_DATATYPE DataTypes::int8
+#define ACCUM_DATATYPE DataTypes::int24
+#define OUTPUT_DATATYPE DataTypes::int8
 #define VECTOR_DATATYPE F16
 
 #elif defined(INT8_32)
 
 using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
-#define INPUT_DATATYPE INT8_
-#define WEIGHT_DATATYPE INT8_
-#define ACCUM_DATATYPE INT32
-#define OUTPUT_DATATYPE INT8_
+#define INPUT_DATATYPE DataTypes::int8
+#define WEIGHT_DATATYPE DataTypes::int8
+#define ACCUM_DATATYPE DataTypes::int32
+#define OUTPUT_DATATYPE DataTypes::int8
 #define VECTOR_DATATYPE F16
 
 #elif defined(MXINT8)
 
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+#define INPUT_DATATYPE DataTypes::int8
+#define WEIGHT_DATATYPE DataTypes::int8
+#define ACCUM_DATATYPE DataTypes::int32
+#define ACCUM_BUFFER_DATATYPE DataTypes::bfloat16
+#define OUTPUT_DATATYPE DataTypes::int8
+#define VECTOR_DATATYPE DataTypes::bfloat16
+#define SCALE_DATATYPE DataTypes::fp8_e8m0
 
-#define INPUT_DATATYPE INT8_
-#define WEIGHT_DATATYPE INT8_
-#define ACCUM_DATATYPE INT32
-#define ACCUM_BUFFER_DATATYPE F16
-#define OUTPUT_DATATYPE INT8_
-#define VECTOR_DATATYPE F16
-#define SCALE_DATATYPE E8M0
+#define OUTPUT_DATATYPES \
+  DataTypes::nf4, DataTypes::fp8_e8m0, DataTypes::bfloat16
 
 #define SUPPORT_MX true
 
 #elif defined(MXNF4)
 
-using NF4 = NormalFloat4;
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+#define INPUT_DATATYPE DataTypes::nf4
+#define WEIGHT_DATATYPE DataTypes::nf4
+#define ACCUM_DATATYPE DataTypes::int32
+#define ACCUM_BUFFER_DATATYPE DataTypes::bfloat16
+#define OUTPUT_DATATYPE DataTypes::nf4
+#define VECTOR_DATATYPE DataTypes::bfloat16
+#define SCALE_DATATYPE DataTypes::fp8_e5m3
 
-#define INPUT_DATATYPE NF4
-#define WEIGHT_DATATYPE NF4
-#define ACCUM_DATATYPE INT32
-#define ACCUM_BUFFER_DATATYPE F16
-#define OUTPUT_DATATYPE NF4
-#define VECTOR_DATATYPE F16
-#define SCALE_DATATYPE E5M3
+#define OUTPUT_DATATYPES \
+  DataTypes::nf4, DataTypes::fp8_e5m3, DataTypes::bfloat16
 
 #define SUPPORT_MX true
 
@@ -176,7 +170,11 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
 // default to E8M0 scale
 #ifndef SCALE_DATATYPE
-#define SCALE_DATATYPE E8M0
+#define SCALE_DATATYPE DataTypes::fp8_e8m0
+#endif
+
+#ifndef OUTPUT_DATATYPES
+#define OUTPUT_DATATYPES INPUT_DATATYPE, VECTOR_DATATYPE
 #endif
 
 #ifndef SUPPORT_MX

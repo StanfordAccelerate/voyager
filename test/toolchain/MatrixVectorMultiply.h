@@ -100,19 +100,20 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
     vector_params->outputWeightLoopIndex[i] = 2;
   }
 
-  vector_params->output_vector_type =
-      DataTypes::TypeName<INPUT_DATATYPE>::name() != output.dtype();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // inst0 - start reduction engine
   VectorInstructions vinst0;
   vinst0.instType = VectorInstructions::reduction;
   vinst0.rCount = reduction_dim / OC_DIMENSION;
   vinst0.rOp = VectorInstructions::radd;
-  vinst0.rDuplicate = 0;
+  vinst0.rdest = 0;
+  vinst0.immediate0 = 1;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
-  // inst 1 - input x weight, send to reduce
+  // inst1 - input x weight, send to reduce
   VectorInstructions vinst1;
   vinst1.instType = VectorInstructions::vector;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;

@@ -11,7 +11,6 @@ class StdFloat;
 template <int W, bool S>
 class Int;
 
-// #include "FloatTypes.h"
 #include "IntTypes.h"
 #include "NormalFloat.h"
 #include "PositTypes.h"
@@ -106,3 +105,31 @@ struct TypeName<nf4> {
 };
 
 };  // namespace DataTypes
+
+template <typename T, typename... Ts>
+struct TypeIndex;
+
+template <typename T, typename... Ts>
+struct TypeIndex<T, T, Ts...> {
+  static constexpr int value = 0;
+};
+
+template <typename T, typename U, typename... Ts>
+struct TypeIndex<T, U, Ts...> {
+  static constexpr int value = 1 + TypeIndex<T, Ts...>::value;
+};
+
+template <typename T, typename... Ts>
+constexpr int get_type_index() {
+  return TypeIndex<T, Ts...>::value;
+}
+
+template <typename... Ts>
+int get_index_from_type_name(const std::string& dtype) {
+  int index = -1;
+  ((dtype == DataTypes::TypeName<Ts>::name()
+        ? (index = get_type_index<Ts, Ts...>())
+        : 0),
+   ...);
+  return index;
+}

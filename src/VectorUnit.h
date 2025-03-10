@@ -112,6 +112,7 @@ SC_MODULE(VectorOpUnit) {
       Pack1D<VectorType, Width> op0_src0;
       Pack1D<VectorType, Width> op0_src1;
       Pack1D<VectorType, Width> op2_src1;
+      Pack1D<VectorType, Width> op3_src1;
 
       if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
           inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
@@ -155,8 +156,14 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
-      if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2) {
-        op2_src1 = vectorFetch2Output.Pop();
+      if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2 ||
+          inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
+        Pack1D<VectorType, Width> temp = vectorFetch2Output.Pop();
+        if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2) {
+          op2_src1 = temp;
+        } else {
+          op3_src1 = temp;
+        }
       }
 
       if (inst.vector_op0_src0 == VectorInstructions::from_accumulation ||
@@ -193,13 +200,10 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_immediate_0 ||
           inst.vector_op0_src1 == VectorInstructions::from_immediate_0) {
-        VectorType immediate;
-        immediate.set_bits(inst.immediate0);
-
         Pack1D<VectorType, Width> temp;
 #pragma hls_unroll yes
         for (int i = 0; i < Width; i++) {
-          temp[i] = immediate;
+          temp[i].set_bits(inst.immediate0);
         }
 
         if (inst.vector_op0_src0 == VectorInstructions::from_immediate_0) {
@@ -209,17 +213,20 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
-      if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1) {
-        VectorType immediate;
-        immediate.set_bits(inst.immediate1);
-
+      if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1 ||
+          inst.vector_op3_src1 == VectorInstructions::from_immediate_1) {
+        Pack1D<VectorType, Width> temp;
 #pragma hls_unroll yes
         for (int i = 0; i < Width; i++) {
-          op2_src1[i] = immediate;
+          temp[i].set_bits(inst.immediate1);
+        }
+
+        if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1) {
+          op2_src1 = temp;
+        } else {
+          op3_src1 = temp;
         }
       }
-
-      // DLOG("vector unit input: " << op0_src0);
 
       // Stage 0: add, sub, mult
       if (inst.vector_op0 == VectorInstructions::vadd ||
@@ -237,46 +244,20 @@ SC_MODULE(VectorOpUnit) {
         res0 = op0_src0;
       }
 
-      // DLOG("res0: " << res0);
-
-      // Stage 1: exp
+      // Stage 1: exp, abs, activations
       if (inst.vector_op1 == VectorInstructions::vexp) {
         vexp<VectorType, Width>(res0, res1);
-      } else if (inst.vector_op1 == VectorInstructions::vscaleexp) {
-        vscaleexp<VectorType, Width>(res0, inst.immediate0, res1);
-      } else {
-        res1 = res0;
-      }
-
-      // DLOG("res1: " << res1);
-
-      // Stage 2: add, mult, square
-      if (inst.vector_op2 == VectorInstructions::vadd) {
-        vadd<VectorType, Width>(res1, op2_src1, res2);
-      } else if (inst.vector_op2 == VectorInstructions::vmult ||
-                 inst.vector_op2 == VectorInstructions::vsquare) {
-        if (inst.vector_op2 == VectorInstructions::vsquare) {
-          op2_src1 = res1;
-        }
-        vmult<VectorType, Width>(res1, op2_src1, res2);
-      } else {
-        res2 = res1;
-      }
-
-      // DLOG("res2: " << res2);
-
-      // Stage 3: activations
-      if (inst.vector_op3 == VectorInstructions::vrelu ||
-          inst.vector_op3 == VectorInstructions::vrelumask) {
-        bool use_mask = inst.vector_op3 == VectorInstructions::vrelumask;
-        vrelu<VectorType, Width>(res2, op0_src1, use_mask, res3);
-      } else if (inst.vector_op3 == VectorInstructions::vgelu) {
-        vgelu<VectorType, Width>(res2, res3);
-      } else if (inst.vector_op3 == VectorInstructions::vsilu) {
-        vsilu<VectorType, Width>(res2, res3);
-      } else if (inst.vector_op3 == VectorInstructions::vmap) {
+      } else if (inst.vector_op1 == VectorInstructions::vabs) {
+        vabs<VectorType, Width>(res0, res1);
+      } else if (inst.vector_op1 == VectorInstructions::vrelu) {
+        vrelu<VectorType, Width>(res0, res1);
+      } else if (inst.vector_op1 == VectorInstructions::vgelu) {
+        vgelu<VectorType, Width>(res0, res1);
+      } else if (inst.vector_op1 == VectorInstructions::vsilu) {
+        vsilu<VectorType, Width>(res0, res1);
+      } else if (inst.vector_op1 == VectorInstructions::vmap) {
         for (int i = 0; i < Width; i++) {
-          DataTypes::bfloat16 value = res2[i];
+          DataTypes::bfloat16 value = res0[i];
 
           ac_int<32, false> address = value.bits_rep() * 2;
           MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
@@ -293,14 +274,33 @@ SC_MODULE(VectorOpUnit) {
           }
 
           value.set_bits(bits);
-          res3[i] = value;
+          res1[i] = value;
         }
+      } else {
+        res1 = res0;
+      }
+
+      // Stage 2: add, mult, square
+      if (inst.vector_op2 == VectorInstructions::vadd) {
+        vadd<VectorType, Width>(res1, op2_src1, res2);
+      } else if (inst.vector_op2 == VectorInstructions::vmult ||
+                 inst.vector_op2 == VectorInstructions::vsquare) {
+        if (inst.vector_op2 == VectorInstructions::vsquare) {
+          op2_src1 = res1;
+        }
+        vmult<VectorType, Width>(res1, op2_src1, res2);
+      } else {
+        res2 = res1;
+      }
+
+      // Stage 3: div, quantize
+      if (inst.vector_op3 == VectorInstructions::vdiv) {
+        vdiv<VectorType, Width>(res2, op3_src1, res3);
       } else {
         res3 = res2;
       }
 
-      // DLOG("res3: " << res3);
-
+      // Write outputs
       if (inst.vdest == VectorInstructions::to_output) {
         vector_op_unit_output.Push(res3);
       } else if (inst.vdest == VectorInstructions::to_reduce) {
@@ -411,16 +411,11 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
-      ac_int<16, false> count = 1;
-      if (inst.rBroadcast) {
-        count = inst.immediate0;
-      }
-
       if (inst.rdest == 0) {
-        broadcast_count.Push(count);
+        broadcast_count.Push(inst.immediate0);
         broadcast_input.Push(res);
       } else {
-        broadcast1_count.Push(count);
+        broadcast1_count.Push(inst.immediate0);
         broadcast1_input.Push(res);
       }
     }
@@ -459,7 +454,7 @@ SC_MODULE(VectorUnit) {
 
   Connections::Out<Pack1D<IOType, Width>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<64, false>> CCS_INIT_S1(vector_output_address);
-  Connections::Out<Pack1D<INT8_, 1>> CCS_INIT_S1(scalar_output);
+  Connections::Out<Pack1D<DataTypes::int8, 1>> CCS_INIT_S1(scalar_output);
   Connections::Out<ac_int<64, false>> CCS_INIT_S1(scalar_output_address);
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
@@ -473,10 +468,10 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(vectorFetchParams);
 
   VectorOpUnit<IOType, VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
-      vector_simd);
+      vector_op_unit);
 
-  VectorUnitOutput<VectorType, ScaleType, IOType, Width> CCS_INIT_S1(
-      vector_unit_output);
+  VectorUnitOutput<VectorType, ScaleType, IOType, Width, OUTPUT_DATATYPES>
+      CCS_INIT_S1(vector_unit_output);
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       vector_unit_output_params);
 
@@ -515,18 +510,18 @@ SC_MODULE(VectorUnit) {
     vector_fetch.vectorFetch2DataResponseConverted(
         vectorFetch2DataResponseConverted);
 
-    vector_simd.clk(clk);
-    vector_simd.rstn(rstn);
-    vector_simd.vector_op_inst(vectorOpInstructions);
-    vector_simd.accumulation_inst(accumulationOpInstructions);
-    vector_simd.reduction_inst(reduceOpInstructions);
-    vector_simd.systolicArrayOutput(systolicArrayOutput);
-    vector_simd.vectorFetch0Output(vectorFetch0DataResponseConverted);
-    vector_simd.vectorFetch1Output(vectorFetch1DataResponseConverted);
-    vector_simd.vectorFetch2Output(vectorFetch2DataResponseConverted);
-    vector_simd.vector_op_unit_output(vector_op_unit_output);
-    vector_simd.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
-    vector_simd.vectorFetch3DataResponse(vectorFetch3DataResponse);
+    vector_op_unit.clk(clk);
+    vector_op_unit.rstn(rstn);
+    vector_op_unit.vector_op_inst(vectorOpInstructions);
+    vector_op_unit.accumulation_inst(accumulationOpInstructions);
+    vector_op_unit.reduction_inst(reduceOpInstructions);
+    vector_op_unit.systolicArrayOutput(systolicArrayOutput);
+    vector_op_unit.vectorFetch0Output(vectorFetch0DataResponseConverted);
+    vector_op_unit.vectorFetch1Output(vectorFetch1DataResponseConverted);
+    vector_op_unit.vectorFetch2Output(vectorFetch2DataResponseConverted);
+    vector_op_unit.vector_op_unit_output(vector_op_unit_output);
+    vector_op_unit.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
+    vector_op_unit.vectorFetch3DataResponse(vectorFetch3DataResponse);
 
     vector_unit_output.clk(clk);
     vector_unit_output.rstn(rstn);

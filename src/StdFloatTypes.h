@@ -56,10 +56,7 @@ class StdFloat {
 
   static decoded max() { return ac_float_rep::max(); }
 
-  StdFloat abs() const {
-    StdFloat r(float_val.abs());
-    return r;
-  }
+  StdFloat abs() const { return float_val.abs(); }
 
   StdFloat negate() const { return -float_val; }
 
@@ -84,20 +81,6 @@ class StdFloat {
 
   StdFloat relu() const {
     return float_val.neg() ? ac_float_rep::zero() : float_val;
-  }
-
-  StdFloat masked_relu(const StdFloat &mask) const {
-    return mask.float_val.neg() ? ac_float_rep::zero() : float_val;
-  }
-
-  template <int width, bool sign>
-  void scale_exp(ac_int<width, sign> offset) {
-    if (float_val == float_val.zero()) return;
-    // TODO handle subnormal numbers
-    ac_int<e_width, true> exp_bits =
-        float_val.d.template slc<e_width>(mant_bits);
-    exp_bits += offset;
-    float_val.d.set_slc(mant_bits, exp_bits);
   }
 
   ac_int<e_width, false> unbiased_exponent() const {

@@ -6,6 +6,7 @@
 #include "test/toolchain/LayerNorm.h"
 #include "test/toolchain/MatrixOps.h"
 #include "test/toolchain/MatrixVectorMultiply.h"
+#include "test/toolchain/Microscaling.h"
 #include "test/toolchain/Pooling.h"
 #include "test/toolchain/Softmax.h"
 #include "test/toolchain/VectorOps.h"
@@ -37,6 +38,8 @@ void MapOperation(const Operation &operation,
   } else if (first_op.target() == "max_pool2d" ||
              first_op.target() == "adaptive_avg_pool2d") {
     MapPoolingOperation(param, mappedParams, opMemoryMaps);
+  } else if (first_op.target() == "calculate_mx_qparam") {
+    MapMicroscaling(param, mappedParams, opMemoryMaps);
   } else {
     MapVectorOperations(param, mappedParams, opMemoryMaps);
   }

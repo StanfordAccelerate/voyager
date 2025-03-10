@@ -29,7 +29,7 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse2Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse1Params);
 
-  static constexpr int BUFSIZE = Width < 32 ? Width : 32;
+  static constexpr int BUFSIZE = 1024 / Width < Width ? 1024 / Width : Width;
 
   SC_CTOR(VectorFetchUnit) {
     SC_THREAD(read_params);

@@ -1,6 +1,7 @@
 #pragma once
 
-template <typename VectorType, typename ScaleType, typename IOType, int Width>
+template <typename VectorType, typename ScaleType, typename IOType, int Width,
+          typename... OutputTypes>
 SC_MODULE(VectorUnitOutput) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -9,7 +10,7 @@ SC_MODULE(VectorUnitOutput) {
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(tensor_in);
   Connections::Out<Pack1D<IOType, Width>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<64, false>> CCS_INIT_S1(vector_output_address);
-  Connections::Out<Pack1D<INT8_, 1>> CCS_INIT_S1(scalar_output);
+  Connections::Out<Pack1D<DataTypes::int8, 1>> CCS_INIT_S1(scalar_output);
   Connections::Out<ac_int<64, false>> CCS_INIT_S1(scalar_output_address);
 
   Connections::SyncOut CCS_INIT_S1(done);
@@ -138,60 +139,53 @@ SC_MODULE(VectorUnitOutput) {
 
                   Pack1D<VectorType, Width> outputs = tensor_in.Pop();
 
-                  if (params.output_vector_type) {
-                    constexpr int num_words = VectorType::width / IOType::width;
-                    Pack1D<IOType, Width> converted_outputs[num_words];
+                  Pack1D<VectorType, Width> scaled_outputs;
+#if SUPPORT_MX
+                  if (params.quantize_output_mx) {
+                    Pack1D<ScaleType, 1> scale;
+                    vquantize_mx<VectorType, IOType, ScaleType, Width>(
+                        outputs, scaled_outputs, scale[0]);
 
-                    convertPack1D<IOType, VectorType, Width>(outputs,
-                                                             converted_outputs);
+                    constexpr int num_words =
+                        ScaleType::width / DataTypes::int8::width;
+                    Pack1D<DataTypes::int8, 1> converted_scale[num_words];
+
+                    convertPack1D<DataTypes::int8, ScaleType, 1>(
+                        scale, converted_scale);
+
+                    ac_int<32, false> scale_address = address / Width;
 
                     for (int i = 0; i < num_words; i++) {
-                      vector_output.Push(converted_outputs[i]);
-                      vector_output_address.Push(params.VECTOR_OUTPUT_OFFSET +
-                                                 address * VectorType::width /
-                                                     8 +
-                                                 i * Width * IOType::width / 8);
+                      scalar_output.Push(converted_scale[i]);
+                      scalar_output_address.Push(
+                          params.SCALE_OFFSET +
+                          scale_address * ScaleType::width / 8 +
+                          i * DataTypes::int8::width / 8);
                     }
                   } else {
-                    Pack1D<IOType, Width> converted_outputs;
-                    if (params.quantize_output) {
-                      VectorType scale;
-                      scale.set_bits(params.output_scale);
-                      vquantize<VectorType, IOType, VectorType, Width>(
-                          outputs, converted_outputs, scale);
-#if SUPPORT_MX
-                    } else if (params.quantize_output_mx) {
-                      Pack1D<ScaleType, 1> scale;
-                      vquantize_mx<VectorType, IOType, ScaleType, Width>(
-                          outputs, converted_outputs, scale[0]);
-
-                      constexpr int num_words = ScaleType::width / INT8_::width;
-                      Pack1D<INT8_, 1> converted_scale[num_words];
-
-                      convertPack1D<INT8_, ScaleType, 1>(scale,
-                                                         converted_scale);
-
-                      ac_int<64, false> scale_address = address / Width;
-
-                      for (int i = 0; i < num_words; i++) {
-                        scalar_output.Push(converted_scale[i]);
-                        scalar_output_address.Push(params.SCALE_OFFSET +
-                                                   scale_address *
-                                                       ScaleType::width / 8 +
-                                                   i * INT8_::width / 8);
-                      }
 #endif
-                    } else {
-#pragma hls_unroll yes
-                      for (int i = 0; i < Width; i++) {
-                        converted_outputs[i] = outputs[i];
-                      }
-                    }
-
-                    vector_output.Push(converted_outputs);
-                    vector_output_address.Push(params.VECTOR_OUTPUT_OFFSET +
-                                               address * IOType::width / 8);
+                    scaled_outputs = outputs;
+#if SUPPORT_MX
                   }
+#endif
+
+                  bool found =
+                      ((get_type_index<OutputTypes, OutputTypes...>() ==
+                                params.output_types
+                            ? (vwrite_out<VectorType, IOType, OutputTypes,
+                                          Width>(scaled_outputs, address,
+                                                 vector_output,
+                                                 vector_output_address, params),
+                               true)
+                            : false) ||
+                       ...);
+
+#ifndef __SYNTHESIS__
+                  if (!found) {
+                    std::cerr << "Error: Index '" << params.output_types
+                              << "' is not valid.\n";
+                  }
+#endif
 
                   if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                     break;
