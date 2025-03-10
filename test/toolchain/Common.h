@@ -57,27 +57,6 @@ inline float read_constant_param(const codegen::Tensor tensor) {
   return array_ptr[0];
 }
 
-int find_largest_factor(const int dim) {
-  // Start from the largest possible factor
-  for (int i = std::min(dim, 1024); i > 1; --i) {
-    if (dim % i == 0) {
-      return i;
-    }
-  }
-  return 1;  // If no factor is found, return 1
-}
-
-void factorize_for_address_gen(const int dim, int *shape) {
-  if (dim > 1024) {
-    int factor = find_largest_factor(dim);
-    shape[0] = dim / factor;
-    shape[1] = factor;
-  } else {
-    shape[0] = 1;
-    shape[1] = dim;
-  }
-}
-
 inline std::vector<int> squeeze_shape(const std::vector<int> &input) {
   std::vector<int> result;
   for (int value : input) {
@@ -88,7 +67,12 @@ inline std::vector<int> squeeze_shape(const std::vector<int> &input) {
   return result;
 }
 
-std::vector<int> split_loops(std::vector<int> loops, int max_value) {
+inline void squeeze_front_ones(std::vector<int> &vec) {
+  vec.erase(vec.begin(),
+            std::find_if(vec.begin(), vec.end(), [](int x) { return x != 1; }));
+}
+
+std::vector<int> split_loops(const std::vector<int> loops, int max_value) {
   if (max_value <= 1) {
     throw std::invalid_argument("max_value must be greater than 1.");
   }

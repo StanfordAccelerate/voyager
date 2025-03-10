@@ -230,7 +230,14 @@ std::vector<std::any> run_operation(const Operation &operation,
                                                        input_shape);
         } else {
           const int block_size = op.kwargs().at("block_size").int_value();
-          const int axis = op.kwargs().at("axis").int_value();
+
+          assert(input_shape.size() == scale_shape.size());
+
+          int axis = 0;
+          for (; axis < input_shape.size(); axis++) {
+            if (input_shape[axis] != scale_shape[axis]) break;
+          }
+
           output_ptr = quantize_mx<Vector, Input, Scale>(
               output_ptr, scale_ptr, input_shape, block_size, axis);
         }

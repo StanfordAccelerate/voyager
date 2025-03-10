@@ -48,6 +48,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   vector_params->addressGen1Mode = true;
 
   auto input_shape = get_shape(tensor);
+  squeeze_front_ones(input_shape);
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
@@ -86,6 +87,7 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
   vector_params->addressGen2Mode = true;
 
   auto input_shape = get_shape(tensor);
+  squeeze_front_ones(input_shape);
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
@@ -212,7 +214,7 @@ void MapVectorOperations(const codegen::Operation &param,
     uint64_t step = reshape_kwargs.at("step").int_value();
     uint64_t dim = reshape_kwargs.at("dim").int_value();
 
-    std::vector<int> shape(input.shape().begin(), input.shape().end());
+    auto shape = get_shape(input, false);
 
     dim = dim < 0 ? dim + shape.size() : dim;
     end = end > shape[dim] ? shape[dim] : end;

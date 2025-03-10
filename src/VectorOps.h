@@ -214,9 +214,7 @@ void vquantize_mx(const Pack1D<InputType, Width>& op0,
     }
 
     InputType amax = temp[num_stage][0];
-
-    InputType max_value = static_cast<InputType>(QuantizedType::max());
-    scale = amax * max_value.reciprocal();
+    scale = amax / static_cast<InputType>(QuantizedType::max());
   }
 
   if (scale.is_zero()) {
