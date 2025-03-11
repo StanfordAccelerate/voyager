@@ -8,10 +8,15 @@ import pandas as pd
 import re
 import signal
 import sys
+from deepdiff import DeepDiff
+
+from google.protobuf import text_format
+from google.protobuf.json_format import MessageToDict
+from quantized_training.codegen import param_pb2
 
 
 def print_test_results(test_results, layers, output_folder):
-    columns = ["Model", "Layer", "Status", "Runtime", "Ideal", "RuntimeType"]
+    columns = ["Model", "Layer", "Status", "Runtime", "Ideal", "RuntimeType", "Count"]
     if len(test_results[0]) == 3:
         columns = columns[:3]
 
@@ -150,12 +155,15 @@ def run_gold_model_tests(layers, num_processes, results_folder):
     return print_test_results(test_results, layers, results_folder)
 
 
-def run_systemc_unit_test(model, layer, output_folder, fast):
+def run_systemc_unit_test(model, layer, output_folder, fast, scale_down_operation):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
     env_vars["CLOCK_PERIOD"] = "1"
     env_vars["SIMS"] = "gold,accelerator"
+
+    if scale_down_operation:
+        env_vars["SCALE_DOWN_OPERATION"] = "1"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
         try:
@@ -180,7 +188,7 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
     return (model, layer, p.returncode == 0)
 
 
-def run_systemc_tests(layers, num_processes, results_folder, fast):
+def run_systemc_tests(layers, condensed_models, num_processes, results_folder, fast):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
     # Build TestRunner binary
@@ -211,7 +219,13 @@ def run_systemc_tests(layers, num_processes, results_folder, fast):
         for test in tests:
             pool.apply_async(
                 run_systemc_unit_test,
-                args=(model, test, results_folder, fast),
+                args=(
+                    model,
+                    test,
+                    results_folder,
+                    fast,
+                    model in condensed_models if condensed_models else False,
+                ),
                 callback=test_results.append,
             )
 
@@ -221,11 +235,15 @@ def run_systemc_tests(layers, num_processes, results_folder, fast):
     return print_test_results(test_results, layers, results_folder)
 
 
-def run_rtl_test(model, layer, output_folder):
+def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
     env_vars["SIMS"] = "gold,accelerator"
+
+    if scale_down_operation:
+        env_vars["SCALE_DOWN_OPERATION"] = "1"
+
     # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an
     # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
@@ -318,10 +336,17 @@ def run_rtl_test(model, layer, output_folder):
         ideal = 0
         runtime_type = ""
 
-    return (model, layer, success, runtime, ideal, runtime_type)
+    return (model, layer, success, runtime, ideal, runtime_type, layer_count)
 
 
-def run_rtl_tests(layers, num_processes, results_folder, keep_build=False):
+def run_rtl_tests(
+    layers,
+    layer_counts,
+    condensed_models,
+    num_processes,
+    results_folder,
+    keep_build=False,
+):
     check_environment_vars(
         ["DATATYPE", "IC_DIMENSION", "OC_DIMENSION", "TECHNOLOGY", "CLOCK_PERIOD"]
     )
@@ -384,7 +409,13 @@ def run_rtl_tests(layers, num_processes, results_folder, keep_build=False):
         for test in tests:
             pool.apply_async(
                 run_rtl_test,
-                args=(model, test, results_folder),
+                args=(
+                    model,
+                    test,
+                    layer_counts[model][test],
+                    results_folder,
+                    model in condensed_models if condensed_models else False,
+                ),
                 callback=test_results.append,
             )
 
@@ -632,12 +663,90 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     return abs(final_accuracy - gold_accuracy) < 1
 
 
+def add_layers(network, layers, layer_counts, uniquify):
+    all_layers = []
+
+    layers[network] = []
+    layer_counts[network] = {}
+
+    if not uniquify:
+        with open(
+            f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/layers.txt",
+            "r",
+        ) as f:
+            layers[network] = f.read().splitlines()
+            layer_counts[network] = {layer: 1 for layer in layers[network]}
+    else:
+        # open the proto file
+        with open(
+            f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/model.txt",
+            "r",
+        ) as f:
+            contents = f.read()
+        params = param_pb2.Model()
+        text_format.Parse(contents, params)
+
+        # convert to json
+        params_dict = MessageToDict(params, preserving_proto_field_name=True)
+
+        def delete_nested_keys(data, key):
+            # if the current element is a dict
+            if isinstance(data, dict):
+                # use list() to create a copy, avoiding modifying the dictionary while iterating
+                for k in list(data.keys()):
+                    if k == key:
+                        del data[k]
+                    else:
+                        # recursively check the value of the current key
+                        delete_nested_keys(data[k], key)
+
+            # if the current element is a list
+            elif isinstance(data, list):
+                for item in data:
+                    delete_nested_keys(item, key)
+
+        unique_layers = {}
+        for op in params_dict["ops"]:
+            # skip nop layers
+            if "op" in op and op["op"]["op"] == "nop":
+                continue
+
+            name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
+
+            # remove the name, memory, and node fields from the op
+            delete_nested_keys(op, "name")
+            delete_nested_keys(op, "memory")
+            delete_nested_keys(op, "node")
+
+            is_unique_layer = True
+            for op_name, op_val in unique_layers.items():
+                if not DeepDiff(op, op_val, ignore_order=True):
+                    layer_counts[network][op_name] += 1
+                    is_unique_layer = False
+                    break
+
+            if is_unique_layer:
+                unique_layers[name] = op
+                layers[network].append(name)
+                layer_counts[network][name] = 1
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--models",
         required=True,
         help="Model(s) to test for regression (resnet18, mobilebert)",
+    )
+    parser.add_argument(
+        "--condensed_models",
+        required=False,
+        help="Model(s) to test for regression, but are first condensed by shrinking larger layers",
+    )
+    parser.add_argument(
+        "--uniquify_layers",
+        action="store_true",
+        help="Remove duplicated layers in the model",
     )
     parser.add_argument(
         "--dataset",
@@ -679,18 +788,23 @@ def main():
     os.system("rm -f regression_results/latest")
     os.system(f"cd regression_results && ln -sf {current_time} latest")
 
+    layers = {}
+    layer_counts = {}
+
     # Add codegen layers
     layers = {}
     if args.tests is None:
-        for network in args.models:
+        all_models = []
+        if args.models is not None:
+            all_models.extend(args.models)
+        if args.condensed_models is not None:
+            all_models.extend(args.condensed_models)
+
+        for network in all_models:
             env_vars = os.environ.copy()
             env_vars["NETWORK"] = network
             subprocess.run(["make", "network-proto"], env=env_vars)
-            with open(
-                f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/layers.txt",
-                "r",
-            ) as f:
-                layers[network] = f.read().splitlines()
+            add_layers(network, layers, layer_counts, args.uniquify_layers)
     else:
         assert (
             len(args.models) == 1
@@ -699,11 +813,20 @@ def main():
 
     if args.sims == "systemc" or args.sims == "fast-systemc":
         success = run_systemc_tests(
-            layers, args.num_processes, results_folder, args.sims == "fast-systemc"
+            layers,
+            args.condensed_models,
+            args.num_processes,
+            results_folder,
+            args.sims == "fast-systemc",
         )
     elif args.sims == "rtl":
         success = run_rtl_tests(
-            layers, args.num_processes, results_folder, args.keep_build
+            layers,
+            layer_counts,
+            args.condensed_models,
+            args.num_processes,
+            results_folder,
+            args.keep_build,
         )
     elif args.sims == "gold_model":
         success = run_gold_model_tests(layers, args.num_processes, results_folder)

@@ -355,6 +355,13 @@ void Harness::sendParams() {
     std::deque<BaseParams *> accelerator_params;
     MapOperation(currentOperation, accelerator_params, accelerator_memory_maps);
 
+    int runtime_scale_factor = 1;
+    std::cout << "Operation: " << currentOperation.name << std::endl;
+    if (currentOperation.has_shrunk_tiling) {
+      runtime_scale_factor = currentOperation.shrink_factor;
+      std::cout << "Scaling operation by " << runtime_scale_factor << std::endl;
+    }
+
     while (accelerator_params.size() > 0) {
       bool matrixParamsValid, vectorParamsValid;
 
@@ -414,10 +421,10 @@ void Harness::sendParams() {
 
       std::cout << "Default time unit: " << sc_get_default_time_unit()
                 << std::endl;
-      std::cout << "Runtime: "
-                << int(end.to_default_time_units() -
-                       start.to_default_time_units())
-                << " ns" << std::endl;
+
+      int runtime = runtime_scale_factor * int(end.to_default_time_units() -
+                                               start.to_default_time_units());
+      std::cout << "Runtime: " << runtime << " ns" << std::endl;
 
       accessCounter->print_summary(currentOperation.tiling,
                                    currentOperation.has_valid_tiling);

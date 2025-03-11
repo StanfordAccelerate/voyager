@@ -17,6 +17,9 @@
 #include "test/common/Utils.h"
 
 Simulation::Simulation() {
+  spdlog::cfg::load_env_levels();
+  spdlog::set_pattern("%v");
+
   model = get_env_var("NETWORK");
   if (model.empty()) {
     model = "resnet18";
@@ -56,8 +59,6 @@ Simulation::Simulation() {
   network = new Network(model);
   operations = network->get_operations(tests);
 
-  spdlog::cfg::load_env_levels();
-  spdlog::set_pattern("%v");
   spdlog::info("Starting new simulation with config:");
   spdlog::info("\n> Model: {}", model);
   spdlog::info("\n> Tests: ");
@@ -133,7 +134,8 @@ void Simulation::load_data() {
   spdlog::info("Data loaded successfully\n");
 }
 
-void Simulation::print_ideal_runtime(const codegen::Operation& param) {
+void Simulation::print_ideal_runtime(const Operation operation) {
+  const auto param = operation.param;
   const auto op_list = get_op_list(param);
   const auto first_op = op_list.front();
   const auto output = get_op_outputs(param).back();
@@ -155,6 +157,11 @@ void Simulation::print_ideal_runtime(const codegen::Operation& param) {
     // the total number of operations is X * Y * C * FX * FY * K.
     long num_macs = get_size(output) * get_size(weight) / K;
     cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
+
+    if (operation.has_shrunk_tiling) {
+      cycles *= operation.shrink_factor;
+    }
+
     spdlog::info("{}, matrix unit ideal runtime: {} ns\n", get_op_name(param),
                  cycles * clock_period_ns);
   } else {
@@ -169,7 +176,7 @@ void Simulation::run() {
   // Run gold models
   for (const auto& operation : operations) {
     const auto param = operation.param;
-    print_ideal_runtime(param);
+    print_ideal_runtime(operation);
 
     if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
       const auto memory = (ArrayMemory*)(memories["gold"]);
