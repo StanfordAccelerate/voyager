@@ -21,9 +21,10 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
   vector_params->ADDRESS_GEN1_OFFSET = memory.address();
-  vector_params->addressGen1Mode = nonzero_dims == 1 ? 3 : 1;
-  vector_params->fetch_vector_type_1 =
-      DataTypes::TypeName<VECTOR_DATATYPE>::name() == tensor.dtype();
+  vector_params->addressGen1Mode = true;
+  vector_params->vec1_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
+  vector_params->vector_input_1_type =
+      get_index_from_type_name<VECTOR_INPUT_DATATYPES>(tensor.dtype());
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
@@ -67,9 +68,11 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
   vector_params->ADDRESS_GEN2_OFFSET = memory.address();
-  vector_params->addressGen2Mode = nonzero_dims == 1 ? 3 : 1;
-  vector_params->fetch_vector_type_2 =
-      DataTypes::TypeName<VECTOR_DATATYPE>::name() == tensor.dtype();
+  vector_params->addressGen2Mode = true;
+  vector_params->vec2_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
+
+  vector_params->vector_input_2_type =
+      get_index_from_type_name<VECTOR_INPUT_DATATYPES>(tensor.dtype());
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
@@ -113,11 +116,14 @@ void set_immediate(const float scalar, const int stage,
   if (stage == 0) {
     inst.vector_op0_src1 = VectorInstructions::from_immediate_0;
     inst.immediate0 = immediate.bits_rep();
-  } else if (stage == 3) {
+  } else if (stage == 2) {
     inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
-  } else if (stage == 5) {
+  } else if (inst.vector_op2_src1 != VectorInstructions::from_immediate_1) {
+    inst.vector_op3_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
+  } else {
+    throw std::invalid_argument("All operand slots are used!");
   }
 }
 
@@ -391,8 +397,8 @@ void MapMatrixOperation(const Operation &operation,
     }
   }
 
-  vector_params->output_vector_type =
-      DataTypes::TypeName<VECTOR_DATATYPE>::name() == output.dtype();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // Transformer head permutation
   if (output.has_reshape()) {
@@ -420,44 +426,48 @@ void MapMatrixOperation(const Operation &operation,
     const auto op = op_list[i];
     const std::string opcode = op.target();
 
-    if (opcode == "quantize" || opcode == "dequantize") {
+    if (opcode == "dequantize") {
       const auto other = op.kwargs().at("scale").tensor();
 
       assert(get_size(other) == 1);
 
       VECTOR_DATATYPE immediate = read_constant_param(other);
-
-      if (opcode == "quantize") {
-        vector_params->quantize_output = true;
-        vector_params->output_scale = immediate.bits_rep();
-      } else {
-        inst.vdequantize = true;
-        inst.vector_dq_scale = immediate.bits_rep();
-      }
+      inst.vdequantize = true;
+      inst.vector_dq_scale = immediate.bits_rep();
     } else if (opcode == "quantize_mx") {
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
           param.outputs().tensors(0).memory().address();
     } else {
-      if (curr_stage == 4) {
+      if (curr_stage == vector_unit_stages.size()) {
         // we have already processed all the stages
         assert(i == op_list.size() - 1);
         break;
       }
 
-      for (int stage = curr_stage; stage < 4; stage++) {
+      for (int stage = curr_stage; stage < vector_unit_stages.size(); stage++) {
         if (vector_unit_stages[stage].find(opcode) ==
             vector_unit_stages[stage].end()) {
           continue;
         }
 
+        // Only the last stage has a true divider
+        if (opcode == "div" && stage != 3) {
+          const auto other = op.kwargs().at("other").tensor();
+          if (get_size(other) > 1) {
+            continue;
+          }
+        }
+
+        spdlog::debug("stage {} target: {}\n", stage, opcode);
+
         unsigned int vop = inst_map[opcode];
         if (stage == 0) {
-          inst.vector_op0 = vop;
+          inst.vector_op0 = opcode == "div" ? VectorInstructions::vmult : vop;
         } else if (stage == 1) {
           inst.vector_op1 = vop;
         } else if (stage == 2) {
-          inst.vector_op2 = vop;
+          inst.vector_op2 = opcode == "div" ? VectorInstructions::vmult : vop;
         } else if (stage == 3) {
           inst.vector_op3 = vop;
         }
@@ -465,8 +475,9 @@ void MapMatrixOperation(const Operation &operation,
         if (opcode == "vmap") {
           const auto other = op.kwargs().at("code").tensor();
           inst.VMAP_OFFSET = other.memory().address();
-        } else if (op.kwargs().contains("other")) {
-          const auto other = op.kwargs().at("other");
+        } else if (op.kwargs().contains("other") || opcode == "quantize") {
+          std::string other_key = opcode == "quantize" ? "scale" : "other";
+          const auto other = op.kwargs().at(other_key);
 
           if (other.has_float_value() || other.has_int_value()) {
             float scalar = other.has_float_value() ? other.float_value()
@@ -490,6 +501,14 @@ void MapMatrixOperation(const Operation &operation,
                 inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
                 set_addr_gen2(tensor_to_load, tiling, accelerator_memory_map,
                               vector_params);
+              } else if (inst.vector_op2_src1 !=
+                         VectorInstructions::from_vector_fetch_2) {
+                inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
+                set_addr_gen2(tensor_to_load, tiling, accelerator_memory_map,
+                              vector_params);
+              } else {
+                throw std::invalid_argument(
+                    "Unsupported number of operands for vector operations!");
               }
             }
           }

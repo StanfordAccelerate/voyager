@@ -1,6 +1,7 @@
 #pragma once
 
-template <typename Input, typename Vector, typename Scale, int Width>
+template <typename IOType, typename VectorType, typename Scale, int Width,
+          typename... InputTypes>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -10,16 +11,16 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
 
-  Connections::In<Pack1D<Input, Width>> CCS_INIT_S1(vectorFetch0DataResponse);
-  Connections::Out<Pack1D<Vector, Width>> CCS_INIT_S1(
+  Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch0DataResponse);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch0DataResponseConverted);
 
-  Connections::In<Pack1D<Input, Width>> CCS_INIT_S1(vectorFetch1DataResponse);
-  Connections::Out<Pack1D<Vector, Width>> CCS_INIT_S1(
+  Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch1DataResponse);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch1DataResponseConverted);
 
-  Connections::In<Pack1D<Input, Width>> CCS_INIT_S1(vectorFetch2DataResponse);
-  Connections::Out<Pack1D<Vector, Width>> CCS_INIT_S1(
+  Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch2DataResponse);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(addressGen0Params);
@@ -29,7 +30,7 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse2Params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(dataResponse1Params);
 
-  static constexpr int BUFSIZE = Width < 32 ? Width : 32;
+  static constexpr int BUFSIZE = 1024 / Width < Width ? 1024 / Width : Width;
 
   SC_CTOR(VectorFetchUnit) {
     SC_THREAD(read_params);
@@ -216,18 +217,22 @@ SC_MODULE(VectorFetchUnit) {
                         Width;
                   }
 
-                  MemoryRequest request;
-                  if (params.fetch_vector_type_0) {
-                    address = address * Vector::width / 8;
-                    request = {params.VECTOR_OFFSET + address,
-                               Width * Vector::width / 8};
-                  } else {
-                    address = address * Input::width / 8;
-                    request = {params.VECTOR_OFFSET + address,
-                               Width * Input::width / 8};
-                  }
+                  bool found = ((get_type_index<InputTypes, InputTypes...>() ==
+                                         params.vector_input_0_type
+                                     ? (send_request<InputTypes, Width>(
+                                            address, params.VECTOR_OFFSET,
+                                            vectorFetch0AddressRequest),
+                                        true)
+                                     : false) ||
+                                ...);
 
-                  vectorFetch0AddressRequest.Push(request);
+#ifndef __SYNTHESIS__
+                  if (!found) {
+                    std::cerr << "Error: vector input 0 type index '"
+                              << params.vector_input_0_type
+                              << "' is not valid.\n";
+                  }
+#endif
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -292,7 +297,7 @@ SC_MODULE(VectorFetchUnit) {
       }
 
       if (params.has_transpose) {
-        Vector buffer[BUFSIZE][Width];
+        VectorType buffer[BUFSIZE][Width];
 
         assert(loop_ends[1][2] == Width);
 
@@ -311,34 +316,40 @@ SC_MODULE(VectorFetchUnit) {
                      loop_counters[1][1] < loop_ends[1][1];
                      loop_counters[1][1]++) {
                   for (int col = 0; col < Width; col++) {
-                    Pack1D<Vector, Width> converted_response;
-                    if (params.fetch_vector_type_0) {
-                      constexpr int num_words = Vector::width / Input::width;
+                    Pack1D<VectorType, Width> full_response;
 
-                      Pack1D<Input, Width> response[num_words];
+                    bool found =
+                        ((get_type_index<InputTypes, InputTypes...>() ==
+                                  params.vector_input_0_type
+                              ? (feed_response<VectorType, IOType, InputTypes,
+                                               Width>(vectorFetch0DataResponse,
+                                                      full_response),
+                                 true)
+                              : false) ||
+                         ...);
 
-                      for (int i = 0; i < num_words; i++) {
-                        response[i] = vectorFetch0DataResponse.Pop();
-                      }
-                      convertPack1D<Input, Vector, Width>(response,
-                                                          converted_response);
-                    } else {
-                      Pack1D<Input, Width> response =
-                          vectorFetch0DataResponse.Pop();
-                      vdequantize<Input, Vector, Width>(
-                          response, converted_response, params.vec0_dq_scale);
+#ifndef __SYNTHESIS__
+                    if (!found) {
+                      std::cerr << "Error: vector input 0 type index '"
+                                << params.vector_input_0_type
+                                << "' is not valid.\n";
                     }
+#endif
+
+                    Pack1D<VectorType, Width> dequantized;
+                    vdequantize<VectorType, VectorType, Width>(
+                        full_response, dequantized, params.vec0_dq_scale);
 
                     // We may not use all the data in the response
 #pragma hls_unroll yes
                     for (int row = 0; row < BUFSIZE; row++) {
-                      buffer[row][col] = converted_response[row];
+                      buffer[row][col] = dequantized[row];
                     }
                   }
 
                   // Write out from transpose buffer
                   for (int row = 0; row < BUFSIZE; row++) {
-                    Pack1D<Vector, Width> transposed;
+                    Pack1D<VectorType, Width> transposed;
 #pragma hls_unroll yes
                     for (int col = 0; col < Width; col++) {
                       transposed[col] = buffer[row][col];
@@ -360,23 +371,29 @@ SC_MODULE(VectorFetchUnit) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (int i = 0; i < num_writes; i++) {
-          Pack1D<Vector, Width> converted_response;
-          if (params.fetch_vector_type_0) {
-            constexpr int num_words = Vector::width / Input::width;
+          Pack1D<VectorType, Width> full_response;
 
-            Pack1D<Input, Width> response[num_words];
+          bool found =
+              ((get_type_index<InputTypes, InputTypes...>() ==
+                        params.vector_input_0_type
+                    ? (feed_response<VectorType, IOType, InputTypes, Width>(
+                           vectorFetch0DataResponse, full_response),
+                       true)
+                    : false) ||
+               ...);
 
-            for (int i = 0; i < num_words; i++) {
-              response[i] = vectorFetch0DataResponse.Pop();
-            }
-            convertPack1D<Input, Vector, Width>(response, converted_response);
-          } else {
-            Pack1D<Input, Width> response = vectorFetch0DataResponse.Pop();
-            vdequantize<Input, Vector, Width>(response, converted_response,
-                                              params.vec0_dq_scale);
+#ifndef __SYNTHESIS__
+          if (!found) {
+            std::cerr << "Error: vector input 0 type index '"
+                      << params.vector_input_0_type << "' is not valid.\n";
           }
+#endif
 
-          vectorFetch0DataResponseConverted.Push(converted_response);
+          Pack1D<VectorType, Width> dequantized;
+          vdequantize<VectorType, VectorType, Width>(full_response, dequantized,
+                                                     params.vec0_dq_scale);
+
+          vectorFetch0DataResponseConverted.Push(dequantized);
         }
       }
     }
@@ -460,27 +477,38 @@ SC_MODULE(VectorFetchUnit) {
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> Y = Y1 * Y0;
 
-                  ac_int<32, false> address;
-                  if (params.addressGen1Mode == 1) {
-                    address = y * X * K + x * K + k;
-                  } else if (params.addressGen1Mode == 2) {
-                    address = x * K + k;
-                  } else if (params.addressGen1Mode == 3) {
-                    address = k;
+                  if (params.vec1_broadcast[0]) {
+                    y = 0;
                   }
 
-                  MemoryRequest request;
-                  if (params.fetch_vector_type_1) {
-                    address = address * Vector::width / 8;
-                    request = {params.ADDRESS_GEN1_OFFSET + address,
-                               Width * Vector::width / 8};
-                  } else {
-                    address = address * Input::width / 8;
-                    request = {params.ADDRESS_GEN1_OFFSET + address,
-                               Width * Input::width / 8};
+                  if (params.vec1_broadcast[1]) {
+                    x = 0;
+                    X = 1;
                   }
 
-                  vectorFetch1AddressRequest.Push(request);
+                  if (params.vec1_broadcast[2]) {
+                    k = 0;
+                    K = 1;
+                  }
+
+                  ac_int<32, false> address = y * X * K + x * K + k;
+
+                  bool found = ((get_type_index<InputTypes, InputTypes...>() ==
+                                         params.vector_input_1_type
+                                     ? (send_request<InputTypes, Width>(
+                                            address, params.ADDRESS_GEN1_OFFSET,
+                                            vectorFetch1AddressRequest),
+                                        true)
+                                     : false) ||
+                                ...);
+
+#ifndef __SYNTHESIS__
+                  if (!found) {
+                    std::cerr << "Error: vector input 1 type index '"
+                              << params.vector_input_1_type
+                              << "' is not valid.\n";
+                  }
+#endif
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -554,29 +582,31 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = loop_starts[1][2];
                      loop_counters[1][2] < loop_ends[1][2];
                      loop_counters[1][2] += loop_steps[1][2]) {
-                  Pack1D<Vector, Width> converted_response;
+                  Pack1D<VectorType, Width> full_response;
 
-                  if (params.fetch_vector_type_1) {
-                    constexpr int num_words = Vector::width / Input::width;
+                  bool found =
+                      ((get_type_index<InputTypes, InputTypes...>() ==
+                                params.vector_input_1_type
+                            ? (feed_response<VectorType, IOType, InputTypes,
+                                             Width>(vectorFetch1DataResponse,
+                                                    full_response),
+                               true)
+                            : false) ||
+                       ...);
 
-                    Pack1D<Input, Width> response[num_words];
-                    for (int i = 0; i < num_words; i++) {
-                      response[i] = vectorFetch1DataResponse.Pop();
-                    }
-
-                    convertPack1D<Input, Vector, Width>(response,
-                                                        converted_response);
-
-                    vectorFetch1DataResponseConverted.Push(converted_response);
-                  } else {
-                    Pack1D<Input, Width> response =
-                        vectorFetch1DataResponse.Pop();
-
-                    vdequantize<Input, Vector, Width>(
-                        response, converted_response, params.vec1_dq_scale);
-
-                    vectorFetch1DataResponseConverted.Push(converted_response);
+#ifndef __SYNTHESIS__
+                  if (!found) {
+                    std::cerr << "Error: vector input 1 type index '"
+                              << params.vector_input_1_type
+                              << "' is not valid.\n";
                   }
+#endif
+
+                  Pack1D<VectorType, Width> dequantized;
+                  vdequantize<VectorType, VectorType, Width>(
+                      full_response, dequantized, params.vec1_dq_scale);
+
+                  vectorFetch1DataResponseConverted.Push(dequantized);
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -684,27 +714,38 @@ SC_MODULE(VectorFetchUnit) {
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> Y = Y1 * Y0;
 
-                  ac_int<32, false> address;
-                  if (params.addressGen2Mode == 1) {
-                    address = y * X * K + x * K + k;
-                  } else if (params.addressGen2Mode == 2) {
-                    address = x * K + k;
-                  } else if (params.addressGen2Mode == 3) {
-                    address = k;
+                  if (params.vec2_broadcast[0]) {
+                    y = 0;
                   }
 
-                  MemoryRequest request;
-                  if (params.fetch_vector_type_2) {
-                    address = address * Vector::width / 8;
-                    request = {params.ADDRESS_GEN2_OFFSET + address,
-                               Width * Vector::width / 8};
-                  } else {
-                    address = address * Input::width / 8;
-                    request = {params.ADDRESS_GEN2_OFFSET + address,
-                               Width * Input::width / 8};
+                  if (params.vec2_broadcast[1]) {
+                    x = 0;
+                    X = 1;
                   }
 
-                  vectorFetch2AddressRequest.Push(request);
+                  if (params.vec2_broadcast[2]) {
+                    k = 0;
+                    K = 1;
+                  }
+
+                  ac_int<32, false> address = y * X * K + x * K + k;
+
+                  bool found = ((get_type_index<InputTypes, InputTypes...>() ==
+                                         params.vector_input_2_type
+                                     ? (send_request<InputTypes, Width>(
+                                            address, params.ADDRESS_GEN2_OFFSET,
+                                            vectorFetch2AddressRequest),
+                                        true)
+                                     : false) ||
+                                ...);
+
+#ifndef __SYNTHESIS__
+                  if (!found) {
+                    std::cerr << "Error: vector input 2 type index '"
+                              << params.vector_input_2_type
+                              << "' is not valid.\n";
+                  }
+#endif
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -778,25 +819,31 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = loop_starts[1][2];
                      loop_counters[1][2] < loop_ends[1][2];
                      loop_counters[1][2] += loop_steps[1][2]) {
-                  Pack1D<Vector, Width> converted_response;
+                  Pack1D<VectorType, Width> full_response;
 
-                  if (params.fetch_vector_type_2) {
-                    constexpr int num_words = Vector::width / Input::width;
-                    Pack1D<Input, Width> response[num_words];
+                  bool found =
+                      ((get_type_index<InputTypes, InputTypes...>() ==
+                                params.vector_input_2_type
+                            ? (feed_response<VectorType, IOType, InputTypes,
+                                             Width>(vectorFetch2DataResponse,
+                                                    full_response),
+                               true)
+                            : false) ||
+                       ...);
 
-                    for (int i = 0; i < num_words; i++) {
-                      response[i] = vectorFetch2DataResponse.Pop();
-                    }
-                    convertPack1D<Input, Vector, Width>(response,
-                                                        converted_response);
-                  } else {
-                    Pack1D<Input, Width> response =
-                        vectorFetch2DataResponse.Pop();
-
-                    vdequantize<Input, Vector, Width>(
-                        response, converted_response, params.vec2_dq_scale);
+#ifndef __SYNTHESIS__
+                  if (!found) {
+                    std::cerr << "Error: vector input 2 type index '"
+                              << params.vector_input_2_type
+                              << "' is not valid.\n";
                   }
-                  vectorFetch2DataResponseConverted.Push(converted_response);
+#endif
+
+                  Pack1D<VectorType, Width> dequantized;
+                  vdequantize<VectorType, VectorType, Width>(
+                      full_response, dequantized, params.vec2_dq_scale);
+
+                  vectorFetch2DataResponseConverted.Push(dequantized);
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {

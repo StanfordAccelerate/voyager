@@ -43,7 +43,8 @@ void register_interface(
     std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
         *vector_output,
     std::deque<sc_lv<Wrapped<uint64_t>::width>> *vector_output_address,
-    std::deque<sc_lv<Wrapped<Pack1D<INT8_, 1>>::width>> *scalar_output,
+    std::deque<sc_lv<Wrapped<Pack1D<DataTypes::int8, 1>>::width>>
+        *scalar_output,
     std::deque<sc_lv<Wrapped<uint64_t>::width>> *scalar_output_address);
 // void copy_output(void *sram, int size, int data_size);
 #endif

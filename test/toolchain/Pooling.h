@@ -25,8 +25,8 @@ void MapPoolingOperation(const codegen::Operation &param,
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
   vector_params->addressGen0Mode = 1;
-  vector_params->fetch_vector_type_0 =
-      input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->vector_input_0_type =
+      get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
   for (int i = 0; i < 2; i++) {
     vector_params->addressGen0Loop[i][0] =
@@ -58,8 +58,9 @@ void MapPoolingOperation(const codegen::Operation &param,
     vector_params->outputXLoopIndex[i] = 1;
     vector_params->outputWeightLoopIndex[i] = 2;
   }
-  vector_params->output_vector_type =
-      output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   const int inst_count = tiling.loops[1][tiling.y_loop_index[1]] *
                          tiling.loops[1][tiling.x_loop_index[1]];

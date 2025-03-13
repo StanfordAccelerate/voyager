@@ -7,11 +7,11 @@
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
-std::map<int, std::set<std::string>> vector_unit_stages = {
-    {0, {"add", "add_", "sub", "sub_", "mul", "mul_", "div", "div_", "neg"}},
-    {1, {"exp"}},
-    {2, {"add", "add_", "mul", "mul_", "div", "div_", "square"}},
-    {3, {"relu", "relu_", "gelu", "gelu_", "silu", "silu_", "vmap"}},
+std::vector<std::set<std::string>> vector_unit_stages = {
+    {"add", "add_", "sub", "sub_", "mul", "mul_", "div", "div_", "neg"},
+    {"exp", "abs", "relu", "relu_", "gelu", "gelu_", "silu", "silu_", "vmap"},
+    {"add", "add_", "mul", "mul_", "square", "div", "div_"},
+    {"div", "div_", "quantize"},
 };
 
 std::map<std::string, unsigned int> get_vector_instruction_mapping() {
@@ -22,18 +22,19 @@ std::map<std::string, unsigned int> get_vector_instruction_mapping() {
   mapping["sub_"] = VectorInstructions::vsub;
   mapping["mul"] = VectorInstructions::vmult;
   mapping["mul_"] = VectorInstructions::vmult;
-  mapping["div"] = VectorInstructions::vmult;
-  mapping["div_"] = VectorInstructions::vmult;
+  mapping["div"] = VectorInstructions::vdiv;
+  mapping["div_"] = VectorInstructions::vdiv;
+  mapping["square"] = VectorInstructions::vsquare;
   mapping["neg"] = VectorInstructions::vsub;
+  mapping["exp"] = VectorInstructions::vexp;
   mapping["relu"] = VectorInstructions::vrelu;
   mapping["relu_"] = VectorInstructions::vrelu;
   mapping["gelu"] = VectorInstructions::vgelu;
   mapping["gelu_"] = VectorInstructions::vgelu;
   mapping["silu"] = VectorInstructions::vsilu;
   mapping["silu_"] = VectorInstructions::vsilu;
-  mapping["exp"] = VectorInstructions::vexp;
-  mapping["square"] = VectorInstructions::vsquare;
   mapping["vmap"] = VectorInstructions::vmap;
+  mapping["quantize"] = VectorInstructions::vdiv;
   return mapping;
 }
 
@@ -56,27 +57,6 @@ inline float read_constant_param(const codegen::Tensor tensor) {
   return array_ptr[0];
 }
 
-int find_largest_factor(const int dim) {
-  // Start from the largest possible factor
-  for (int i = std::min(dim, 1024); i > 1; --i) {
-    if (dim % i == 0) {
-      return i;
-    }
-  }
-  return 1;  // If no factor is found, return 1
-}
-
-void factorize_for_address_gen(const int dim, int *shape) {
-  if (dim > 1024) {
-    int factor = find_largest_factor(dim);
-    shape[0] = dim / factor;
-    shape[1] = factor;
-  } else {
-    shape[0] = 1;
-    shape[1] = dim;
-  }
-}
-
 inline std::vector<int> squeeze_shape(const std::vector<int> &input) {
   std::vector<int> result;
   for (int value : input) {
@@ -87,7 +67,12 @@ inline std::vector<int> squeeze_shape(const std::vector<int> &input) {
   return result;
 }
 
-std::vector<int> split_loops(std::vector<int> loops, int max_value) {
+inline void squeeze_front_ones(std::vector<int> &vec) {
+  vec.erase(vec.begin(),
+            std::find_if(vec.begin(), vec.end(), [](int x) { return x != 1; }));
+}
+
+std::vector<int> split_loops(const std::vector<int> loops, int max_value) {
   if (max_value <= 1) {
     throw std::invalid_argument("max_value must be greater than 1.");
   }
@@ -205,4 +190,57 @@ bool is_transpose(const std::vector<int> &dims) {
 
   // Check that the last two axes are swapped.
   return (dims[n - 2] == n - 1 && dims[n - 1] == n - 2);
+}
+
+std::pair<std::vector<int>, std::vector<int>> factor_out_non_broadcastable_dim(
+    std::vector<int> shape1, std::vector<int> shape2) {
+  if (shape1.size() != shape2.size()) {
+    throw std::invalid_argument(
+        "Shapes must have the same number of dimensions");
+  }
+
+  int ndim = shape1.size();
+  int non_broadcast_dim = -1;
+  int min_dim;
+  int max_dim;
+
+  // Find the non-broadcastable dimension where one shape is bs times larger
+  // than the other
+  for (int i = 0; i < ndim; ++i) {
+    min_dim = std::min(shape1[i], shape2[i]);
+    max_dim = std::max(shape1[i], shape2[i]);
+    if (shape1[i] != shape2[i] && max_dim % min_dim == 0) {
+      non_broadcast_dim = i;
+      break;
+    }
+  }
+
+  if (non_broadcast_dim == -1) {
+    throw std::runtime_error("No non-broadcastable dimension found");
+  }
+
+  // Merge the non-broadcastable dimension into the previous dimension
+  int merge_dim = non_broadcast_dim - 1;
+  if (merge_dim < 0) {
+    throw std::runtime_error(
+        "Cannot merge into a non-existent previous dimension");
+  }
+
+  shape1[merge_dim] *= min_dim;
+  shape2[merge_dim] *= min_dim;
+
+  shape1[non_broadcast_dim] /= min_dim;
+  shape2[non_broadcast_dim] /= min_dim;
+
+  return {shape1, shape2};
+}
+
+void update_tensor_shape(codegen::Tensor &tensor, const std::vector<int> &new_shape) {
+  // Clear the existing shape
+  tensor.clear_shape();
+
+  // Add new values from the vector
+  for (int dim : new_shape) {
+    tensor.add_shape(dim);
+  }
 }

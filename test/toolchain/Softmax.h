@@ -42,6 +42,8 @@ void MapSoftmax(const codegen::Operation &param,
   vector_params->VECTOR_OFFSET = input_memory.address();
   vector_params->addressGen0Mode = 2;
   vector_params->vec0_broadcast = 0b010000;
+  vector_params->vector_input_0_type =
+      get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
   vector_params->addressGen0Loop[0][0] = non_reduction_loops[0];
   vector_params->addressGen0Loop[0][1] = non_reduction_loops[1];
@@ -49,9 +51,6 @@ void MapSoftmax(const codegen::Operation &param,
   vector_params->addressGen0Loop[1][0] = non_reduction_loops[3];
   vector_params->addressGen0Loop[1][1] = 3;
   vector_params->addressGen0Loop[1][2] = outer_dim / OC_DIMENSION;
-
-  vector_params->fetch_vector_type_0 =
-      input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
 
   // output
   const auto output_memory = output.memory();
@@ -66,8 +65,8 @@ void MapSoftmax(const codegen::Operation &param,
   vector_params->outputLoops[1][1] = non_reduction_loops[3];
   vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_vector_type =
-      output.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name();
+  vector_params->output_types =
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // Instruction 0 - start reduction engine to calculate max
   VectorInstructions vinst0;
@@ -123,12 +122,9 @@ void MapSoftmax(const codegen::Operation &param,
   inst4.vector_op1 = VectorInstructions::vexp;
   inst4.vector_op2 = VectorInstructions::vmult;
   inst4.vdest = VectorInstructions::to_output;
-  vector_instruction_config->inst[4] = inst4;
-  vector_instruction_config->instCount[4] = outer_dim / OC_DIMENSION;
 
   if (op_list.size() > 1) {
     const auto quantize_op = op_list[1];
-    spdlog::debug("Performing {}\n", quantize_op.target());
 
     if (quantize_op.target() == "quantize") {
       const auto scale = quantize_op.kwargs().at("scale").tensor();
@@ -136,8 +132,9 @@ void MapSoftmax(const codegen::Operation &param,
 
       // scalar scale factor
       VECTOR_DATATYPE immediate = read_constant_param(scale);
-      vector_params->quantize_output = true;
-      vector_params->output_scale = immediate.bits_rep();
+      inst4.vector_op3 = VectorInstructions::vdiv;
+      inst4.vector_op3_src1 = VectorInstructions::from_immediate_1;
+      inst4.immediate1 = immediate.bits_rep();
     } else if (quantize_op.target() == "quantize_mx") {
       const int block_size = quantize_op.kwargs().at("block_size").int_value();
       assert(block_size == OC_DIMENSION);
@@ -150,6 +147,9 @@ void MapSoftmax(const codegen::Operation &param,
                                   quantize_op.target());
     }
   }
+
+  vector_instruction_config->inst[4] = inst4;
+  vector_instruction_config->instCount[4] = outer_dim / OC_DIMENSION;
 
   vector_instruction_config->instLen = 5;
   vector_instruction_config->instLoopCount = inner_dim;

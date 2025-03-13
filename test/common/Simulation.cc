@@ -152,11 +152,7 @@ void Simulation::print_ideal_runtime(const codegen::Operation& param) {
     const auto weight_shape = get_shape(weight);
     const auto output_shape = get_shape(output);
 
-    int K = weight_shape[weight_shape.size() - 1];
-    // sometimes K and C and swapped in the weight tensor
-    if (K != output_shape[output_shape.size() - 1]) {
-      K = weight_shape[weight_shape.size() - 2];
-    }
+    int K = is_matmul ? weight_shape[weight_shape.size() - 1] : weight_shape[0];
 
     // the total number of operations is X * Y * C * FX * FY * K.
     long num_macs = get_size(output) * get_size(weight) / K;

@@ -73,7 +73,7 @@ inline long get_size(const codegen::Tensor& tensor) {
 inline void print_shape(const std::vector<int>& shape) {
   spdlog::error("(");
   for (size_t i = 0; i < shape.size(); ++i) {
-    spdlog::error("{} {}", shape[i], (i + 1 < shape.size() ? "," : ")"));
+    spdlog::error("{}{}", shape[i], (i + 1 < shape.size() ? ", " : ")"));
   }
   spdlog::error("\n");
 }

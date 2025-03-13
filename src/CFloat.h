@@ -47,13 +47,7 @@ class CFloat {
   CFloat sqrt() const { return std::sqrt(float_val); }
   CFloat inv_sqrt() const { return 1.0 / std::sqrt(float_val); }
   CFloat max1() const { return std::max(float_val, 1.0f); }
-
   CFloat relu() const { return float_val < 0 ? 0 : float_val; }
-  CFloat masked_relu(const CFloat &mask) const {
-    return mask.float_val < 0 ? 0 : float_val;
-  }
-
-  void scale_exp(int offset) { float_val *= std::pow(2, offset); }
 
   CFloat fma(CFloat &b, CFloat &c) {
     return CFloat(float_val * b.float_val + c.float_val);
