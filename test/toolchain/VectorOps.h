@@ -250,6 +250,10 @@ void MapVectorOperations(const codegen::Operation &param,
   } else if (reshape_op.target() == "transpose") {
     int dim0 = reshape_kwargs.at("dim0").int_value();
     int dim1 = reshape_kwargs.at("dim1").int_value();
+
+    dim0 = dim0 < 0 ? dim0 + input.shape_size() : dim0;
+    dim1 = dim1 < 0 ? dim1 + input.shape_size() : dim1;
+
     if (dim0 > dim1) {
       std::swap(dim0, dim1);
     }
