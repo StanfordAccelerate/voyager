@@ -95,6 +95,11 @@ SPDLOG_OBJ_FILES = $(patsubst lib/spdlog/src/%.cpp,$(CC_BUILD_DIR)/spdlog_%.o,$(
 $(CC_BUILD_DIR)/spdlog_%.o: lib/spdlog/src/%.cpp
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
+$(CC_BUILD_DIR)/spdlog.o: $(SPDLOG_OBJ_FILES)
+	ld -r -o $@ $^
+
+spdlog: $(CC_BUILD_DIR)/spdlog.o
+
 ###########################################################
 # Catapult Synthesis
 ###########################################################
