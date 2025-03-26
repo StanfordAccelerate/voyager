@@ -285,6 +285,7 @@ SC_MODULE(VectorOpUnit) {
       }
 
       // Stage 3: div, quantize
+#if SUPPORT_MX
       if (inst.vector_op3 == VectorInstructions::vquantize_mx) {
         vquantize_mx<VectorType, ScaleType, Width>(res2, scale,
                                                    inst.immediate2);
@@ -296,6 +297,7 @@ SC_MODULE(VectorOpUnit) {
 
         mx_scale_output.Push(scale);
       }
+#endif
 
       if (inst.vector_op3 == VectorInstructions::vdiv ||
           inst.vector_op3 == VectorInstructions::vquantize_mx) {
