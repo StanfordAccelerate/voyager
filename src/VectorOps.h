@@ -161,10 +161,9 @@ void vdequantize(const Pack1D<Input, Width>& op0, Pack1D<Output, Width>& res,
   }
 }
 
-#pragma hls_design ccore
 template <typename VectorType, typename ScaleType, int Width>
 void vquantize_mx(const Pack1D<VectorType, Width>& op0, ScaleType& scale,
-                  ac_int<16> param) {
+                  ac_int<16> qparam) {
   if constexpr (ScaleType::width == ScaleType::e_width) {
     using exp_t = ac_int<VectorType::e_width, false>;
 
@@ -180,7 +179,7 @@ void vquantize_mx(const Pack1D<VectorType, Width>& op0, ScaleType& scale,
     if (max_exp == 0) {
       scaled_exp = 127;
     } else {
-      scaled_exp = max_exp - param;
+      scaled_exp = max_exp - qparam;
     }
 
     scale.set_bits(scaled_exp);
@@ -203,7 +202,7 @@ void vquantize_mx(const Pack1D<VectorType, Width>& op0, ScaleType& scale,
     }
 
     VectorType quant_max;
-    quant_max.set_bits(param);
+    quant_max.set_bits(qparam);
 
     scale = temp[num_stage][0] / quant_max;
   }

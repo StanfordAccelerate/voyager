@@ -285,20 +285,20 @@ SC_MODULE(VectorOpUnit) {
       }
 
       // Stage 3: div, quantize
-      if (inst.vector_op3 == VectorInstructions::vdiv ||
-          inst.vector_op3 == VectorInstructions::vquantize_mx) {
-        if (inst.vector_op3 == VectorInstructions::vquantize_mx) {
-          vquantize_mx<VectorType, ScaleType, Width>(res2, scale,
-                                                     inst.immediate2);
-
-          mx_scale_output.Push(scale);
+      if (inst.vector_op3 == VectorInstructions::vquantize_mx) {
+        vquantize_mx<VectorType, ScaleType, Width>(res2, scale,
+                                                   inst.immediate2);
 
 #pragma hls_unroll yes
-          for (int i = 0; i < Width; i++) {
-            op3_src1[i] = scale;
-          }
+        for (int i = 0; i < Width; i++) {
+          op3_src1[i] = scale;
         }
 
+        mx_scale_output.Push(scale);
+      }
+
+      if (inst.vector_op3 == VectorInstructions::vdiv ||
+          inst.vector_op3 == VectorInstructions::vquantize_mx) {
         vdiv<VectorType, Width>(res2, op3_src1, res3);
       } else {
         res3 = res2;
@@ -460,8 +460,7 @@ SC_MODULE(VectorUnit) {
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_output_address);
-  Connections::Out<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
-      scalar_output);
+  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scalar_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       scalar_output_address);
 
@@ -565,7 +564,6 @@ SC_MODULE(VectorUnit) {
 
       vectorFetchParams.Push(params);
       vector_unit_output_params.Push(params);
-      // outputAddressGenParams.Push(params);
     }
   }
 

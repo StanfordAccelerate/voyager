@@ -13,7 +13,7 @@ SC_MODULE(VectorUnitOutput) {
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_address_out);
-  Connections::Out<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(scale_out);
+  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scale_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(scale_address_out);
 
   Connections::SyncOut CCS_INIT_S1(done);
@@ -141,6 +141,16 @@ SC_MODULE(VectorUnitOutput) {
                         Width;
                   }
 
+#if SUPPORT_MX
+                  if (params.quantize_output_mx) {
+                    ScaleType scale = scale_in.Pop();
+                    scale_out.Push(scale.bits_rep());
+                    scale_address_out.Push(params.SCALE_OFFSET +
+                                           address / Width * ScaleType::width /
+                                               8);
+                  }
+#endif
+
                   Pack1D<VectorType, Width> outputs = tensor_in.Pop();
 
                   bool found =
@@ -158,16 +168,6 @@ SC_MODULE(VectorUnitOutput) {
                   if (!found) {
                     std::cerr << "Error: Index '" << params.output_types
                               << "' is not valid.\n";
-                  }
-#endif
-
-#if SUPPORT_MX
-                  if (params.quantize_output_mx) {
-                    ScaleType scale = scale_in.Pop();
-                    scale_out.Push(scale.bits_rep());
-                    scale_address_out.Push(params.SCALE_OFFSET +
-                                           address / Width * ScaleType::width /
-                                               8);
                   }
 #endif
 
