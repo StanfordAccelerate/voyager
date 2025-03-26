@@ -148,16 +148,6 @@ T treemax(const Pack1D<T, Width>& op) {
 }
 
 #pragma hls_design ccore
-template <typename Input, typename Output, typename Scale, int Width>
-void vquantize(const Pack1D<Input, Width>& op0, Pack1D<Output, Width>& res,
-               const Scale scale) {
-#pragma hls_unroll yes
-  for (int i = 0; i < Width; i++) {
-    res[i] = scale.is_zero() ? op0[i] : op0[i] / static_cast<Input>(scale);
-  }
-}
-
-#pragma hls_design ccore
 template <typename Input, typename Output, int Width>
 void vdequantize(const Pack1D<Input, Width>& op0, Pack1D<Output, Width>& res,
                  ac_int<Output::width, false> scale_bits) {
@@ -172,12 +162,11 @@ void vdequantize(const Pack1D<Input, Width>& op0, Pack1D<Output, Width>& res,
 }
 
 #pragma hls_design ccore
-template <typename InputType, typename QuantizedType, typename ScaleType,
-          int Width>
-void vquantize_mx(const Pack1D<InputType, Width>& op0,
-                  Pack1D<InputType, Width>& res, ScaleType& scale) {
+template <typename VectorType, typename ScaleType, int Width>
+void vquantize_mx(const Pack1D<VectorType, Width>& op0, ScaleType& scale,
+                  ac_int<16> param) {
   if constexpr (ScaleType::width == ScaleType::e_width) {
-    using exp_t = ac_int<InputType::e_width, false>;
+    using exp_t = ac_int<VectorType::e_width, false>;
 
     Pack1D<exp_t, Width> exponents;
 #pragma hls_unroll yes
@@ -187,17 +176,17 @@ void vquantize_mx(const Pack1D<InputType, Width>& op0,
 
     exp_t max_exp = treemax(exponents);
 
-    ac_int<InputType::e_width, true> scaled_exp;
+    ac_int<VectorType::e_width, true> scaled_exp;
     if (max_exp == 0) {
       scaled_exp = 127;
     } else {
-      scaled_exp = max_exp - QuantizedType::emax;
+      scaled_exp = max_exp - param;
     }
 
     scale.set_bits(scaled_exp);
   } else {
     constexpr int num_stage = constexpr_log2(Width);
-    Pack1D<InputType, Width> temp[num_stage + 1];
+    Pack1D<VectorType, Width> temp[num_stage + 1];
 
 #pragma hls_unroll yes
     for (int i = 0; i < Width; i++) {
@@ -213,17 +202,14 @@ void vquantize_mx(const Pack1D<InputType, Width>& op0,
       }
     }
 
-    InputType amax = temp[num_stage][0];
-    scale = amax / static_cast<InputType>(QuantizedType::max());
+    VectorType quant_max;
+    quant_max.set_bits(param);
+
+    scale = temp[num_stage][0] / quant_max;
   }
 
   if (scale.is_zero()) {
     scale = ScaleType::one();
-  }
-
-#pragma hls_unroll yes
-  for (int i = 0; i < Width; i++) {
-    res[i] = op0[i] / static_cast<InputType>(scale);
   }
 }
 

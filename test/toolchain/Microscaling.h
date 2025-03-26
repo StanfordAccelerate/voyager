@@ -12,6 +12,8 @@ void MapMicroscaling(const codegen::Operation &param,
   const int axis = quantize_mx_op.kwargs().at("axis").int_value();
   const int block_size = quantize_mx_op.kwargs().at("block_size").int_value();
   const float quant_max = quantize_mx_op.kwargs().at("quant_max").float_value();
+  const bool force_scale_power_of_two =
+      quantize_mx_op.kwargs().at("force_scale_power_of_two").int_value();
 
   codegen::Tensor output;
   if (param.has_output()) {
@@ -96,7 +98,12 @@ void MapMicroscaling(const codegen::Operation &param,
   vinst2.instType = VectorInstructions::vector;
   vinst2.vector_op0_src0 = VectorInstructions::from_accumulation;
   vinst2.vector_op0_src1 = VectorInstructions::from_immediate_0;
-  VECTOR_DATATYPE immediate = 1.0 / quant_max;
+  VECTOR_DATATYPE immediate;
+  if (force_scale_power_of_two) {
+    immediate = 1.0 / pow(2, floor(log2(quant_max)));
+  } else {
+    immediate = 1.0 / quant_max;
+  }
   vinst2.immediate0 = immediate.bits_rep();
   vinst2.vector_op0 = VectorInstructions::vmult;
   vinst2.vdest = VectorInstructions::to_output;

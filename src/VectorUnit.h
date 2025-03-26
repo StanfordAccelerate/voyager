@@ -12,7 +12,8 @@
 #include "VectorFetch.h"
 #include "VectorUnitOutput.h"
 
-template <typename VectorType, typename BufferType, int Width>
+template <typename VectorType, typename BufferType, typename ScaleType,
+          int Width>
 SC_MODULE(VectorOpUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -31,6 +32,7 @@ SC_MODULE(VectorOpUnit) {
 
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_op_unit_output);
+  Connections::Out<ScaleType> CCS_INIT_S1(mx_scale_output);
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       accumulation_input);
@@ -105,6 +107,7 @@ SC_MODULE(VectorOpUnit) {
       Pack1D<VectorType, Width> res1;
       Pack1D<VectorType, Width> res2;
       Pack1D<VectorType, Width> res3;
+      ScaleType scale;
 
       // Vector unit inputs
       Pack1D<VectorType, Width> op0_src0;
@@ -211,18 +214,17 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
-      if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1 ||
-          inst.vector_op3_src1 == VectorInstructions::from_immediate_1) {
-        Pack1D<VectorType, Width> temp;
+      if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1) {
 #pragma hls_unroll yes
         for (int i = 0; i < Width; i++) {
-          temp[i].set_bits(inst.immediate1);
+          op2_src1[i].set_bits(inst.immediate1);
         }
+      }
 
-        if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1) {
-          op2_src1 = temp;
-        } else {
-          op3_src1 = temp;
+      if (inst.vector_op3_src1 == VectorInstructions::from_immediate_2) {
+#pragma hls_unroll yes
+        for (int i = 0; i < Width; i++) {
+          op3_src1[i].set_bits(inst.immediate2);
         }
       }
 
@@ -282,7 +284,20 @@ SC_MODULE(VectorOpUnit) {
       }
 
       // Stage 3: div, quantize
-      if (inst.vector_op3 == VectorInstructions::vdiv) {
+      if (inst.vector_op3 == VectorInstructions::vdiv ||
+          inst.vector_op3 == VectorInstructions::vquantize_mx) {
+        if (inst.vector_op3 == VectorInstructions::vquantize_mx) {
+          vquantize_mx<VectorType, ScaleType, Width>(res2, scale,
+                                                     inst.immediate2);
+
+          mx_scale_output.Push(scale);
+
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            op3_src1[i] = scale;
+          }
+        }
+
         vdiv<VectorType, Width>(res2, op3_src1, res3);
       } else {
         res3 = res2;
@@ -410,8 +425,8 @@ SC_MODULE(VectorOpUnit) {
   }
 };
 
-template <typename IOType, typename VectorType, typename BufferType,
-          typename ScaleType, int Width>
+template <typename VectorType, typename BufferType, typename ScaleType,
+          int Width>
 SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -451,6 +466,7 @@ SC_MODULE(VectorUnit) {
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_op_unit_output);
+  Connections::Combinational<ScaleType> CCS_INIT_S1(mx_scale_output);
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
@@ -459,10 +475,11 @@ SC_MODULE(VectorUnit) {
       vector_fetch);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vectorFetchParams);
 
-  VectorOpUnit<VectorType, BufferType, Width> CCS_INIT_S1(vector_op_unit);
+  VectorOpUnit<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
+      vector_op_unit);
 
-  VectorUnitOutput<VectorType, ScaleType, IOType, Width, OUTPUT_DATATYPES>
-      CCS_INIT_S1(vector_unit_output);
+  VectorUnitOutput<VectorType, ScaleType, Width, OUTPUT_DATATYPES> CCS_INIT_S1(
+      vector_unit_output);
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       vector_unit_output_params);
 
@@ -511,6 +528,7 @@ SC_MODULE(VectorUnit) {
     vector_op_unit.vectorFetch1Output(vectorFetch1DataResponseConverted);
     vector_op_unit.vectorFetch2Output(vectorFetch2DataResponseConverted);
     vector_op_unit.vector_op_unit_output(vector_op_unit_output);
+    vector_op_unit.mx_scale_output(mx_scale_output);
     vector_op_unit.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
     vector_op_unit.vectorFetch3DataResponse(vectorFetch3DataResponse);
 
@@ -518,10 +536,11 @@ SC_MODULE(VectorUnit) {
     vector_unit_output.rstn(rstn);
     vector_unit_output.params_in(vector_unit_output_params);
     vector_unit_output.tensor_in(vector_op_unit_output);
-    vector_unit_output.vector_output(vector_output);
-    vector_unit_output.vector_output_address(vector_output_address);
-    vector_unit_output.scalar_output(scalar_output);
-    vector_unit_output.scalar_output_address(scalar_output_address);
+    vector_unit_output.scale_in(mx_scale_output);
+    vector_unit_output.vector_out(vector_output);
+    vector_unit_output.vector_address_out(vector_output_address);
+    vector_unit_output.scale_out(scalar_output);
+    vector_unit_output.scale_address_out(scalar_output_address);
     vector_unit_output.done(done);
 
     SC_THREAD(read_params);

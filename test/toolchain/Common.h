@@ -11,7 +11,7 @@ std::vector<std::set<std::string>> vector_unit_stages = {
     {"add", "add_", "sub", "sub_", "mul", "mul_", "div", "div_", "neg"},
     {"exp", "abs", "relu", "relu_", "gelu", "gelu_", "silu", "silu_", "vmap"},
     {"add", "add_", "mul", "mul_", "square", "div", "div_"},
-    {"div", "div_", "quantize"},
+    {"div", "div_", "quantize", "quantize_mx"},
 };
 
 std::map<std::string, unsigned int> get_vector_instruction_mapping() {
@@ -35,6 +35,7 @@ std::map<std::string, unsigned int> get_vector_instruction_mapping() {
   mapping["silu_"] = VectorInstructions::vsilu;
   mapping["vmap"] = VectorInstructions::vmap;
   mapping["quantize"] = VectorInstructions::vdiv;
+  mapping["quantize_mx"] = VectorInstructions::vquantize_mx;
   return mapping;
 }
 

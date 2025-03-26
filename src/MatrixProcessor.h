@@ -627,7 +627,6 @@ SC_MODULE(MatrixProcessor) {
         }
         readNewWeights = readNewWeights || step == 0;
         if (readNewWeights && params.is_mx_op) {
-          std::cout << "reading new weight scales" << std::endl;
           auto bits = weightScaleChannel.Pop();
           weightScales = BitsToType<Pack1D<Scale, NCols>>(TypeToBits(bits));
         }

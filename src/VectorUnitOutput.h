@@ -1,6 +1,6 @@
 #pragma once
 
-template <typename VectorType, typename ScaleType, typename IOType, int Width,
+template <typename VectorType, typename ScaleType, int Width,
           typename... OutputTypes>
 SC_MODULE(VectorUnitOutput) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -8,13 +8,13 @@ SC_MODULE(VectorUnitOutput) {
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(tensor_in);
-  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
+  Connections::In<ScaleType> CCS_INIT_S1(scale_in);
+
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      vector_output_address);
-  Connections::Out<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
-      scalar_output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      scalar_output_address);
+      vector_address_out);
+  Connections::Out<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(scale_out);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(scale_address_out);
 
   Connections::SyncOut CCS_INIT_S1(done);
 
@@ -27,10 +27,10 @@ SC_MODULE(VectorUnitOutput) {
   void run() {
     params_in.Reset();
     tensor_in.Reset();
-    vector_output.Reset();
-    vector_output_address.Reset();
-    scalar_output.Reset();
-    scalar_output_address.Reset();
+    vector_out.Reset();
+    vector_address_out.Reset();
+    scale_out.Reset();
+    scale_address_out.Reset();
     done.Reset();
 
     wait();
@@ -142,32 +142,13 @@ SC_MODULE(VectorUnitOutput) {
 
                   Pack1D<VectorType, Width> outputs = tensor_in.Pop();
 
-                  Pack1D<VectorType, Width> scaled_outputs;
-#if SUPPORT_MX
-                  if (params.quantize_output_mx) {
-                    ScaleType scale;
-                    vquantize_mx<VectorType, IOType, ScaleType, Width>(
-                        outputs, scaled_outputs, scale);
-
-                    scalar_output.Push(scale.bits_rep());
-                    scalar_output_address.Push(params.SCALE_OFFSET +
-                                               address / Width *
-                                                   ScaleType::width / 8);
-
-                  } else {
-#endif
-                    scaled_outputs = outputs;
-#if SUPPORT_MX
-                  }
-#endif
-
                   bool found =
                       ((get_type_index<OutputTypes, OutputTypes...>() ==
                                 params.output_types
                             ? (vwrite_out<VectorType, OutputTypes, Width>(
-                                   scaled_outputs, address,
-                                   params.VECTOR_OUTPUT_OFFSET, vector_output,
-                                   vector_output_address),
+                                   outputs, address,
+                                   params.VECTOR_OUTPUT_OFFSET, vector_out,
+                                   vector_address_out),
                                true)
                             : false) ||
                        ...);
@@ -176,6 +157,16 @@ SC_MODULE(VectorUnitOutput) {
                   if (!found) {
                     std::cerr << "Error: Index '" << params.output_types
                               << "' is not valid.\n";
+                  }
+#endif
+
+#if SUPPORT_MX
+                  if (params.quantize_output_mx) {
+                    ScaleType scale = scale_in.Pop();
+                    scale_out.Push(scale.bits_rep());
+                    scale_address_out.Push(params.SCALE_OFFSET +
+                                           address / Width * ScaleType::width /
+                                               8);
                   }
 #endif
 

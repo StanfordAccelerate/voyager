@@ -130,14 +130,28 @@ void MapSoftmax(const codegen::Operation &param,
       const auto scale = quantize_op.kwargs().at("scale").tensor();
       assert(get_size(scale) == 1);
 
+      inst4.vector_op3 = VectorInstructions::vdiv;
+      inst4.vector_op3_src1 = VectorInstructions::from_immediate_2;
+
       // scalar scale factor
       VECTOR_DATATYPE immediate = read_constant_param(scale);
-      inst4.vector_op3 = VectorInstructions::vdiv;
-      inst4.vector_op3_src1 = VectorInstructions::from_immediate_1;
-      inst4.immediate1 = immediate.bits_rep();
+      inst4.immediate2 = immediate.bits_rep();
     } else if (quantize_op.target() == "quantize_mx") {
       const int block_size = quantize_op.kwargs().at("block_size").int_value();
       assert(block_size == OC_DIMENSION);
+
+      inst4.vector_op3 = VectorInstructions::vquantize_mx;
+
+      float quant_max = quantize_op.kwargs().at("quant_max").float_value();
+      bool force_scale_power_of_two =
+          quantize_op.kwargs().at("force_scale_power_of_two").int_value();
+
+      if (force_scale_power_of_two) {
+        inst4.immediate2 = floor(log2(quant_max));
+      } else {
+        VECTOR_DATATYPE scale = quant_max;
+        inst4.immediate2 = scale.bits_rep();
+      }
 
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
