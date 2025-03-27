@@ -8,24 +8,12 @@ dependencies:
   - pytorch==2.3.1
   - torchvision==0.18.1
   - torchaudio==2.3.1
+  - pip
   - pip:
       - deepdiff
       - xonsh
       - git+https://github.com/mflowgen/mflowgen.git@69412255acc2c509e98105804e5a97d9738ddfe1#egg=mflowgen
       - pandas
-      - matplotlib
-      - scipy
-      - transformers==4.45.2
-      - datasets==2.15.0
-      - accelerate==0.22.0
-      - evaluate
-      - scikit-learn
-      - peft==0.6.2
-      - softposit
-      - wandb
-      - librosa
-      - soundfile
-      - jiwer
-      - tabulate
-      - protobuf
-      - graphviz
+      - -r quantized-training/requirements.txt
+      - -e quantized-training
+      - -e interstellar
