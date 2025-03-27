@@ -1,13 +1,5 @@
 .DEFAULT_GOAL := TestRunner
 
-# Detect OS
-OS := $(shell lsb_release -si)
-VER := $(shell lsb_release -sr)
-
-# Add default message
-MSG := Compiling on $(OS) $(VER)
-$(info $(MSG))
-
 # Build folder format is build/DATATYPE_DIMENSIONxDIMENSION
 export PROJ_ROOT = $(shell pwd)
 # TODO: buffer size info is not in the build dir name currently
@@ -18,8 +10,7 @@ ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 $(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
-# CC := $(CATAPULT_ROOT)/bin/g++
-CC := /cad/mentor/2024.2_2/Mgc_home/bin/g++
+CC := $(CATAPULT_ROOT)/bin/g++
 
 export CODEGEN_DIR ?= test/compiler
 
@@ -36,7 +27,7 @@ ifndef OC_DIMENSION
 endif
 
 INC := \
-	-I/cad/mentor/2024.2_2/Mgc_home/shared/include/ \
+	-I$(CATAPULT_ROOT)/shared/include/ \
 	-Ilib/ \
 	-Ilib/xtensor/include \
 	-Ilib/xtl/include \
@@ -92,7 +83,7 @@ endif
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
 LDFLAGS += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
-LDLIBS += -L/cad/mentor/2024.2_2/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
+LDLIBS += -L$(CATAPULT_ROOT)/shared/lib/ -L$(CONDA_PREFIX)/lib
 LDFLAGS_NO_SYSC += -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 

@@ -24,6 +24,8 @@ solution options set Flows/VCS/VLOGAN_OPTS {+v2k -timescale=1ns/10ps +notimingch
 solution options set Flows/VCS/VCS_DOFILE dump.do
 solution options set Flows/VCS/COMP_FLAGS "-O3 -Wall -Wno-unknown-pragmas -I$ROOT/lib/ -I$ROOT/lib/xtensor/include -I$ROOT/lib/xtl/include -I$ROOT/lib/spdlog/include -I$ROOT/src/ -I$ROOT/ -I$::env(CONDA_PREFIX)/include -DSIM_$BLOCK -D$DATATYPE -DIC_DIMENSION=$IC_DIMENSION -DOC_DIMENSION=$OC_DIMENSION -DINPUT_BUFFER_SIZE=$INPUT_BUFFER_SIZE -DWEIGHT_BUFFER_SIZE=$WEIGHT_BUFFER_SIZE -DACCUM_BUFFER_SIZE=$ACCUM_BUFFER_SIZE -std=c++17"
 solution options set Flows/VCS/VCSELAB_OPTS "-timescale=1ns/1ps -sysc=blocksync -lstdc++fs -L$::env(CONDA_PREFIX)/lib -LDFLAGS \"-Wl,--enable-new-dtags -Wl,-R,$::env(CONDA_PREFIX)/lib\" -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread"
+solution options set Cache/UserCacheHome "$ROOT/$CATAPULT_BUILD_DIR/cache"
+solution options set Cache/DefaultCacheHomeEnabled false
 
 flow package require /SCVerify
 flow package option set /SCVerify/USE_VCS true
