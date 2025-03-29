@@ -319,6 +319,7 @@ struct VectorInstructions {
     rdest = 0;
     immediate0 = 0;
     immediate1 = 0;
+    immediate2 = 0;
     VMAP_OFFSET = 0;
   }
 #endif
@@ -342,6 +343,7 @@ struct VectorInstructions {
   static const unsigned int from_reduction_1 = 7;
   static const unsigned int from_immediate_0 = 8;
   static const unsigned int from_immediate_1 = 9;
+  static const unsigned int from_immediate_2 = 10;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
@@ -364,12 +366,11 @@ struct VectorInstructions {
 
   // Stage 2: add, mult, square, div
   ac_int<2, false> vector_op2;
-  // static const unsigned int vadd = 1;
-  // static const unsigned int vmult = 2;
   static const unsigned int vsquare = 3;
 
-  ac_int<1, false> vector_op3;
+  ac_int<2, false> vector_op3;
   static const unsigned int vdiv = 1;
+  static const unsigned int vquantize_mx = 2;
 
   ac_int<10, false> rCount;
   ac_int<3, false> rOp;
@@ -393,9 +394,10 @@ struct VectorInstructions {
 
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
+  ac_int<16, false> immediate2;
   ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 160;
+  static const unsigned int width = 177;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -422,6 +424,7 @@ struct VectorInstructions {
     m & vdest;
     m & immediate0;
     m & immediate1;
+    m & immediate2;
     m & VMAP_OFFSET;
   }
 
@@ -456,6 +459,7 @@ struct VectorInstructions {
     os << "vdest: " << params.vdest << std::endl;
     os << "immediate0: " << params.immediate0 << std::endl;
     os << "immediate1: " << params.immediate1 << std::endl;
+    os << "immediate2: " << params.immediate2 << std::endl;
     os << "VMAP_OFFSET: " << params.VMAP_OFFSET << std::endl;
     return os;
   }
@@ -479,6 +483,7 @@ struct VectorInstructions {
            lhs.rBroadcast == rhs.rBroadcast && lhs.rdest == rhs.rdest &&
            lhs.vdest == rhs.vdest && lhs.immediate0 == rhs.immediate0 &&
            lhs.immediate1 == rhs.immediate1 &&
+           lhs.immediate2 == rhs.immediate2 &&
            lhs.VMAP_OFFSET == rhs.VMAP_OFFSET;
   }
 };
@@ -1092,6 +1097,9 @@ struct VectorInstructionConfig : BaseParams {
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].immediate1;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].immediate2;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].VMAP_OFFSET;

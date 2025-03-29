@@ -281,16 +281,16 @@ void MapLayerNorm(const codegen::Operation &param,
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // inputs x weights + bias
-  VectorInstructions instr2;
-  instr2.instType = VectorInstructions::vector;
-  instr2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
-  instr2.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
-  instr2.vector_op0 = VectorInstructions::vmult;
+  VectorInstructions inst2;
+  inst2.instType = VectorInstructions::vector;
+  inst2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
+  inst2.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
+  inst2.vector_op0 = VectorInstructions::vmult;
   if (has_bias) {
-    instr2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-    instr2.vector_op2 = VectorInstructions::vadd;
+    inst2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
+    inst2.vector_op2 = VectorInstructions::vadd;
   }
-  instr2.vdest = VectorInstructions::to_output;
+  inst2.vdest = VectorInstructions::to_output;
 
   if (op_list.size() > 1) {
     const auto quantize_op = op_list[1];
@@ -299,14 +299,28 @@ void MapLayerNorm(const codegen::Operation &param,
       const auto scale = quantize_op.kwargs().at("scale").tensor();
       assert(get_size(scale) == 1);
 
+      inst2.vector_op3 = VectorInstructions::vdiv;
+      inst2.vector_op3_src1 = VectorInstructions::from_immediate_2;
+
       // scalar scale factor
       VECTOR_DATATYPE immediate = read_constant_param(scale);
-      instr2.vector_op3 = VectorInstructions::vdiv;
-      instr2.vector_op3_src1 = VectorInstructions::from_immediate_1;
-      instr2.immediate1 = immediate.bits_rep();
+      inst2.immediate2 = immediate.bits_rep();
     } else if (quantize_op.target() == "quantize_mx") {
       const int block_size = quantize_op.kwargs().at("block_size").int_value();
       assert(block_size == OC_DIMENSION);
+
+      inst2.vector_op3 = VectorInstructions::vquantize_mx;
+
+      float quant_max = quantize_op.kwargs().at("quant_max").float_value();
+      bool force_scale_power_of_two =
+          quantize_op.kwargs().at("force_scale_power_of_two").int_value();
+
+      if (force_scale_power_of_two) {
+        inst2.immediate2 = floor(log2(quant_max));
+      } else {
+        VECTOR_DATATYPE scale = quant_max;
+        inst2.immediate2 = scale.bits_rep();
+      }
 
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
@@ -317,7 +331,7 @@ void MapLayerNorm(const codegen::Operation &param,
     }
   }
 
-  vinstr_config->inst[0] = instr2;
+  vinstr_config->inst[0] = inst2;
   vinstr_config->instCount[0] = inner_dim * outer_dim / OC_DIMENSION;
 
   vinstr_config->instLen = 1;

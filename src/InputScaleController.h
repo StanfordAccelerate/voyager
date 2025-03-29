@@ -6,7 +6,7 @@
 #include "AccelTypes.h"
 #include "ParamsDeserializer.h"
 
-template <typename Input, typename Scale, int NRows>
+template <typename Scale, int NRows>
 SC_MODULE(InputScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -14,9 +14,9 @@ SC_MODULE(InputScaleController) {
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<Input, 1> > CCS_INIT_S1(dataResponse);
+  Connections::In<ac_int<Scale::width, false> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<Scale, 1> > writeRequest[2];
+  Connections::Out<BufferWriteRequest<Scale::width> > writeRequest[2];
   Connections::Out<ac_int<32, false> > writeControl[2];
   Connections::Out<ac_int<16, false> > readAddress[2];
   Connections::Out<ac_int<32, false> > readControl[2];
@@ -452,31 +452,14 @@ SC_MODULE(InputScaleController) {
                             full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
                           }
 
-                          Pack1D<Scale, 1> data;
+                          ac_int<Scale::width, false> data;
 
                           if ((full_x < 0) || (full_y < 0) ||
                               (full_x >= STRIDE * X0 * X1) ||
                               (full_y >= STRIDE * Y0 * Y1)) {
-#pragma hls_unroll yes
-                            for (int dims = 0; dims < 1; dims++) {
-                              data[dims].set_one();
-                            }
+                            data = Scale::one().bits_rep();
                           } else {
-                            constexpr int num_words =
-                                Scale::width / Input::width;
-                            if constexpr (num_words == 1) {
-                              Pack1D<Input, 1> response = dataResponse.Pop();
-
-                              data[0].set_bits(response[0].bits_rep());
-
-                            } else {
-                              Pack1D<Input, 1> response[num_words];
-                              for (int word = 0; word < num_words; word++) {
-                                response[word] = dataResponse.Pop();
-                              }
-
-                              convertPack1D<Input, Scale, 1>(response, data);
-                            }
+                            data = dataResponse.Pop();
                           }
 
                           ac_int<32, false> address =
@@ -490,11 +473,10 @@ SC_MODULE(InputScaleController) {
                                 c1;
                           }
 
-                          BufferWriteRequest<Scale, 1> req;
+                          BufferWriteRequest<Scale::width> req;
                           req.address = address;
                           req.data = data;
                           writeRequest[bankSel].Push(req);
-                          // CCS_LOG("pushing write request: " << address);
 
                           if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                             break;

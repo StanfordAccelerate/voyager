@@ -45,8 +45,8 @@ Scale* calculate_mx_qparam(std::any input_tensor, std::vector<int> shape,
       scales[i] = amax_arr[i] / Input::max();
     }
 
-    if (scales[i].to_ac_float() == Scale::ac_float_rep::zero()) {
-      scales[i].set_one();
+    if (scales[i].is_zero()) {
+      scales[i] = Scale::one();
     }
   }
 

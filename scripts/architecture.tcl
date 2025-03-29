@@ -8,8 +8,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "Posit<8, 1>::decoded"
   set PE_WEIGHT_DATATYPE "Posit<8, 1>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "bits"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -20,8 +19,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<3, 4, false, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, false, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -32,8 +30,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<3, 4, false, false, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, false, false, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -44,8 +41,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<3, 4, true, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, true, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, true, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -56,8 +52,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<3, 4, true, false, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<3, 4, true, false, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, true, false, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -68,8 +63,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<2, 5, false, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<2, 5, false, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -80,8 +74,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<3, 5, false, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<3, 5, false, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 8
@@ -92,8 +85,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -104,8 +96,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F32"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<23, 8, false, false, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -116,8 +107,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F32"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<23, 8, false, true, AC_TRN_ZERO>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -128,8 +118,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F32"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<23, 8, false, false, AC_TRN_ZERO>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -140,8 +129,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -152,8 +140,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, false, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -164,8 +151,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, true, AC_TRN_ZERO>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -176,8 +162,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<7, 8, false, false, AC_TRN_ZERO>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 16
@@ -188,8 +173,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F32"
   set PE_INPUT_DATATYPE "StdFloat<23, 8, false, true, AC_RND_CONV>::decoded"
   set PE_WEIGHT_DATATYPE "StdFloat<23, 8, false, true, AC_RND_CONV>::decoded"
-  set PE_PSUM_DATATYPE "StdFloat<23, 8, false, true, AC_RND_CONV>::decoded"
-  set C_DATA_REP_NAME "float_val.d"
+
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
   set IO_DATATYPE_WIDTH 32
@@ -200,8 +184,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "Int<8, true>::decoded"
   set PE_WEIGHT_DATATYPE "Int<8, true>::decoded"
-  set PE_PSUM_DATATYPE "Int<24, true>::decoded"
-  set C_DATA_REP_NAME "int_val"
+
   set ACC_BUF_C_DATA_REP_NAME "int_val"
 
   set IO_DATATYPE_WIDTH 8
@@ -212,8 +195,7 @@ if { $DATATYPE == "P8_1" } {
   set VECTOR_DATATYPE "F16"
   set PE_INPUT_DATATYPE "Int<8, true>::decoded"
   set PE_WEIGHT_DATATYPE "Int<8, true>::decoded"
-  set PE_PSUM_DATATYPE "Int<32, true>::decoded"
-  set C_DATA_REP_NAME "int_val"
+
   set ACC_BUF_C_DATA_REP_NAME "int_val"
 
   set IO_DATATYPE_WIDTH 8
@@ -227,11 +209,8 @@ if { $DATATYPE == "P8_1" } {
 
   set PE_INPUT_DATATYPE "Int<8, true>::decoded"
   set PE_WEIGHT_DATATYPE "Int<8, true>::decoded"
-  set PE_PSUM_DATATYPE "Int<32, true>::decoded"
 
-  set C_DATA_REP_NAME "int_val"
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
-  set SCALE_C_DATA_REP_NAME "d"
 
   set SUPPORT_MX true
   set IO_DATATYPE_WIDTH 8
@@ -246,11 +225,8 @@ if { $DATATYPE == "P8_1" } {
 
   set PE_INPUT_DATATYPE "NormalFloat4::decoded"
   set PE_WEIGHT_DATATYPE "NormalFloat4::decoded"
-  set PE_PSUM_DATATYPE "Int<32, true>::decoded"
 
-  set C_DATA_REP_NAME "index"
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
-  set SCALE_C_DATA_REP_NAME "d"
 
   set SUPPORT_MX true
   set IO_DATATYPE_WIDTH 4
@@ -280,3 +256,7 @@ if {!$SUPPORT_MX} {
   set OUTPUT_DATATYPES "$IO_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE"
   set VECTOR_INPUT_DATATYPES "$IO_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE"
 }
+
+set IC_PORT_WIDTH [expr $IC_DIMENSION*$IO_DATATYPE_WIDTH]
+set OC_PORT_WIDTH [expr $OC_DIMENSION*$IO_DATATYPE_WIDTH]
+set ADDRESS_WIDTH 64

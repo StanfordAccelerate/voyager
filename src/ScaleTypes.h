@@ -14,7 +14,7 @@ class UFloat {
 
   ac_int_rep d;
 
-  UFloat() : d(ac_float_rep::one().data()) {}
+  UFloat() : d(0) {}
 
 #ifndef __SYNTHESIS__
   UFloat(const float val) {
@@ -49,9 +49,9 @@ class UFloat {
 
   void set_bits(const ac_int<W, true> &rhs) { d = rhs; }
   void set_zero() { d = ac_float_rep::zero().data(); }
-  void set_one() { d = ac_float_rep::one().data(); }
-
   bool is_zero() const { return d == ac_float_rep::zero().data(); }
+
+  static UFloat one() { return UFloat(ac_float_rep::one()); }
 
   UFloat operator*(const UFloat &rhs) const {
     if constexpr (W == E) {

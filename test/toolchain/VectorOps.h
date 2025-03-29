@@ -130,11 +130,9 @@ void set_vector_immediate(const float scalar, const int stage,
   } else if (stage == 2) {
     inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
     inst.immediate1 = immediate.bits_rep();
-  } else if (inst.vector_op2_src1 != VectorInstructions::from_immediate_1) {
-    inst.vector_op3_src1 = VectorInstructions::from_immediate_1;
-    inst.immediate1 = immediate.bits_rep();
   } else {
-    throw std::invalid_argument("All operand slots are used!");
+    inst.vector_op3_src1 = VectorInstructions::from_immediate_2;
+    inst.immediate2 = immediate.bits_rep();
   }
 }
 
@@ -443,10 +441,6 @@ void MapVectorOperations(const codegen::Operation &param,
       VECTOR_DATATYPE immediate = read_constant_param(scale);
       inst.vdequantize = true;
       inst.immediate0 = immediate.bits_rep();
-    } else if (opcode == "quantize_mx") {
-      vector_params->quantize_output_mx = true;
-      vector_params->SCALE_OFFSET =
-          param.outputs().tensors(0).memory().address();
     } else {
       if (curr_stage == vector_unit_stages.size()) {
         // we have already processed all the stages
@@ -484,6 +478,21 @@ void MapVectorOperations(const codegen::Operation &param,
         if (opcode == "vmap") {
           const auto other = op.kwargs().at("other").tensor();
           inst.VMAP_OFFSET = other.memory().address();
+        } else if (opcode == "quantize_mx") {
+          float quant_max = op.kwargs().at("quant_max").float_value();
+          bool force_scale_power_of_two =
+              op.kwargs().at("force_scale_power_of_two").int_value();
+
+          if (force_scale_power_of_two) {
+            inst.immediate2 = floor(log2(quant_max));
+          } else {
+            VECTOR_DATATYPE scale = quant_max;
+            inst.immediate2 = scale.bits_rep();
+          }
+
+          vector_params->quantize_output_mx = true;
+          vector_params->SCALE_OFFSET =
+              param.outputs().tensors(0).memory().address();
         } else if (opcode == "neg") {
           const auto self = op.kwargs().at("input").tensor();
           const auto output_shape = squeeze_shape(get_shape(self));

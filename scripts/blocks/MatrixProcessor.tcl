@@ -1,5 +1,5 @@
 set block "MatrixProcessor"
-set full_block_name "MatrixProcessor<$IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
+set full_block_name "MatrixProcessor<$IO_DATATYPE, $IO_DATATYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
 set full_block_name_stripped [string map {" " ""} $full_block_name]
 
 
@@ -24,8 +24,8 @@ proc pre_analyze {} {
 }
 
 proc pre_compile {} {
-  global PE_INPUT_DATATYPE PE_WEIGHT_DATATYPE PE_PSUM_DATATYPE IC_DIMENSION OC_DIMENSION
-  solution design set "SystolicArray<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $PE_PSUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>" -mapped
+  global PE_INPUT_DATATYPE PE_WEIGHT_DATATYPE ACCUM_DATATYPE IC_DIMENSION OC_DIMENSION
+  solution design set "SystolicArray<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>" -mapped
 }
 
 proc pre_libraries {} {
@@ -34,8 +34,8 @@ proc pre_libraries {} {
 
 proc pre_assembly {} {
   global full_block_name_stripped
-  global PE_INPUT_DATATYPE PE_WEIGHT_DATATYPE PE_PSUM_DATATYPE IC_DIMENSION OC_DIMENSION
-  set systolic_array_name "SystolicArray<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $PE_PSUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
+  global PE_INPUT_DATATYPE PE_WEIGHT_DATATYPE ACCUM_DATATYPE IC_DIMENSION OC_DIMENSION
+  set systolic_array_name "SystolicArray<$PE_INPUT_DATATYPE, $PE_WEIGHT_DATATYPE, $ACCUM_DATATYPE, $IC_DIMENSION, $OC_DIMENSION>"
   set systolic_array_name_stripped [string map {" " ""} $systolic_array_name]
 
   directive set /$full_block_name_stripped/$systolic_array_name_stripped -MAP_TO_MODULE {[Block] SystolicArray.v1}

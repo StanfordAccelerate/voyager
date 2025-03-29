@@ -14,15 +14,15 @@ SC_MODULE(InputController) {
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<Input, NRows> > CCS_INIT_S1(dataResponse);
+  Connections::In<ac_int<IC_PORT_WIDTH, false> > CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<Input, NRows> > writeRequest[2];
+  Connections::Out<BufferWriteRequest<IC_PORT_WIDTH> > writeRequest[2];
   Connections::Out<ac_int<32, false> > writeControl[2];
   Connections::Out<ac_int<16, false> > readAddress[2];
   Connections::Out<ac_int<32, false> > readControl[2];
 
-  Connections::In<Pack1D<Input, NRows> > CCS_INIT_S1(windowBufferIn);
-  Connections::Out<Pack1D<Input, NRows> > CCS_INIT_S1(windowBufferOut);
+  Connections::In<ac_int<IC_PORT_WIDTH, false> > CCS_INIT_S1(windowBufferIn);
+  Connections::Out<ac_int<IC_PORT_WIDTH, false> > CCS_INIT_S1(windowBufferOut);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
@@ -31,7 +31,7 @@ SC_MODULE(InputController) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(windowBufferParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
 
-  Connections::Combinational<Pack1D<Input, NRows> > transposeOut;
+  Connections::Combinational<ac_int<IC_PORT_WIDTH, false> > transposeOut;
 
   MatrixParamsDeserializer<0> CCS_INIT_S1(paramsDeserializer);
 
@@ -495,14 +495,17 @@ SC_MODULE(InputController) {
                             full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
                           }
 
-                          Pack1D<Input, NRows> data;
+                          ac_int<IC_PORT_WIDTH, false> data;
 
                           if ((full_x < 0) || (full_y < 0) ||
                               (full_x >= STRIDE * X0 * X1) ||
                               (full_y >= STRIDE * Y0 * Y1)) {
+                            Input zero;
+                            zero.set_zero();
 #pragma hls_unroll yes
                             for (int dims = 0; dims < NRows; dims++) {
-                              data[dims].set_zero();
+                              data.set_slc(dims * Input::width,
+                                           zero.bits_rep());
                             }
                           } else {
                             data = transposeOut.Pop();
@@ -522,7 +525,7 @@ SC_MODULE(InputController) {
                                 c1;
                           }
 
-                          BufferWriteRequest<Input, NRows> req;
+                          BufferWriteRequest<IC_PORT_WIDTH> req;
                           req.address = address;
                           req.data = data;
                           writeRequest[bankSel].Push(req);
@@ -830,16 +833,24 @@ SC_MODULE(InputController) {
                         for (loop_counters[1][4] = 0;
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
-                          Pack1D<Input, NRows> data;
+                          ac_int<IC_PORT_WIDTH, false> data;
 
-                          Pack1D<Input, NRows> buffer = windowBufferIn.Pop();
+                          ac_int<IC_PORT_WIDTH, false> buffer =
+                              windowBufferIn.Pop();
 #pragma hls_unroll yes
                           for (int x = 0; x < 3; x++) {
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
                               // grab last 3 x values from buffer
-                              data.value[x * 3 + dim] =
-                                  buffer[(packingFactor - 3 + x) * 3 + dim];
+                              // data.value[x * 3 + dim] =
+                              //     buffer[(packingFactor - 3 + x) * 3 + dim];
+
+                              int dst_idx = x * 3 + dim;
+                              int src_idx = (packingFactor - 3 + x) * 3 + dim;
+
+                              auto temp = buffer.template slc<Input::width>(
+                                  src_idx * Input::width);
+                              data.set_slc(dst_idx * Input::width, temp);
                             }
                           }
 
@@ -850,7 +861,14 @@ SC_MODULE(InputController) {
                                x++) {
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
-                              data[x * 3 + dim] = buffer[(x - 3) * 3 + dim];
+                              // data[x * 3 + dim] = buffer[(x - 3) * 3 + dim];
+
+                              int dst_idx = x * 3 + dim;
+                              int src_idx = (x - 3) * 3 + dim;
+
+                              auto temp = buffer.template slc<Input::width>(
+                                  src_idx * Input::width);
+                              data.set_slc(dst_idx * Input::width, temp);
                             }
                           }
 
@@ -869,7 +887,14 @@ SC_MODULE(InputController) {
                                  x++) {
 #pragma hls_unroll yes
                               for (int dim = 0; dim < 3; dim++) {
-                                data[x * 3 + dim] = data[(x + 2) * 3 + dim];
+                                // data[x * 3 + dim] = data[(x + 2) * 3 + dim];
+
+                                int dst_idx = x * 3 + dim;
+                                int src_idx = (x + 2) * 3 + dim;
+
+                                auto temp = data.template slc<Input::width>(
+                                    src_idx * Input::width);
+                                data.set_slc(dst_idx * Input::width, temp);
                               }
                             }
 
@@ -886,12 +911,25 @@ SC_MODULE(InputController) {
                                  x++) {
 #pragma hls_unroll yes
                               for (int dim = 0; dim < 3; dim++) {
-                                data[x * 3 + dim] =
-                                    buffer[(bufferPosition + x -
-                                            (unrollingFactor +
-                                             additionalUnrollingFactor - 2)) *
-                                               3 +
-                                           dim];
+                                // data[x * 3 + dim] =
+                                //     buffer[(bufferPosition + x -
+                                //             (unrollingFactor +
+                                //              additionalUnrollingFactor - 2))
+                                //              *
+                                //                3 +
+                                //            dim];
+
+                                int dst_idx = x * 3 + dim;
+                                int src_idx =
+                                    (bufferPosition + x -
+                                     (unrollingFactor +
+                                      additionalUnrollingFactor - 2)) *
+                                        3 +
+                                    dim;
+
+                                auto temp = buffer.template slc<Input::width>(
+                                    src_idx * Input::width);
+                                data.set_slc(dst_idx * Input::width, temp);
                               }
                             }
 
@@ -938,24 +976,31 @@ SC_MODULE(InputController) {
                         for (loop_counters[1][4] = 0;
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
-                          Pack1D<Input, NRows> buffer = windowBufferIn.Pop();
+                          ac_int<IC_PORT_WIDTH, false> buffer =
+                              windowBufferIn.Pop();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
                           for (loop_counters[1][5] = 0;
                                loop_counters[1][5] < loop_bounds[1][5];
                                loop_counters[1][5]++) {
-                            Pack1D<Input, NRows> data;
+                            ac_int<IC_PORT_WIDTH, false> data;
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
-                              data[dim] = buffer[3 + dim];
+                              auto temp = buffer.template slc<Input::width>(
+                                  (dim + 3) * Input::width);
+                              data.set_slc(dim * Input::width, temp);
                             }
 
                             buffer = windowBufferIn.Pop();
 
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
-                              data[3 + dim] = buffer[dim];
+                              // data[3 + dim] = buffer[dim];
+
+                              auto temp = buffer.template slc<Input::width>(
+                                  dim * Input::width);
+                              data.set_slc((3 + dim) * Input::width, temp);
                             }
                             windowBufferOut.Push(data);
                           }
@@ -1036,7 +1081,7 @@ SC_MODULE(InputController) {
       loop_bounds[1][params.fyIndex] = 1;
 
       if (params.has_input_transpose && NRows <= 32) {
-        Input transposeBuffer[NRows][NRows];
+        ac_int<Input::width> transposeBuffer[NRows][NRows];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -1072,23 +1117,25 @@ SC_MODULE(InputController) {
                                loop_counters[1][5] < loop_bounds[1][5] / NRows;
                                loop_counters[1][5]++) {
                             for (int c0 = 0; c0 < NRows; c0++) {
-                              Pack1D<Input, NRows> originalValue =
-                                  dataResponse.Pop();
+                              auto bits = dataResponse.Pop();
 #pragma hls_unroll yes
                               for (int dim = 0; dim < NRows; dim++) {
-                                transposeBuffer[dim][c0] = originalValue[dim];
+                                transposeBuffer[dim][c0] =
+                                    bits.template slc<Input::width>(
+                                        dim * Input::width);
                               }
                             }
 
                             // Write out from tranposeBuffer
                             for (int c0 = 0; c0 < NRows; c0++) {
-                              Pack1D<Input, NRows> transposedValue;
+                              ac_int<IC_PORT_WIDTH, false> transposed;
 
 #pragma hls_unroll yes
                               for (int dim = 0; dim < NRows; dim++) {
-                                transposedValue[dim] = transposeBuffer[c0][dim];
+                                transposed.set_slc(dim * Input::width,
+                                                   transposeBuffer[c0][dim]);
                               }
-                              transposeOut.Push(transposedValue);
+                              transposeOut.Push(transposed);
                             }
                           }
                         }

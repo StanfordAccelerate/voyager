@@ -7,7 +7,7 @@
 #include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
 
-template <typename Weight, typename Scale, int NRows, int NCols>
+template <typename Scale, int NRows, int NCols>
 SC_MODULE(WeightScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -15,9 +15,9 @@ SC_MODULE(WeightScaleController) {
   Connections::In<int> serialParamsIn;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<Weight, NCols>> CCS_INIT_S1(dataResponse);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<Scale, NCols>> writeRequest[2];
+  Connections::Out<BufferWriteRequest<Scale::width * NCols>> writeRequest[2];
   Connections::Out<ac_int<32, false>> writeControl[2];
   Connections::Out<ac_int<16, false>> readAddress[2];
   Connections::Out<ac_int<32, false>> readControl[2];
@@ -285,26 +285,16 @@ SC_MODULE(WeightScaleController) {
                           int address = (fy * FX * C * K1) + (fx * C * K1) +
                                         (c * K1) + k1;
 
-                          Pack1D<Scale, NCols> data;
+                          ac_int<Scale::width * NCols, false> data;
 
                           constexpr int num_words =
-                              Scale::width / Weight::width;
-                          if constexpr (num_words == 1) {
-                            Pack1D<Weight, NCols> response = dataResponse.Pop();
-#pragma hls_unroll yes
-                            for (int dim = 0; dim < NCols; dim++) {
-                              data[dim].set_bits(response[dim].bits_rep());
-                            }
-                          } else {
-                            Pack1D<Weight, NCols> response[num_words];
-                            for (int word = 0; word < num_words; word++) {
-                              response[word] = dataResponse.Pop();
-                            }
+                              Scale::width * NCols / OC_PORT_WIDTH;
 
-                            convertPack1D<Weight, Scale, NCols>(response, data);
+                          for (int i = 0; i < num_words; i++) {
+                            data.set_slc(i * OC_PORT_WIDTH, dataResponse.Pop());
                           }
 
-                          BufferWriteRequest<Scale, NCols> req;
+                          BufferWriteRequest<Scale::width * NCols> req;
                           req.address = address;
                           req.data = data;
                           writeRequest[bankSel].Push(req);

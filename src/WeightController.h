@@ -15,19 +15,17 @@ SC_MODULE(WeightController) {
   Connections::In<int> serialParamsIn;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<Pack1D<Weight, NCols> > CCS_INIT_S1(dataResponse);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(dataResponse);
 
-  Connections::Out<BufferWriteRequest<Weight, NCols> > writeRequest[2];
-  Connections::Out<ac_int<32, false> > writeControl[2];
-  Connections::Out<ac_int<16, false> > readAddress[2];
-  Connections::Out<ac_int<32, false> > readControl[2];
+  Connections::Out<BufferWriteRequest<OC_PORT_WIDTH>> writeRequest[2];
+  Connections::Out<ac_int<32, false>> writeControl[2];
+  Connections::Out<ac_int<16, false>> readAddress[2];
+  Connections::Out<ac_int<32, false>> readControl[2];
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
-  Connections::In<Pack1D<Weight, NCols> > CCS_INIT_S1(biasDataResponse);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(biasDataResponse);
 
-  Connections::Out<Pack1D<typename Weight::decoded, NCols> > CCS_INIT_S1(
-      weightsToSystolicArray);
-  Connections::Out<Pack1D<Bias, NCols> > CCS_INIT_S1(biasToSystolicArray);
+  Connections::Out<Pack1D<Bias, NCols>> CCS_INIT_S1(biasToSystolicArray);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
@@ -37,7 +35,7 @@ SC_MODULE(WeightController) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(biasFetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(biasCombinerParams);
 
-  Connections::Combinational<Pack1D<Weight, NCols> > transposeOut;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> transposeOut;
 
   MatrixParamsDeserializer<2> CCS_INIT_S1(paramsDeserializer);
 
@@ -296,12 +294,12 @@ SC_MODULE(WeightController) {
                         ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
                         ac_int<16, false> K = K2 * K1 * NCols;
 
-                        Pack1D<Weight, NCols> data = transposeOut.Pop();
+                        ac_int<OC_PORT_WIDTH, false> data = transposeOut.Pop();
 
                         int address = (fy * FX * C * K1) + (fx * C * K1) +
                                       ((c0 + c1 * C0) * K1) + k1;
 
-                        BufferWriteRequest<Weight, NCols> req;
+                        BufferWriteRequest<OC_PORT_WIDTH> req;
                         req.address = address;
                         req.data = data;
                         writeRequest[bankSel].Push(req);
@@ -631,8 +629,9 @@ SC_MODULE(WeightController) {
       // than 32x32, as it will require a very large buffer
       if (params.has_weight_transpose && NRows < 64 && NCols < 64) {
         // we need a square buffer to store the transpose
-        Weight transposeBuffer[NRows > NCols ? NRows : NCols]
-                              [NRows > NCols ? NRows : NCols];
+        ac_int<Weight::width, false>
+            transposeBuffer[NRows > NCols ? NRows : NCols]
+                           [NRows > NCols ? NRows : NCols];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -664,23 +663,27 @@ SC_MODULE(WeightController) {
 
                         // Fill up transposeBuffer
                         for (int c0 = 0; c0 < NCols; c0++) {
-                          Pack1D<Weight, NCols> originalValue =
+                          ac_int<OC_PORT_WIDTH, false> response =
                               dataResponse.Pop();
 #pragma hls_unroll yes
                           for (int dim = 0; dim < NCols; dim++) {
-                            transposeBuffer[dim][c0] = originalValue[dim];
+                            transposeBuffer[dim][c0] =
+                                response.template slc<Weight::width>(
+                                    dim * Weight::width);
                           }
                         }
 
                         // Write out from tranposeBuffer
                         for (int c0 = 0; c0 < NCols; c0++) {
-                          Pack1D<Weight, NCols> transposedValue;
+                          ac_int<OC_PORT_WIDTH, false> transposed;
 
 #pragma hls_unroll yes
                           for (int dim = 0; dim < NCols; dim++) {
-                            transposedValue[dim] = transposeBuffer[c0][dim];
+                            transposed.set_slc(dim * Weight::width,
+                                               transposeBuffer[c0][dim]);
                           }
-                          transposeOut.Push(transposedValue);
+
+                          transposeOut.Push(transposed);
                         }
 
                         if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
@@ -894,17 +897,18 @@ SC_MODULE(WeightController) {
                            loop_counters[1][5] < loop_bounds[1][5];
                            loop_counters[1][5]++) {
                         constexpr int num_words = Bias::width / Weight::width;
-                        Pack1D<Weight, NCols> response[num_words];
-                        for (int word = 0; word < num_words; word++) {
-                          response[word] = biasDataResponse.Pop();
+
+                        ac_int<Bias::width * NCols, false> bits;
+
+                        for (int i = 0; i < num_words; i++) {
+                          bits.set_slc(i * OC_PORT_WIDTH,
+                                       biasDataResponse.Pop());
                         }
 
-                        Pack1D<Bias, NCols> converted_response;
-                        convertPack1D<Weight, Bias, NCols>(response,
-                                                           converted_response);
+                        Pack1D<Bias, NCols> biases =
+                            BitsToType<Pack1D<Bias, NCols>>(TypeToBits(bits));
 
-                        biasToSystolicArray.Push(converted_response);
-
+                        biasToSystolicArray.Push(biases);
                         if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                           break;
                         }

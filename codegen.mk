@@ -27,26 +27,26 @@ $(CODEGEN_DIR)/networks/mobilebert_encoder/%/model.txt: quantized-training/test/
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py mobilebert_encoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
-test/compiler/networks/bert/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/bert/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py bert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
 
-test/compiler/networks/llama/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/llama/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py llama_decoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
 
-test/compiler/networks/vit/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)networks/vit/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py vit $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
 
-test/compiler/networks/segformer/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/segformer/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python -u quantized-training/test/test_codegen.py segformer $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
 
 ################################################################################
 # Gesture
 ################################################################################
-test/compiler/networks/gesture/CFLOAT/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/gesture/CFLOAT/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py gesture --model_name_or_path models/gesture/model.pth --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 

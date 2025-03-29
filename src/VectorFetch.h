@@ -1,7 +1,6 @@
 #pragma once
 
-template <typename IOType, typename VectorType, typename Scale, int Width,
-          typename... InputTypes>
+template <typename VectorType, int Width, typename... InputTypes>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -11,15 +10,18 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
 
-  Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch0DataResponse);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      vectorFetch0DataResponse);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch0DataResponseConverted);
 
-  Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch1DataResponse);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      vectorFetch1DataResponse);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch1DataResponseConverted);
 
-  Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch2DataResponse);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      vectorFetch2DataResponse);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch2DataResponseConverted);
 
@@ -321,9 +323,8 @@ SC_MODULE(VectorFetchUnit) {
                     bool found =
                         ((get_type_index<InputTypes, InputTypes...>() ==
                                   params.vector_input_0_type
-                              ? (feed_response<VectorType, IOType, InputTypes,
-                                               Width>(vectorFetch0DataResponse,
-                                                      full_response),
+                              ? (feed_response<InputTypes, VectorType, Width>(
+                                     vectorFetch0DataResponse, full_response),
                                  true)
                               : false) ||
                          ...);
@@ -373,14 +374,13 @@ SC_MODULE(VectorFetchUnit) {
         for (int i = 0; i < num_writes; i++) {
           Pack1D<VectorType, Width> full_response;
 
-          bool found =
-              ((get_type_index<InputTypes, InputTypes...>() ==
-                        params.vector_input_0_type
-                    ? (feed_response<VectorType, IOType, InputTypes, Width>(
-                           vectorFetch0DataResponse, full_response),
-                       true)
-                    : false) ||
-               ...);
+          bool found = ((get_type_index<InputTypes, InputTypes...>() ==
+                                 params.vector_input_0_type
+                             ? (feed_response<InputTypes, VectorType, Width>(
+                                    vectorFetch0DataResponse, full_response),
+                                true)
+                             : false) ||
+                        ...);
 
 #ifndef __SYNTHESIS__
           if (!found) {
@@ -587,9 +587,8 @@ SC_MODULE(VectorFetchUnit) {
                   bool found =
                       ((get_type_index<InputTypes, InputTypes...>() ==
                                 params.vector_input_1_type
-                            ? (feed_response<VectorType, IOType, InputTypes,
-                                             Width>(vectorFetch1DataResponse,
-                                                    full_response),
+                            ? (feed_response<InputTypes, VectorType, Width>(
+                                   vectorFetch1DataResponse, full_response),
                                true)
                             : false) ||
                        ...);
@@ -824,9 +823,8 @@ SC_MODULE(VectorFetchUnit) {
                   bool found =
                       ((get_type_index<InputTypes, InputTypes...>() ==
                                 params.vector_input_2_type
-                            ? (feed_response<VectorType, IOType, InputTypes,
-                                             Width>(vectorFetch2DataResponse,
-                                                    full_response),
+                            ? (feed_response<InputTypes, VectorType, Width>(
+                                   vectorFetch2DataResponse, full_response),
                                true)
                             : false) ||
                        ...);

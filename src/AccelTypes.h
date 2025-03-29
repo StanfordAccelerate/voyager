@@ -8,7 +8,6 @@
 #include <ccs_types.h>
 #include <mc_connections.h>
 
-#include "ConditionalConnections.h"
 #include "DataTypes.h"
 #include "Params.h"
 
@@ -623,12 +622,12 @@ class Pack1D<UFloat<W, E>, Width> {
   }
 };
 
-template <typename T, size_t Width>
+template <size_t Width>
 struct BufferWriteRequest {
   ac_int<16, false> address;
-  Pack1D<T, Width> data;
+  ac_int<Width, false> data;
 
-  static const unsigned int width = 16 + Pack1D<T, Width>::width;
+  static const unsigned int width = 16 + Width;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
@@ -680,47 +679,4 @@ inline std::ostream &operator<<(ostream &os, const Pack1D<T, Width> &vec) {
     os << vec[i] << " ";
   }
   return os;
-}
-
-// Convert lower precision Pack1D to higher precision Pack1D
-template <typename T1, typename T2, size_t Width>
-void convertPack1D(Pack1D<T1, Width> low_precision[T2::width / T1::width],
-                   Pack1D<T2, Width> &high_precision) {
-  static_assert(
-      T1::width <= T2::width,
-      "Lower precision type must be smaller than higher precision type.");
-
-  constexpr int num_words = T2::width / T1::width;
-  ac_int<T2::width * Width, false> bits;
-
-#pragma hls_unroll yes
-  for (int i = 0; i < num_words; i++) {
-    bits.set_slc(static_cast<unsigned int>(i * T1::width * Width),
-                 BitsToType<ac_int<T1::width * Width, false> >(
-                     TypeToBits(low_precision[i])));
-  }
-
-  high_precision = BitsToType<Pack1D<T2, Width> >(TypeToBits(bits));
-}
-
-// Convert higher precision Pack1D to lower precision Pack1D
-template <typename T1, typename T2, size_t Width>
-void convertPack1D(Pack1D<T2, Width> &high_precision,
-                   Pack1D<T1, Width> low_precision[T2::width / T1::width]) {
-  static_assert(
-      T1::width <= T2::width,
-      "Lower precision type must be smaller than higher precision type.");
-
-  constexpr int num_words = T2::width / T1::width;
-
-  ac_int<T2::width * Width, false> bits;
-  bits = BitsToType<decltype(bits)>(TypeToBits(high_precision));
-
-#pragma hls_unroll yes
-  for (int i = 0; i < num_words; i++) {
-    ac_int<T1::width * Width, false> slice =
-        bits.template slc<T1::width * Width>(
-            static_cast<unsigned int>(i * T1::width * Width));
-    low_precision[i] = BitsToType<Pack1D<T1, Width> >(TypeToBits(slice));
-  }
 }

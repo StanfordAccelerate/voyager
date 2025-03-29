@@ -1,6 +1,6 @@
 #pragma once
 
-template <typename VectorType, typename ScaleType, typename IOType, int Width,
+template <typename VectorType, typename ScaleType, int Width,
           typename... OutputTypes>
 SC_MODULE(VectorUnitOutput) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -8,10 +8,13 @@ SC_MODULE(VectorUnitOutput) {
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(tensor_in);
-  Connections::Out<Pack1D<IOType, Width>> CCS_INIT_S1(vector_output);
-  Connections::Out<ac_int<64, false>> CCS_INIT_S1(vector_output_address);
-  Connections::Out<Pack1D<DataTypes::int8, 1>> CCS_INIT_S1(scalar_output);
-  Connections::Out<ac_int<64, false>> CCS_INIT_S1(scalar_output_address);
+  Connections::In<ScaleType> CCS_INIT_S1(scale_in);
+
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      vector_address_out);
+  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scale_out);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(scale_address_out);
 
   Connections::SyncOut CCS_INIT_S1(done);
 
@@ -24,10 +27,11 @@ SC_MODULE(VectorUnitOutput) {
   void run() {
     params_in.Reset();
     tensor_in.Reset();
-    vector_output.Reset();
-    vector_output_address.Reset();
-    scalar_output.Reset();
-    scalar_output_address.Reset();
+    scale_in.Reset();
+    vector_out.Reset();
+    vector_address_out.Reset();
+    scale_out.Reset();
+    scale_address_out.Reset();
     done.Reset();
 
     wait();
@@ -137,46 +141,25 @@ SC_MODULE(VectorUnitOutput) {
                         Width;
                   }
 
-                  Pack1D<VectorType, Width> outputs = tensor_in.Pop();
-
-                  Pack1D<VectorType, Width> scaled_outputs;
 #if SUPPORT_MX
                   if (params.quantize_output_mx) {
-                    Pack1D<ScaleType, 1> scale;
-                    vquantize_mx<VectorType, IOType, ScaleType, Width>(
-                        outputs, scaled_outputs, scale[0]);
-
-                    constexpr int num_words =
-                        ScaleType::width / DataTypes::int8::width;
-                    Pack1D<DataTypes::int8, 1> converted_scale[num_words];
-
-                    convertPack1D<DataTypes::int8, ScaleType, 1>(
-                        scale, converted_scale);
-
-                    ac_int<32, false> scale_address = address / Width;
-
-                    for (int i = 0; i < num_words; i++) {
-                      scalar_output.Push(converted_scale[i]);
-                      scalar_output_address.Push(
-                          params.SCALE_OFFSET +
-                          scale_address * ScaleType::width / 8 +
-                          i * DataTypes::int8::width / 8);
-                    }
-                  } else {
-#endif
-                    scaled_outputs = outputs;
-#if SUPPORT_MX
+                    ScaleType scale = scale_in.Pop();
+                    scale_out.Push(scale.bits_rep());
+                    scale_address_out.Push(params.SCALE_OFFSET +
+                                           address / Width * ScaleType::width /
+                                               8);
                   }
 #endif
+
+                  Pack1D<VectorType, Width> outputs = tensor_in.Pop();
 
                   bool found =
                       ((get_type_index<OutputTypes, OutputTypes...>() ==
                                 params.output_types
-                            ? (vwrite_out<VectorType, IOType, OutputTypes,
-                                          Width>(scaled_outputs, address,
-                                                 params.VECTOR_OUTPUT_OFFSET,
-                                                 vector_output,
-                                                 vector_output_address),
+                            ? (vwrite_out<VectorType, OutputTypes, Width>(
+                                   outputs, address,
+                                   params.VECTOR_OUTPUT_OFFSET, vector_out,
+                                   vector_address_out),
                                true)
                             : false) ||
                        ...);

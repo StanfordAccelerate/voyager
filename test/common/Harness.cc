@@ -18,34 +18,35 @@ void register_interface(
     std::deque<sc_lv<Wrapped<int>::width>> *serialMatrixParamsIn,
     std::deque<sc_lv<Wrapped<int>::width>> *serialVectorParamsIn,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *inputAddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<IC_PORT_WIDTH, false>>::width>>
         *inputAddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *weightAddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *weightAddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch0AddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vectorFetch0AddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch1AddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vectorFetch1AddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch2AddressRequest,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vectorFetch2AddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
         *vectorFetch3AddressRequest,
-    std::deque<sc_lv<
-        Wrapped<Pack1D<INPUT_DATATYPE, 16 / INPUT_DATATYPE::width>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<16, false>>::width>>
         *vectorFetch3AddressResponse,
-    std::deque<sc_lv<Wrapped<Pack1D<INPUT_DATATYPE, DIMENSION>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vector_output,
-    std::deque<sc_lv<Wrapped<uint64_t>::width>> *vector_output_address,
-    std::deque<sc_lv<Wrapped<Pack1D<DataTypes::int8, 1>>::width>>
+    std::deque<sc_lv<Wrapped<ac_int<ADDRESS_WIDTH, false>>::width>>
+        *vector_output_address,
+    std::deque<sc_lv<Wrapped<ac_int<SCALE_DATATYPE::width, false>>::width>>
         *scalar_output,
-    std::deque<sc_lv<Wrapped<uint64_t>::width>> *scalar_output_address);
+    std::deque<sc_lv<Wrapped<ac_int<ADDRESS_WIDTH, false>>::width>>
+        *scalar_output_address);
 // void copy_output(void *sram, int size, int data_size);
 #endif
 
@@ -213,11 +214,13 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 #endif
 }
 
-template <typename T, long unsigned int Dim>
+template <int Width>
 void Harness::readMemoryRequest(
     CombinationalInterface<MemoryRequest> *request_out,
-    sc_fifo<Pack1D<T, Dim>> *data_fifo) {
+    sc_fifo<ac_int<Width, false>> *data_fifo) {
   request_out->ResetRead();
+
+  constexpr int num_bytes = Width / 8;
 
   wait();
 
@@ -225,43 +228,30 @@ void Harness::readMemoryRequest(
     MemoryRequest request = request_out->Pop();
 
     uint64_t base_address = request.address;
-    int num_bytes = request.burst_size;
-    int num_groups = num_bytes / (T::width / 8.0) / Dim;
+    int total_bytes = request.burst_size;
+    int num_words = total_bytes / num_bytes;
 
-    accessCounter->increment(std::string(name()), num_bytes);
+    accessCounter->increment(std::string(name()), total_bytes);
 
-    constexpr int buffer_size = (T::width / 8 + 2) * 8;
-    ac_int<buffer_size, false> bits;
+    ac_int<Width, false> bits;
 
-    for (int i = 0; i < num_groups; i++) {
-      Pack1D<T, Dim> data;
-      for (int j = 0; j < Dim; j++) {
-        int start = (i * Dim + j) * T::width;
-        int end = start + T::width;
-        int offset = start % 8;
-
-        int start_byte = start / 8;
-        int end_byte = (end + 7) / 8;
-
-        for (int byte = start_byte; byte < end_byte; byte++) {
-          uint64_t address = base_address + byte;
-          bits.set_slc((byte - start_byte) * 8,
-                       static_cast<ac_int<8, false>>(memory[address]));
-        }
-
-        data[j].set_bits(bits >> offset);
+    for (int i = 0; i < num_words; i++) {
+      for (int j = 0; j < num_bytes; j++) {
+        uint64_t address = base_address + i * num_bytes + j;
+        DLOG("read addr: " << address << " data: " << memory[address]
+                           << std::endl);
+        bits.set_slc(j * 8, static_cast<ac_int<8, false>>(memory[address]));
       }
 
-      DLOG("read addr: " << request.address << " data: " << data << std::endl);
-      data_fifo->write(data);
+      data_fifo->write(bits);
     }
   }
 }
 
-template <typename T, long unsigned int Dim>
+template <int Width>
 void Harness::sendMemoryResponse(
-    sc_fifo<Pack1D<T, Dim>> *data_fifo,
-    CombinationalInterface<Pack1D<T, Dim>> *response) {
+    sc_fifo<ac_int<Width, false>> *data_fifo,
+    CombinationalInterface<ac_int<Width, false>> *response) {
   response->ResetWrite();
 
   wait();
@@ -271,46 +261,26 @@ void Harness::sendMemoryResponse(
   }
 }
 
-template <typename T, long unsigned int Dim>
+template <int Width>
 void Harness::storeMemoryResponse(
-    CombinationalInterface<Pack1D<T, Dim>> *data_out,
-    CombinationalInterface<ac_int<64, false>> *address_out) {
+    CombinationalInterface<ac_int<Width, false>> *data_out,
+    CombinationalInterface<ac_int<ADDRESS_WIDTH, false>> *address_out) {
   data_out->ResetRead();
   address_out->ResetRead();
+
+  constexpr int num_bytes = Width / 8;
 
   wait();
 
   while (true) {
-    Pack1D<T, Dim> data = data_out->Pop();
     uint64_t address = address_out->Pop();
+    auto data = data_out->Pop();
     DLOG("write address: " << address << " data: " << data);
-    accessCounter->increment(std::string(name()) + "_" + "outputs",
-                             OC_DIMENSION);
 
-    constexpr int width = T::width;
-    constexpr int buf_width = (width / 8 + 2) * 8;
+    accessCounter->increment(std::string(name()) + "_" + "outputs", num_bytes);
 
-    for (int i = 0; i < Dim; i++) {
-      int start = i * width / 8;
-      int end = (i + 1) * width / 8;
-      int offset = (i * width) % 8;
-      int num_bytes = (end - start + 1) * 8;
-
-      int bits_remaining = num_bytes * 8 - width - offset;
-      num_bytes = num_bytes - bits_remaining / 8;
-
-      ac_int<buf_width, false> bytes = data[i].bits_rep();
-      ac_int<buf_width, false> masks = ((1 << width) - 1);
-
-      bytes = bytes << offset;
-      masks = masks << offset;
-
-      for (int i = 0; i < num_bytes; i++) {
-        char mask = masks.template slc<8>(i * 8);
-        char new_data = bytes.template slc<8>(i * 8) & mask;
-        char orig_data = memory[address + start + i] & ~mask;
-        memory[address + start + i] = new_data | orig_data;
-      }
+    for (int i = 0; i < num_bytes; i++) {
+      memory[address + i] = data.template slc<8>(i * 8);
     }
   }
 }

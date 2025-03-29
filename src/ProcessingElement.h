@@ -96,17 +96,17 @@ SC_MODULE(ProcessingElement) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode bubble
     while (true) {
-      PEInput<Input> input_struct = input_in.Pop();
+      PEInput<Input> input = input_in.Pop();
 
-      if (input_struct.swapWeights) {
+      if (input.swapWeights) {
         weight_reg = stored_weight.Pop();
       }
 
       Psum psum = psum_in.Pop();
 
-      input_out.Push(input_struct);
+      input_out.Push(input);
 
-      Psum output = pe_fma(input_struct.data, weight_reg, psum);
+      Psum output = pe_fma(input.data, weight_reg, psum);
       psum_out.Push(output);
     }
   }
