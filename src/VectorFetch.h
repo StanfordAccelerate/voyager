@@ -1,7 +1,7 @@
 #pragma once
 
-template <typename IOType, typename VectorType, typename Scale, int Width,
-          typename... InputTypes>
+template <typename IOType, typename VectorType, typename BufferType,
+          typename Scale, int Width, typename... InputTypes>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -11,9 +11,18 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
 
+  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
+  Connections::SyncOut accumulation_buffer_done[2];
+
   Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch0DataResponse);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vectorFetch0DataResponseConverted);
+
+  Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
+  Connections::Out<BufferWriteRequest<BufferType, Width>>
+      accumulation_buffer_write_request[2];
+  Connections::Out<Pack1D<BufferType, Width>> CCS_INIT_S1(
+      accumulationBufferOutput);
 
   Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch1DataResponse);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
@@ -65,6 +74,12 @@ SC_MODULE(VectorFetchUnit) {
   void fetch_address_0() {
     addressGen0Params.ResetRead();
     vectorFetch0AddressRequest.Reset();
+    accumulation_buffer_read_address[0].Reset();
+    accumulation_buffer_read_address[1].Reset();
+    accumulation_buffer_done[0].Reset();
+    accumulation_buffer_done[1].Reset();
+
+    bool accumulation_buffer_bank = 0;
 
     wait();
 
@@ -142,6 +157,7 @@ SC_MODULE(VectorFetchUnit) {
                      loop_counters[1][2] < loop_ends[1][2];
                      loop_counters[1][2] += loop_steps[1][2]) {
                   ac_int<32, false> address;
+                  bool switch_accumulation_buffer_bank = false;
                   if (params.addressGen0Mode == 1) {
                     ac_int<11, false> x0 =
                         loop_counters[1][params.addressGen0InputXLoopIndex[1]];
@@ -215,24 +231,56 @@ SC_MODULE(VectorFetchUnit) {
                          indices[3] * loop_bounds[4] * loop_bounds[5] +
                          indices[4] * loop_bounds[5] + indices[5]) *
                         Width;
+                  } else if (params.addressGen0Mode == 3) {
+                    // read from accumulation buffer
+                    ac_int<11, false> x0 =
+                        loop_counters[1][params.addressGen0InputXLoopIndex[1]];
+                    ac_int<11, false> x1 =
+                        loop_counters[0][params.addressGen0InputXLoopIndex[0]];
+                    ac_int<11, false> y0 =
+                        loop_counters[1][params.addressGen0InputYLoopIndex[1]];
+                    ac_int<11, false> y1 =
+                        loop_counters[0][params.addressGen0InputYLoopIndex[0]];
+                    ac_int<11, false> k0 =
+                        loop_counters[1][params.addressGen0WeightLoopIndex[1]];
+                    ac_int<11, false> k1 =
+                        loop_counters[0][params.addressGen0WeightLoopIndex[0]];
+
+                    address = k0 * Y0 * X0 + y0 * X0 + x0;
+
+                    if (k0 == K0 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
+                      switch_accumulation_buffer_bank = true;
+                    }
                   }
 
-                  bool found = ((get_type_index<InputTypes, InputTypes...>() ==
-                                         params.vector_input_0_type
-                                     ? (send_request<InputTypes, Width>(
-                                            address, params.VECTOR_OFFSET,
-                                            vectorFetch0AddressRequest),
-                                        true)
-                                     : false) ||
-                                ...);
+                  if (params.addressGen0Mode == 1 ||
+                      params.addressGen0Mode == 2) {
+                    bool found =
+                        ((get_type_index<InputTypes, InputTypes...>() ==
+                                  params.vector_input_0_type
+                              ? (send_request<InputTypes, Width>(
+                                     address, params.VECTOR_OFFSET,
+                                     vectorFetch0AddressRequest),
+                                 true)
+                              : false) ||
+                         ...);
 
 #ifndef __SYNTHESIS__
-                  if (!found) {
-                    std::cerr << "Error: vector input 0 type index '"
-                              << params.vector_input_0_type
-                              << "' is not valid.\n";
-                  }
+                    if (!found) {
+                      std::cerr << "Error: vector input 0 type index '"
+                                << params.vector_input_0_type
+                                << "' is not valid.\n";
+                    }
 #endif
+                  } else {
+                    accumulation_buffer_read_address[accumulation_buffer_bank]
+                        .Push(address);
+                    if (switch_accumulation_buffer_bank) {
+                      accumulation_buffer_done[accumulation_buffer_bank]
+                          .SyncPush();
+                      accumulation_buffer_bank = !accumulation_buffer_bank;
+                    }
+                  }
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -266,6 +314,13 @@ SC_MODULE(VectorFetchUnit) {
     vectorFetch0DataResponse.Reset();
     vectorFetch0DataResponseConverted.Reset();
     dataResponse0Params.ResetRead();
+
+    accumulation_buffer_read_data[0].Reset();
+    accumulation_buffer_read_data[1].Reset();
+    accumulation_buffer_write_request[0].Reset();
+    accumulation_buffer_write_request[1].Reset();
+
+    bool accumulation_buffer_bank = 0;
 
     wait();
 
@@ -360,6 +415,87 @@ SC_MODULE(VectorFetchUnit) {
                 }
               }
             }
+          }
+        }
+      } else if (params.addressGen0Mode == 3) {
+        ac_int<11, false> Y1 =
+            params.addressGen0Loop[0][params.addressGen0InputYLoopIndex[0]];
+        ac_int<11, false> X1 =
+            params.addressGen0Loop[0][params.addressGen0InputXLoopIndex[0]];
+        ac_int<11, false> K1 =
+            params.addressGen0Loop[0][params.addressGen0WeightLoopIndex[0]];
+        ac_int<11, false> Y0 =
+            params.addressGen0Loop[1][params.addressGen0InputYLoopIndex[1]];
+        ac_int<11, false> X0 =
+            params.addressGen0Loop[1][params.addressGen0InputXLoopIndex[1]];
+        ac_int<11, false> K0 =
+            params.addressGen0Loop[1][params.addressGen0WeightLoopIndex[1]];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = loop_starts[0][0];
+             loop_counters[0][0] < loop_ends[0][0];
+             loop_counters[0][0] += loop_steps[0][0]) {
+          for (loop_counters[0][1] = loop_starts[0][1];
+               loop_counters[0][1] < loop_ends[0][1];
+               loop_counters[0][1] += loop_steps[0][1]) {
+            for (loop_counters[0][2] = loop_starts[0][2];
+                 loop_counters[0][2] < loop_ends[0][2];
+                 loop_counters[0][2] += loop_steps[0][2]) {
+              for (loop_counters[1][0] = loop_starts[1][0];
+                   loop_counters[1][0] < loop_ends[1][0];
+                   loop_counters[1][0] += loop_steps[1][0]) {
+                for (loop_counters[1][1] = loop_starts[1][1];
+                     loop_counters[1][1] < loop_ends[1][1];
+                     loop_counters[1][1] += loop_steps[1][1]) {
+                  for (loop_counters[1][2] = loop_starts[1][2];
+                       loop_counters[1][2] < loop_ends[1][2];
+                       loop_counters[1][2] += loop_steps[1][2]) {
+                    Pack1D<BufferType, Width> read_data =
+                        accumulation_buffer_read_data[accumulation_buffer_bank]
+                            .Pop();
+                    accumulationBufferOutput.Push(read_data);
+
+                    ac_int<11, false> x0 =
+                        loop_counters[1][params.addressGen0InputXLoopIndex[1]];
+                    ac_int<11, false> x1 =
+                        loop_counters[0][params.addressGen0InputXLoopIndex[0]];
+                    ac_int<11, false> y0 =
+                        loop_counters[1][params.addressGen0InputYLoopIndex[1]];
+                    ac_int<11, false> y1 =
+                        loop_counters[0][params.addressGen0InputYLoopIndex[0]];
+                    ac_int<11, false> k0 =
+                        loop_counters[1][params.addressGen0WeightLoopIndex[1]];
+                    ac_int<11, false> k1 =
+                        loop_counters[0][params.addressGen0WeightLoopIndex[0]];
+
+                    if (k0 == K0 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
+                      accumulation_buffer_bank = !accumulation_buffer_bank;
+                    }
+                    if (loop_counters[1][2] >=
+                        loop_ends[1][2] - loop_steps[1][2]) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >=
+                      loop_ends[1][1] - loop_steps[1][1]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][0] >= loop_ends[1][0] - loop_steps[1][0]) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_ends[0][2] - loop_steps[0][2]) {
+                break;
+              }
+            }
+            if (loop_counters[0][1] >= loop_ends[0][1] - loop_steps[0][1]) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_ends[0][0] - loop_steps[0][0]) {
+            break;
           }
         }
       } else {

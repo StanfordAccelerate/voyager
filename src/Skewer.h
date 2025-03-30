@@ -7,7 +7,7 @@
 #include "ArchitectureParams.h"
 
 #ifndef PE_LATENCY
-#define PE_LATENCY 1
+#define PE_LATENCY 2
 #endif
 
 #define REPEAT_IC(x) BOOST_PP_REPEAT(IC_DIMENSION, x, 0)
@@ -57,11 +57,11 @@ SC_MODULE(SerializedSkewer) {
 
 #ifdef P8_1
   // Temporary fix for Posit8 utilization problem
-  // Need to add the latency of input conversion after read from fifo for latency matching
-  // Latency is assumed to be 1 here, but it is decided by HLS 
+  // Need to add the latency of input conversion after read from fifo for
+  // latency matching Latency is assumed to be 1 here, but it is decided by HLS
 #define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1 + 1),
 #else
-#define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1),
+#define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * PE_LATENCY + 1),
 #endif
 
   SC_CTOR(SerializedSkewer) : REPEAT_OC(FIFO_SIZE_INIT) dummy(0) {
@@ -75,7 +75,7 @@ SC_MODULE(SerializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                          \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(readFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),     \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),    \
                                             SC_CURRENT_USER_MODULE,         \
                                             BOOST_PP_CAT(readFifos, i));    \
   sensitive << clk.pos();                                                   \
@@ -154,7 +154,7 @@ SC_MODULE(MultiInputSerializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                          \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(readFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),     \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),    \
                                             SC_CURRENT_USER_MODULE,         \
                                             BOOST_PP_CAT(readFifos, i));    \
   sensitive << clk.pos();                                                   \
@@ -231,7 +231,7 @@ SC_MODULE(WeightSerializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                          \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(readFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),     \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(readFifos, i)),    \
                                             SC_CURRENT_USER_MODULE,         \
                                             BOOST_PP_CAT(readFifos, i));    \
   sensitive << clk.pos();                                                   \
@@ -306,7 +306,7 @@ SC_MODULE(DeserializedSkewer) {
 
 #define DECL_THREADS(z, i, unused)                                           \
   declare_thread_process(BOOST_PP_CAT(BOOST_PP_CAT(writeFifos, i), _handle), \
-                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(writeFifos, i)),     \
+                         BOOST_PP_STRINGIZE(BOOST_PP_CAT(writeFifos, i)),    \
                                             SC_CURRENT_USER_MODULE,          \
                                             BOOST_PP_CAT(writeFifos, i));    \
   sensitive << clk.pos();                                                    \

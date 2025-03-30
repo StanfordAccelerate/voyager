@@ -41,30 +41,13 @@ proc pre_assembly {} {
   directive set /$full_block_name_stripped/$systolic_array_name_stripped -MAP_TO_MODULE {[Block] SystolicArray.v1}
 }
 
-proc pre_architect {} {
-  global full_block_name_stripped ACC_BUF_C_DATA_REP_NAME ACCUM_DATATYPE_WIDTH OC_DIMENSION TECHNOLOGY memories SUPPORT_MX ACCUM_BUFFER_SIZE
-
-  if {$SUPPORT_MX == true} {
-    set accumulation_buffer_path "/$full_block_name_stripped/$full_block_name_stripped:process_accumulation/process_accumulation/while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME"
-  } else {
-    set accumulation_buffer_path "/$full_block_name_stripped/$full_block_name_stripped:run/run/while:accumulation_buffer.value.$ACC_BUF_C_DATA_REP_NAME"
-  }
-  directive set $accumulation_buffer_path -WORD_WIDTH [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
-
-  if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
-    set memory_width [expr $ACCUM_DATATYPE_WIDTH * $OC_DIMENSION]
-    directive set $accumulation_buffer_path:rsc -MAP_TO_MODULE [get_memory_name 0 $ACCUM_BUFFER_SIZE $memory_width]
-  }
-}
-
 proc pre_extract {} {
   global SUPPORT_MX
-  ignore_memory_precedences -from WRITE_ACC_BUFFER* -to READ_ACC_BUFFER*
-
+  if {$SUPPORT_MX == true} {
+    cycle set unscaledAccumulationChannel_delayed.Push() -from unscaledAccumulationChannel.Pop() -equal 2
+  } else {
+    cycle set inputsToSkewer_delayed.Push() -from inputsToSkewer.Pop() -equal 2
+  }
   # to prevent stuttering issues, schedule inputDin and psumIn to happen in the same cycle
   cycle set inputSkewerDin.Push() -from psumInSkewerDin.Push() -equal 0
-
-  if {$SUPPORT_MX != true} {
-    cycle set *INCR_OUT_STEP:* -from *WRITE_ACC_BUFFER:* -equal 0
-  }
 }

@@ -4,6 +4,7 @@
 #include <systemc.h>
 
 #include "DoubleBuffer.h"
+#include "DualPortDoubleBuffer.h"
 #include "InputController.h"
 #include "InputScaleController.h"
 #include "MatrixProcessor.h"
@@ -124,8 +125,24 @@ SC_MODULE(MatrixUnit) {
       CCS_INIT_S1(weightsToSystolicArray);
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
       CCS_INIT_S1(biasToSystolicArray);
-  Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>> CCS_INIT_S1(
-      outputsFromSystolicArray);
+
+  DualPortDoubleBuffer<ACCUM_BUFFER_DATATYPE, OC_DIMENSION, ACCUM_BUFFER_SIZE>
+      CCS_INIT_S1(accumulation_buffer);
+  Connections::Combinational<ac_int<16, false>>
+      accumulation_buffer_mu_read_address[2];
+  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      accumulation_buffer_mu_read_data[2];
+  Connections::Combinational<
+      BufferWriteRequest<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      accumulation_buffer_mu_write_request[2];
+  Connections::SyncChannel accumulation_buffer_mu_done[2];
+
+  Connections::In<ac_int<16, false>> accumulation_buffer_vu_read_address[2];
+  Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      accumulation_buffer_vu_read_data[2];
+  Connections::In<BufferWriteRequest<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      accumulation_buffer_vu_write_request[2];
+  Connections::SyncIn accumulation_buffer_vu_done[2];
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
   Connections::SyncOut CCS_INIT_S1(doneSignal);
@@ -237,10 +254,42 @@ SC_MODULE(MatrixUnit) {
     matrixProcessor.inputsChannel(inputsToSystolicArray);
     matrixProcessor.weightsChannel(weightsFromBuffer);
     matrixProcessor.biasChannel(biasToSystolicArray);
-    matrixProcessor.outputsChannel(outputsFromSystolicArray);
     matrixProcessor.serialParamsIn(serialMatrixParams[2]);
     matrixProcessor.startSignal(startSignal);
     matrixProcessor.doneSignal(doneSignal);
+
+    for (int i = 0; i < 2; i++) {
+      matrixProcessor.accumulation_buffer_read_address[i](
+          accumulation_buffer_mu_read_address[i]);
+      matrixProcessor.accumulation_buffer_read_data[i](
+          accumulation_buffer_mu_read_data[i]);
+      matrixProcessor.accumulation_buffer_write_request[i](
+          accumulation_buffer_mu_write_request[i]);
+      matrixProcessor.accumulation_buffer_done[i](
+          accumulation_buffer_mu_done[i]);
+    }
+
+    accumulation_buffer.clk(clk);
+    accumulation_buffer.rstn(rstn);
+
+    for (int i = 0; i < 2; i++) {
+      accumulation_buffer.read_address[i * 2](
+          accumulation_buffer_mu_read_address[i]);
+      accumulation_buffer.read_data[i * 2](accumulation_buffer_mu_read_data[i]);
+      accumulation_buffer.write_request[i * 2](
+          accumulation_buffer_mu_write_request[i]);
+      accumulation_buffer.done[i * 2](accumulation_buffer_mu_done[i]);
+    }
+
+    for (int i = 0; i < 2; i++) {
+      accumulation_buffer.read_address[i * 2 + 1](
+          accumulation_buffer_vu_read_address[i]);
+      accumulation_buffer.read_data[i * 2 + 1](
+          accumulation_buffer_vu_read_data[i]);
+      accumulation_buffer.write_request[i * 2 + 1](
+          accumulation_buffer_vu_write_request[i]);
+      accumulation_buffer.done[i * 2 + 1](accumulation_buffer_vu_done[i]);
+    }
 
 #if SUPPORT_MX
     matrixProcessor.inputScaleChannel(inputScaleFromBuffer);

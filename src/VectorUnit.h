@@ -22,7 +22,8 @@ SC_MODULE(VectorOpUnit) {
   Connections::In<VectorInstructions> CCS_INIT_S1(accumulation_inst);
   Connections::In<VectorInstructions> CCS_INIT_S1(reduction_inst);
 
-  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(systolicArrayOutput);
+  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(
+      accumulationBufferOutput);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vectorFetch0Output);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vectorFetch1Output);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vectorFetch2Output);
@@ -84,7 +85,7 @@ SC_MODULE(VectorOpUnit) {
 
   void run_vector_ops() {
     vector_op_inst.Reset();
-    systolicArrayOutput.Reset();
+    accumulationBufferOutput.Reset();
     vectorFetch0Output.Reset();
     vectorFetch1Output.Reset();
     vectorFetch2Output.Reset();
@@ -116,7 +117,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
           inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
-        Pack1D<BufferType, Width> sa_output = systolicArrayOutput.Pop();
+        Pack1D<BufferType, Width> sa_output = accumulationBufferOutput.Pop();
 
         Pack1D<VectorType, Width> temp;
         if (inst.vdequantize) {
@@ -430,7 +431,13 @@ SC_MODULE(VectorUnit) {
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
-  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(systolicArrayOutput);
+  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
+  Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
+  Connections::SyncOut accumulation_buffer_done[2];
+  Connections::Out<BufferWriteRequest<BufferType, Width>>
+      accumulation_buffer_write_request[2];
+  Connections::Combinational<Pack1D<BufferType, Width>>
+      accumulationBufferOutput;
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
   Connections::In<Pack1D<IOType, Width>> CCS_INIT_S1(vectorFetch0DataResponse);
@@ -463,7 +470,8 @@ SC_MODULE(VectorUnit) {
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
 
-  VectorFetchUnit<IOType, VectorType, ScaleType, Width, VECTOR_INPUT_DATATYPES>
+  VectorFetchUnit<IOType, VectorType, BufferType, ScaleType, Width,
+                  VECTOR_INPUT_DATATYPES>
       CCS_INIT_S1(vector_fetch);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vectorFetchParams);
 
@@ -497,8 +505,23 @@ SC_MODULE(VectorUnit) {
     vector_fetch.clk(clk);
     vector_fetch.rstn(rstn);
     vector_fetch.paramsIn(vectorFetchParams);
+    vector_fetch.accumulation_buffer_read_address[0](
+        accumulation_buffer_read_address[0]);
+    vector_fetch.accumulation_buffer_read_address[1](
+        accumulation_buffer_read_address[1]);
+    vector_fetch.accumulation_buffer_done[0](accumulation_buffer_done[0]);
+    vector_fetch.accumulation_buffer_done[1](accumulation_buffer_done[1]);
     vector_fetch.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
     vector_fetch.vectorFetch0DataResponse(vectorFetch0DataResponse);
+    vector_fetch.accumulation_buffer_read_data[0](
+        accumulation_buffer_read_data[0]);
+    vector_fetch.accumulation_buffer_read_data[1](
+        accumulation_buffer_read_data[1]);
+    vector_fetch.accumulationBufferOutput(accumulationBufferOutput);
+    vector_fetch.accumulation_buffer_write_request[0](
+        accumulation_buffer_write_request[0]);
+    vector_fetch.accumulation_buffer_write_request[1](
+        accumulation_buffer_write_request[1]);
     vector_fetch.vectorFetch0DataResponseConverted(
         vectorFetch0DataResponseConverted);
     vector_fetch.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
@@ -515,7 +538,7 @@ SC_MODULE(VectorUnit) {
     vector_op_unit.vector_op_inst(vectorOpInstructions);
     vector_op_unit.accumulation_inst(accumulationOpInstructions);
     vector_op_unit.reduction_inst(reduceOpInstructions);
-    vector_op_unit.systolicArrayOutput(systolicArrayOutput);
+    vector_op_unit.accumulationBufferOutput(accumulationBufferOutput);
     vector_op_unit.vectorFetch0Output(vectorFetch0DataResponseConverted);
     vector_op_unit.vectorFetch1Output(vectorFetch1DataResponseConverted);
     vector_op_unit.vectorFetch2Output(vectorFetch2DataResponseConverted);
