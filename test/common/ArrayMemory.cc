@@ -55,7 +55,7 @@ std::map<std::string, std::any> ArrayMemory::get_args(
   for (const auto op : op_list) {
     for (const auto [key, value] : op.kwargs()) {
       if (value.has_tensor() && value.tensor().has_memory()) {
-        spdlog::debug("Pushing tensor: {}", value.tensor().node());
+        spdlog::debug("Pushing tensor: {}\n", value.tensor().node());
         kwargs[value.tensor().node()] = read_tensor(value.tensor());
       }
     }
@@ -103,10 +103,7 @@ std::vector<std::any> ArrayMemory::get_reference_outputs(
 std::any ArrayMemory::read_tensor(const codegen::Tensor& tensor) {
   int partition = tensor.memory().partition();
 
-  int size = 1;
-  for (const auto& dim : tensor.shape()) {
-    size *= dim;
-  }
+  int size = get_size(tensor, false);
 
   if (size == 1) {  // for scalar, we get the arg from the file, not from memory
     const char* env_var = std::getenv("NETWORK");

@@ -65,8 +65,8 @@ inline long get_size(const std::vector<int>& shape) {
   return size;
 }
 
-inline long get_size(const codegen::Tensor& tensor) {
-  const auto shape = get_shape(tensor);
+inline long get_size(const codegen::Tensor& tensor, bool reshape = true) {
+  const auto shape = get_shape(tensor, reshape);
   return get_size(shape);
 }
 

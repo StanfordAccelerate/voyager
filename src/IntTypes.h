@@ -104,7 +104,9 @@ template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
           ac_q_mode Q>
 Int<W, S>::Int(
     const StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q> &other) {
-  int_val = other.float_val.template convert_to_ac_int<W, S>();
+  int_val = other.float_val
+                .template convert_to_ac_fixed<W, W, S, AC_RND_CONV, AC_SAT>()
+                .to_ac_int();
 }
 
 template <int W, bool S>

@@ -21,11 +21,11 @@ $(CODEGEN_DIR)/networks/resnet50/%/model.txt: quantized-training/test/test_codeg
 
 $(CODEGEN_DIR)/networks/mobilebert/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/mobilebert_encoder/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py mobilebert_encoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py mobilebert_encoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/bert/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
