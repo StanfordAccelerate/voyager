@@ -14,7 +14,7 @@
 
 template <typename VectorType, typename BufferType, typename ScaleType,
           int Width>
-SC_MODULE(Vectoreduce_opUnit) {
+SC_MODULE(VectorOpUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
@@ -58,7 +58,7 @@ SC_MODULE(Vectoreduce_opUnit) {
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       reduction_output_1);
 
-  SC_CTOR(Vectoreduce_opUnit) {
+  SC_CTOR(VectorOpUnit) {
     reduction_broadcaster_0.clk(clk);
     reduction_broadcaster_0.rstn(rstn);
     reduction_broadcaster_0.dataIn(broadcast_input_0);
@@ -440,7 +440,7 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
       vector_instruction);
 
-  Vectoreduce_opUnit<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
+  VectorOpUnit<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
       vector_op_unit);
 
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(vector_op_insts);
