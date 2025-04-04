@@ -47,48 +47,48 @@ void MapLayerNorm(const codegen::Operation &param,
   const auto input_memory = input.memory();
   memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
-  vector_params->addressGen0Mode = 2;
-  vector_params->vec0_broadcast = 0b010000;
-  vector_params->vector_input_0_type =
+  vector_params->addr_gen0_mode = 2;
+  vector_params->addr_gen0_broadcast = 0b010000;
+  vector_params->addr_gen0_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
   // Fetch inputs twice, once for calculating mean and once for subtracting mean
-  vector_params->addressGen0Loop[0][0] = non_reduction_loops[0];
-  vector_params->addressGen0Loop[0][1] = non_reduction_loops[1];
-  vector_params->addressGen0Loop[0][2] = non_reduction_loops[2];
-  vector_params->addressGen0Loop[1][0] = non_reduction_loops[3];
-  vector_params->addressGen0Loop[1][1] = 2;
-  vector_params->addressGen0Loop[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[0][0] = non_reduction_loops[0];
+  vector_params->addr_gen0_loops[0][1] = non_reduction_loops[1];
+  vector_params->addr_gen0_loops[0][2] = non_reduction_loops[2];
+  vector_params->addr_gen0_loops[1][0] = non_reduction_loops[3];
+  vector_params->addr_gen0_loops[1][1] = 2;
+  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
 
   // Overwrite inputs
   memory_map["outputs"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = input_memory.address();
-  vector_params->outputAddressMode = 2;
+  vector_params->output_mode = 2;
 
-  vector_params->outputLoops[0][0] = 1;
-  vector_params->outputLoops[0][1] = non_reduction_loops[0];
-  vector_params->outputLoops[0][2] = non_reduction_loops[1];
-  vector_params->outputLoops[1][0] = non_reduction_loops[2];
-  vector_params->outputLoops[1][1] = non_reduction_loops[3];
-  vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->output_loops[0][0] = 1;
+  vector_params->output_loops[0][1] = non_reduction_loops[0];
+  vector_params->output_loops[0][2] = non_reduction_loops[1];
+  vector_params->output_loops[1][0] = non_reduction_loops[2];
+  vector_params->output_loops[1][1] = non_reduction_loops[3];
+  vector_params->output_loops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(input.dtype());
 
   // Configure reduction engine
   VectorInstructions instr0_0;
-  instr0_0.instType = VectorInstructions::reduction;
-  instr0_0.rCount = outer_dim / OC_DIMENSION;
-  instr0_0.rOp = VectorInstructions::radd;
-  instr0_0.rDuplicate = 1;
-  instr0_0.rBroadcast = 1;
+  instr0_0.op_type = VectorInstructions::reduction;
+  instr0_0.reduce_count = outer_dim / OC_DIMENSION;
+  instr0_0.reduce_op = VectorInstructions::radd;
+  instr0_0.rduplicate = 1;
+  instr0_0.rbroadcast = 1;
   instr0_0.immediate0 = outer_dim / OC_DIMENSION;
   vinstr_config->inst[0] = instr0_0;
   vinstr_config->instCount[0] = 1;
 
   // Scale inputs by 1 / norm_size and send to the reduction engine
   VectorInstructions instr0_1;
-  instr0_1.instType = VectorInstructions::vector;
+  instr0_1.op_type = VectorInstructions::vector;
   instr0_1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   instr0_1.vector_op0_src1 = VectorInstructions::from_immediate_0;
   instr0_1.vector_op0 = VectorInstructions::vmult;
@@ -100,7 +100,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   // Subtract mean from tensor
   VectorInstructions instr0_2;
-  instr0_2.instType = VectorInstructions::vector;
+  instr0_2.op_type = VectorInstructions::vector;
   instr0_2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   instr0_2.vector_op0_src1 = VectorInstructions::from_reduction_0;
   instr0_2.vector_op0 = VectorInstructions::vsub;
@@ -123,50 +123,50 @@ void MapLayerNorm(const codegen::Operation &param,
 
   memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
-  vector_params->addressGen0Mode = 2;
-  vector_params->vec0_broadcast = 0b010000;
-  vector_params->vector_input_0_type =
+  vector_params->addr_gen0_mode = 2;
+  vector_params->addr_gen0_broadcast = 0b010000;
+  vector_params->addr_gen0_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
   // Fetch inputs twice, once for calculating variance and once for division
-  vector_params->addressGen0Loop[0][0] = non_reduction_loops[0];
-  vector_params->addressGen0Loop[0][1] = non_reduction_loops[1];
-  vector_params->addressGen0Loop[0][2] = non_reduction_loops[2];
-  vector_params->addressGen0Loop[1][0] = non_reduction_loops[3];
-  vector_params->addressGen0Loop[1][1] = 2;
-  vector_params->addressGen0Loop[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[0][0] = non_reduction_loops[0];
+  vector_params->addr_gen0_loops[0][1] = non_reduction_loops[1];
+  vector_params->addr_gen0_loops[0][2] = non_reduction_loops[2];
+  vector_params->addr_gen0_loops[1][0] = non_reduction_loops[3];
+  vector_params->addr_gen0_loops[1][1] = 2;
+  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
 
   // Overwrite inputs
   memory_map["outputs"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = input_memory.address();
-  vector_params->outputAddressMode = 2;
+  vector_params->output_mode = 2;
 
-  vector_params->outputLoops[0][0] = 1;
-  vector_params->outputLoops[0][1] = non_reduction_loops[0];
-  vector_params->outputLoops[0][2] = non_reduction_loops[1];
-  vector_params->outputLoops[1][0] = non_reduction_loops[2];
-  vector_params->outputLoops[1][1] = non_reduction_loops[3];
-  vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->output_loops[0][0] = 1;
+  vector_params->output_loops[0][1] = non_reduction_loops[0];
+  vector_params->output_loops[0][2] = non_reduction_loops[1];
+  vector_params->output_loops[1][0] = non_reduction_loops[2];
+  vector_params->output_loops[1][1] = non_reduction_loops[3];
+  vector_params->output_loops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(input.dtype());
 
   // Configure reduction unit
   VectorInstructions instr1_0;
-  instr1_0.instType = VectorInstructions::reduction;
-  instr1_0.rCount = outer_dim / OC_DIMENSION;
-  instr1_0.rOp = VectorInstructions::radd;
-  instr1_0.rSqrt = 1;
-  instr1_0.rReciprocal = 1;
-  instr1_0.rDuplicate = 1;
-  instr1_0.rBroadcast = 1;
+  instr1_0.op_type = VectorInstructions::reduction;
+  instr1_0.reduce_count = outer_dim / OC_DIMENSION;
+  instr1_0.reduce_op = VectorInstructions::radd;
+  instr1_0.rsqrt = 1;
+  instr1_0.rreciprocal = 1;
+  instr1_0.rduplicate = 1;
+  instr1_0.rbroadcast = 1;
   instr1_0.immediate0 = outer_dim / OC_DIMENSION;
   vinstr_config->inst[0] = instr1_0;
   vinstr_config->instCount[0] = 1;
 
   // Perform squaring and send outputs to reduction engine
   VectorInstructions instr1_1;
-  instr1_1.instType = VectorInstructions::vector;
+  instr1_1.op_type = VectorInstructions::vector;
   instr1_1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   instr1_1.vector_op2 = VectorInstructions::vsquare;
   instr1_1.vdest = VectorInstructions::to_reduce;
@@ -175,7 +175,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   // Multiply inputs with the inverse sqrt of the variance
   VectorInstructions instr1_2;
-  instr1_2.instType = VectorInstructions::vector;
+  instr1_2.op_type = VectorInstructions::vector;
   instr1_2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   instr1_2.vector_op0_src1 = VectorInstructions::from_reduction_0;
   instr1_2.vector_op2_src1 = VectorInstructions::from_immediate_1;
@@ -203,41 +203,41 @@ void MapLayerNorm(const codegen::Operation &param,
   // Fetch inputs
   memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
-  vector_params->addressGen0Mode = 2;
-  vector_params->vector_input_0_type =
+  vector_params->addr_gen0_mode = 2;
+  vector_params->addr_gen0_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
-  vector_params->addressGen0Loop[0][0] = 1;
-  vector_params->addressGen0Loop[0][1] = non_reduction_loops[0];
-  vector_params->addressGen0Loop[0][2] = non_reduction_loops[1];
-  vector_params->addressGen0Loop[1][0] = non_reduction_loops[2];
-  vector_params->addressGen0Loop[1][1] = non_reduction_loops[3];
-  vector_params->addressGen0Loop[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[0][0] = 1;
+  vector_params->addr_gen0_loops[0][1] = non_reduction_loops[0];
+  vector_params->addr_gen0_loops[0][2] = non_reduction_loops[1];
+  vector_params->addr_gen0_loops[1][0] = non_reduction_loops[2];
+  vector_params->addr_gen0_loops[1][1] = non_reduction_loops[3];
+  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
 
   // Fetch weights
   const auto weight_memory = weight.memory();
   memory_map["vector1"] = get_partition(weight_memory.partition());
   vector_params->ADDRESS_GEN1_OFFSET = weight_memory.address();
-  vector_params->addressGen1Mode = true;
-  vector_params->vec1_broadcast = 0b011;
-  vector_params->vector_input_1_type =
+  vector_params->addr_gen1_mode = true;
+  vector_params->addr_gen1_broadcast = 0b011;
+  vector_params->addr_gen1_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(weight.dtype());
 
   auto param_loops = squeeze_shape(non_reduction_loops);
   pad_shape_to_ndim(param_loops, 2);
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addressGen1InputYLoopIndex[i] = 0;
-    vector_params->addressGen1InputXLoopIndex[i] = 1;
-    vector_params->addressGen1WeightLoopIndex[i] = 2;
+    vector_params->addr_gen1_y_loop_idx[i] = 0;
+    vector_params->addr_gen1_x_loop_idx[i] = 1;
+    vector_params->addr_gen1_k_loop_idx[i] = 2;
   }
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addressGen1Loops[0][i] = 1;
+    vector_params->addr_gen1_loops[0][i] = 1;
   }
-  vector_params->addressGen1Loops[1][0] = param_loops[0];
-  vector_params->addressGen1Loops[1][1] = param_loops[1];
-  vector_params->addressGen1Loops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen1_loops[1][0] = param_loops[0];
+  vector_params->addr_gen1_loops[1][1] = param_loops[1];
+  vector_params->addr_gen1_loops[1][2] = outer_dim / OC_DIMENSION;
 
   // Fetch bias
   const bool has_bias = layer_norm_op.kwargs().contains("bias");
@@ -246,43 +246,43 @@ void MapLayerNorm(const codegen::Operation &param,
     const auto bias_memory = bias.memory();
     memory_map["vector2"] = get_partition(bias_memory.partition());
     vector_params->ADDRESS_GEN2_OFFSET = bias_memory.address();
-    vector_params->addressGen2Mode = true;
-    vector_params->vec2_broadcast = 0b011;
-    vector_params->vector_input_2_type =
+    vector_params->addr_gen2_mode = true;
+    vector_params->addr_gen2_broadcast = 0b011;
+    vector_params->addr_gen2_dtype =
         get_index_from_type_name<VECTOR_INPUT_DATATYPES>(bias.dtype());
 
     for (int i = 0; i < 2; i++) {
-      vector_params->addressGen2InputYLoopIndex[i] = 0;
-      vector_params->addressGen2InputXLoopIndex[i] = 1;
-      vector_params->addressGen2WeightLoopIndex[i] = 2;
+      vector_params->addr_gen2_y_loop_idx[i] = 0;
+      vector_params->addr_gen2_x_loop_idx[i] = 1;
+      vector_params->addr_gen2_k_loop_idx[i] = 2;
     }
 
     for (int i = 0; i < 3; i++) {
-      vector_params->addressGen2Loops[0][i] = 1;
+      vector_params->addr_gen2_loops[0][i] = 1;
     }
-    vector_params->addressGen2Loops[1][0] = param_loops[0];
-    vector_params->addressGen2Loops[1][1] = param_loops[1];
-    vector_params->addressGen2Loops[1][2] = outer_dim / OC_DIMENSION;
+    vector_params->addr_gen2_loops[1][0] = param_loops[0];
+    vector_params->addr_gen2_loops[1][1] = param_loops[1];
+    vector_params->addr_gen2_loops[1][2] = outer_dim / OC_DIMENSION;
   }
 
   const auto output_memory = output.memory();
   memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
-  vector_params->outputAddressMode = 2;
+  vector_params->output_mode = 2;
 
-  vector_params->outputLoops[0][0] = 1;
-  vector_params->outputLoops[0][1] = non_reduction_loops[0];
-  vector_params->outputLoops[0][2] = non_reduction_loops[1];
-  vector_params->outputLoops[1][0] = non_reduction_loops[2];
-  vector_params->outputLoops[1][1] = non_reduction_loops[3];
-  vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->output_loops[0][0] = 1;
+  vector_params->output_loops[0][1] = non_reduction_loops[0];
+  vector_params->output_loops[0][2] = non_reduction_loops[1];
+  vector_params->output_loops[1][0] = non_reduction_loops[2];
+  vector_params->output_loops[1][1] = non_reduction_loops[3];
+  vector_params->output_loops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // inputs x weights + bias
   VectorInstructions inst2;
-  inst2.instType = VectorInstructions::vector;
+  inst2.op_type = VectorInstructions::vector;
   inst2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst2.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   inst2.vector_op0 = VectorInstructions::vmult;

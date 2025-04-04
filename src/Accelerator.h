@@ -41,29 +41,29 @@ SC_MODULE(Accelerator) {
 
 #ifdef SIM_VectorUnit
   // clang-format off
-  CCS_DESIGN((VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE, OC_DIMENSION>)) CCS_INIT_S1(vectorUnit);
+  CCS_DESIGN((VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE, OC_DIMENSION>)) CCS_INIT_S1(vector_unit);
   // clang-format on
 #else
   VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
              OC_DIMENSION>
-      CCS_INIT_S1(vectorUnit);
+      CCS_INIT_S1(vector_unit);
 #endif
 
   Connections::In<int> CCS_INIT_S1(serialVectorParamsIn);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch0DataResponse);
+      vector_fetch_0_resp_in);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch1DataResponse);
+      vector_fetch_1_resp_in);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch2DataResponse);
+      vector_fetch_2_resp_in);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vectorFetch3DataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
+  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp_in);
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
@@ -97,24 +97,24 @@ SC_MODULE(Accelerator) {
     matrixUnit.weightScaleDataResponse(weightScaleDataResponse);
 #endif
 
-    vectorUnit.clk(clk);
-    vectorUnit.rstn(rstn);
-    vectorUnit.serialParamsIn(serialVectorParamsIn);
-    vectorUnit.systolicArrayOutput(outputsFromSystolicArray);
-    vectorUnit.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
-    vectorUnit.vectorFetch0DataResponse(vectorFetch0DataResponse);
-    vectorUnit.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
-    vectorUnit.vectorFetch1DataResponse(vectorFetch1DataResponse);
-    vectorUnit.vectorFetch2AddressRequest(vectorFetch2AddressRequest);
-    vectorUnit.vectorFetch2DataResponse(vectorFetch2DataResponse);
-    vectorUnit.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
-    vectorUnit.vectorFetch3DataResponse(vectorFetch3DataResponse);
-    vectorUnit.vector_output(vector_output);
-    vectorUnit.vector_output_address(vector_output_address);
-    vectorUnit.scalar_output(scalar_output);
-    vectorUnit.scalar_output_address(scalar_output_address);
-    vectorUnit.start(vectorUnitStartSignal);
-    vectorUnit.done(vectorUnitDoneSignal);
+    vector_unit.clk(clk);
+    vector_unit.rstn(rstn);
+    vector_unit.serial_params_in(serialVectorParamsIn);
+    vector_unit.matrix_unit_in(outputsFromSystolicArray);
+    vector_unit.vector_fetch_0_request_out(vector_fetch_0_request_out);
+    vector_unit.vector_fetch_0_response_in(vector_fetch_0_resp_in);
+    vector_unit.vector_fetch_1_request_out(vector_fetch_1_request_out);
+    vector_unit.vector_fetch_1_response_in(vector_fetch_1_resp_in);
+    vector_unit.vector_fetch_2_request_out(vector_fetch_2_request_out);
+    vector_unit.vector_fetch_2_response_in(vector_fetch_2_resp_in);
+    vector_unit.vector_fetch_3_request_out(vector_fetch_3_request_out);
+    vector_unit.vector_fetch_3_response_in(vector_fetch_3_resp_in);
+    vector_unit.vector_out(vector_output);
+    vector_unit.vector_address_out(vector_output_address);
+    vector_unit.scale_out(scalar_output);
+    vector_unit.scale_address_out(scalar_output_address);
+    vector_unit.start(vectorUnitStartSignal);
+    vector_unit.done(vectorUnitDoneSignal);
 
     SC_THREAD(run);
     sensitive << clk.pos();

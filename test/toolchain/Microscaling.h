@@ -38,55 +38,55 @@ void MapMicroscaling(const codegen::Operation &param,
   const auto input_memory = input.memory();
   memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
-  vector_params->addressGen0Mode = 1;
-  vector_params->vector_input_0_type =
+  vector_params->addr_gen0_mode = 1;
+  vector_params->addr_gen0_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
   input_shape = squeeze_shape(input_shape);
   input_shape = split_loops(input_shape, 1024);
   pad_shape_to_ndim(input_shape, 3);
 
-  vector_params->addressGen0Loop[0][0] = input_shape[0];
-  vector_params->addressGen0Loop[0][1] = input_shape[1] / block_size;
-  vector_params->addressGen0Loop[0][2] = input_shape[2] / OC_DIMENSION;
-  vector_params->addressGen0Loop[1][0] = 1;
-  vector_params->addressGen0Loop[1][1] = block_size;
-  vector_params->addressGen0Loop[1][2] = 1;
+  vector_params->addr_gen0_loops[0][0] = input_shape[0];
+  vector_params->addr_gen0_loops[0][1] = input_shape[1] / block_size;
+  vector_params->addr_gen0_loops[0][2] = input_shape[2] / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][0] = 1;
+  vector_params->addr_gen0_loops[1][1] = block_size;
+  vector_params->addr_gen0_loops[1][2] = 1;
 
-  vector_params->addressGen0InputYLoopIndex[0] = 0;
-  vector_params->addressGen0InputXLoopIndex[0] = 1;
-  vector_params->addressGen0WeightLoopIndex[0] = 2;
+  vector_params->addr_gen0_y_loop_idx[0] = 0;
+  vector_params->addr_gen0_x_loop_idx[0] = 1;
+  vector_params->addr_gen0_k_loop_idx[0] = 2;
 
   const auto output_memory = output.memory();
   memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
-  vector_params->outputAddressMode = 1;
+  vector_params->output_mode = 1;
 
-  vector_params->outputLoops[0][0] = input_shape[0];
-  vector_params->outputLoops[0][1] = input_shape[1] / block_size;
-  vector_params->outputLoops[0][2] = input_shape[2] / OC_DIMENSION;
-  vector_params->outputLoops[1][0] = 1;
-  vector_params->outputLoops[1][1] = 1;
-  vector_params->outputLoops[1][2] = 1;
+  vector_params->output_loops[0][0] = input_shape[0];
+  vector_params->output_loops[0][1] = input_shape[1] / block_size;
+  vector_params->output_loops[0][2] = input_shape[2] / OC_DIMENSION;
+  vector_params->output_loops[1][0] = 1;
+  vector_params->output_loops[1][1] = 1;
+  vector_params->output_loops[1][2] = 1;
 
-  vector_params->outputYLoopIndex[0] = 0;
-  vector_params->outputXLoopIndex[0] = 1;
-  vector_params->outputWeightLoopIndex[0] = 2;
+  vector_params->output_y_loop_idx[0] = 0;
+  vector_params->output_x_loop_idx[0] = 1;
+  vector_params->output_k_loop_idx[0] = 2;
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // perform max accumulation
   VectorInstructions vinst0;
-  vinst0.instType = VectorInstructions::accumulation;
-  vinst0.rOp = VectorInstructions::rmax;
-  vinst0.rCount = block_size;
+  vinst0.op_type = VectorInstructions::accumulation;
+  vinst0.reduce_op = VectorInstructions::rmax;
+  vinst0.reduce_count = block_size;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
   // feed accumulator
   VectorInstructions vinst1;
-  vinst1.instType = VectorInstructions::vector;
+  vinst1.op_type = VectorInstructions::vector;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vector_op1 = VectorInstructions::vabs;
   vinst1.vdest = VectorInstructions::to_accumulate;
@@ -95,7 +95,7 @@ void MapMicroscaling(const codegen::Operation &param,
 
   // read out from max accumulator and scale by 1 / quant_max
   VectorInstructions vinst2;
-  vinst2.instType = VectorInstructions::vector;
+  vinst2.op_type = VectorInstructions::vector;
   vinst2.vector_op0_src0 = VectorInstructions::from_accumulation;
   vinst2.vector_op0_src1 = VectorInstructions::from_immediate_0;
   VECTOR_DATATYPE immediate;

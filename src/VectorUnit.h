@@ -8,9 +8,9 @@
 #include "VectorOps.h"
 // clang-format on
 #include "Broadcaster.h"
+#include "OutputController.h"
 #include "ParamsDeserializer.h"
 #include "VectorFetch.h"
-#include "VectorUnitOutput.h"
 
 template <typename VectorType, typename BufferType, typename ScaleType,
           int Width>
@@ -18,21 +18,23 @@ SC_MODULE(VectorOpUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<VectorInstructions> CCS_INIT_S1(vector_op_inst);
-  Connections::In<VectorInstructions> CCS_INIT_S1(accumulation_inst);
-  Connections::In<VectorInstructions> CCS_INIT_S1(reduction_inst);
+  Connections::In<VectorInstructions> CCS_INIT_S1(vector_op_inst_in);
+  Connections::In<VectorInstructions> CCS_INIT_S1(accumulation_inst_in);
+  Connections::In<VectorInstructions> CCS_INIT_S1(reduction_inst_in);
 
-  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(systolicArrayOutput);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vectorFetch0Output);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vectorFetch1Output);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vectorFetch2Output);
+  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(matrix_unit_in);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      vector_fetch_0_data_in);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      vector_fetch_1_data_in);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      vector_fetch_2_data_in);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vectorFetch3DataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
+  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_response_in);
 
-  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_op_unit_output);
-  Connections::Out<ScaleType> CCS_INIT_S1(mx_scale_output);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_op_unit_out);
+  Connections::Out<ScaleType> CCS_INIT_S1(mx_scale_out);
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       accumulation_input);
@@ -42,31 +44,31 @@ SC_MODULE(VectorOpUnit) {
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       reduction_input);
 
-  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(reduction_broadcaster);
-  Connections::Combinational<ac_int<16, false>> broadcast_count;
+  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(reduction_broadcaster_0);
+  Connections::Combinational<ac_int<16, false>> broadcast_count_0;
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      broadcast_input);
+      broadcast_input_0);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      reduction_output);
+      reduction_output_0);
 
   Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(reduction_broadcaster_1);
-  Connections::Combinational<ac_int<16, false>> broadcast1_count;
+  Connections::Combinational<ac_int<16, false>> broadcast_count_1;
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      broadcast1_input);
+      broadcast_input_1);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       reduction_output_1);
 
   SC_CTOR(VectorOpUnit) {
-    reduction_broadcaster.clk(clk);
-    reduction_broadcaster.rstn(rstn);
-    reduction_broadcaster.dataIn(broadcast_input);
-    reduction_broadcaster.count(broadcast_count);
-    reduction_broadcaster.dataOut(reduction_output);
+    reduction_broadcaster_0.clk(clk);
+    reduction_broadcaster_0.rstn(rstn);
+    reduction_broadcaster_0.dataIn(broadcast_input_0);
+    reduction_broadcaster_0.count(broadcast_count_0);
+    reduction_broadcaster_0.dataOut(reduction_output_0);
 
     reduction_broadcaster_1.clk(clk);
     reduction_broadcaster_1.rstn(rstn);
-    reduction_broadcaster_1.dataIn(broadcast1_input);
-    reduction_broadcaster_1.count(broadcast1_count);
+    reduction_broadcaster_1.dataIn(broadcast_input_1);
+    reduction_broadcaster_1.count(broadcast_count_1);
     reduction_broadcaster_1.dataOut(reduction_output_1);
 
     SC_THREAD(run_vector_ops);
@@ -83,26 +85,27 @@ SC_MODULE(VectorOpUnit) {
   }
 
   void run_vector_ops() {
-    vector_op_inst.Reset();
-    systolicArrayOutput.Reset();
-    vectorFetch0Output.Reset();
-    vectorFetch1Output.Reset();
-    vectorFetch2Output.Reset();
-    vector_op_unit_output.Reset();
-    mx_scale_output.Reset();
+    vector_op_inst_in.Reset();
+    matrix_unit_in.Reset();
+    vector_fetch_0_data_in.Reset();
+    vector_fetch_1_data_in.Reset();
+    vector_fetch_2_data_in.Reset();
+    vector_fetch_3_request_out.Reset();
+    vector_fetch_3_response_in.Reset();
+    mx_scale_out.Reset();
+    vector_op_unit_out.Reset();
     accumulation_input.ResetWrite();
     accumulation_output.ResetRead();
     reduction_input.ResetWrite();
-    reduction_output.ResetRead();
-    vectorFetch3AddressRequest.Reset();
-    vectorFetch3DataResponse.Reset();
+    reduction_output_0.ResetRead();
+    reduction_output_1.ResetRead();
 
     wait();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode bubble
     while (true) {
-      VectorInstructions inst = vector_op_inst.Pop();
+      VectorInstructions inst = vector_op_inst_in.Pop();
 
       Pack1D<VectorType, Width> res0;
       Pack1D<VectorType, Width> res1;
@@ -118,7 +121,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
           inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
-        Pack1D<BufferType, Width> sa_output = systolicArrayOutput.Pop();
+        Pack1D<BufferType, Width> sa_output = matrix_unit_in.Pop();
 
         Pack1D<VectorType, Width> temp;
         if (inst.vdequantize) {
@@ -140,7 +143,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0 ||
           inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_0) {
-        Pack1D<VectorType, Width> temp = vectorFetch0Output.Pop();
+        Pack1D<VectorType, Width> temp = vector_fetch_0_data_in.Pop();
         if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0) {
           op0_src0 = temp;
         } else {
@@ -150,7 +153,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1 ||
           inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_1) {
-        Pack1D<VectorType, Width> temp = vectorFetch1Output.Pop();
+        Pack1D<VectorType, Width> temp = vector_fetch_1_data_in.Pop();
         if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1) {
           op0_src0 = temp;
         } else {
@@ -160,7 +163,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2 ||
           inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
-        Pack1D<VectorType, Width> temp = vectorFetch2Output.Pop();
+        Pack1D<VectorType, Width> temp = vector_fetch_2_data_in.Pop();
         if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2) {
           op2_src1 = temp;
         } else {
@@ -185,7 +188,7 @@ SC_MODULE(VectorOpUnit) {
       if (inst.vector_op0_src0 == VectorInstructions::from_reduction_0 ||
           inst.vector_op0_src1 == VectorInstructions::from_reduction_0 ||
           inst.vector_op2_src1 == VectorInstructions::from_reduction_0) {
-        Pack1D<VectorType, Width> temp = reduction_output.Pop();
+        Pack1D<VectorType, Width> temp = reduction_output_0.Pop();
         if (inst.vector_op0_src0 == VectorInstructions::from_reduction_0) {
           op0_src0 = temp;
         } else if (inst.vector_op0_src1 ==
@@ -262,9 +265,9 @@ SC_MODULE(VectorOpUnit) {
 
           ac_int<32, false> address = value.bits_rep() * 2;
           MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
-          vectorFetch3AddressRequest.Push(request);
+          vector_fetch_3_request_out.Push(request);
 
-          value.set_bits(vectorFetch3DataResponse.Pop());
+          value.set_bits(vector_fetch_3_response_in.Pop());
           res1[i] = value;
         }
       } else {
@@ -295,7 +298,7 @@ SC_MODULE(VectorOpUnit) {
           op3_src1[i] = scale;
         }
 
-        mx_scale_output.Push(scale);
+        mx_scale_out.Push(scale);
       }
 #endif
 
@@ -308,7 +311,7 @@ SC_MODULE(VectorOpUnit) {
 
       // Write outputs
       if (inst.vdest == VectorInstructions::to_output) {
-        vector_op_unit_output.Push(res3);
+        vector_op_unit_out.Push(res3);
       } else if (inst.vdest == VectorInstructions::to_reduce) {
         reduction_input.Push(res3);
       } else if (inst.vdest == VectorInstructions::to_accumulate) {
@@ -318,14 +321,14 @@ SC_MODULE(VectorOpUnit) {
   }
 
   void run_accumulation() {
-    accumulation_inst.Reset();
+    accumulation_inst_in.Reset();
     accumulation_input.ResetRead();
     accumulation_output.ResetWrite();
 
     wait();
 
     while (true) {
-      VectorInstructions inst = accumulation_inst.Pop();
+      VectorInstructions inst = accumulation_inst_in.Pop();
 
       Pack1D<VectorType, Width> outputs;
 
@@ -336,15 +339,15 @@ SC_MODULE(VectorOpUnit) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < inst.rCount; i++) {
+      for (int i = 0; i < inst.reduce_count; i++) {
         Pack1D<VectorType, Width> op = accumulation_input.Pop();
 
-        if (inst.rOp == VectorInstructions::radd) {
+        if (inst.reduce_op == VectorInstructions::radd) {
 #pragma hls_unroll yes
           for (int j = 0; j < Width; j++) {
             outputs[j] += op[j];
           }
-        } else if (inst.rOp == VectorInstructions::rmax) {
+        } else if (inst.reduce_op == VectorInstructions::rmax) {
 #pragma hls_unroll yes
           for (int j = 0; j < Width; j++) {
             outputs[j] = (outputs[j] < op[j] || i == 0) ? op[j] : outputs[j];
@@ -358,59 +361,55 @@ SC_MODULE(VectorOpUnit) {
   }
 
   void run_reduction() {
-    reduction_inst.Reset();
+    reduction_inst_in.Reset();
     reduction_input.ResetRead();
-    broadcast_input.ResetWrite();
-    broadcast_count.ResetWrite();
-    broadcast1_input.ResetWrite();
-    broadcast1_count.ResetWrite();
+    broadcast_input_0.ResetWrite();
+    broadcast_count_0.ResetWrite();
+    broadcast_input_1.ResetWrite();
+    broadcast_count_1.ResetWrite();
 
     wait();
 
     while (true) {
-      VectorInstructions inst = reduction_inst.Pop();
+      VectorInstructions inst = reduction_inst_in.Pop();
 
       Pack1D<VectorType, Width> res;
       VectorType output;
 
-      int num_outputs = inst.rDuplicate ? 1 : Width;
+      int num_outputs = inst.rduplicate ? 1 : Width;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (int i = 0; i < num_outputs; i++) {
-        for (int j = 0; j < inst.rCount; j++) {
+        for (int j = 0; j < inst.reduce_count; j++) {
           Pack1D<VectorType, Width> op = reduction_input.Pop();
 
-          if (inst.rOp == VectorInstructions::radd) {
+          if (inst.reduce_op == VectorInstructions::radd) {
             VectorType sum = treeadd(op);
             output = (j == 0) ? sum : output + sum;
-          } else if (inst.rOp == VectorInstructions::rmax) {
+          } else if (inst.reduce_op == VectorInstructions::rmax) {
             VectorType max = treemax(op);
             output = (output < max || j == 0) ? max : output;
           }
         }
 
-        if (!inst.rDuplicate) {
+        if (!inst.rduplicate) {
           res[i] = output;
         }
 
         DLOG("Reduction " << i << "/" << num_outputs << " : " << output);
       }
 
-      if (inst.rSqrt) {
+      if (inst.rsqrt) {
         output = output.sqrt();
       }
 
-      if (inst.rReciprocal) {
+      if (inst.rreciprocal) {
         output = output.reciprocal();
       }
 
-      if (inst.rMax1) {
-        output = output.max1();
-      }
-
       // Duplicate the scalar result into a vector
-      if (inst.rDuplicate) {
+      if (inst.rduplicate) {
 #pragma hls_unroll yes
         for (int i = 0; i < Width; i++) {
           res[i] = output;
@@ -418,11 +417,11 @@ SC_MODULE(VectorOpUnit) {
       }
 
       if (inst.rdest == 0) {
-        broadcast_count.Push(inst.immediate0);
-        broadcast_input.Push(res);
+        broadcast_count_0.Push(inst.immediate0);
+        broadcast_input_0.Push(res);
       } else {
-        broadcast1_count.Push(inst.immediate0);
-        broadcast1_input.Push(res);
+        broadcast_count_1.Push(inst.immediate0);
+        broadcast_input_1.Push(res);
       }
     }
   }
@@ -434,116 +433,110 @@ SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+  VectorParamsDeserializer CCS_INIT_S1(param_deserializer);
 
-  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(systolicArrayOutput);
+  Connections::In<int> CCS_INIT_S1(serial_params_in);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(vector_params);
+  Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
+      vector_instruction);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
+  VectorOpUnit<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
+      vector_op_unit);
+
+  Connections::Combinational<VectorInstructions> CCS_INIT_S1(vector_op_insts);
+  Connections::Combinational<VectorInstructions> CCS_INIT_S1(
+      accumulation_insts);
+  Connections::Combinational<VectorInstructions> CCS_INIT_S1(reduction_insts);
+
+  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(matrix_unit_in);
+
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch0DataResponse);
+      vector_fetch_0_response_in);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vectorFetch0DataResponseConverted);
+      vector_fetch_0_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch1DataResponse);
+      vector_fetch_1_response_in);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vectorFetch1DataResponseConverted);
+      vector_fetch_1_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch2DataResponse);
+      vector_fetch_2_response_in);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vectorFetch2DataResponseConverted);
+      vector_fetch_2_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vectorFetch3DataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
+  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_response_in);
 
-  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
+  Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      vector_unit_output);
+  Connections::Combinational<ScaleType> CCS_INIT_S1(mx_scale);
+
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      vector_output_address);
-  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scalar_output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      scalar_output_address);
-
-  Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_op_unit_output);
-  Connections::Combinational<ScaleType> CCS_INIT_S1(mx_scale_output);
+      vector_address_out);
+  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scale_out);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(scale_address_out);
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
 
   VectorFetchUnit<VectorType, Width, VECTOR_INPUT_DATATYPES> CCS_INIT_S1(
-      vector_fetch);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(vectorFetchParams);
+      vector_fetcher);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(vector_fetch_params);
 
-  VectorOpUnit<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
-      vector_op_unit);
-
-  VectorUnitOutput<VectorType, ScaleType, Width, OUTPUT_DATATYPES> CCS_INIT_S1(
-      vector_unit_output);
+  OutputController<VectorType, ScaleType, Width, OUTPUT_DATATYPES> CCS_INIT_S1(
+      output_controller);
   Connections::Combinational<VectorParams> CCS_INIT_S1(
-      vector_unit_output_params);
-
-  Connections::Combinational<VectorInstructions> CCS_INIT_S1(
-      vectorOpInstructions);
-  Connections::Combinational<VectorInstructions> CCS_INIT_S1(
-      accumulationOpInstructions);
-  Connections::Combinational<VectorInstructions> CCS_INIT_S1(
-      reduceOpInstructions);
-
-  VectorParamsDeserializer CCS_INIT_S1(paramsDeserializer);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(vectorParamsIn);
-  Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
-      vectorInstructionsIn);
+      output_controller_params);
 
   SC_CTOR(VectorUnit) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.vectorParamsOut(vectorParamsIn);
-    paramsDeserializer.vectorInstructionsOut(vectorInstructionsIn);
+    param_deserializer.clk(clk);
+    param_deserializer.rstn(rstn);
+    param_deserializer.serialParamsIn(serial_params_in);
+    param_deserializer.vectorParamsOut(vector_params);
+    param_deserializer.vectorInstructionsOut(vector_instruction);
 
-    vector_fetch.clk(clk);
-    vector_fetch.rstn(rstn);
-    vector_fetch.paramsIn(vectorFetchParams);
-    vector_fetch.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
-    vector_fetch.vectorFetch0DataResponse(vectorFetch0DataResponse);
-    vector_fetch.vectorFetch0DataResponseConverted(
-        vectorFetch0DataResponseConverted);
-    vector_fetch.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
-    vector_fetch.vectorFetch1DataResponse(vectorFetch1DataResponse);
-    vector_fetch.vectorFetch1DataResponseConverted(
-        vectorFetch1DataResponseConverted);
-    vector_fetch.vectorFetch2AddressRequest(vectorFetch2AddressRequest);
-    vector_fetch.vectorFetch2DataResponse(vectorFetch2DataResponse);
-    vector_fetch.vectorFetch2DataResponseConverted(
-        vectorFetch2DataResponseConverted);
+    vector_fetcher.clk(clk);
+    vector_fetcher.rstn(rstn);
+    vector_fetcher.params_in(vector_fetch_params);
+    vector_fetcher.vector_fetch_0_request_out(vector_fetch_0_request_out);
+    vector_fetcher.vector_fetch_0_resp_in(vector_fetch_0_response_in);
+    vector_fetcher.vector_fetch_0_data_out(vector_fetch_0_data);
+    vector_fetcher.vector_fetch_1_request_out(vector_fetch_1_request_out);
+    vector_fetcher.vector_fetch_1_resp_in(vector_fetch_1_response_in);
+    vector_fetcher.vector_fetch_1_data_out(vector_fetch_1_data);
+    vector_fetcher.vector_fetch_2_request_out(vector_fetch_2_request_out);
+    vector_fetcher.vector_fetch_2_resp_in(vector_fetch_2_response_in);
+    vector_fetcher.vector_fetch_2_data_out(vector_fetch_2_data);
 
     vector_op_unit.clk(clk);
     vector_op_unit.rstn(rstn);
-    vector_op_unit.vector_op_inst(vectorOpInstructions);
-    vector_op_unit.accumulation_inst(accumulationOpInstructions);
-    vector_op_unit.reduction_inst(reduceOpInstructions);
-    vector_op_unit.systolicArrayOutput(systolicArrayOutput);
-    vector_op_unit.vectorFetch0Output(vectorFetch0DataResponseConverted);
-    vector_op_unit.vectorFetch1Output(vectorFetch1DataResponseConverted);
-    vector_op_unit.vectorFetch2Output(vectorFetch2DataResponseConverted);
-    vector_op_unit.vector_op_unit_output(vector_op_unit_output);
-    vector_op_unit.mx_scale_output(mx_scale_output);
-    vector_op_unit.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
-    vector_op_unit.vectorFetch3DataResponse(vectorFetch3DataResponse);
+    vector_op_unit.vector_op_inst_in(vector_op_insts);
+    vector_op_unit.accumulation_inst_in(accumulation_insts);
+    vector_op_unit.reduction_inst_in(reduction_insts);
+    vector_op_unit.matrix_unit_in(matrix_unit_in);
+    vector_op_unit.vector_fetch_0_data_in(vector_fetch_0_data);
+    vector_op_unit.vector_fetch_1_data_in(vector_fetch_1_data);
+    vector_op_unit.vector_fetch_2_data_in(vector_fetch_2_data);
+    vector_op_unit.vector_fetch_3_request_out(vector_fetch_3_request_out);
+    vector_op_unit.vector_fetch_3_response_in(vector_fetch_3_response_in);
+    vector_op_unit.vector_op_unit_out(vector_unit_output);
+    vector_op_unit.mx_scale_out(mx_scale);
 
-    vector_unit_output.clk(clk);
-    vector_unit_output.rstn(rstn);
-    vector_unit_output.params_in(vector_unit_output_params);
-    vector_unit_output.tensor_in(vector_op_unit_output);
-    vector_unit_output.scale_in(mx_scale_output);
-    vector_unit_output.vector_out(vector_output);
-    vector_unit_output.vector_address_out(vector_output_address);
-    vector_unit_output.scale_out(scalar_output);
-    vector_unit_output.scale_address_out(scalar_output_address);
-    vector_unit_output.done(done);
+    output_controller.clk(clk);
+    output_controller.rstn(rstn);
+    output_controller.params_in(output_controller_params);
+    output_controller.vector_in(vector_unit_output);
+    output_controller.scale_in(mx_scale);
+    output_controller.vector_out(vector_out);
+    output_controller.vector_address_out(vector_address_out);
+    output_controller.scale_out(scale_out);
+    output_controller.scale_address_out(scale_address_out);
+    output_controller.done(done);
 
     SC_THREAD(read_params);
     sensitive << clk.pos();
@@ -555,51 +548,53 @@ SC_MODULE(VectorUnit) {
   }
 
   void read_params() {
-    vectorParamsIn.ResetRead();
-    vectorFetchParams.ResetWrite();
-    vector_unit_output_params.ResetWrite();
+    vector_params.ResetRead();
+    vector_fetch_params.ResetWrite();
+    output_controller_params.ResetWrite();
 
     wait();
 
     while (true) {
-      VectorParams params = vectorParamsIn.Pop();
+      VectorParams params = vector_params.Pop();
 
-      vectorFetchParams.Push(params);
-      vector_unit_output_params.Push(params);
+      vector_fetch_params.Push(params);
+      output_controller_params.Push(params);
     }
   }
 
   void send_instructions() {
-    vectorOpInstructions.ResetWrite();
-    reduceOpInstructions.ResetWrite();
-    accumulationOpInstructions.ResetWrite();
-    vectorInstructionsIn.ResetRead();
+    vector_instruction.ResetRead();
+    vector_op_insts.ResetWrite();
+    reduction_insts.ResetWrite();
+    accumulation_insts.ResetWrite();
+
     start.Reset();
 
     wait();
 
     while (true) {
-      VectorInstructionConfig instConfig = vectorInstructionsIn.Pop();
+      VectorInstructionConfig vector_inst_config = vector_instruction.Pop();
 
       start.SyncPush();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int loop = 0; loop < instConfig.instLoopCount; loop++) {
+      for (int loop = 0; loop < vector_inst_config.instLoopCount; loop++) {
         for (int i = 0; i < 8; i++) {
-          VectorInstructions inst = instConfig.inst[i];
+          VectorInstructions inst = vector_inst_config.inst[i];
 
-          for (int count = 0; count < instConfig.instCount[i]; count++) {
-            if (inst.instType == VectorInstructions::vector) {
-              vectorOpInstructions.Push(inst);
-            } else if (inst.instType == VectorInstructions::accumulation) {
-              accumulationOpInstructions.Push(inst);
+          for (int count = 0; count < vector_inst_config.instCount[i];
+               count++) {
+            if (inst.op_type == VectorInstructions::vector) {
+              vector_op_insts.Push(inst);
+            } else if (inst.op_type == VectorInstructions::accumulation) {
+              accumulation_insts.Push(inst);
             } else {
-              reduceOpInstructions.Push(inst);
+              reduction_insts.Push(inst);
             }
           }
 
-          if (i >= instConfig.instLen - 1) {
+          if (i >= vector_inst_config.instLen - 1) {
             break;
           }
         }

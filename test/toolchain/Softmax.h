@@ -40,49 +40,49 @@ void MapSoftmax(const codegen::Operation &param,
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
-  vector_params->addressGen0Mode = 2;
-  vector_params->vec0_broadcast = 0b010000;
-  vector_params->vector_input_0_type =
+  vector_params->addr_gen0_mode = 2;
+  vector_params->addr_gen0_broadcast = 0b010000;
+  vector_params->addr_gen0_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
-  vector_params->addressGen0Loop[0][0] = non_reduction_loops[0];
-  vector_params->addressGen0Loop[0][1] = non_reduction_loops[1];
-  vector_params->addressGen0Loop[0][2] = non_reduction_loops[2];
-  vector_params->addressGen0Loop[1][0] = non_reduction_loops[3];
-  vector_params->addressGen0Loop[1][1] = 3;
-  vector_params->addressGen0Loop[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[0][0] = non_reduction_loops[0];
+  vector_params->addr_gen0_loops[0][1] = non_reduction_loops[1];
+  vector_params->addr_gen0_loops[0][2] = non_reduction_loops[2];
+  vector_params->addr_gen0_loops[1][0] = non_reduction_loops[3];
+  vector_params->addr_gen0_loops[1][1] = 3;
+  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
 
   // output
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
-  vector_params->outputAddressMode = 2;
+  vector_params->output_mode = 2;
 
-  vector_params->outputLoops[0][0] = 1;
-  vector_params->outputLoops[0][1] = non_reduction_loops[0];
-  vector_params->outputLoops[0][2] = non_reduction_loops[1];
-  vector_params->outputLoops[1][0] = non_reduction_loops[2];
-  vector_params->outputLoops[1][1] = non_reduction_loops[3];
-  vector_params->outputLoops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->output_loops[0][0] = 1;
+  vector_params->output_loops[0][1] = non_reduction_loops[0];
+  vector_params->output_loops[0][2] = non_reduction_loops[1];
+  vector_params->output_loops[1][0] = non_reduction_loops[2];
+  vector_params->output_loops[1][1] = non_reduction_loops[3];
+  vector_params->output_loops[1][2] = outer_dim / OC_DIMENSION;
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // Instruction 0 - start reduction engine to calculate max
   VectorInstructions vinst0;
-  vinst0.instType = VectorInstructions::reduction;
-  vinst0.rCount = outer_dim / OC_DIMENSION;
-  vinst0.rOp = VectorInstructions::rmax;
-  vinst0.rDuplicate = 1;
+  vinst0.op_type = VectorInstructions::reduction;
+  vinst0.reduce_count = outer_dim / OC_DIMENSION;
+  vinst0.reduce_op = VectorInstructions::rmax;
+  vinst0.rduplicate = 1;
   // broadcast max over entire array, for 2 passes
-  vinst0.rBroadcast = 1;
+  vinst0.rbroadcast = 1;
   vinst0.immediate0 = 2 * outer_dim / OC_DIMENSION;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
   // Instruction 1 - send to reduction engine to calculate max
   VectorInstructions vinst1;
-  vinst1.instType = VectorInstructions::vector;
+  vinst1.op_type = VectorInstructions::vector;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst1;
@@ -90,12 +90,12 @@ void MapSoftmax(const codegen::Operation &param,
 
   // Instruction 2 - start reduction engine to calculate sum
   VectorInstructions vinst2;
-  vinst2.instType = VectorInstructions::reduction;
-  vinst2.rCount = outer_dim / OC_DIMENSION;
-  vinst2.rOp = VectorInstructions::radd;
-  vinst2.rReciprocal = 1;
-  vinst2.rDuplicate = 1;
-  vinst2.rBroadcast = 1;
+  vinst2.op_type = VectorInstructions::reduction;
+  vinst2.reduce_count = outer_dim / OC_DIMENSION;
+  vinst2.reduce_op = VectorInstructions::radd;
+  vinst2.rreciprocal = 1;
+  vinst2.rduplicate = 1;
+  vinst2.rbroadcast = 1;
   vinst2.immediate0 = outer_dim / OC_DIMENSION;
   vinst2.rdest = VectorInstructions::to_op2;
   vector_instruction_config->inst[2] = vinst2;
@@ -103,7 +103,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   // Instruction 3 - subtract max and exp, and reduce sum
   VectorInstructions vinst3;
-  vinst3.instType = VectorInstructions::vector;
+  vinst3.op_type = VectorInstructions::vector;
   vinst3.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst3.vector_op0_src1 = VectorInstructions::from_reduction_0;
   vinst3.vector_op0 = VectorInstructions::vsub;
@@ -114,7 +114,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   // Instruction 4 - subtract max and exp, and divide by reduced value
   VectorInstructions inst4;
-  inst4.instType = VectorInstructions::vector;
+  inst4.op_type = VectorInstructions::vector;
   inst4.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst4.vector_op0_src1 = VectorInstructions::from_reduction_0;
   inst4.vector_op2_src1 = VectorInstructions::from_reduction_1;

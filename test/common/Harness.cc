@@ -24,19 +24,19 @@ void register_interface(
     std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *weightAddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vectorFetch0AddressRequest,
+        *vector_fetch_0_request_out,
     std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vectorFetch0AddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vectorFetch1AddressRequest,
+        *vector_fetch_1_request_out,
     std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vectorFetch1AddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vectorFetch2AddressRequest,
+        *vector_fetch_2_request_out,
     std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *vectorFetch2AddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vectorFetch3AddressRequest,
+        *vector_fetch_3_request_out,
     std::deque<sc_lv<Wrapped<ac_int<16, false>>::width>>
         *vectorFetch3AddressResponse,
     std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
@@ -73,14 +73,14 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.weightDataResponse(weightDataResponse);
   accelerator.biasAddressRequest(biasAddressRequest);
   accelerator.biasDataResponse(biasDataResponse);
-  accelerator.vectorFetch0AddressRequest(vectorFetch0AddressRequest);
-  accelerator.vectorFetch0DataResponse(vectorFetch0DataResponse);
-  accelerator.vectorFetch1AddressRequest(vectorFetch1AddressRequest);
-  accelerator.vectorFetch1DataResponse(vectorFetch1DataResponse);
-  accelerator.vectorFetch2AddressRequest(vectorFetch2AddressRequest);
-  accelerator.vectorFetch2DataResponse(vectorFetch2DataResponse);
-  accelerator.vectorFetch3AddressRequest(vectorFetch3AddressRequest);
-  accelerator.vectorFetch3DataResponse(vectorFetch3DataResponse);
+  accelerator.vector_fetch_0_request_out(vector_fetch_0_request_out);
+  accelerator.vector_fetch_0_resp_in(vector_fetch_0_resp_in);
+  accelerator.vector_fetch_1_request_out(vector_fetch_1_request_out);
+  accelerator.vector_fetch_1_resp_in(vector_fetch_1_resp_in);
+  accelerator.vector_fetch_2_request_out(vector_fetch_2_request_out);
+  accelerator.vector_fetch_2_resp_in(vector_fetch_2_resp_in);
+  accelerator.vector_fetch_3_request_out(vector_fetch_3_request_out);
+  accelerator.vector_fetch_3_resp_in(vector_fetch_3_resp_in);
   accelerator.vector_output(vector_output);
   accelerator.vector_output_address(vector_output_address);
   accelerator.scalar_output(scalar_output);
@@ -104,14 +104,14 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
       serialMatrixParamsIn.getDataQueue(), serialVectorParamsIn.getDataQueue(),
       inputAddressRequest.getDataQueue(), inputDataResponse.getDataQueue(),
       weightAddressRequest.getDataQueue(), weightDataResponse.getDataQueue(),
-      vectorFetch0AddressRequest.getDataQueue(),
-      vectorFetch0DataResponse.getDataQueue(),
-      vectorFetch1AddressRequest.getDataQueue(),
-      vectorFetch1DataResponse.getDataQueue(),
-      vectorFetch2AddressRequest.getDataQueue(),
-      vectorFetch2DataResponse.getDataQueue(),
-      vectorFetch3AddressRequest.getDataQueue(),
-      vectorFetch3DataResponse.getDataQueue(), vector_output.getDataQueue(),
+      vector_fetch_0_request_out.getDataQueue(),
+      vector_fetch_0_resp_in.getDataQueue(),
+      vector_fetch_1_request_out.getDataQueue(),
+      vector_fetch_1_resp_in.getDataQueue(),
+      vector_fetch_2_request_out.getDataQueue(),
+      vector_fetch_2_resp_in.getDataQueue(),
+      vector_fetch_3_request_out.getDataQueue(),
+      vector_fetch_3_resp_in.getDataQueue(), vector_output.getDataQueue(),
       vector_output_address.getDataQueue(), scalar_output.getDataQueue(),
       scalar_output_address.getDataQueue());
 #endif
@@ -322,35 +322,35 @@ void Harness::sendResponseWeightScale() {
 }
 
 void Harness::readRequestVector0() {
-  readMemoryRequest(&vectorFetch0AddressRequest,
+  readMemoryRequest(&vector_fetch_0_request_out,
                     &vectorFetch0DataResponse_fifo);
 }
 void Harness::sendResponseVector0() {
-  sendMemoryResponse(&vectorFetch0DataResponse_fifo, &vectorFetch0DataResponse);
+  sendMemoryResponse(&vectorFetch0DataResponse_fifo, &vector_fetch_0_resp_in);
 }
 
 void Harness::readRequestVector1() {
-  readMemoryRequest(&vectorFetch1AddressRequest,
+  readMemoryRequest(&vector_fetch_1_request_out,
                     &vectorFetch1DataResponse_fifo);
 }
 void Harness::sendResponseVector1() {
-  sendMemoryResponse(&vectorFetch1DataResponse_fifo, &vectorFetch1DataResponse);
+  sendMemoryResponse(&vectorFetch1DataResponse_fifo, &vector_fetch_1_resp_in);
 }
 
 void Harness::readRequestVector2() {
-  readMemoryRequest(&vectorFetch2AddressRequest,
+  readMemoryRequest(&vector_fetch_2_request_out,
                     &vectorFetch2DataResponse_fifo);
 }
 void Harness::sendResponseVector2() {
-  sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vectorFetch2DataResponse);
+  sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vector_fetch_2_resp_in);
 }
 
 void Harness::readRequestVector3() {
-  readMemoryRequest(&vectorFetch3AddressRequest,
+  readMemoryRequest(&vector_fetch_3_request_out,
                     &vectorFetch3DataResponse_fifo);
 }
 void Harness::sendResponseVector3() {
-  sendMemoryResponse(&vectorFetch3DataResponse_fifo, &vectorFetch3DataResponse);
+  sendMemoryResponse(&vectorFetch3DataResponse_fifo, &vector_fetch_3_resp_in);
 }
 
 void Harness::readRequestBias() {

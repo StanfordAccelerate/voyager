@@ -2,12 +2,12 @@
 
 template <typename VectorType, typename ScaleType, int Width,
           typename... OutputTypes>
-SC_MODULE(VectorUnitOutput) {
+SC_MODULE(OutputController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(tensor_in);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_in);
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
@@ -18,7 +18,7 @@ SC_MODULE(VectorUnitOutput) {
 
   Connections::SyncOut CCS_INIT_S1(done);
 
-  SC_CTOR(VectorUnitOutput) {
+  SC_CTOR(OutputController) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -26,7 +26,7 @@ SC_MODULE(VectorUnitOutput) {
 
   void run() {
     params_in.Reset();
-    tensor_in.Reset();
+    vector_in.Reset();
     scale_in.Reset();
     vector_out.Reset();
     vector_address_out.Reset();
@@ -45,7 +45,7 @@ SC_MODULE(VectorUnitOutput) {
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
         for (int j = 0; j < 3; j++) {
-          loop_bounds[i][j] = params.outputLoops[i][j];
+          loop_bounds[i][j] = params.output_loops[i][j];
         }
       }
 
@@ -67,32 +67,32 @@ SC_MODULE(VectorUnitOutput) {
                      loop_counters[1][2] < loop_bounds[1][2];
                      loop_counters[1][2]++) {
                   ac_int<32, false> address;
-                  if (params.outputAddressMode == 1) {
+                  if (params.output_mode == 1) {
                     ac_int<11, false> x0 =
-                        loop_counters[1][params.outputXLoopIndex[1]];
+                        loop_counters[1][params.output_x_loop_idx[1]];
                     ac_int<11, false> x1 =
-                        loop_counters[0][params.outputXLoopIndex[0]];
+                        loop_counters[0][params.output_x_loop_idx[0]];
                     ac_int<11, false> y0 =
-                        loop_counters[1][params.outputYLoopIndex[1]];
+                        loop_counters[1][params.output_y_loop_idx[1]];
                     ac_int<11, false> y1 =
-                        loop_counters[0][params.outputYLoopIndex[0]];
+                        loop_counters[0][params.output_y_loop_idx[0]];
                     ac_int<11, false> k1 =
-                        loop_counters[1][params.outputWeightLoopIndex[1]];
+                        loop_counters[1][params.output_k_loop_idx[1]];
                     ac_int<11, false> k2 =
-                        loop_counters[0][params.outputWeightLoopIndex[0]];
+                        loop_counters[0][params.output_k_loop_idx[0]];
 
                     ac_int<11, false> X0 =
-                        loop_bounds[1][params.outputXLoopIndex[1]];
+                        loop_bounds[1][params.output_x_loop_idx[1]];
                     ac_int<11, false> X1 =
-                        loop_bounds[0][params.outputXLoopIndex[0]];
+                        loop_bounds[0][params.output_x_loop_idx[0]];
                     ac_int<11, false> Y0 =
-                        loop_bounds[1][params.outputYLoopIndex[1]];
+                        loop_bounds[1][params.output_y_loop_idx[1]];
                     ac_int<11, false> Y1 =
-                        loop_bounds[0][params.outputYLoopIndex[0]];
+                        loop_bounds[0][params.output_y_loop_idx[0]];
                     ac_int<11, false> K2 =
-                        loop_bounds[0][params.outputWeightLoopIndex[0]];
+                        loop_bounds[0][params.output_k_loop_idx[0]];
                     ac_int<11, false> K1 =
-                        loop_bounds[1][params.outputWeightLoopIndex[1]];
+                        loop_bounds[1][params.output_k_loop_idx[1]];
 
                     ac_int<16, false> k = k2 * K1 * Width + k1 * Width;
                     ac_int<16, false> K = K2 * K1 * Width;
@@ -109,13 +109,13 @@ SC_MODULE(VectorUnitOutput) {
                     if (params.has_attn_head_permute) {
                       address = (((k >> head_size) * X) << head_size) +
                                 (x << head_size) + (k & mask);
-                    } else if (params.CONCAT_OUTPUT) {
+                    } else if (params.has_output_permute) {
                       address = ((k >> head_size) * K) + ((y & mask) * K * 4) +
                                 (k & mask) + (y >> head_size * K / 4);
                     } else {
                       address = y * X * K + x * K + k;
                     }
-                  } else if (params.outputAddressMode == 2) {
+                  } else if (params.output_mode == 2) {
                     ac_int<11, false> loop_0 = loop_counters[0][0];
                     ac_int<11, false> loop_1 = loop_counters[0][1];
                     ac_int<11, false> loop_2 = loop_counters[0][2];
@@ -151,11 +151,11 @@ SC_MODULE(VectorUnitOutput) {
                   }
 #endif
 
-                  Pack1D<VectorType, Width> outputs = tensor_in.Pop();
+                  Pack1D<VectorType, Width> outputs = vector_in.Pop();
 
                   bool found =
                       ((get_type_index<OutputTypes, OutputTypes...>() ==
-                                params.output_types
+                                params.output_dtype
                             ? (vwrite_out<VectorType, OutputTypes, Width>(
                                    outputs, address,
                                    params.VECTOR_OUTPUT_OFFSET, vector_out,
@@ -166,7 +166,7 @@ SC_MODULE(VectorUnitOutput) {
 
 #ifndef __SYNTHESIS__
                   if (!found) {
-                    std::cerr << "Error: Index '" << params.output_types
+                    std::cerr << "Error: Index '" << params.output_dtype
                               << "' is not valid.\n";
                   }
 #endif

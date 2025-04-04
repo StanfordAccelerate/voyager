@@ -100,23 +100,22 @@ SC_MODULE(Harness) {
   CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       biasDataResponse);
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch0AddressRequest);
+  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch0DataResponse_fifo;
   CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch0DataResponse);
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch1AddressRequest);
+      vector_fetch_0_resp_in);
+  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch1DataResponse_fifo;
   CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch1DataResponse);
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch2AddressRequest);
+      vector_fetch_1_resp_in);
+  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch2DataResponse_fifo;
   CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vectorFetch2DataResponse);
+      vector_fetch_2_resp_in);
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vectorFetch3AddressRequest);
+  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
   sc_fifo<ac_int<16, false>> vectorFetch3DataResponse_fifo;
-  CombinationalInterface<ac_int<16, false>> CCS_INIT_S1(
-      vectorFetch3DataResponse);
+  CombinationalInterface<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp_in);
 
   CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_output);

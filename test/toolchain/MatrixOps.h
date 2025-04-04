@@ -21,40 +21,40 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
   vector_params->ADDRESS_GEN1_OFFSET = memory.address();
-  vector_params->addressGen1Mode = true;
-  vector_params->vec1_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
-  vector_params->vector_input_1_type =
+  vector_params->addr_gen1_mode = true;
+  vector_params->addr_gen1_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
+  vector_params->addr_gen1_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(tensor.dtype());
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
-    vector_params->addressGen1Loops[0][i] = tiling.loops[0][i];
+    vector_params->addr_gen1_loops[0][i] = tiling.loops[0][i];
   }
-  vector_params->addressGen1InputXLoopIndex[0] = tiling.x_loop_index[0];
-  vector_params->addressGen1InputYLoopIndex[0] = tiling.y_loop_index[0];
-  vector_params->addressGen1WeightLoopIndex[0] = tiling.weight_loop_index[0];
+  vector_params->addr_gen1_x_loop_idx[0] = tiling.x_loop_index[0];
+  vector_params->addr_gen1_y_loop_idx[0] = tiling.y_loop_index[0];
+  vector_params->addr_gen1_k_loop_idx[0] = tiling.weight_loop_index[0];
 
   int loop_index = 0;
   for (int i = 0; i < 6; i++) {
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
         i == tiling.y_loop_index[1]) {
-      vector_params->addressGen1Loops[1][loop_index] = tiling.loops[1][i];
+      vector_params->addr_gen1_loops[1][loop_index] = tiling.loops[1][i];
       if (i == tiling.x_loop_index[1]) {
-        vector_params->addressGen1InputXLoopIndex[1] = loop_index;
+        vector_params->addr_gen1_x_loop_idx[1] = loop_index;
       }
       if (i == tiling.y_loop_index[1]) {
-        vector_params->addressGen1InputYLoopIndex[1] = loop_index;
+        vector_params->addr_gen1_y_loop_idx[1] = loop_index;
       }
       if (i == tiling.weight_loop_index[1]) {
-        vector_params->addressGen1WeightLoopIndex[1] = loop_index;
+        vector_params->addr_gen1_k_loop_idx[1] = loop_index;
       }
       loop_index++;
     }
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->vec1_dq_scale = scale.bits_rep();
+  vector_params->addr_gen1_dq_scale = scale.bits_rep();
 }
 
 void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
@@ -68,41 +68,41 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
   vector_params->ADDRESS_GEN2_OFFSET = memory.address();
-  vector_params->addressGen2Mode = true;
-  vector_params->vec2_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
+  vector_params->addr_gen2_mode = true;
+  vector_params->addr_gen2_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
 
-  vector_params->vector_input_2_type =
+  vector_params->addr_gen2_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(tensor.dtype());
 
   // copy loop values and indices
   for (int i = 0; i < 3; i++) {
-    vector_params->addressGen2Loops[0][i] = tiling.loops[0][i];
+    vector_params->addr_gen2_loops[0][i] = tiling.loops[0][i];
   }
-  vector_params->addressGen2InputXLoopIndex[0] = tiling.x_loop_index[0];
-  vector_params->addressGen2InputYLoopIndex[0] = tiling.y_loop_index[0];
-  vector_params->addressGen2WeightLoopIndex[0] = tiling.weight_loop_index[0];
+  vector_params->addr_gen2_x_loop_idx[0] = tiling.x_loop_index[0];
+  vector_params->addr_gen2_y_loop_idx[0] = tiling.y_loop_index[0];
+  vector_params->addr_gen2_k_loop_idx[0] = tiling.weight_loop_index[0];
 
   int loop_index = 0;
   for (int i = 0; i < 6; i++) {
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
         i == tiling.y_loop_index[1]) {
-      vector_params->addressGen2Loops[1][loop_index] = tiling.loops[1][i];
+      vector_params->addr_gen2_loops[1][loop_index] = tiling.loops[1][i];
       if (i == tiling.x_loop_index[1]) {
-        vector_params->addressGen2InputXLoopIndex[1] = loop_index;
+        vector_params->addr_gen2_x_loop_idx[1] = loop_index;
       }
       if (i == tiling.y_loop_index[1]) {
-        vector_params->addressGen2InputYLoopIndex[1] = loop_index;
+        vector_params->addr_gen2_y_loop_idx[1] = loop_index;
       }
       if (i == tiling.weight_loop_index[1]) {
-        vector_params->addressGen2WeightLoopIndex[1] = loop_index;
+        vector_params->addr_gen2_k_loop_idx[1] = loop_index;
       }
       loop_index++;
     }
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->vec2_dq_scale = scale.bits_rep();
+  vector_params->addr_gen2_dq_scale = scale.bits_rep();
 }
 
 void set_immediate(const float scalar, const int stage,
@@ -353,7 +353,7 @@ void MapMatrixOperation(const Operation &operation,
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
-  vector_params->addressGen0Mode = 0;  // use matrix unit outputs
+  vector_params->addr_gen0_mode = 0;  // use matrix unit outputs
 
   codegen::Tensor output;
   if (param.has_output()) {
@@ -369,11 +369,11 @@ void MapMatrixOperation(const Operation &operation,
 
   // Set outer loops
   for (int i = 0; i < 3; i++) {
-    vector_params->outputLoops[0][i] = tiling.loops[0][i];
+    vector_params->output_loops[0][i] = tiling.loops[0][i];
   }
-  vector_params->outputYLoopIndex[0] = tiling.y_loop_index[0];
-  vector_params->outputXLoopIndex[0] = tiling.x_loop_index[0];
-  vector_params->outputWeightLoopIndex[0] = tiling.weight_loop_index[0];
+  vector_params->output_y_loop_idx[0] = tiling.y_loop_index[0];
+  vector_params->output_x_loop_idx[0] = tiling.x_loop_index[0];
+  vector_params->output_k_loop_idx[0] = tiling.weight_loop_index[0];
 
   // Set inner loops
   int outputLoopIndex = 0;
@@ -381,21 +381,21 @@ void MapMatrixOperation(const Operation &operation,
     // ignore the loops not present in outputs (reduction, fx, fy)
     if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
         i == tiling.y_loop_index[1]) {
-      vector_params->outputLoops[1][outputLoopIndex] = tiling.loops[1][i];
+      vector_params->output_loops[1][outputLoopIndex] = tiling.loops[1][i];
       if (i == tiling.y_loop_index[1]) {
-        vector_params->outputYLoopIndex[1] = outputLoopIndex;
+        vector_params->output_y_loop_idx[1] = outputLoopIndex;
       }
       if (i == tiling.x_loop_index[1]) {
-        vector_params->outputXLoopIndex[1] = outputLoopIndex;
+        vector_params->output_x_loop_idx[1] = outputLoopIndex;
       }
       if (i == tiling.weight_loop_index[1]) {
-        vector_params->outputWeightLoopIndex[1] = outputLoopIndex;
+        vector_params->output_k_loop_idx[1] = outputLoopIndex;
       }
       outputLoopIndex++;
     }
   }
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   // Transformer head permutation
@@ -412,7 +412,7 @@ void MapMatrixOperation(const Operation &operation,
 
   VectorInstructions inst;
   memset(&inst, 0, sizeof(inst));
-  inst.instType = VectorInstructions::vector;
+  inst.op_type = VectorInstructions::vector;
   inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
   inst.vdest = VectorInstructions::to_output;
 

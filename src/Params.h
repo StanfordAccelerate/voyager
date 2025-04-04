@@ -291,7 +291,7 @@ struct MatrixParams : BaseParams {
 struct VectorInstructions {
   /*
    * Vector Instruction
-   * instType determines if it's for vector or reduction unit
+   * op_type determines if it's for vector or reduction unit
    *
    * Vector Unit Pipeline Configuration
    * Reduce Unit Configuration
@@ -299,7 +299,7 @@ struct VectorInstructions {
 
 #ifndef __SYNTHESIS__
   VectorInstructions() {
-    instType = 0;
+    op_type = 0;
     vector_op0_src0 = 0;
     vector_op0_src1 = 0;
     vector_op2_src1 = 0;
@@ -309,13 +309,12 @@ struct VectorInstructions {
     vector_op2 = 0;
     vector_op3 = 0;
     vdest = 0;
-    rCount = 0;
-    rOp = 0;
-    rSqrt = 0;
-    rReciprocal = 0;
-    rMax1 = 0;
-    rDuplicate = 0;
-    rBroadcast = 0;
+    reduce_count = 0;
+    reduce_op = 0;
+    rsqrt = 0;
+    rreciprocal = 0;
+    rduplicate = 0;
+    rbroadcast = 0;
     rdest = 0;
     immediate0 = 0;
     immediate1 = 0;
@@ -324,7 +323,7 @@ struct VectorInstructions {
   }
 #endif
 
-  ac_int<2, false> instType;
+  ac_int<2, false> op_type;
   static const unsigned int vector = 0;
   static const unsigned int reduction = 1;
   static const unsigned int accumulation = 2;
@@ -372,16 +371,15 @@ struct VectorInstructions {
   static const unsigned int vdiv = 1;
   static const unsigned int vquantize_mx = 2;
 
-  ac_int<10, false> rCount;
-  ac_int<3, false> rOp;
+  ac_int<10, false> reduce_count;
+  ac_int<3, false> reduce_op;
   static const unsigned int radd = 1;
   static const unsigned int rmax = 2;
 
-  ac_int<1, false> rSqrt;
-  ac_int<1, false> rReciprocal;
-  ac_int<1, false> rMax1;
-  ac_int<1, false> rDuplicate;
-  ac_int<1, false> rBroadcast;  // broadcast by immediate0
+  ac_int<1, false> rsqrt;
+  ac_int<1, false> rreciprocal;
+  ac_int<1, false> rduplicate;
+  ac_int<1, false> rbroadcast;  // broadcast by immediate0
 
   ac_int<1, false> rdest;
   static const unsigned int to_op0 = 0;
@@ -397,12 +395,12 @@ struct VectorInstructions {
   ac_int<16, false> immediate2;
   ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 177;
+  static const unsigned int width = 176;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    m & instType;
+    m & op_type;
     m & vector_op0_src0;
     m & vector_op0_src1;
     m & vector_op2_src1;
@@ -413,13 +411,12 @@ struct VectorInstructions {
     m & vector_op1;
     m & vector_op2;
     m & vector_op3;
-    m & rCount;
-    m & rOp;
-    m & rSqrt;
-    m & rReciprocal;
-    m & rMax1;
-    m & rDuplicate;
-    m & rBroadcast;
+    m & reduce_count;
+    m & reduce_op;
+    m & rsqrt;
+    m & rreciprocal;
+    m & rduplicate;
+    m & rbroadcast;
     m & rdest;
     m & vdest;
     m & immediate0;
@@ -437,7 +434,7 @@ struct VectorInstructions {
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorInstructions& params) {
-    os << "instType: " << params.instType << std::endl;
+    os << "op_type: " << params.op_type << std::endl;
     os << "vector_op0_src0: " << params.vector_op0_src0 << std::endl;
     os << "vector_op0_src1: " << params.vector_op0_src1 << std::endl;
     os << "vector_op2_src1: " << params.vector_op2_src1 << std::endl;
@@ -448,13 +445,12 @@ struct VectorInstructions {
     os << "vector_op1: " << params.vector_op1 << std::endl;
     os << "vector_op2: " << params.vector_op2 << std::endl;
     os << "vector_op3: " << params.vector_op3 << std::endl;
-    os << "rCount: " << params.rCount << std::endl;
-    os << "rOp: " << params.rOp << std::endl;
-    os << "rSqrt: " << params.rSqrt << std::endl;
-    os << "rReciprocal: " << params.rReciprocal << std::endl;
-    os << "rMax1: " << params.rMax1 << std::endl;
-    os << "rDuplicate: " << params.rDuplicate << std::endl;
-    os << "rBroadcast: " << params.rBroadcast << std::endl;
+    os << "reduce_count: " << params.reduce_count << std::endl;
+    os << "reduce_op: " << params.reduce_op << std::endl;
+    os << "rsqrt: " << params.rsqrt << std::endl;
+    os << "rreciprocal: " << params.rreciprocal << std::endl;
+    os << "rduplicate: " << params.rduplicate << std::endl;
+    os << "rbroadcast: " << params.rbroadcast << std::endl;
     os << "rdest: " << params.rdest << std::endl;
     os << "vdest: " << params.vdest << std::endl;
     os << "immediate0: " << params.immediate0 << std::endl;
@@ -466,7 +462,7 @@ struct VectorInstructions {
 
   inline friend bool operator==(const VectorInstructions& lhs,
                                 const VectorInstructions& rhs) {
-    return lhs.instType == rhs.instType &&
+    return lhs.op_type == rhs.op_type &&
            lhs.vector_op0_src0 == rhs.vector_op0_src0 &&
            lhs.vector_op0_src1 == rhs.vector_op0_src1 &&
            lhs.vector_op2_src1 == rhs.vector_op2_src1 &&
@@ -477,10 +473,11 @@ struct VectorInstructions {
            lhs.vector_op3 == rhs.vector_op3 &&
            lhs.vdequantize == rhs.vdequantize &&
            lhs.vector_dq_scale == rhs.vector_dq_scale &&
-           lhs.rCount == rhs.rCount && lhs.rOp == rhs.rOp &&
-           lhs.rSqrt == rhs.rSqrt && lhs.rReciprocal == rhs.rReciprocal &&
-           lhs.rMax1 == rhs.rMax1 && lhs.rDuplicate == rhs.rDuplicate &&
-           lhs.rBroadcast == rhs.rBroadcast && lhs.rdest == rhs.rdest &&
+           lhs.reduce_count == rhs.reduce_count &&
+           lhs.reduce_op == rhs.reduce_op && lhs.rsqrt == rhs.rsqrt &&
+           lhs.rreciprocal == rhs.rreciprocal &&
+           lhs.rduplicate == rhs.rduplicate &&
+           lhs.rbroadcast == rhs.rbroadcast && lhs.rdest == rhs.rdest &&
            lhs.vdest == rhs.vdest && lhs.immediate0 == rhs.immediate0 &&
            lhs.immediate1 == rhs.immediate1 &&
            lhs.immediate2 == rhs.immediate2 &&
@@ -491,86 +488,85 @@ struct VectorInstructions {
 struct VectorParams : BaseParams {
 #ifndef __SYNTHESIS__
   VectorParams() {
-    addressGen0Mode = 0;
+    addr_gen0_mode = 0;
     VECTOR_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        addressGen0Loop[i][j] = 0;
+        addr_gen0_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      addressGen0InputYLoopIndex[i] = 0;
-      addressGen0InputXLoopIndex[i] = 1;
-      addressGen0WeightLoopIndex[i] = 2;
+      addr_gen0_y_loop_idx[i] = 0;
+      addr_gen0_x_loop_idx[i] = 1;
+      addr_gen0_k_loop_idx[i] = 2;
     }
-    vec0_dq_scale = 0;
-    vector_input_0_type = 0;
+    addr_gen0_dq_scale = 0;
+    addr_gen0_dtype = 0;
 
-    addressGen1Mode = 0;
+    addr_gen1_mode = 0;
     ADDRESS_GEN1_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        addressGen1Loops[i][j] = 0;
+        addr_gen1_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      addressGen1InputYLoopIndex[i] = 0;
-      addressGen1InputXLoopIndex[i] = 1;
-      addressGen1WeightLoopIndex[i] = 2;
+      addr_gen1_y_loop_idx[i] = 0;
+      addr_gen1_x_loop_idx[i] = 1;
+      addr_gen1_k_loop_idx[i] = 2;
     }
-    vec1_dq_scale = 0;
-    vector_input_1_type = 0;
+    addr_gen1_dq_scale = 0;
+    addr_gen1_dtype = 0;
 
-    addressGen2Mode = 0;
+    addr_gen2_mode = 0;
     ADDRESS_GEN2_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        addressGen2Loops[i][j] = 0;
+        addr_gen2_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      addressGen2InputYLoopIndex[i] = 0;
-      addressGen2InputXLoopIndex[i] = 1;
-      addressGen2WeightLoopIndex[i] = 2;
+      addr_gen2_y_loop_idx[i] = 0;
+      addr_gen2_x_loop_idx[i] = 1;
+      addr_gen2_k_loop_idx[i] = 2;
     }
-    vec2_dq_scale = 0;
-    vector_input_2_type = 0;
+    addr_gen2_dq_scale = 0;
+    addr_gen2_dtype = 0;
 
-    outputAddressMode = 1;
+    output_mode = 1;
     VECTOR_OUTPUT_OFFSET = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        outputLoops[i][j] = 0;
+        output_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      outputYLoopIndex[i] = 0;
-      outputXLoopIndex[i] = 1;
-      outputWeightLoopIndex[i] = 2;
+      output_y_loop_idx[i] = 0;
+      output_x_loop_idx[i] = 1;
+      output_k_loop_idx[i] = 2;
     }
-    output_scale = 0;
-    output_types = 0;
+    output_dtype = 0;
 
-    vec0_broadcast = 0;
-    vec1_broadcast = 0;
-    vec2_broadcast = 0;
+    addr_gen0_broadcast = 0;
+    addr_gen1_broadcast = 0;
+    addr_gen2_broadcast = 0;
 
     has_slicing = false;
-    vec0_dim = 0;
-    vec0_start = 0;
-    vec0_end = 0;
-    vec0_step = 0;
+    addr_gen0_dim = 0;
+    addr_gen0_start = 0;
+    addr_gen0_end = 0;
+    addr_gen0_step = 0;
 
     has_permute = false;
     for (int i = 0; i < 6; i++) {
-      vec0_dim_order[i] = i;
+      addr_gen0_dims[i] = i;
     }
 
     has_transpose = false;
 
     head_size_power_of_two = 32;
     has_attn_head_permute = false;
-    CONCAT_OUTPUT = false;
+    has_output_permute = false;
 
     quantize_output_mx = false;
     SCALE_OFFSET = 0;
@@ -578,65 +574,64 @@ struct VectorParams : BaseParams {
 #endif
 
   // Address generator 0 (vector input)
-  ac_int<2, false> addressGen0Mode;
+  ac_int<2, false> addr_gen0_mode;
   uint64_t VECTOR_OFFSET;
-  ac_int<11, false> addressGen0Loop[2][3];
-  ac_int<3, false> addressGen0InputXLoopIndex[2];
-  ac_int<3, false> addressGen0InputYLoopIndex[2];
-  ac_int<3, false> addressGen0WeightLoopIndex[2];
-  ac_int<16, false> vec0_dq_scale;
-  ac_int<2, false> vector_input_0_type;
+  ac_int<11, false> addr_gen0_loops[2][3];
+  ac_int<3, false> addr_gen0_x_loop_idx[2];
+  ac_int<3, false> addr_gen0_y_loop_idx[2];
+  ac_int<3, false> addr_gen0_k_loop_idx[2];
+  ac_int<16, false> addr_gen0_dq_scale;
+  ac_int<2, false> addr_gen0_dtype;
 
   // Address generator 1 (op0src1)
-  ac_int<2, false> addressGen1Mode;
+  ac_int<2, false> addr_gen1_mode;
   uint64_t ADDRESS_GEN1_OFFSET;
-  ac_int<11, false> addressGen1Loops[2][3];
-  ac_int<3, false> addressGen1InputXLoopIndex[2];
-  ac_int<3, false> addressGen1InputYLoopIndex[2];
-  ac_int<3, false> addressGen1WeightLoopIndex[2];
-  ac_int<16, false> vec1_dq_scale;
-  ac_int<2, false> vector_input_1_type;
+  ac_int<11, false> addr_gen1_loops[2][3];
+  ac_int<3, false> addr_gen1_x_loop_idx[2];
+  ac_int<3, false> addr_gen1_y_loop_idx[2];
+  ac_int<3, false> addr_gen1_k_loop_idx[2];
+  ac_int<16, false> addr_gen1_dq_scale;
+  ac_int<2, false> addr_gen1_dtype;
 
   // Address generator 2 (op3src1)
-  ac_int<2, false> addressGen2Mode;
+  ac_int<2, false> addr_gen2_mode;
   uint64_t ADDRESS_GEN2_OFFSET;
-  ac_int<11, false> addressGen2Loops[2][3];
-  ac_int<3, false> addressGen2InputXLoopIndex[2];
-  ac_int<3, false> addressGen2InputYLoopIndex[2];
-  ac_int<3, false> addressGen2WeightLoopIndex[2];
-  ac_int<16, false> vec2_dq_scale;
-  ac_int<2, false> vector_input_2_type;
+  ac_int<11, false> addr_gen2_loops[2][3];
+  ac_int<3, false> addr_gen2_x_loop_idx[2];
+  ac_int<3, false> addr_gen2_y_loop_idx[2];
+  ac_int<3, false> addr_gen2_k_loop_idx[2];
+  ac_int<16, false> addr_gen2_dq_scale;
+  ac_int<2, false> addr_gen2_dtype;
 
   // Output address generator
-  ac_int<2, false> outputAddressMode;
+  ac_int<2, false> output_mode;
   uint64_t VECTOR_OUTPUT_OFFSET;
-  ac_int<11, false> outputLoops[2][3];
-  ac_int<3, false> outputXLoopIndex[2];
-  ac_int<3, false> outputYLoopIndex[2];
-  ac_int<3, false> outputWeightLoopIndex[2];
-  ac_int<16, false> output_scale;
-  ac_int<2, false> output_types;
+  ac_int<11, false> output_loops[2][3];
+  ac_int<3, false> output_x_loop_idx[2];
+  ac_int<3, false> output_y_loop_idx[2];
+  ac_int<3, false> output_k_loop_idx[2];
+  ac_int<2, false> output_dtype;
 
-  ac_int<6, false> vec0_broadcast;
-  ac_int<3, false> vec1_broadcast;
-  ac_int<3, false> vec2_broadcast;
+  ac_int<6, false> addr_gen0_broadcast;
+  ac_int<3, false> addr_gen1_broadcast;
+  ac_int<3, false> addr_gen2_broadcast;
 
   // Address generator 0 slicing and reshape
   bool has_slicing;
-  ac_int<3, false> vec0_dim;
-  ac_int<11, false> vec0_start;
-  ac_int<11, false> vec0_end;
-  ac_int<11, false> vec0_step;
+  ac_int<3, false> addr_gen0_dim;
+  ac_int<11, false> addr_gen0_start;
+  ac_int<11, false> addr_gen0_end;
+  ac_int<11, false> addr_gen0_step;
 
   bool has_permute;
-  ac_int<3, false> vec0_dim_order[6];
+  ac_int<3, false> addr_gen0_dims[6];
 
   bool has_transpose;
 
   // Transformer head permutation
   ac_int<4, false> head_size_power_of_two;
   bool has_attn_head_permute;
-  bool CONCAT_OUTPUT;
+  bool has_output_permute;
 
   bool quantize_output_mx;
   uint64_t SCALE_OFFSET;
@@ -650,105 +645,104 @@ struct VectorParams : BaseParams {
   // slicing params + 18-bit reshape params + 4-bit head size + 6 boolean flags
   // + 64-bit scale offset
   static const unsigned int width =
-      4 * address_gen_width + 12 + 36 + 18 + 4 + 6 + 64;
+      4 * address_gen_width + 12 + 36 + 18 + 4 + 6 + 64 - 16;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     // Address generator 0
-    m & addressGen0Mode;
+    m & addr_gen0_mode;
     m & VECTOR_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& addressGen0Loop[i][j];
+        m& addr_gen0_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen0InputXLoopIndex[i];
+      m& addr_gen0_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen0InputYLoopIndex[i];
+      m& addr_gen0_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen0WeightLoopIndex[i];
+      m& addr_gen0_k_loop_idx[i];
     }
-    m & vec0_dq_scale;
-    m & vector_input_0_type;
+    m & addr_gen0_dq_scale;
+    m & addr_gen0_dtype;
 
     // Address generator 1
-    m & addressGen1Mode;
+    m & addr_gen1_mode;
     m & ADDRESS_GEN1_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& addressGen1Loops[i][j];
+        m& addr_gen1_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen1InputXLoopIndex[i];
+      m& addr_gen1_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen1InputYLoopIndex[i];
+      m& addr_gen1_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen1WeightLoopIndex[i];
+      m& addr_gen1_k_loop_idx[i];
     }
-    m & vec1_dq_scale;
-    m & vector_input_1_type;
+    m & addr_gen1_dq_scale;
+    m & addr_gen1_dtype;
 
     // Address generator 2
-    m & addressGen2Mode;
+    m & addr_gen2_mode;
     m & ADDRESS_GEN2_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& addressGen2Loops[i][j];
+        m& addr_gen2_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen2InputXLoopIndex[i];
+      m& addr_gen2_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen2InputYLoopIndex[i];
+      m& addr_gen2_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addressGen2WeightLoopIndex[i];
+      m& addr_gen2_k_loop_idx[i];
     }
-    m & vec2_dq_scale;
-    m & vector_input_2_type;
+    m & addr_gen2_dq_scale;
+    m & addr_gen2_dtype;
 
     // Output address generator
-    m & outputAddressMode;
+    m & output_mode;
     m & VECTOR_OUTPUT_OFFSET;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& outputLoops[i][j];
+        m& output_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& outputXLoopIndex[i];
+      m& output_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& outputYLoopIndex[i];
+      m& output_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& outputWeightLoopIndex[i];
+      m& output_k_loop_idx[i];
     }
-    m & output_scale;
-    m & output_types;
+    m & output_dtype;
 
-    m & vec0_broadcast;
-    m & vec1_broadcast;
-    m & vec2_broadcast;
+    m & addr_gen0_broadcast;
+    m & addr_gen1_broadcast;
+    m & addr_gen2_broadcast;
 
     // Slicing and reshape
     m & has_slicing;
-    m & vec0_dim;
-    m & vec0_start;
-    m & vec0_end;
-    m & vec0_step;
+    m & addr_gen0_dim;
+    m & addr_gen0_start;
+    m & addr_gen0_end;
+    m & addr_gen0_step;
 
     m & has_permute;
     for (int i = 0; i < 6; i++) {
-      m& vec0_dim_order[i];
+      m& addr_gen0_dims[i];
     }
 
     m & has_transpose;
@@ -756,7 +750,7 @@ struct VectorParams : BaseParams {
     // Transformer head permutation flags
     m & head_size_power_of_two;
     m & has_attn_head_permute;
-    m & CONCAT_OUTPUT;
+    m & has_output_permute;
 
     m & quantize_output_mx;
     m & SCALE_OFFSET;
@@ -770,111 +764,110 @@ struct VectorParams : BaseParams {
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorParams& params) {
-    os << "addressGen0Mode: " << params.addressGen0Mode << std::endl;
+    os << "addr_gen0_mode: " << params.addr_gen0_mode << std::endl;
     os << "VECTOR_OFFSET: " << params.VECTOR_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "addressGen0Loop[" << i << "][" << j
-           << "]: " << params.addressGen0Loop[i][j] << std::endl;
+        os << "addr_gen0_loops[" << i << "][" << j
+           << "]: " << params.addr_gen0_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen0InputYLoopIndex[" << i
-         << "]: " << params.addressGen0InputYLoopIndex[i] << std::endl;
+      os << "addr_gen0_y_loop_idx[" << i
+         << "]: " << params.addr_gen0_y_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen0InputXLoopIndex[" << i
-         << "]: " << params.addressGen0InputXLoopIndex[i] << std::endl;
+      os << "addr_gen0_x_loop_idx[" << i
+         << "]: " << params.addr_gen0_x_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen0WeightLoopIndex[" << i
-         << "]: " << params.addressGen0WeightLoopIndex[i] << std::endl;
+      os << "addr_gen0_k_loop_idx[" << i
+         << "]: " << params.addr_gen0_k_loop_idx[i] << std::endl;
     }
-    os << "vec0_dq_scale: " << params.vec0_dq_scale << std::endl;
-    os << "vector_input_0_type: " << params.vector_input_0_type << std::endl;
+    os << "addr_gen0_dq_scale: " << params.addr_gen0_dq_scale << std::endl;
+    os << "addr_gen0_dtype: " << params.addr_gen0_dtype << std::endl;
 
-    os << "addressGen1Mode: " << params.addressGen1Mode << std::endl;
+    os << "addr_gen1_mode: " << params.addr_gen1_mode << std::endl;
     os << "ADDRESS_GEN1_OFFSET: " << params.ADDRESS_GEN1_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "addressGen1Loops[" << i << "][" << j
-           << "]: " << params.addressGen1Loops[i][j] << std::endl;
+        os << "addr_gen1_loops[" << i << "][" << j
+           << "]: " << params.addr_gen1_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen1InputYLoopIndex[" << i
-         << "]: " << params.addressGen1InputYLoopIndex[i] << std::endl;
+      os << "addr_gen1_y_loop_idx[" << i
+         << "]: " << params.addr_gen1_y_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen1InputXLoopIndex[" << i
-         << "]: " << params.addressGen1InputXLoopIndex[i] << std::endl;
+      os << "addr_gen1_x_loop_idx[" << i
+         << "]: " << params.addr_gen1_x_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen1WeightLoopIndex[" << i
-         << "]: " << params.addressGen1WeightLoopIndex[i] << std::endl;
+      os << "addr_gen1_k_loop_idx[" << i
+         << "]: " << params.addr_gen1_k_loop_idx[i] << std::endl;
     }
-    os << "vec1_dq_scale: " << params.vec1_dq_scale << std::endl;
-    os << "vector_input_1_type: " << params.vector_input_1_type << std::endl;
+    os << "addr_gen1_dq_scale: " << params.addr_gen1_dq_scale << std::endl;
+    os << "addr_gen1_dtype: " << params.addr_gen1_dtype << std::endl;
 
-    os << "addressGen2Mode: " << params.addressGen2Mode << std::endl;
+    os << "addr_gen2_mode: " << params.addr_gen2_mode << std::endl;
     os << "ADDRESS_GEN2_OFFSET: " << params.ADDRESS_GEN2_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "addressGen2Loops[" << i << "][" << j
-           << "]: " << params.addressGen2Loops[i][j] << std::endl;
+        os << "addr_gen2_loops[" << i << "][" << j
+           << "]: " << params.addr_gen2_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen2InputYLoopIndex[" << i
-         << "]: " << params.addressGen2InputYLoopIndex[i] << std::endl;
+      os << "addr_gen2_y_loop_idx[" << i
+         << "]: " << params.addr_gen2_y_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen2InputXLoopIndex[" << i
-         << "]: " << params.addressGen2InputXLoopIndex[i] << std::endl;
+      os << "addr_gen2_x_loop_idx[" << i
+         << "]: " << params.addr_gen2_x_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addressGen2WeightLoopIndex[" << i
-         << "]: " << params.addressGen2WeightLoopIndex[i] << std::endl;
+      os << "addr_gen2_k_loop_idx[" << i
+         << "]: " << params.addr_gen2_k_loop_idx[i] << std::endl;
     }
-    os << "vec2_dq_scale: " << params.vec2_dq_scale << std::endl;
-    os << "vector_input_2_type: " << params.vector_input_2_type << std::endl;
+    os << "addr_gen2_dq_scale: " << params.addr_gen2_dq_scale << std::endl;
+    os << "addr_gen2_dtype: " << params.addr_gen2_dtype << std::endl;
 
-    os << "outputAddressMode: " << params.outputAddressMode << std::endl;
+    os << "output_mode: " << params.output_mode << std::endl;
     os << "VECTOR_OUTPUT_OFFSET: " << params.VECTOR_OUTPUT_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "outputLoops[" << i << "][" << j
-           << "]: " << params.outputLoops[i][j] << std::endl;
+        os << "output_loops[" << i << "][" << j
+           << "]: " << params.output_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "outputYLoopIndex[" << i << "]: " << params.outputYLoopIndex[i]
+      os << "output_y_loop_idx[" << i << "]: " << params.output_y_loop_idx[i]
          << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "outputXLoopIndex[" << i << "]: " << params.outputXLoopIndex[i]
+      os << "output_x_loop_idx[" << i << "]: " << params.output_x_loop_idx[i]
          << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "outputWeightLoopIndex[" << i
-         << "]: " << params.outputWeightLoopIndex[i] << std::endl;
+      os << "output_k_loop_idx[" << i << "]: " << params.output_k_loop_idx[i]
+         << std::endl;
     }
-    os << "output_scale: " << params.output_scale << std::endl;
-    os << "output_types: " << params.output_types << std::endl;
+    os << "output_dtype: " << params.output_dtype << std::endl;
 
-    os << "vec0_broadcast: " << params.vec0_broadcast << std::endl;
-    os << "vec1_broadcast: " << params.vec1_broadcast << std::endl;
-    os << "vec2_broadcast: " << params.vec2_broadcast << std::endl;
+    os << "addr_gen0_broadcast: " << params.addr_gen0_broadcast << std::endl;
+    os << "addr_gen1_broadcast: " << params.addr_gen1_broadcast << std::endl;
+    os << "addr_gen2_broadcast: " << params.addr_gen2_broadcast << std::endl;
 
     os << "has_slicing: " << params.has_slicing << std::endl;
-    os << "vec0_dim: " << params.vec0_dim << std::endl;
-    os << "vec0_start: " << params.vec0_start << std::endl;
-    os << "vec0_end: " << params.vec0_end << std::endl;
-    os << "vec0_step: " << params.vec0_step << std::endl;
+    os << "addr_gen0_dim: " << params.addr_gen0_dim << std::endl;
+    os << "addr_gen0_start: " << params.addr_gen0_start << std::endl;
+    os << "addr_gen0_end: " << params.addr_gen0_end << std::endl;
+    os << "addr_gen0_step: " << params.addr_gen0_step << std::endl;
 
     os << "has_permute: " << params.has_permute << std::endl;
     for (int i = 0; i < 6; i++) {
-      os << "vec0_dim_order[" << i << "]: " << params.vec0_dim_order[i]
+      os << "addr_gen0_dims[" << i << "]: " << params.addr_gen0_dims[i]
          << std::endl;
     }
 
@@ -884,7 +877,7 @@ struct VectorParams : BaseParams {
        << std::endl;
     os << "has_attn_head_permute: " << params.has_attn_head_permute
        << std::endl;
-    os << "CONCAT_OUTPUT: " << params.CONCAT_OUTPUT << std::endl;
+    os << "has_output_permute: " << params.has_output_permute << std::endl;
 
     os << "quantize_output_mx: " << params.quantize_output_mx << std::endl;
     os << "SCALE_OFFSET: " << params.SCALE_OFFSET << std::endl;
@@ -898,112 +891,101 @@ struct VectorParams : BaseParams {
     if (lhs.VECTOR_OFFSET != rhs.VECTOR_OFFSET) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.addressGen0Loop[i][j] != rhs.addressGen0Loop[i][j])
+        if (lhs.addr_gen0_loops[i][j] != rhs.addr_gen0_loops[i][j])
           return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.addressGen0InputXLoopIndex[i] !=
-          rhs.addressGen0InputXLoopIndex[i])
+      if (lhs.addr_gen0_x_loop_idx[i] != rhs.addr_gen0_x_loop_idx[i])
         return false;
-      if (lhs.addressGen0InputYLoopIndex[i] !=
-          rhs.addressGen0InputYLoopIndex[i])
+      if (lhs.addr_gen0_y_loop_idx[i] != rhs.addr_gen0_y_loop_idx[i])
         return false;
-      if (lhs.addressGen0WeightLoopIndex[i] !=
-          rhs.addressGen0WeightLoopIndex[i])
+      if (lhs.addr_gen0_k_loop_idx[i] != rhs.addr_gen0_k_loop_idx[i])
         return false;
     }
-    if (lhs.vec0_dq_scale != rhs.vec0_dq_scale) return false;
-    if (lhs.vector_input_0_type != rhs.vector_input_0_type) return false;
+    if (lhs.addr_gen0_dq_scale != rhs.addr_gen0_dq_scale) return false;
+    if (lhs.addr_gen0_dtype != rhs.addr_gen0_dtype) return false;
 
     // Compare Address Gen 1 members
     if (lhs.ADDRESS_GEN1_OFFSET != rhs.ADDRESS_GEN1_OFFSET) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.addressGen1Loops[i][j] != rhs.addressGen1Loops[i][j])
+        if (lhs.addr_gen1_loops[i][j] != rhs.addr_gen1_loops[i][j])
           return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.addressGen1InputXLoopIndex[i] !=
-          rhs.addressGen1InputXLoopIndex[i])
+      if (lhs.addr_gen1_x_loop_idx[i] != rhs.addr_gen1_x_loop_idx[i])
         return false;
-      if (lhs.addressGen1InputYLoopIndex[i] !=
-          rhs.addressGen1InputYLoopIndex[i])
+      if (lhs.addr_gen1_y_loop_idx[i] != rhs.addr_gen1_y_loop_idx[i])
         return false;
-      if (lhs.addressGen1WeightLoopIndex[i] !=
-          rhs.addressGen1WeightLoopIndex[i])
+      if (lhs.addr_gen1_k_loop_idx[i] != rhs.addr_gen1_k_loop_idx[i])
         return false;
     }
-    if (lhs.vec1_dq_scale != rhs.vec1_dq_scale) return false;
-    if (lhs.vector_input_1_type != rhs.vector_input_1_type) return false;
+    if (lhs.addr_gen1_dq_scale != rhs.addr_gen1_dq_scale) return false;
+    if (lhs.addr_gen1_dtype != rhs.addr_gen1_dtype) return false;
 
     // Compare Address Gen 2 members
     if (lhs.ADDRESS_GEN2_OFFSET != rhs.ADDRESS_GEN2_OFFSET) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.addressGen2Loops[i][j] != rhs.addressGen2Loops[i][j])
+        if (lhs.addr_gen2_loops[i][j] != rhs.addr_gen2_loops[i][j])
           return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.addressGen2InputXLoopIndex[i] !=
-          rhs.addressGen2InputXLoopIndex[i])
+      if (lhs.addr_gen2_x_loop_idx[i] != rhs.addr_gen2_x_loop_idx[i])
         return false;
-      if (lhs.addressGen2InputYLoopIndex[i] !=
-          rhs.addressGen2InputYLoopIndex[i])
+      if (lhs.addr_gen2_y_loop_idx[i] != rhs.addr_gen2_y_loop_idx[i])
         return false;
-      if (lhs.addressGen2WeightLoopIndex[i] !=
-          rhs.addressGen2WeightLoopIndex[i])
+      if (lhs.addr_gen2_k_loop_idx[i] != rhs.addr_gen2_k_loop_idx[i])
         return false;
     }
-    if (lhs.vec2_dq_scale != rhs.vec2_dq_scale) return false;
-    if (lhs.vector_input_2_type != rhs.vector_input_2_type) return false;
+    if (lhs.addr_gen2_dq_scale != rhs.addr_gen2_dq_scale) return false;
+    if (lhs.addr_gen2_dtype != rhs.addr_gen2_dtype) return false;
 
     // Compare output and other members
     if (lhs.VECTOR_OUTPUT_OFFSET != rhs.VECTOR_OUTPUT_OFFSET) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.outputLoops[i][j] != rhs.outputLoops[i][j]) return false;
+        if (lhs.output_loops[i][j] != rhs.output_loops[i][j]) return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.outputXLoopIndex[i] != rhs.outputXLoopIndex[i]) return false;
-      if (lhs.outputYLoopIndex[i] != rhs.outputYLoopIndex[i]) return false;
-      if (lhs.outputWeightLoopIndex[i] != rhs.outputWeightLoopIndex[i])
-        return false;
+      if (lhs.output_x_loop_idx[i] != rhs.output_x_loop_idx[i]) return false;
+      if (lhs.output_y_loop_idx[i] != rhs.output_y_loop_idx[i]) return false;
+      if (lhs.output_k_loop_idx[i] != rhs.output_k_loop_idx[i]) return false;
     }
-    if (lhs.output_scale != rhs.output_scale) return false;
-    if (lhs.output_types != rhs.output_types) return false;
+    if (lhs.output_dtype != rhs.output_dtype) return false;
 
-    if (lhs.vec0_broadcast != rhs.vec0_broadcast) return false;
-    if (lhs.vec1_broadcast != rhs.vec1_broadcast) return false;
-    if (lhs.vec2_broadcast != rhs.vec2_broadcast) return false;
+    if (lhs.addr_gen0_broadcast != rhs.addr_gen0_broadcast) return false;
+    if (lhs.addr_gen1_broadcast != rhs.addr_gen1_broadcast) return false;
+    if (lhs.addr_gen2_broadcast != rhs.addr_gen2_broadcast) return false;
 
     if (lhs.has_slicing != rhs.has_slicing) return false;
-    if (lhs.vec0_dim != rhs.vec0_dim) return false;
-    if (lhs.vec0_start != rhs.vec0_start) return false;
-    if (lhs.vec0_end != rhs.vec0_end) return false;
-    if (lhs.vec0_step != rhs.vec0_step) return false;
+    if (lhs.addr_gen0_dim != rhs.addr_gen0_dim) return false;
+    if (lhs.addr_gen0_start != rhs.addr_gen0_start) return false;
+    if (lhs.addr_gen0_end != rhs.addr_gen0_end) return false;
+    if (lhs.addr_gen0_step != rhs.addr_gen0_step) return false;
 
     if (lhs.has_permute != rhs.has_permute) return false;
     for (int i = 0; i < 6; i++) {
-      if (lhs.vec0_dim_order[i] != rhs.vec0_dim_order[i]) return false;
+      if (lhs.addr_gen0_dims[i] != rhs.addr_gen0_dims[i]) return false;
     }
 
     if (lhs.has_transpose != rhs.has_transpose) return false;
 
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
     if (lhs.has_attn_head_permute != rhs.has_attn_head_permute) return false;
-    if (lhs.CONCAT_OUTPUT != rhs.CONCAT_OUTPUT) return false;
+    if (lhs.has_output_permute != rhs.has_output_permute) return false;
 
     if (lhs.quantize_output_mx != rhs.quantize_output_mx) return false;
 
     // Compare address generation modes and pooling settings
-    if (lhs.addressGen0Mode != rhs.addressGen0Mode) return false;
-    if (lhs.addressGen1Mode != rhs.addressGen1Mode) return false;
-    if (lhs.addressGen2Mode != rhs.addressGen2Mode) return false;
-    if (lhs.outputAddressMode != rhs.outputAddressMode) return false;
+    if (lhs.addr_gen0_mode != rhs.addr_gen0_mode) return false;
+    if (lhs.addr_gen1_mode != rhs.addr_gen1_mode) return false;
+    if (lhs.addr_gen2_mode != rhs.addr_gen2_mode) return false;
+    if (lhs.output_mode != rhs.output_mode) return false;
 
     // If all members are equal, return true
     return true;
@@ -1033,7 +1015,7 @@ struct VectorInstructionConfig : BaseParams {
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     for (int j = 0; j < 8; j++) {
-      m& inst[j].instType;
+      m& inst[j].op_type;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vector_op0_src0;
@@ -1066,25 +1048,22 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].vector_op3;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rCount;
+      m& inst[j].reduce_count;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rOp;
+      m& inst[j].reduce_op;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rSqrt;
+      m& inst[j].rsqrt;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rReciprocal;
+      m& inst[j].rreciprocal;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rMax1;
+      m& inst[j].rduplicate;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rDuplicate;
-    }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].rBroadcast;
+      m& inst[j].rbroadcast;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rdest;

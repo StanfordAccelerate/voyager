@@ -24,21 +24,21 @@ void MapPoolingOperation(const codegen::Operation &param,
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->VECTOR_OFFSET = input_memory.address();
-  vector_params->addressGen0Mode = 1;
-  vector_params->vector_input_0_type =
+  vector_params->addr_gen0_mode = 1;
+  vector_params->addr_gen0_dtype =
       get_index_from_type_name<VECTOR_INPUT_DATATYPES>(input.dtype());
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addressGen0Loop[i][0] =
+    vector_params->addr_gen0_loops[i][0] =
         tiling.loops[i][tiling.weight_loop_index[i]];
-    vector_params->addressGen0Loop[i][1] =
+    vector_params->addr_gen0_loops[i][1] =
         tiling.loops[i][tiling.y_loop_index[i]];
-    vector_params->addressGen0Loop[i][2] =
+    vector_params->addr_gen0_loops[i][2] =
         tiling.loops[i][tiling.x_loop_index[i]];
 
-    vector_params->addressGen0InputXLoopIndex[i] = 2;
-    vector_params->addressGen0InputYLoopIndex[i] = 1;
-    vector_params->addressGen0WeightLoopIndex[i] = 0;
+    vector_params->addr_gen0_x_loop_idx[i] = 2;
+    vector_params->addr_gen0_y_loop_idx[i] = 1;
+    vector_params->addr_gen0_k_loop_idx[i] = 0;
   }
 
   // output
@@ -47,19 +47,19 @@ void MapPoolingOperation(const codegen::Operation &param,
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
 
   for (int i = 0; i < 3; i++) {
-    vector_params->outputLoops[0][i] = 1;
+    vector_params->output_loops[0][i] = 1;
   }
-  vector_params->outputLoops[1][0] = tiling.loops[0][tiling.y_loop_index[0]];
-  vector_params->outputLoops[1][1] = tiling.loops[0][tiling.x_loop_index[0]];
-  vector_params->outputLoops[1][2] = output_dim / (OC_DIMENSION);
+  vector_params->output_loops[1][0] = tiling.loops[0][tiling.y_loop_index[0]];
+  vector_params->output_loops[1][1] = tiling.loops[0][tiling.x_loop_index[0]];
+  vector_params->output_loops[1][2] = output_dim / (OC_DIMENSION);
 
   for (int i = 0; i < 2; i++) {
-    vector_params->outputYLoopIndex[i] = 0;
-    vector_params->outputXLoopIndex[i] = 1;
-    vector_params->outputWeightLoopIndex[i] = 2;
+    vector_params->output_y_loop_idx[i] = 0;
+    vector_params->output_x_loop_idx[i] = 1;
+    vector_params->output_k_loop_idx[i] = 2;
   }
 
-  vector_params->output_types =
+  vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   const int inst_count = tiling.loops[1][tiling.y_loop_index[1]] *
@@ -69,16 +69,16 @@ void MapPoolingOperation(const codegen::Operation &param,
 
   // perform max/sum accumulation
   VectorInstructions vinst0;
-  vinst0.instType = VectorInstructions::accumulation;
-  vinst0.rOp =
+  vinst0.op_type = VectorInstructions::accumulation;
+  vinst0.reduce_op =
       is_max_pool ? VectorInstructions::rmax : VectorInstructions::radd;
-  vinst0.rCount = inst_count;
+  vinst0.reduce_count = inst_count;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
   // feed accumulator
   VectorInstructions vinst1;
-  vinst1.instType = VectorInstructions::vector;
+  vinst1.op_type = VectorInstructions::vector;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vdest = VectorInstructions::to_accumulate;
   vector_instruction_config->inst[1] = vinst1;
@@ -86,7 +86,7 @@ void MapPoolingOperation(const codegen::Operation &param,
 
   // read out from the accumulator and write out
   VectorInstructions vinst2;
-  vinst2.instType = VectorInstructions::vector;
+  vinst2.op_type = VectorInstructions::vector;
   vinst2.vector_op0_src0 = VectorInstructions::from_accumulation;
   vinst2.vdest = VectorInstructions::to_output;
 
