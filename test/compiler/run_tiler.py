@@ -72,8 +72,8 @@ class RuntimeCalculator:
         input_buffer_loading_size = 1
         for loop in input_relevant_loops:
             input_buffer_loading_size *= mapping.loop_blockings[loop][1]
-        # currently assume that the input buffer is loaded in one cycle
-        input_buffer_loading_time = 1
+        # currently assume that each value in the input buffer is loaded in one cycle
+        input_buffer_loading_time = input_buffer_loading_size
 
         weight_relevant_loops = [
             interstellar.le.IC,
@@ -84,8 +84,8 @@ class RuntimeCalculator:
         weight_buffer_loading_size = 1
         for loop in weight_relevant_loops:
             weight_buffer_loading_size *= mapping.loop_blockings[loop][1]
-        # currently assume that the weight buffer is loaded in one cycle
-        weight_buffer_loading_time = 1
+        # currently assume that each value in the weight buffer is loaded in one cycle
+        weight_buffer_loading_time = weight_buffer_loading_size
 
         # assume that writing out from accumulation buffer will not stall the system
         l1_time = max(
@@ -97,7 +97,12 @@ class RuntimeCalculator:
             l2_blocks *= mapping.loop_blockings[i][2]
 
         # assumes 3 level memory hierarchy
-        total_time = l2_blocks * l1_time
+        total_time = (
+            # initial buffer loading time
+            max(input_buffer_loading_time, weight_buffer_loading_time)
+            + l2_blocks * l1_time
+        )
+
         return total_time
 
 
