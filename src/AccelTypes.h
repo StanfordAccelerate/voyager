@@ -627,13 +627,15 @@ template <typename T, size_t Width>
 struct BufferWriteRequest {
   ac_int<16, false> address;
   Pack1D<T, Width> data;
+  bool last;
 
-  static const unsigned int width = 16 + Pack1D<T, Width>::width;
+  static const unsigned int width = 16 + Pack1D<T, Width>::width + 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
     m & address;
     m & data;
+    m & last;
   }
 
   inline friend void sc_trace(sc_trace_file *tf,
@@ -641,19 +643,89 @@ struct BufferWriteRequest {
                               const std::string &name) {
     sc_trace(tf, bufWrite.address, name + ".address");
     sc_trace(tf, bufWrite.data, name + ".data");
+    sc_trace(tf, bufWrite.last, name + ".last");
   }
 
   inline friend std::ostream &operator<<(ostream &os,
                                          const BufferWriteRequest &bufWrite) {
     os << bufWrite.address << " ";
     os << bufWrite.data << " ";
+    os << bufWrite.last << " ";
 
     return os;
   }
 
   inline friend bool operator==(const BufferWriteRequest &lhs,
                                 const BufferWriteRequest &rhs) {
-    return lhs.address == rhs.address && lhs.data == rhs.data;
+    return lhs.address == rhs.address && lhs.data == rhs.data &&
+           lhs.last == rhs.last;
+  }
+};
+
+struct BufferReadRequest {
+  ac_int<16, false> address;
+  bool last;
+
+  static const unsigned int width = 16 + 1;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m & address;
+    m & last;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf,
+                              const BufferReadRequest &bufRead,
+                              const std::string &name) {
+    sc_trace(tf, bufRead.address, name + ".address");
+    sc_trace(tf, bufRead.last, name + ".last");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os,
+                                         const BufferReadRequest &bufRead) {
+    os << bufRead.address << " ";
+    os << bufRead.last << " ";
+
+    return os;
+  }
+
+  inline friend bool operator==(const BufferReadRequest &lhs,
+                                const BufferReadRequest &rhs) {
+    return lhs.address == rhs.address && lhs.last == rhs.last;
+  }
+};
+
+template <typename T, size_t Width>
+struct BufferReadResponse {
+  Pack1D<T, Width> data;
+  bool last;
+
+  static const unsigned int width = Pack1D<T, Width>::width + 1;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m & data;
+    m & last;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf,
+                              const BufferReadResponse &bufWrite,
+                              const std::string &name) {
+    sc_trace(tf, bufWrite.data, name + ".data");
+    sc_trace(tf, bufWrite.last, name + ".last");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os,
+                                         const BufferReadResponse &bufWrite) {
+    os << bufWrite.data << " ";
+    os << bufWrite.last << " ";
+
+    return os;
+  }
+
+  inline friend bool operator==(const BufferReadResponse &lhs,
+                                const BufferReadResponse &rhs) {
+    return lhs.data == rhs.data && lhs.last == rhs.last;
   }
 };
 

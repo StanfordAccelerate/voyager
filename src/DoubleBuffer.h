@@ -18,13 +18,8 @@ SC_MODULE(DoubleBuffer) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<BufferWriteRequest<DTYPE, WIDTH> > writeRequest[2];
-  Connections::In<ac_int<32, false> > writeControl[2];
-
-  Connections::Combinational<Pack1D<DTYPE, WIDTH> > readData[2];
-  Connections::In<ac_int<16, false> > readAddress[2];
-  Connections::In<ac_int<32, false> > readControl[2];
-
-  Connections::Combinational<ac_int<32, false> > outputControl[2];
+  Connections::In<BufferReadRequest> readAddress[2];
+  Connections::Combinational<BufferReadResponse<DTYPE, WIDTH> > readData[2];
   Connections::Out<Pack1D<DTYPE, WIDTH> > CCS_INIT_S1(output);
 
 #ifndef __SYNTHESIS__
@@ -49,25 +44,23 @@ SC_MODULE(DoubleBuffer) {
 #endif
   }
 
-  void mem0Run() {
-    writeRequest[0].Reset();
-    writeControl[0].Reset();
-
-    readData[0].ResetWrite();
-    readAddress[0].Reset();
-    readControl[0].Reset();
-
-    outputControl[0].ResetWrite();
+  template <int port>
+  void mem_run() {
+    writeRequest[port].Reset();
+    readData[port].ResetWrite();
+    readAddress[port].Reset();
 
     wait();
 
-    while (true) {
-      ac_int<32, false> wsize = writeControl[0].Pop();
-
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < wsize; i++) {
-        BufferWriteRequest<DTYPE, WIDTH> req = writeRequest[0].Pop();
+    while (true) {
+      bool done = false;
+      while (!done) {
+        BufferWriteRequest<DTYPE, WIDTH> req = writeRequest[port].Pop();
+        if (req.last) {
+          done = true;
+        }
 
         ac_int<16, false> address = req.address;
 
@@ -79,99 +72,49 @@ SC_MODULE(DoubleBuffer) {
 #endif
 
         Pack1D<DTYPE, WIDTH> data = req.data;
-        mem0[address] = data;
 
-        if (i >= wsize - 1) {
-          break;
-        }
-      }
-
-      ac_int<32, false> rsize = readControl[0].Pop();
-#ifndef __SYNTHESIS__
-      accessCounter->increment(name(), rsize * WIDTH);
-#endif
-      outputControl[0].Push(rsize);
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < rsize; i++) {
-        ac_int<16, false> address = readAddress[0].Pop();
-        Pack1D<DTYPE, WIDTH> data;
-
-        if (address != 0xFFFF) {
-          data = mem0[address];
+        if constexpr (port == 0) {
+          mem0[address] = data;
         } else {
-#pragma hls_unroll yes
-          for (int j = 0; j < WIDTH; j++) {
-            data[j].set_zero();
-          }
-        }
-        readData[0].Push(data);
-
-        if (i >= rsize - 1) {
-          break;
+          mem1[address] = data;
         }
       }
-    }
-  }
 
-  void mem1Run() {
-    writeRequest[1].Reset();
-    writeControl[1].Reset();
-
-    readData[1].ResetWrite();
-    readAddress[1].Reset();
-    readControl[1].Reset();
-
-    outputControl[1].ResetWrite();
-
-    wait();
-
-    while (true) {
-      ac_int<32, false> wsize = writeControl[1].Pop();
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < wsize; i++) {
-        BufferWriteRequest<DTYPE, WIDTH> req = writeRequest[1].Pop();
-
+      done = false;
+      while (!done) {
+        BufferReadRequest req = readAddress[port].Pop();
         ac_int<16, false> address = req.address;
-
-        Pack1D<DTYPE, WIDTH> data = req.data;
-        mem1[address] = data;
-
-        if (i >= wsize - 1) {
-          break;
+        if (req.last) {
+          done = true;
         }
-      }
 
-      ac_int<32, false> rsize = readControl[1].Pop();
 #ifndef __SYNTHESIS__
-      accessCounter->increment(name(), rsize * WIDTH);
+        accessCounter->increment(name(), WIDTH);
 #endif
-      outputControl[1].Push(rsize);
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < rsize; i++) {
-        ac_int<16, false> address = readAddress[1].Pop();
-        Pack1D<DTYPE, WIDTH> data;
+
+        BufferReadResponse<DTYPE, WIDTH> response;
+        response.last = req.last;
 
         if (address != 0xFFFF) {
-          data = mem1[address];
+          if constexpr (port == 0) {
+            response.data = mem0[address];
+          } else {
+            response.data = mem1[address];
+          }
         } else {
 #pragma hls_unroll yes
           for (int j = 0; j < WIDTH; j++) {
-            data[j].set_zero();
+            response.data[j].set_zero();
           }
         }
-
-        readData[1].Push(data);
-
-        if (i >= rsize - 1) {
-          break;
-        }
+        readData[port].Push(response);
       }
     }
   }
+
+  void mem0Run() { mem_run<0>(); }
+
+  void mem1Run() { mem_run<1>(); }
 
   void outputData() {
     bool bankSel = 0;
@@ -179,24 +122,20 @@ SC_MODULE(DoubleBuffer) {
 
     readData[0].ResetRead();
     readData[1].ResetRead();
-    outputControl[0].ResetRead();
-    outputControl[1].ResetRead();
 
     wait();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      ac_int<32, false> size = outputControl[bankSel].Pop();
-
-      for (int i = 0; i < size; i++) {
-        output.Push(readData[bankSel].Pop());
-
-        if (i >= size - 1) {
-          break;
+      bool done = false;
+      while (!done) {
+        BufferReadResponse<DTYPE, WIDTH> response = readData[bankSel].Pop();
+        if (response.last) {
+          done = true;
         }
+        output.Push(response.data);
       }
-
       bankSel = !bankSel;
     }
   }

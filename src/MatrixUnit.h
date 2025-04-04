@@ -41,9 +41,7 @@ SC_MODULE(MatrixUnit) {
       inputDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, IC_DIMENSION>>
       inputBufferWriteReq[2];
-  Connections::Combinational<ac_int<32, false>> inputBufferWriteControl[2];
-  Connections::Combinational<ac_int<16, false>> inputBufferReadAddress[2];
-  Connections::Combinational<ac_int<32, false>> inputBufferReadControl[2];
+  Connections::Combinational<BufferReadRequest> inputBufferReadAddress[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, IC_DIMENSION>> CCS_INIT_S1(
       inputsToWindowBuffer);
 
@@ -57,9 +55,7 @@ SC_MODULE(MatrixUnit) {
       inputScaleDataResponse);
   Connections::Combinational<BufferWriteRequest<SCALE_DATATYPE, 1>>
       inputScaleWriteRequest[2];
-  Connections::Combinational<ac_int<32, false>> inputScaleWriteControl[2];
-  Connections::Combinational<ac_int<16, false>> inputScaleReadAddress[2];
-  Connections::Combinational<ac_int<32, false>> inputScaleReadControl[2];
+  Connections::Combinational<BufferReadRequest> inputScaleReadAddress[2];
   Connections::Combinational<Pack1D<SCALE_DATATYPE, 1>> CCS_INIT_S1(
       inputScaleFromBuffer);
 #endif
@@ -84,9 +80,7 @@ SC_MODULE(MatrixUnit) {
       biasDataResponse);
   Connections::Combinational<BufferWriteRequest<INPUT_DATATYPE, OC_DIMENSION>>
       weightBufferWriteReq[2];
-  Connections::Combinational<ac_int<32, false>> weightBufferWriteControl[2];
-  Connections::Combinational<ac_int<16, false>> weightBufferReadAddress[2];
-  Connections::Combinational<ac_int<32, false>> weightBufferReadControl[2];
+  Connections::Combinational<BufferReadRequest> weightBufferReadAddress[2];
   Connections::Combinational<Pack1D<INPUT_DATATYPE, OC_DIMENSION>> CCS_INIT_S1(
       weightsFromBuffer);
 
@@ -101,9 +95,7 @@ SC_MODULE(MatrixUnit) {
       weightScaleDataResponse);
   Connections::Combinational<BufferWriteRequest<SCALE_DATATYPE, OC_DIMENSION>>
       weightScaleWriteRequest[2];
-  Connections::Combinational<ac_int<32, false>> weightScaleWriteControl[2];
-  Connections::Combinational<ac_int<16, false>> weightScaleReadAddress[2];
-  Connections::Combinational<ac_int<32, false>> weightScaleReadControl[2];
+  Connections::Combinational<BufferReadRequest> weightScaleReadAddress[2];
   Connections::Combinational<Pack1D<SCALE_DATATYPE, OC_DIMENSION>> CCS_INIT_S1(
       weightScaleFromBuffer);
 #endif
@@ -167,14 +159,10 @@ SC_MODULE(MatrixUnit) {
     inputBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
       inputController.writeRequest[i](inputBufferWriteReq[i]);
-      inputController.writeControl[i](inputBufferWriteControl[i]);
       inputController.readAddress[i](inputBufferReadAddress[i]);
-      inputController.readControl[i](inputBufferReadControl[i]);
 
       inputBuffer.writeRequest[i](inputBufferWriteReq[i]);
-      inputBuffer.writeControl[i](inputBufferWriteControl[i]);
       inputBuffer.readAddress[i](inputBufferReadAddress[i]);
-      inputBuffer.readControl[i](inputBufferReadControl[i]);
     }
     inputBuffer.output(inputsToWindowBuffer);
 
@@ -189,14 +177,10 @@ SC_MODULE(MatrixUnit) {
     inputScaleBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
       inputScaleController.writeRequest[i](inputScaleWriteRequest[i]);
-      inputScaleController.writeControl[i](inputScaleWriteControl[i]);
       inputScaleController.readAddress[i](inputScaleReadAddress[i]);
-      inputScaleController.readControl[i](inputScaleReadControl[i]);
 
       inputScaleBuffer.writeRequest[i](inputScaleWriteRequest[i]);
-      inputScaleBuffer.writeControl[i](inputScaleWriteControl[i]);
       inputScaleBuffer.readAddress[i](inputScaleReadAddress[i]);
-      inputScaleBuffer.readControl[i](inputScaleReadControl[i]);
     }
     inputScaleBuffer.output(inputScaleFromBuffer);
 #endif
@@ -215,14 +199,10 @@ SC_MODULE(MatrixUnit) {
     weightBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
       weightController.writeRequest[i](weightBufferWriteReq[i]);
-      weightController.writeControl[i](weightBufferWriteControl[i]);
       weightController.readAddress[i](weightBufferReadAddress[i]);
-      weightController.readControl[i](weightBufferReadControl[i]);
 
       weightBuffer.writeRequest[i](weightBufferWriteReq[i]);
-      weightBuffer.writeControl[i](weightBufferWriteControl[i]);
       weightBuffer.readAddress[i](weightBufferReadAddress[i]);
-      weightBuffer.readControl[i](weightBufferReadControl[i]);
     }
     weightBuffer.output(weightsFromBuffer);
 
@@ -237,14 +217,10 @@ SC_MODULE(MatrixUnit) {
     weightScaleBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
       weightScaleController.writeRequest[i](weightScaleWriteRequest[i]);
-      weightScaleController.writeControl[i](weightScaleWriteControl[i]);
       weightScaleController.readAddress[i](weightScaleReadAddress[i]);
-      weightScaleController.readControl[i](weightScaleReadControl[i]);
 
       weightScaleBuffer.writeRequest[i](weightScaleWriteRequest[i]);
-      weightScaleBuffer.writeControl[i](weightScaleWriteControl[i]);
       weightScaleBuffer.readAddress[i](weightScaleReadAddress[i]);
-      weightScaleBuffer.readControl[i](weightScaleReadControl[i]);
     }
     weightScaleBuffer.output(weightScaleFromBuffer);
 #endif

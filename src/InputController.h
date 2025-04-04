@@ -17,9 +17,7 @@ SC_MODULE(InputController) {
   Connections::In<Pack1D<Input, NRows> > CCS_INIT_S1(dataResponse);
 
   Connections::Out<BufferWriteRequest<Input, NRows> > writeRequest[2];
-  Connections::Out<ac_int<32, false> > writeControl[2];
-  Connections::Out<ac_int<16, false> > readAddress[2];
-  Connections::Out<ac_int<32, false> > readControl[2];
+  Connections::Out<BufferReadRequest> readAddress[2];
 
   Connections::In<Pack1D<Input, NRows> > CCS_INIT_S1(windowBufferIn);
   Connections::Out<Pack1D<Input, NRows> > CCS_INIT_S1(windowBufferOut);
@@ -330,8 +328,6 @@ SC_MODULE(InputController) {
     writerParams.ResetRead();
     transposeOut.ResetRead();
 
-    writeControl[0].Reset();
-    writeControl[1].Reset();
     writeRequest[0].Reset();
     writeRequest[1].Reset();
 
@@ -441,8 +437,6 @@ SC_MODULE(InputController) {
                      2 * boundaryWords);  // 2 extra writes for padding
               }
 
-              writeControl[bankSel].Push(total_writes);
-
               // inner memory
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
@@ -525,6 +519,13 @@ SC_MODULE(InputController) {
                           BufferWriteRequest<Input, NRows> req;
                           req.address = address;
                           req.data = data;
+                          req.last =
+                              loop_counters[1][5] == loop_bounds[1][5] - 1 &&
+                              loop_counters[1][4] == loop_bounds[1][4] - 1 &&
+                              loop_counters[1][3] == loop_bounds[1][3] - 1 &&
+                              loop_counters[1][2] == loop_bounds[1][2] - 1 &&
+                              loop_counters[1][1] == loop_bounds[1][1] - 1 &&
+                              loop_counters[1][0] == loop_bounds[1][0] - 1;
                           writeRequest[bankSel].Push(req);
 
                           if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
@@ -574,8 +575,6 @@ SC_MODULE(InputController) {
   void reader() {
     readerParams.ResetRead();
 
-    readControl[0].Reset();
-    readControl[1].Reset();
     readAddress[0].Reset();
     readAddress[1].Reset();
 
@@ -648,7 +647,6 @@ SC_MODULE(InputController) {
                   loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
                   loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
 
-              readControl[bankSel].Push(total_reads);
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -702,7 +700,17 @@ SC_MODULE(InputController) {
                             }
                           }
 
-                          readAddress[bankSel].Push(address);
+                          BufferReadRequest req;
+                          req.address = address;
+                          req.last =
+                              loop_counters[1][5] == loop_bounds[1][5] - 1 &&
+                              loop_counters[1][4] == loop_bounds[1][4] - 1 &&
+                              loop_counters[1][3] == loop_bounds[1][3] - 1 &&
+                              loop_counters[1][2] == loop_bounds[1][2] - 1 &&
+                              loop_counters[1][1] == loop_bounds[1][1] - 1 &&
+                              loop_counters[1][0] == loop_bounds[1][0] - 1;
+
+                          readAddress[bankSel].Push(req);
 
                           if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                             break;

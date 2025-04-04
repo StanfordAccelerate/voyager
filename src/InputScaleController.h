@@ -17,9 +17,7 @@ SC_MODULE(InputScaleController) {
   Connections::In<Pack1D<Input, 1> > CCS_INIT_S1(dataResponse);
 
   Connections::Out<BufferWriteRequest<Scale, 1> > writeRequest[2];
-  Connections::Out<ac_int<32, false> > writeControl[2];
-  Connections::Out<ac_int<16, false> > readAddress[2];
-  Connections::Out<ac_int<32, false> > readControl[2];
+  Connections::Out<BufferReadRequest> readAddress[2];
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
@@ -295,8 +293,6 @@ SC_MODULE(InputScaleController) {
   void writer() {
     writerParams.ResetRead();
     dataResponse.Reset();
-    writeControl[0].Reset();
-    writeControl[1].Reset();
     writeRequest[0].Reset();
     writeRequest[1].Reset();
 
@@ -380,24 +376,6 @@ SC_MODULE(InputScaleController) {
                 loop_bounds[1][params.inputXLoopIndex[1]] += FX - 1;
                 loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
               }
-
-              // TODO: make this dynamic
-              ac_int<32, false> total_writes;
-              if (!params.is_replication) {
-                total_writes =
-                    (loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-                     loop_bounds[1][3] * loop_bounds[1][4]) *
-                    loop_bounds[1][5];
-              } else {
-                // 2 extra writes for padding
-                total_writes = loop_bounds[1][0] * loop_bounds[1][1] *
-                                   loop_bounds[1][2] * loop_bounds[1][3] *
-                                   loop_bounds[1][4] * STRIDE * X0 /
-                                   packingFactor +
-                               2;
-              }
-              // CCS_LOG("total_writes: " << total_writes);
-              writeControl[bankSel].Push(total_writes);
 
               // inner memory
 #pragma hls_pipeline_init_interval 1
@@ -493,6 +471,13 @@ SC_MODULE(InputScaleController) {
                           BufferWriteRequest<Scale, 1> req;
                           req.address = address;
                           req.data = data;
+                          req.last =
+                              loop_counters[1][5] == loop_bounds[1][5] - 1 &&
+                              loop_counters[1][4] == loop_bounds[1][4] - 1 &&
+                              loop_counters[1][3] == loop_bounds[1][3] - 1 &&
+                              loop_counters[1][2] == loop_bounds[1][2] - 1 &&
+                              loop_counters[1][1] == loop_bounds[1][1] - 1 &&
+                              loop_counters[1][0] == loop_bounds[1][0] - 1;
                           writeRequest[bankSel].Push(req);
                           // CCS_LOG("pushing write request: " << address);
 
@@ -543,8 +528,6 @@ SC_MODULE(InputScaleController) {
   void reader() {
     readerParams.ResetRead();
 
-    readControl[0].Reset();
-    readControl[1].Reset();
     readAddress[0].Reset();
     readAddress[1].Reset();
 
@@ -598,10 +581,10 @@ SC_MODULE(InputScaleController) {
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              int total_reads = loop_bounds[1][0] * loop_bounds[1][1] *
-                                loop_bounds[1][2] * loop_bounds[1][3] *
-                                loop_bounds[1][4] * loop_bounds[1][5];
-              readControl[bankSel].Push(total_reads);
+              // int total_reads = loop_bounds[1][0] * loop_bounds[1][1] *
+              //                   loop_bounds[1][2] * loop_bounds[1][3] *
+              //                   loop_bounds[1][4] * loop_bounds[1][5];
+              // readControl[bankSel].Push(total_reads);
               // inner memory
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
@@ -654,7 +637,16 @@ SC_MODULE(InputScaleController) {
                             }
                           }
 
-                          readAddress[bankSel].Push(address);
+                          BufferReadRequest req;
+                          req.address = address;
+                          req.last =
+                              loop_counters[1][5] == loop_bounds[1][5] - 1 &&
+                              loop_counters[1][4] == loop_bounds[1][4] - 1 &&
+                              loop_counters[1][3] == loop_bounds[1][3] - 1 &&
+                              loop_counters[1][2] == loop_bounds[1][2] - 1 &&
+                              loop_counters[1][1] == loop_bounds[1][1] - 1 &&
+                              loop_counters[1][0] == loop_bounds[1][0] - 1;
+                          readAddress[bankSel].Push(req);
 
                           if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                             break;
