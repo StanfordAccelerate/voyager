@@ -494,7 +494,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         subprocess.run(
             [
                 "python",
-                "test/compiler/run_compiler.py",
+                "quantized-training/test/test_codegen.py",
                 model,
                 "--model_name_or_path",
                 model_path,
@@ -556,7 +556,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     accuracy_regex = "Accuracy: \d+\/\d+ \((\d+\.+\d+)%\)"
     with open(f"{output_folder}/{model}_{dataset}.log", "r") as logfile:
         text = logfile.read()
-    final_accuracy = re.findall(accuracy_regex, text)[-1]
+    final_accuracy = float(re.findall(accuracy_regex, text)[-1])
 
     print(f"Final accuracy: {final_accuracy}%")
 
@@ -567,6 +567,15 @@ def run_accuracy(model, dataset, num_processes, output_folder):
 
     # dump dataframe to pickle
     df.to_pickle(f"{output_folder}/test_results.pkl")
+
+    if model == "resnet18":
+        return final_accuracy >= 70.0
+    elif model == "resnet50":
+        return final_accuracy >= 60.0
+    elif model == "mobilebert" and dataset == "sst2":
+        return final_accuracy >= 90.0
+    else:
+        return True
 
 
 def main():
@@ -645,8 +654,7 @@ def main():
     elif args.sims == "gold_model":
         success = run_gold_model_tests(layers, args.num_processes, results_folder)
     elif args.sims == "accuracy":
-        run_accuracy(args.models, args.dataset, args.num_processes, results_folder)
-        success = True
+        success = run_accuracy(args.models, args.dataset, args.num_processes, results_folder)
     else:
         raise ValueError("Invalid simulation type")
 

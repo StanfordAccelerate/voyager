@@ -123,13 +123,21 @@ void Simulation::load_data() {
   const auto operations = network->get_operations(tests, false);
 
   for (const auto& [key, dataloader] : dataLoaders) {
-    dataloader->load_inputs(operations.front().param, data_dir);
-    dataloader->load_outputs(operations.back().param, data_dir);
+    // Load the inputs to the entire model first, e.g. attention mask
+    for (const auto& tensor : network->model.inputs()) {
+      dataloader->load_tensor(tensor, data_dir);
+    }
 
     for (const auto& tensor : network->model.parameters()) {
-      bool has_transpose = tensor.shape(0) != num_classes;
+      bool has_transpose =
+          tensor.shape(0) != num_classes &&
+          tensor.node().find("_param_constant") != std::string::npos;
       dataloader->load_tensor(tensor, data_dir, has_transpose);
     }
+
+    // Load the layer's input and output last
+    dataloader->load_inputs(operations.front().param, data_dir);
+    dataloader->load_outputs(operations.back().param, data_dir);
   }
 
   spdlog::info("Data loaded successfully\n");
