@@ -3,23 +3,20 @@
 
 #if defined(P8_1)
 
-using P8 = Posit<8, 1>;
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
-
-#define INPUT_DATATYPE P8
-#define WEIGHT_DATATYPE P8
-#define ACCUM_DATATYPE F16
+#define INPUT_DATATYPE DataTypes::posit8
+#define WEIGHT_DATATYPE DataTypes::posit8
+#define ACCUM_DATATYPE DataTypes::bfloat16
 #define VECTOR_DATATYPE ACCUM_DATATYPE
+
+#define SA_INPUT_TYPE INPUT_DATATYPE::decoded
+#define SA_WEIGHT_TYPE WEIGHT_DATATYPE::decoded
 
 #elif defined(E4M3)
 
-using F8 = StdFloat<3, 4, false, true, AC_RND_CONV>;
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
-
-#define INPUT_DATATYPE F8
-#define WEIGHT_DATATYPE F8
-#define ACCUM_DATATYPE F16
-#define VECTOR_DATATYPE F16
+#define INPUT_DATATYPE DataTypes::e4m3
+#define WEIGHT_DATATYPE DataTypes::e4m3
+#define ACCUM_DATATYPE DataTypes::bfloat16
+#define VECTOR_DATATYPE DataTypes::bfloat16
 
 #elif defined(E4M3_NS)
 
@@ -53,13 +50,10 @@ using F16 = StdFloat<7, 8, true, false, AC_RND_CONV>;
 
 #elif defined(E5M2)
 
-using F8 = StdFloat<2, 5>;
-using F16 = StdFloat<7, 8>;
-
-#define INPUT_DATATYPE F8
-#define WEIGHT_DATATYPE F8
-#define ACCUM_DATATYPE F16
-#define VECTOR_DATATYPE F16
+#define INPUT_DATATYPE DataTypes::e5m2
+#define WEIGHT_DATATYPE DataTypes::e5m2
+#define ACCUM_DATATYPE DataTypes::bfloat16
+#define VECTOR_DATATYPE DataTypes::bfloat16
 
 #elif defined(HYBRID_FP8)
 
@@ -75,25 +69,21 @@ using F9 = StdFloat<3, 5>;
 
 #elif defined(BF16)
 
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
-
-#define INPUT_DATATYPE F16
-#define WEIGHT_DATATYPE F16
-#define ACCUM_DATATYPE F16
-#define VECTOR_DATATYPE F16
+#define INPUT_DATATYPE DataTypes::bfloat16
+#define WEIGHT_DATATYPE DataTypes::bfloat16
+#define ACCUM_DATATYPE DataTypes::bfloat16
+#define VECTOR_DATATYPE DataTypes::bfloat16
 
 #elif defined(FP32)
 
-using F32 = StdFloat<23, 8, false, true, AC_RND_CONV>;
-
-#define INPUT_DATATYPE F32
-#define WEIGHT_DATATYPE F32
-#define ACCUM_DATATYPE F32
-#define VECTOR_DATATYPE F32
+#define INPUT_DATATYPE DataTypes::float32
+#define WEIGHT_DATATYPE DataTypes::float32
+#define ACCUM_DATATYPE DataTypes::float32
+#define VECTOR_DATATYPE DataTypes::float32
 
 #elif defined(INT8)
 
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+using F16 = DataTypes::bfloat16;
 
 #define INPUT_DATATYPE DataTypes::int8
 #define WEIGHT_DATATYPE DataTypes::int8
@@ -102,7 +92,7 @@ using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
 
 #elif defined(INT8_32)
 
-using F16 = StdFloat<7, 8, false, true, AC_RND_CONV>;
+using F16 = DataTypes::bfloat16;
 
 #define INPUT_DATATYPE DataTypes::int8
 #define WEIGHT_DATATYPE DataTypes::int8

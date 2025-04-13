@@ -74,7 +74,7 @@ SC_MODULE(MatrixUnit) {
       CCS_INIT_S1(weightController);
 #endif
 
-  DoubleBuffer<WEIGHT_BUFFER_SIZE, INPUT_BUFFER_WIDTH> CCS_INIT_S1(
+  DoubleBuffer<WEIGHT_BUFFER_SIZE, WEIGHT_BUFFER_WIDTH> CCS_INIT_S1(
       weightBuffer);
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(weightDataResponse);
