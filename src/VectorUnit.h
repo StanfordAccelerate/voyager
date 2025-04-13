@@ -334,7 +334,7 @@ SC_MODULE(VectorOpUnit) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < Width; i++) {
-        outputs[i].set_zero();
+        outputs[i] = VectorType::zero();
       }
 
 #pragma hls_pipeline_init_interval 1

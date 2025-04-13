@@ -229,7 +229,7 @@ void Harness::readMemoryRequest(
 
     uint64_t base_address = request.address;
     int total_bytes = request.burst_size;
-    int num_words = total_bytes / num_bytes;
+    int num_words = (total_bytes + num_bytes - 1) / num_bytes;
 
     accessCounter->increment(std::string(name()), total_bytes);
 
@@ -482,8 +482,6 @@ void Harness::sendParams() {
     }
 
 #ifdef SOC_COSIM
-    // copy_output(sramMemory, sizeof(INPUT_DATATYPE) * 2 * 1024 * 1024,
-    //             sizeof(INPUT_DATATYPE));
     syscDone = true;
 #endif
   }

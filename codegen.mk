@@ -25,15 +25,19 @@ $(CODEGEN_DIR)/networks/mobilebert/%/model.txt: quantized-training/test/test_cod
 
 $(CODEGEN_DIR)/networks/mobilebert_encoder/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py mobilebert_encoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --remove_duplicate > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/bert/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py bert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
 
-$(CODEGEN_DIR)/networks/llama/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/llama_prefill/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llama_decoder $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate --qscheme q_0 &> $(dir $@)codegen.log
+
+$(CODEGEN_DIR)/networks/llama_decode/%/model.txt: quantized-training/test/test_codegen.py
+	mkdir -p $(dir $@)
+	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate --qscheme q_0 &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)networks/vit/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)

@@ -3,7 +3,7 @@
 
 #define NO_SYSC
 // clang-format off
-#include "DataTypes.h"
+#include "src/datatypes/DataTypes.h"
 // clang-format on
 #include "src/ArchitectureParams.h"
 
@@ -45,34 +45,33 @@ class Checker {
   std::deque<T> *reference;
 };
 
+template <typename Input, typename Weight, typename Psum, int NRows, int NCols>
 class PEChecker {
  public:
   PEChecker() {
-    for (int i = 0; i < IC_DIMENSION * OC_DIMENSION; i++) {
-      checkers[i] = new Checker<
-          std::tuple<INPUT_DATATYPE, INPUT_DATATYPE, ACCUM_DATATYPE> >();
+    for (int i = 0; i < NRows * NCols; i++) {
+      checkers[i] = new Checker<std::tuple<Input, Weight, Psum> >();
     }
   }
 
   ~PEChecker() {
-    for (int i = 0; i < IC_DIMENSION * OC_DIMENSION; i++) {
+    for (int i = 0; i < NRows * NCols; i++) {
       delete checkers[i];
     }
   }
 
-  void add_reference(int pe_num, INPUT_DATATYPE input, INPUT_DATATYPE weight,
-                     ACCUM_DATATYPE accum) {
+  void add_reference(int pe_num, Input input, Weight weight, Psum accum) {
     checkers[pe_num]->add_reference(std::make_tuple(input, weight, accum));
   }
 
-  void check_reference(int pe_num, INPUT_DATATYPE input, INPUT_DATATYPE weight,
-                       ACCUM_DATATYPE accum) {
+  void check_reference(int pe_num, Input input, Weight weight, Psum accum) {
     checkers[pe_num]->check_reference(std::make_tuple(input, weight, accum));
   }
 
  private:
-  Checker<std::tuple<INPUT_DATATYPE, INPUT_DATATYPE, ACCUM_DATATYPE> >
-      *checkers[IC_DIMENSION * OC_DIMENSION];
+  Checker<std::tuple<Input, Weight, Psum> > *checkers[NRows * NCols];
 };
 
-extern PEChecker pe_checker;
+extern PEChecker<SA_INPUT_TYPE, SA_WEIGHT_TYPE, ACCUM_DATATYPE, IC_DIMENSION,
+                 OC_DIMENSION>
+    pe_checker;

@@ -7,6 +7,26 @@
 DataLoader::DataLoader(ArrayMemory* memory, bool is_dut, bool is_cnn)
     : memory(memory), is_dut(is_dut), is_cnn(is_cnn) {}
 
+template <typename T>
+bool write_data(ArrayMemory* memory, uint64_t offset, int partition,
+                int address, float value, std::string dtype) {
+  if (dtype == DataTypes::TypeName<T>::name()) {
+    memory->write_data_to_memory<T>(offset, partition, address, value);
+    return true;
+  }
+  return false;
+}
+
+template <typename... Ts>
+void write_data_helper(ArrayMemory* memory, uint64_t offset, int partition,
+                       int address, float value, std::string dtype) {
+  bool matched =
+      (write_data<Ts>(memory, offset, partition, address, value, dtype) || ...);
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + dtype);
+  }
+}
+
 void DataLoader::load_tensor(const codegen::Tensor& tensor,
                              std::string data_dir, bool transpose,
                              bool replication) {
@@ -53,29 +73,8 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
 
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
-    if (tensor.dtype() == "int8") {
-      memory->write_data_to_memory<DataTypes::int8>(offset, partition, address,
-                                                    *it);
-    } else if (tensor.dtype() == "bfloat16") {
-      memory->write_data_to_memory<DataTypes::bfloat16>(offset, partition,
-                                                        address, *it);
-    } else if (tensor.dtype() == "int24") {
-      memory->write_data_to_memory<DataTypes::int24>(offset, partition, address,
-                                                     *it);
-    } else if (tensor.dtype() == "int32") {
-      memory->write_data_to_memory<DataTypes::int32>(offset, partition, address,
-                                                     *it);
-    } else if (tensor.dtype() == "fp8_e8m0") {
-      memory->write_data_to_memory<DataTypes::fp8_e8m0>(offset, partition,
-                                                        address, *it);
-    } else if (tensor.dtype() == "fp8_e5m3") {
-      memory->write_data_to_memory<DataTypes::fp8_e5m3>(offset, partition,
-                                                        address, *it);
-    } else {
-      // if unspecified, we will assume it's INPUT_DATATYPE
-      memory->write_data_to_memory<INPUT_DATATYPE>(offset, partition, address,
-                                                   *it);
-    }
+    write_data_helper<SUPPORTED_TYPES>(memory, offset, partition, address, *it,
+                                       tensor.dtype());
 
     address++;
     if (replication && address % IC_DIMENSION == packing_factor) {

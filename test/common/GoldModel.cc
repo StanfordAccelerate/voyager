@@ -14,8 +14,49 @@
 #include "test/common/operations/Softmax.h"
 #include "test/common/operations/VectorOps.h"
 
-template <typename Input, typename Psum, typename AccumBuffer, typename Scale,
-          typename Vector>
+template <typename T, typename U>
+bool type_cast_helper(std::any &input_ptr, codegen::Tensor tensor,
+                      bool is_input) {
+  if ((is_input && tensor.dtype() != DataTypes::TypeName<T>::name()) ||
+      (!is_input && tensor.dtype() != DataTypes::TypeName<U>::name())) {
+    return false;
+  }
+
+  if (DataTypes::TypeName<T>::name() == DataTypes::TypeName<U>::name()) {
+    return true;
+  }
+
+  int size = get_size(tensor);
+
+  T *inputs = std::any_cast<T *>(input_ptr);
+  U *outputs = new U[size];
+
+  for (int i = 0; i < size; i++) {
+    outputs[i] = static_cast<U>(inputs[i]);
+  }
+
+  delete[] inputs;
+  input_ptr = outputs;
+
+  return true;
+}
+
+template <typename U, typename... Ts>
+void cast_input(std::any &input_ptr, codegen::Tensor tensor) {
+  if (!(type_cast_helper<Ts, U>(input_ptr, tensor, true) || ...)) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+}
+
+template <typename U, typename... Ts>
+void cast_output(std::any &input_ptr, codegen::Tensor tensor) {
+  if (!(type_cast_helper<U, Ts>(input_ptr, tensor, false) || ...)) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+}
+
+template <typename SaInput, typename SaWeight, typename Psum,
+          typename AccumBuffer, typename Scale, typename Vector>
 std::vector<std::any> run_operation(const Operation &operation,
                                     std::map<std::string, std::any> kwargs) {
   std::any output_ptr;
@@ -41,33 +82,11 @@ std::vector<std::any> run_operation(const Operation &operation,
     const auto weight = first_op.kwargs().at(weight_key).tensor();
     std::any weight_ptr = kwargs[weight.node()];
 
-    std::any input_scale_ptr = static_cast<Scale *>(nullptr);
-    std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
-
-    bool is_mx_op = first_op.target().find("mx") != std::string::npos;
-    if (is_mx_op) {
-      const auto input_scale = first_op.kwargs().at("input_scale").tensor();
-      input_scale_ptr = kwargs[input_scale.node()];
-
-      const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
-      weight_scale_ptr = kwargs[weight_scale.node()];
-    }
-
     std::any bias_ptr = static_cast<AccumBuffer *>(nullptr);
 
     if (first_op.kwargs().contains("bias")) {
       const auto bias = first_op.kwargs().at("bias").tensor();
       bias_ptr = kwargs[bias.node()];
-    }
-
-    if (input.has_reshape()) {
-      input_ptr = transpose<Input>(input_ptr, input.reshape());
-      input_ptr = permute<Input>(input_ptr, input.reshape());
-    }
-
-    if (weight.has_reshape()) {
-      weight_ptr = transpose<Input>(weight_ptr, weight.reshape());
-      weight_ptr = permute<Input>(weight_ptr, weight.reshape());
     }
 
     int dim = 1;
@@ -76,10 +95,36 @@ std::vector<std::any> run_operation(const Operation &operation,
     }
 
     if (dim == 1) {
-      output_ptr = matrix_vector_multiply<Input, Psum, Vector>(
-          input_ptr, weight_ptr, bias_ptr, get_shape(weight));
+      output_ptr = matrix_vector_multiply<Vector>(input_ptr, weight_ptr,
+                                                  bias_ptr, get_shape(weight));
     } else {
-      output_ptr = gemm<Input, Psum, AccumBuffer, Scale>(
+      // Cast input and weight to systolic array compute types
+      cast_input<SaInput, SUPPORTED_TYPES>(input_ptr, input);
+      cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight);
+
+      // Perform reshape if necessary
+      if (input.has_reshape()) {
+        input_ptr = reshape_if_needed<SaInput>(input_ptr, input.reshape());
+      }
+
+      if (weight.has_reshape()) {
+        weight_ptr = reshape_if_needed<SaWeight>(weight_ptr, weight.reshape());
+      }
+
+      // Fetch microscaling scales
+      std::any input_scale_ptr = static_cast<Scale *>(nullptr);
+      std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
+
+      bool is_mx_op = first_op.target().find("mx") != std::string::npos;
+      if (is_mx_op) {
+        const auto input_scale = first_op.kwargs().at("input_scale").tensor();
+        input_scale_ptr = kwargs[input_scale.node()];
+
+        const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
+        weight_scale_ptr = kwargs[weight_scale.node()];
+      }
+
+      output_ptr = gemm<SaInput, SaWeight, Psum, AccumBuffer, Scale>(
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
           operation);
     }
@@ -99,7 +144,7 @@ std::vector<std::any> run_operation(const Operation &operation,
           "No calculate_mx_param operation should be emitted for CFloat\n");
       std::abort();
     } else {
-      output_ptr = calculate_mx_qparam<Vector, Scale, Input>(kwargs, first_op);
+      output_ptr = calculate_mx_qparam<Vector, Scale>(kwargs, first_op);
     }
   }
 
@@ -113,29 +158,17 @@ std::vector<std::any> run_operation(const Operation &operation,
 
   if (first_op.target() == "transpose") {
     const auto input = first_op.kwargs().at("input").tensor();
-    if (input.dtype() == DataTypes::TypeName<Input>::name()) {
-      output_ptr = transpose<Input>(kwargs[input.node()], first_op);
-    } else {
-      output_ptr = transpose<Vector>(kwargs[input.node()], first_op);
-    }
+    output_ptr = transpose<Vector>(kwargs[input.node()], first_op);
   }
 
   if (first_op.target() == "permute") {
     const auto input = first_op.kwargs().at("input").tensor();
-    if (input.dtype() == DataTypes::TypeName<Input>::name()) {
-      output_ptr = permute<Input>(kwargs[input.node()], first_op);
-    } else {
-      output_ptr = permute<Vector>(kwargs[input.node()], first_op);
-    }
+    output_ptr = permute<Vector>(kwargs[input.node()], first_op);
   }
 
   if (first_op.target() == "slice") {
     const auto input = first_op.kwargs().at("input").tensor();
-    if (input.dtype() == DataTypes::TypeName<Input>::name()) {
-      output_ptr = slice<Input>(kwargs[input.node()], first_op);
-    } else {
-      output_ptr = slice<Vector>(kwargs[input.node()], first_op);
-    }
+    output_ptr = slice<Vector>(kwargs[input.node()], first_op);
   }
 
   if (output_ptr.has_value()) {
@@ -226,8 +259,8 @@ std::vector<std::any> run_operation(const Operation &operation,
         const auto scale_shape = get_shape(scale);
 
         if (scale.shape_size() == 1) {
-          output_ptr = quantize<Vector, Input, Vector>(output_ptr, scale_ptr,
-                                                       input_shape);
+          output_ptr =
+              quantize<Vector, Vector>(output_ptr, scale_ptr, input_shape);
         } else {
           const int block_size = op.kwargs().at("block_size").int_value();
 
@@ -238,7 +271,7 @@ std::vector<std::any> run_operation(const Operation &operation,
             if (input_shape[axis] != scale_shape[axis]) break;
           }
 
-          output_ptr = quantize_mx<Vector, Input, Scale>(
+          output_ptr = quantize_mx<Vector, Scale>(
               output_ptr, scale_ptr, input_shape, block_size, axis);
         }
       }
@@ -250,14 +283,18 @@ std::vector<std::any> run_operation(const Operation &operation,
       } else {
         const auto input = op.kwargs().at("input").tensor();
         const auto input_shape = get_shape(input);
-
+        const float quant_max = op.kwargs().at("quant_max").float_value();
         const int block_size = op.kwargs().at("block_size").int_value();
         const int axis = op.kwargs().at("axis").int_value();
+        const bool force_scale_power_of_two =
+            op.kwargs().at("force_scale_power_of_two").int_value();
 
-        Scale *mx_scale = calculate_mx_qparam<Vector, Scale, Input>(
-            output_ptr, input_shape, block_size, axis);
-        output_ptr = quantize_mx<Vector, Input, Scale>(
-            output_ptr, mx_scale, input_shape, block_size, axis);
+        Vector *mx_scale = calculate_mx_qparam<Vector, Scale>(
+            output_ptr, input_shape, quant_max, block_size, axis,
+            force_scale_power_of_two);
+
+        output_ptr = quantize_mx<Vector, Vector>(output_ptr, mx_scale,
+                                                 input_shape, block_size, axis);
 
         outputs.push_back(mx_scale);
       }
@@ -296,24 +333,29 @@ std::vector<std::any> run_operation(const Operation &operation,
     }
   }
 
-  if (param.output().has_reshape()) {
-    const auto reshape_op = param.output().reshape();
-    if (param.output().dtype() == DataTypes::TypeName<Vector>::name()) {
-      output_ptr = transpose<Vector>(output_ptr, reshape_op);
-      output_ptr = permute<Vector>(output_ptr, reshape_op);
-    } else {
-      output_ptr = transpose<Input>(output_ptr, reshape_op);
-      output_ptr = permute<Input>(output_ptr, reshape_op);
-    }
-  }
-
   outputs.push_back(output_ptr);
+
+  spdlog::debug("Operation {} finished\n", first_op.target());
+
+  const auto output_tensors = get_op_outputs(param);
+
+  for (int i = 0; i < output_tensors.size(); i++) {
+    const auto output_tensor = output_tensors[i];
+
+    if (output_tensor.has_reshape()) {
+      const auto reshape_op = output_tensor.reshape();
+      outputs[i] = reshape_if_needed<Vector>(outputs[i], reshape_op);
+    }
+
+    cast_output<Vector, SUPPORTED_TYPES>(outputs[i], output_tensor);
+  }
 
   return outputs;
 }
 
 std::vector<std::any> run_gold_model(const Operation &operation,
                                      std::map<std::string, std::any> kwargs) {
-  return run_operation<INPUT_DATATYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                       SCALE_DATATYPE, VECTOR_DATATYPE>(operation, kwargs);
+  return run_operation<SA_INPUT_TYPE, SA_WEIGHT_TYPE, ACCUM_DATATYPE,
+                       ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE, VECTOR_DATATYPE>(
+      operation, kwargs);
 }

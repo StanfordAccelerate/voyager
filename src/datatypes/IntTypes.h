@@ -42,10 +42,10 @@ class Int {
 
   void set_bits(int i) { int_val = i; }
 
-  void set_zero() { int_val = 0; }
-
-  static decoded max() {
-    return ac_int_rep(S ? (1 << (W - 1)) - 1 : (1 << W) - 1);
+  static Int zero() {
+    Int<W, S> r;
+    r.int_val = 0;
+    return r;
   }
 
   template <int W2, bool S2>

@@ -252,16 +252,16 @@ $(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h tes
 $(CC_BUILD_DIR)/Harness-checker.o: test/common/Harness.cc test/common/Harness.h test/common/VerificationTypes.h test/toolchain/MapOperation.h $(wildcard src/*.h) test/checker/PEChecker.h
 	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
 
-$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/common/operations/*.h)
+$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h $(wildcard src/datatypes/*.h) $(wildcard test/common/operations/*.h)
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
 
-$(CC_BUILD_DIR)/GoldModel-checker.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/common/operations/*.h) test/checker/PEChecker.h
+$(CC_BUILD_DIR)/GoldModel-checker.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/VerificationTypes.h src/ArchitectureParams.h $(wildcard src/datatypes/*.h) $(wildcard test/common/operations/*.h) test/checker/PEChecker.h
 	$(CC) $(C17FLAGS) -DCHECK_PE -g -c -o $@ $<
 
-$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h
+$(CC_BUILD_DIR)/Utils.o: test/common/Utils.cc test/common/Utils.h src/ArchitectureParams.h $(wildcard src/datatypes/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h test/common/VerificationTypes.h
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h $(wildcard src/datatypes/*.h) test/common/VerificationTypes.h
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/ArrayMemory.o: test/common/ArrayMemory.cc test/common/ArrayMemory.h
@@ -276,10 +276,10 @@ $(CC_BUILD_DIR)/MapOperation.o: test/toolchain/MapOperation.cc $(wildcard test/t
 $(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/PEChecker.o: test/checker/PEChecker.cc test/checker/PEChecker.h src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h
+$(CC_BUILD_DIR)/PEChecker.o: test/checker/PEChecker.cc test/checker/PEChecker.h $(wildcard src/datatypes/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc src/PositTypes.h src/StdFloatTypes.h src/IntTypes.h $(wildcard test/toolchain/*.h)
+$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc $(wildcard src/datatypes/*.h) $(wildcard test/toolchain/*.h)
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/AccessCounter.o: test/common/AccessCounter.cc test/common/AccessCounter.h

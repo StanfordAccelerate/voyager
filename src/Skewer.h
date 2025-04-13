@@ -13,37 +13,15 @@
 #define REPEAT_IC(x) BOOST_PP_REPEAT(IC_DIMENSION, x, 0)
 #define REPEAT_OC(x) BOOST_PP_REPEAT(OC_DIMENSION, x, 0)
 
-template <typename T, int NUM_REGS>
-class Fifo {
- public:
-  Fifo() {}
-
-#pragma hls_design interface ccore
-  void run(T input, T &output) {
-  SHIFT:
-    for (int i = NUM_REGS - 1; i >= 0; i--) {
-      if (i == 0) {
-        regs[i] = input;
-      } else {
-        regs[i] = regs[i - 1];
-      }
-
-      output = regs[NUM_REGS - 1];
-    }
-  }
-
- private:
-  T regs[NUM_REGS];
-};
-
 /*
- * Takes an input of Pack1D<IDTYPE, SIZE> and skews it to produce
- * n=SIZE outputs of ODTYPE
+ * This module takes a single wide input (a packed array of Size elements), and
+ * distributes or "skews" this data across Size independent serialized output
+ * channels outputs
  */
-template <typename IDTYPE, typename ODTYPE, int SIZE>
+template <typename T, int Size>
 SC_MODULE(SerializedSkewer) {
  private:
-#define DECL_FIFOS(z, i, unused) sc_fifo<IDTYPE> BOOST_PP_CAT(fifo, i);
+#define DECL_FIFOS(z, i, unused) sc_fifo<T> BOOST_PP_CAT(fifo, i);
   REPEAT_OC(DECL_FIFOS)
 #undef DECL_FIFOS
   int dummy;
@@ -52,13 +30,13 @@ SC_MODULE(SerializedSkewer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<Pack1D<IDTYPE, SIZE> > CCS_INIT_S1(din);
-  Connections::Out<ODTYPE> dout[SIZE];
+  Connections::In<Pack1D<T, Size>> CCS_INIT_S1(din);
+  Connections::Out<T> dout[Size];
 
 #ifdef P8_1
   // Temporary fix for Posit8 utilization problem
-  // Need to add the latency of input conversion after read from fifo for latency matching
-  // Latency is assumed to be 1 here, but it is decided by HLS 
+  // Need to add the latency of input conversion after read from fifo for
+  // latency matching Latency is assumed to be 1 here, but it is decided by HLS
 #define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1 + 1),
 #else
 #define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1),
@@ -93,13 +71,7 @@ SC_MODULE(SerializedSkewer) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      Pack1D<IDTYPE, SIZE> input = din.Pop();
-
-      // CCS_LOG("psum input");
-      // for (int i = 0; i < SIZE; i++) {
-      //   std::cout << input[i].bits.to_string(AC_HEX) << " ";
-      // }
-      // std::cout << std::endl;
+      Pack1D<T, Size> input = din.Pop();
 
 #define FIFO_WRITE(z, i, unused) BOOST_PP_CAT(fifo, i).write(input[i]);
       REPEAT_OC(FIFO_WRITE)
@@ -121,15 +93,10 @@ SC_MODULE(SerializedSkewer) {
 #undef DECL_FUNCS
 };
 
-/*
- * Takes an input of Pack1D<IDTYPE, SIZE> and skews it to produce
- * n=SIZE outputs of ODTYPE
- */
-template <typename IDTYPE, typename ODTYPE, int SIZE>
-SC_MODULE(MultiInputSerializedSkewer) {
+template <typename T, int Size>
+SC_MODULE(InputSerializedSkewer) {
  private:
-#define DECL_FIFOS(z, i, unused) \
-  sc_fifo<PEInput<IDTYPE> > BOOST_PP_CAT(fifo, i);
+#define DECL_FIFOS(z, i, unused) sc_fifo<PEInput<T>> BOOST_PP_CAT(fifo, i);
   REPEAT_IC(DECL_FIFOS)
 #undef DECL_FIFOS
   int dummy;
@@ -138,12 +105,12 @@ SC_MODULE(MultiInputSerializedSkewer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<Pack1D<PEInput<IDTYPE>, SIZE> > CCS_INIT_S1(din);
-  Connections::Out<PEInput<ODTYPE> > dout[SIZE];
+  Connections::In<Pack1D<PEInput<T>, Size>> CCS_INIT_S1(din);
+  Connections::Out<PEInput<T>> dout[Size];
 
 #define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * PE_LATENCY + 1),
 
-  SC_CTOR(MultiInputSerializedSkewer) : REPEAT_IC(FIFO_SIZE_INIT) dummy(0) {
+  SC_CTOR(InputSerializedSkewer) : REPEAT_IC(FIFO_SIZE_INIT) dummy(0) {
 #undef FIFO_SIZE_INIT
     SC_THREAD(writeFifos);
     sensitive << clk.pos();
@@ -172,7 +139,7 @@ SC_MODULE(MultiInputSerializedSkewer) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      Pack1D<PEInput<IDTYPE>, SIZE> input = din.Pop();
+      Pack1D<PEInput<T>, Size> input = din.Pop();
 
 #define FIFO_WRITE(z, i, unused) BOOST_PP_CAT(fifo, i).write(input[i]);
       REPEAT_IC(FIFO_WRITE)
@@ -186,11 +153,11 @@ SC_MODULE(MultiInputSerializedSkewer) {
     wait();                                                     \
     _Pragma("hls_pipeline_init_interval 1")                     \
         _Pragma("hls_pipeline_stall_mode flush") while (true) { \
-      PEInput<IDTYPE> inVal = BOOST_PP_CAT(fifo, i).read();     \
-      PEInput<ODTYPE> outVal;                                   \
-      outVal.data = inVal.data;                                 \
-      outVal.swapWeights = inVal.swapWeights;                   \
-      dout[i].Push(outVal);                                     \
+      PEInput<T> pe_in = BOOST_PP_CAT(fifo, i).read();          \
+      PEInput<T> pe_out;                                        \
+      pe_out.data = pe_in.data;                                 \
+      pe_out.swapWeights = pe_in.swapWeights;                   \
+      dout[i].Push(pe_out);                                     \
     }                                                           \
   }
 
@@ -198,15 +165,10 @@ SC_MODULE(MultiInputSerializedSkewer) {
 #undef DECL_FUNCS
 };
 
-/*
- * Takes an input of Pack1D<IDTYPE, SIZE> and skews it to produce
- * n=SIZE outputs of ODTYPE
- */
-template <typename IDTYPE, typename ODTYPE, int SIZE>
+template <typename T, int Size>
 SC_MODULE(WeightSerializedSkewer) {
  private:
-#define DECL_FIFOS(z, i, unused) \
-  sc_fifo<PEWeight<IDTYPE> > BOOST_PP_CAT(fifo, i);
+#define DECL_FIFOS(z, i, unused) sc_fifo<PEWeight<T>> BOOST_PP_CAT(fifo, i);
   REPEAT_OC(DECL_FIFOS)
 #undef DECL_FIFOS
   int dummy;
@@ -215,8 +177,8 @@ SC_MODULE(WeightSerializedSkewer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<Pack1D<PEWeight<IDTYPE>, SIZE> > CCS_INIT_S1(din);
-  Connections::Out<PEWeight<ODTYPE> > dout[SIZE];
+  Connections::In<Pack1D<PEWeight<T>, Size>> CCS_INIT_S1(din);
+  Connections::Out<PEWeight<T>> dout[Size];
 
 #define FIFO_SIZE_INIT(z, i, unused) BOOST_PP_CAT(fifo, i)(i * 1 + 1),
 
@@ -249,7 +211,7 @@ SC_MODULE(WeightSerializedSkewer) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      Pack1D<PEWeight<IDTYPE>, SIZE> input = din.Pop();
+      Pack1D<PEWeight<T>, Size> input = din.Pop();
 
 #define FIFO_WRITE(z, i, unused) BOOST_PP_CAT(fifo, i).write(input[i]);
       REPEAT_OC(FIFO_WRITE)
@@ -263,11 +225,11 @@ SC_MODULE(WeightSerializedSkewer) {
     wait();                                                     \
     _Pragma("hls_pipeline_init_interval 1")                     \
         _Pragma("hls_pipeline_stall_mode flush") while (true) { \
-      PEWeight<IDTYPE> inVal = BOOST_PP_CAT(fifo, i).read();    \
-      PEWeight<ODTYPE> outVal;                                  \
-      outVal.data = inVal.data;                                 \
-      outVal.tag = inVal.tag;                                   \
-      dout[i].Push(outVal);                                     \
+      PEWeight<T> pe_in = BOOST_PP_CAT(fifo, i).read();         \
+      PEWeight<T> pe_out;                                       \
+      pe_out.data = pe_in.data;                                 \
+      pe_out.tag = pe_in.tag;                                   \
+      dout[i].Push(pe_out);                                     \
     }                                                           \
   }
 
@@ -275,14 +237,10 @@ SC_MODULE(WeightSerializedSkewer) {
 #undef DECL_FUNCS
 };
 
-/*
- * Takes an input of n=SIZE outputs of DTYPE and skews it to produce
- * an output Pack1D<DTYPE, SIZE>
- */
-template <typename IDTYPE, typename ODTYPE, int SIZE>
+template <typename T, int Size>
 SC_MODULE(DeserializedSkewer) {
  private:
-#define DECL_FIFOS(z, i, unused) sc_fifo<ODTYPE> BOOST_PP_CAT(fifo, i);
+#define DECL_FIFOS(z, i, unused) sc_fifo<T> BOOST_PP_CAT(fifo, i);
   REPEAT_OC(DECL_FIFOS)
 #undef DECL_FIFOS
 
@@ -292,8 +250,8 @@ SC_MODULE(DeserializedSkewer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<IDTYPE> din[SIZE];
-  Connections::Out<Pack1D<ODTYPE, SIZE> > CCS_INIT_S1(dout);
+  Connections::In<T> din[Size];
+  Connections::Out<Pack1D<T, Size>> CCS_INIT_S1(dout);
 
 #define FIFO_SIZE_INIT(z, i, unused) \
   BOOST_PP_CAT(fifo, i)(1 * (OC_DIMENSION - i + 1)),
@@ -324,15 +282,11 @@ SC_MODULE(DeserializedSkewer) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (true) {
-      Pack1D<ODTYPE, SIZE> output;
+      Pack1D<T, Size> output;
 
 #define FIFO_READ(z, i, unused) output[i] = BOOST_PP_CAT(fifo, i).read();
       REPEAT_OC(FIFO_READ)
 #undef FIFO_READ
-      // for (int i = 0; i < SIZE; i++) {
-      //   std::cout << output[i].bits.to_string(AC_HEX) << " ";
-      // }
-      // std::cout << std::endl;
       dout.Push(output);
     }
   }

@@ -10,7 +10,7 @@
 
 class ArrayMemory {
  public:
-  ArrayMemory(std::vector<long long>);
+  ArrayMemory(std::vector<uint64_t>);
   ~ArrayMemory();
 
   std::vector<char*> memories;
@@ -18,7 +18,7 @@ class ArrayMemory {
   char* get_memory(const int partition);
 
   template <typename T>
-  void read_tensor_from_memory(const long long address, const int partition,
+  void read_tensor_from_memory(const uint64_t address, const int partition,
                                const int size, T* tensor);
   template <typename T>
   void write_data_to_memory(const uint64_t address, const int partition,
@@ -37,7 +37,7 @@ class ArrayMemory {
 };
 
 template <typename T>
-void ArrayMemory::read_tensor_from_memory(const long long address,
+void ArrayMemory::read_tensor_from_memory(const uint64_t address,
                                           const int partition, const int size,
                                           T* tensor) {
   char* memory = get_memory(partition) + address;

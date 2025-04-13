@@ -89,7 +89,7 @@ Simulation::~Simulation() {
 }
 
 void Simulation::load_data() {
-  std::vector<long long> memory_sizes{SRAM_MEMORY_SIZE, REFERENCE_MEMORY_SIZE};
+  std::vector<uint64_t> memory_sizes{SRAM_MEMORY_SIZE, REFERENCE_MEMORY_SIZE};
 
   bool is_cnn = model == "resnet18" || model == "resnet50";
 
@@ -202,6 +202,37 @@ void Simulation::run() {
   }
 }
 
+template <typename T>
+bool compare_arrays(codegen::Tensor tensor, const std::any& output1,
+                    const std::string& name1, const std::any& output2,
+                    const std::string& name2, const std::string& filename,
+                    int& error_count) {
+  if (tensor.dtype() == DataTypes::TypeName<T>::name()) {
+    const auto size = get_size(tensor);
+    error_count += compare_arrays<T, T>(output1, name1, output2, name2, size,
+                                        filename, false);
+    return true;
+  }
+  return false;
+}
+
+template <typename... Ts>
+int compare_arrays_helper(codegen::Tensor tensor, const std::any& output1,
+                          const std::string& name1, const std::any& output2,
+                          const std::string& name2,
+                          const std::string& filename) {
+  int error_count = 0;
+  bool matched = (compare_arrays<Ts>(tensor, output1, name1, output2, name2,
+                                     filename, error_count) ||
+                  ...);
+
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+
+  return error_count;
+}
+
 int Simulation::check_outputs() {
   std::string prefix;
   if (operations.size() == 1) {
@@ -274,35 +305,14 @@ int Simulation::check_outputs() {
   const auto output_tensors = get_op_outputs(param);
 
   for (int i = 0; i < outputs1.size(); i++) {
-    const auto output1 = outputs1[i];
-    const auto output2 = outputs2[i];
-
-    const auto tensor = output_tensors[i];
-    const int size = get_size(tensor);
-
     std::string suffix = ".txt";
     if (outputs1.size() > 1) {
       suffix = "_" + std::to_string(i) + ".txt";
     }
 
-    if (tensor.dtype() == "bfloat16") {
-      rel_err += compare_arrays<DataTypes::bfloat16, DataTypes::bfloat16>(
-          output1, output_names[0], output2, output_names[1], size,
-          filename + suffix, false);
-    } else if (tensor.dtype() == "fp8_e8m0") {
-      rel_err += compare_arrays<DataTypes::fp8_e8m0, DataTypes::fp8_e8m0>(
-          output1, output_names[0], output2, output_names[1], size,
-          filename + suffix, false);
-    } else if (tensor.dtype() == "fp8_e5m3") {
-      rel_err += compare_arrays<DataTypes::fp8_e5m3, DataTypes::fp8_e5m3>(
-          output1, output_names[0], output2, output_names[1], size,
-          filename + suffix, false);
-    } else {
-      // if unspecified, we will assume it's INPUT_DATATYPE
-      rel_err += compare_arrays<INPUT_DATATYPE, INPUT_DATATYPE>(
-          output1, output_names[0], output2, output_names[1], size,
-          filename + suffix, false);
-    }
+    rel_err += compare_arrays_helper<SUPPORTED_TYPES>(
+        output_tensors[i], outputs1[i], output_names[0], outputs2[i],
+        output_names[1], filename + suffix);
   }
 
   int error_count = 0;

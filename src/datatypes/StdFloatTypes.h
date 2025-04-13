@@ -52,11 +52,13 @@ class StdFloat {
 
   void set_bits(int i) { float_val.d = i; }
 
-  void set_zero() { float_val = ac_float_rep::zero(); }
-
   bool is_zero() const { return float_val == ac_float_rep::zero(); }
 
-  static decoded max() { return ac_float_rep::max(); }
+  static StdFloat zero() {
+    StdFloat r;
+    r.float_val = ac_float_rep::zero();
+    return r;
+  }
 
   StdFloat abs() const { return float_val.abs(); }
 

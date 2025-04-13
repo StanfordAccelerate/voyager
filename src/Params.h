@@ -4,6 +4,9 @@
 #include "TypeToBits.h"
 #endif
 
+#include "ArchitectureParams.h"
+#include "src/datatypes/DataTypes.h"
+
 // Base params struct
 struct BaseParams {
   // empty, only purpose is to serve as a base class for polymorphism
@@ -49,6 +52,9 @@ struct MatrixParams : BaseParams {
     weightAddressGenFxIndex = 0;
     weightAddressGenFyIndex = 0;
 
+    input_dtype = 0;
+    weight_dtype = 0;
+
     STRIDE = 1;
     head_size_power_of_two = 0;
 
@@ -87,6 +93,9 @@ struct MatrixParams : BaseParams {
   ac_int<3, false> weightAddressGenFxIndex;
   ac_int<3, false> weightAddressGenFyIndex;
 
+  ac_int<DTYPE_INDEX_WIDTH, false> input_dtype;
+  ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
+
   ac_int<2, false> STRIDE;
   ac_int<8, false> head_size_power_of_two;
 
@@ -99,7 +108,8 @@ struct MatrixParams : BaseParams {
 
   static const unsigned int width =
       5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
-      19 * 3 /* Loop indices */ + 6 * 1 /* Bools */ + 2 + 8;
+      19 * 3 /* Loop indices */ + 6 * 1 /* Bools */ + 2 + 8 +
+      DTYPE_INDEX_WIDTH * 2;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -145,6 +155,10 @@ struct MatrixParams : BaseParams {
     }
     m & weightAddressGenFxIndex;
     m & weightAddressGenFyIndex;
+
+    m & input_dtype;
+    m & weight_dtype;
+
     m & STRIDE;
     m & head_size_power_of_two;
 
@@ -216,6 +230,9 @@ struct MatrixParams : BaseParams {
        << std::endl;
     os << "weightAddressGenFyIndex: " << params.weightAddressGenFyIndex
        << std::endl;
+    os << "input_dtype: " << params.input_dtype << std::endl;
+    os << "weight_dtype: " << params.weight_dtype << std::endl;
+
     os << "STRIDE: " << params.STRIDE << std::endl;
     os << "head_size_power_of_two: " << params.head_size_power_of_two
        << std::endl;
@@ -266,9 +283,13 @@ struct MatrixParams : BaseParams {
 
     // Compare other members
     if (lhs.fxIndex != rhs.fxIndex || lhs.fyIndex != rhs.fyIndex) return false;
-    if (lhs.weightAddressGenFxIndex != rhs.weightAddressGenFxIndex ||
-        lhs.weightAddressGenFyIndex != rhs.weightAddressGenFyIndex)
+    if ((lhs.weightAddressGenFxIndex != rhs.weightAddressGenFxIndex ||
+         lhs.weightAddressGenFyIndex != rhs.weightAddressGenFyIndex))
       return false;
+
+    if (lhs.input_dtype != rhs.input_dtype) return false;
+    if (lhs.weight_dtype != rhs.weight_dtype) return false;
+
     if (lhs.STRIDE != rhs.STRIDE) return false;
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
 
@@ -581,7 +602,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addr_gen0_y_loop_idx[2];
   ac_int<3, false> addr_gen0_k_loop_idx[2];
   ac_int<16, false> addr_gen0_dq_scale;
-  ac_int<2, false> addr_gen0_dtype;
+  ac_int<4, false> addr_gen0_dtype;
 
   // Address generator 1 (op0src1)
   ac_int<2, false> addr_gen1_mode;
@@ -591,7 +612,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addr_gen1_y_loop_idx[2];
   ac_int<3, false> addr_gen1_k_loop_idx[2];
   ac_int<16, false> addr_gen1_dq_scale;
-  ac_int<2, false> addr_gen1_dtype;
+  ac_int<4, false> addr_gen1_dtype;
 
   // Address generator 2 (op3src1)
   ac_int<2, false> addr_gen2_mode;
@@ -601,7 +622,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addr_gen2_y_loop_idx[2];
   ac_int<3, false> addr_gen2_k_loop_idx[2];
   ac_int<16, false> addr_gen2_dq_scale;
-  ac_int<2, false> addr_gen2_dtype;
+  ac_int<4, false> addr_gen2_dtype;
 
   // Output address generator
   ac_int<2, false> output_mode;
@@ -610,7 +631,7 @@ struct VectorParams : BaseParams {
   ac_int<3, false> output_x_loop_idx[2];
   ac_int<3, false> output_y_loop_idx[2];
   ac_int<3, false> output_k_loop_idx[2];
-  ac_int<2, false> output_dtype;
+  ac_int<4, false> output_dtype;
 
   ac_int<6, false> addr_gen0_broadcast;
   ac_int<3, false> addr_gen1_broadcast;
@@ -637,9 +658,10 @@ struct VectorParams : BaseParams {
   uint64_t SCALE_OFFSET;
 
   // Each address generator has a 2-bit mode flag, 64-bit address, 6 11-bit loop
-  // boundaries, 6 3-bit loop indices, and a 16-bit dequantize scale
+  // boundaries, 6 3-bit loop indices, a 16-bit dequantize scale, and a 2-bit
+  // data type
   static const unsigned int address_gen_width =
-      2 + 64 + 6 * 11 + 6 * 3 + 16 + 2;
+      2 + 64 + 6 * 11 + 6 * 3 + 16 + 4;
 
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
   // slicing params + 18-bit reshape params + 4-bit head size + 6 boolean flags

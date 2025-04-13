@@ -153,20 +153,16 @@ SC_MODULE(OutputController) {
 
                   Pack1D<VectorType, Width> outputs = vector_in.Pop();
 
-                  bool found =
-                      ((get_type_index<OutputTypes, OutputTypes...>() ==
-                                params.output_dtype
-                            ? (vwrite_out<VectorType, OutputTypes, Width>(
-                                   outputs, address,
-                                   params.VECTOR_OUTPUT_OFFSET, vector_out,
-                                   vector_address_out),
-                               true)
-                            : false) ||
-                       ...);
+                  bool found = (send_vector_outputs<OutputTypes, Width,
+                                                    VectorType, OutputTypes...>(
+                                    params.output_dtype, outputs, address,
+                                    params.VECTOR_OUTPUT_OFFSET, vector_out,
+                                    vector_address_out) ||
+                                ...);
 
 #ifndef __SYNTHESIS__
                   if (!found) {
-                    std::cerr << "Error: Index '" << params.output_dtype
+                    std::cerr << "Error: output type '" << params.output_dtype
                               << "' is not valid.\n";
                   }
 #endif

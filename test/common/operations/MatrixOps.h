@@ -14,17 +14,18 @@ inline void fused_multiply_add(T1 a, T1 b, T2 &c) {
   c = v1.fma(v2, c);
 }
 
-template <typename Input, typename Psum, typename Buffer, typename Scale>
+template <typename Input, typename Weight, typename Psum, typename Buffer,
+          typename Scale>
 inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                     std::any weight_ptr, std::any weight_scale_ptr,
                     std::any bias_ptr, const Tiling &tiling,
                     const int block_size) {
-  spdlog::debug("Performing GEMM");
+  spdlog::debug("Performing GEMM\n");
 
   Input *inputs = std::any_cast<Input *>(input_ptr);
   Scale *input_scales = std::any_cast<Scale *>(input_scale_ptr);
 
-  Input *weights = std::any_cast<Input *>(weight_ptr);
+  Weight *weights = std::any_cast<Weight *>(weight_ptr);
   Scale *weight_scales = std::any_cast<Scale *>(weight_scale_ptr);
 
   Buffer *biases = std::any_cast<Buffer *>(bias_ptr);
@@ -151,7 +152,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                               STRIDE * y + fy >= 0 &&
                               STRIDE * y + fy < STRIDE * Y) {
                             Input input = inputs[input_addr];
-                            Input weight = weights[weight_addr];
+                            Weight weight = weights[weight_addr];
 #ifdef CHECK_PE
                             int pe_num = ic0 * OC_DIMENSION + oc0;
                             if (tiling.replication) {
@@ -175,11 +176,9 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                       IC_UNROLL * OC_DIMENSION +
                                   oc0;
                             }
-                            Input input;
-                            input.set_zero();
-                            Input weight = weights[weight_addr];
-                            pe_checker.add_reference(pe_num, input, weight,
-                                                     psum);
+                            Weight weight = weights[weight_addr];
+                            pe_checker.add_reference(pe_num, Input::zero(),
+                                                     weight, psum);
 #endif
                           }
                         }
@@ -211,7 +210,6 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                             outputs[output_addr] +=
                                 static_cast<Buffer>(psum) * scale;
                           }
-
                         } else {
                           if (tiling.replication) {
                             accumulations[output_addr] += psum;
@@ -283,7 +281,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
     }
   }
 
-  spdlog::debug("GEMM done");
+  spdlog::debug("GEMM done\n");
 
   delete[] inputs;
   delete[] weights;
@@ -303,7 +301,8 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
   return outputs;
 }
 
-template <typename Input, typename Psum, typename Buffer, typename Scale>
+template <typename Input, typename Weight, typename Psum, typename Buffer,
+          typename Scale>
 inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                     std::any weight_ptr, std::any weight_scale_ptr,
                     std::any bias_ptr, const Operation &operation) {
@@ -324,12 +323,12 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
   bool is_mx = matrix_op.target().find("mx") != std::string::npos;
   int block_size = is_mx ? matrix_op.kwargs().at("block_size").int_value() : 0;
 
-  return gemm<Input, Psum, Buffer, Scale>(input_ptr, input_scale_ptr,
-                                          weight_ptr, weight_scale_ptr,
-                                          bias_ptr, tiling, block_size);
+  return gemm<Input, Weight, Psum, Buffer, Scale>(input_ptr, input_scale_ptr,
+                                                  weight_ptr, weight_scale_ptr,
+                                                  bias_ptr, tiling, block_size);
 }
 
-template <typename Input, typename Psum, typename Vector>
+template <typename Vector>
 inline Vector *matrix_vector_multiply(std::any input_ptr, std::any weight_ptr,
                                       std::any bias_ptr,
                                       const std::vector<int> &weight_shape) {

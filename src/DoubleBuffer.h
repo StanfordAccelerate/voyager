@@ -7,7 +7,7 @@
 #include "test/common/AccessCounter.h"
 #endif
 
-template <int Width, int Depth>
+template <int Depth, int Width>
 SC_MODULE(DoubleBuffer) {
  private:
   ac_int<Width, false> mem0[Depth];
@@ -17,15 +17,15 @@ SC_MODULE(DoubleBuffer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<BufferWriteRequest<Width> > writeRequest[2];
-  Connections::In<ac_int<32, false> > writeControl[2];
+  Connections::In<BufferWriteRequest<Width>> writeRequest[2];
+  Connections::In<ac_int<32, false>> writeControl[2];
 
-  Connections::Combinational<ac_int<Width, false> > readData[2];
-  Connections::In<ac_int<16, false> > readAddress[2];
-  Connections::In<ac_int<32, false> > readControl[2];
+  Connections::Combinational<ac_int<Width, false>> readData[2];
+  Connections::In<ac_int<16, false>> readAddress[2];
+  Connections::In<ac_int<32, false>> readControl[2];
 
-  Connections::Combinational<ac_int<32, false> > outputControl[2];
-  Connections::Out<ac_int<Width, false> > CCS_INIT_S1(output);
+  Connections::Combinational<ac_int<32, false>> outputControl[2];
+  Connections::Out<ac_int<Width, false>> CCS_INIT_S1(output);
 
 #ifndef __SYNTHESIS__
   AccessCounter *accessCounter;

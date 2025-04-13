@@ -142,12 +142,11 @@ class Posit {
 
   ac_int<nbits, false> bits_rep() { return bits; }
   void set_bits(int i) { bits = i; }
-  void set_zero() { bits = 0; }
 
-  static decoded max() {
-    Posit<nbits, es> max;
-    max.set_bits((1 << nbits) - 1);
-    return max;
+  static Posit zero() {
+    Posit<nbits, es> r;
+    r.bits = 0;
+    return r;
   }
 
   void negate() { twos_complement(bits); }
@@ -187,7 +186,7 @@ class Posit {
         StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>;
     std_float_t f;
     if (bits == 0) {
-      f.set_zero();
+      f = std_float_t::zero();
     } else {
       bool sign;
       int scale;

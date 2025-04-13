@@ -212,47 +212,64 @@ void vquantize_mx(const Pack1D<VectorType, Width>& op0, ScaleType& scale,
   }
 }
 
-template <typename T, size_t Width>
-void send_request(ac_int<32, false> address,
-                  ac_int<ADDRESS_WIDTH, false> offset,
-                  Connections::Out<MemoryRequest>& channel) {
+template <typename T, size_t Width, typename... Ts>
+bool fetch_vector_input(ac_int<4, false> dtype, ac_int<32, false> address,
+                        ac_int<ADDRESS_WIDTH, false> offset,
+                        Connections::Out<MemoryRequest>& channel) {
+  if (get_type_index<T, Ts...>() != dtype) {
+    return false;
+  }
+
   MemoryRequest request = {offset + address * T::width / 8,
                            Width * T::width / 8};
   channel.Push(request);
+  return true;
 }
 
-template <typename FetchType, typename VectorType, size_t Width>
-void feed_response(Connections::In<ac_int<OC_PORT_WIDTH, false>>& input_channel,
-                   Pack1D<VectorType, Width>& outputs) {
-  constexpr int num_words = FetchType::width * Width / OC_PORT_WIDTH;
+template <typename T, size_t Width, typename VectorType, typename... Ts>
+bool process_vector_input(
+    ac_int<4, false> dtype,
+    Connections::In<ac_int<OC_PORT_WIDTH, false>>& input_channel,
+    Pack1D<VectorType, Width>& outputs) {
+  if (get_type_index<T, Ts...>() != dtype) {
+    return false;
+  }
 
-  static_assert(
-      num_words > 0,
-      "Width of input type must be greater than or equal to the width "
-      "of the input channel");
+  constexpr int num_words =
+      (T::width * Width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
 
-  ac_int<FetchType::width * Width, false> bits;
+  ac_int<num_words * OC_PORT_WIDTH, false> bits;
 
   for (int i = 0; i < num_words; i++) {
     bits.set_slc(i * OC_PORT_WIDTH, input_channel.Pop());
   }
 
-  Pack1D<FetchType, Width> typed =
-      BitsToType<Pack1D<FetchType, Width>>(TypeToBits(bits));
+  ac_int<Width * T::width, false> bits_rep =
+      bits.template slc<Width * T::width>(0);
+
+  Pack1D<T, Width> typed = BitsToType<Pack1D<T, Width>>(TypeToBits(bits_rep));
 
 #pragma hls_unroll yes
   for (int i = 0; i < Width; i++) {
     outputs[i] = typed[i];
   }
+
+  return true;
 }
 
-template <typename VectorType, typename OutputType, size_t Width>
-void vwrite_out(
-    Pack1D<VectorType, Width> inputs, ac_int<32, false> address,
-    ac_int<ADDRESS_WIDTH, false> offset,
+template <typename OutputType, size_t Width, typename VectorType,
+          typename... Ts>
+bool send_vector_outputs(
+    ac_int<4, false> dtype, Pack1D<VectorType, Width> inputs,
+    ac_int<32, false> address, ac_int<ADDRESS_WIDTH, false> offset,
     Connections::Out<ac_int<OC_PORT_WIDTH, false>>& output_channel,
     Connections::Out<ac_int<ADDRESS_WIDTH, false>>& address_channel) {
-  constexpr int num_words = OutputType::width * Width / OC_PORT_WIDTH;
+  if (get_type_index<OutputType, Ts...>() != dtype) {
+    return false;
+  }
+
+  constexpr int num_words =
+      (OutputType::width * Width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
 
   static_assert(
       num_words > 0,
@@ -273,4 +290,6 @@ void vwrite_out(
     address_channel.Push(offset + address * OutputType::width / 8 +
                          i * OC_PORT_WIDTH / 8);
   }
+
+  return true;
 }

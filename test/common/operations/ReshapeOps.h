@@ -77,3 +77,14 @@ inline T* transpose(std::any input_ptr, const codegen::OpOverload op) {
 
   return transpose<T>(input_ptr, input_shape, dim0, dim1);
 }
+
+template <typename T>
+inline T* reshape_if_needed(std::any input_ptr, const codegen::OpOverload op) {
+  if (op.target() == "transpose") {
+    return transpose<T>(input_ptr, op);
+  } else if (op.target() == "permute") {
+    return permute<T>(input_ptr, op);
+  } else {
+    return std::any_cast<T*>(input_ptr);
+  }
+}

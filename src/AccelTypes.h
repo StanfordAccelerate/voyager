@@ -8,8 +8,8 @@
 #include <ccs_types.h>
 #include <mc_connections.h>
 
-#include "DataTypes.h"
 #include "Params.h"
+#include "src/datatypes/DataTypes.h"
 
 #ifdef DEBUG
 #define DLOG(x) CCS_LOG(x)
@@ -150,24 +150,112 @@ class Pack1D {
   }
 };
 
-// TODO: is there a way to make this more generic?
-
-template <size_t Width, int nbits, int es>
-class Pack1D<PEInput<Posit<nbits, es> >, Width> {
+template <size_t Width, int W>
+class Pack1D<PEInput<ac_int<W, false>>, Width> {
  public:
-  PEInput<Posit<nbits, es> > value[Width];
+  PEInput<ac_int<W, false>> value[Width];
 
-  static const unsigned int width = PEInput<Posit<nbits, es> >::width * Width;
+  static const unsigned int width = PEInput<ac_int<W, false>>::width * Width;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
-  operator int() const { return Pack1D<PEInput<Posit<nbits, es> >, Width>(); }
+  operator int() const { return Pack1D<PEInput<ac_int<W, false>>, Width>(); }
 
-  PEInput<Posit<nbits, es> > &operator[](unsigned int i) {
+  PEInput<ac_int<W, false>> &operator[](unsigned int i) {
     return this->value[i];
   }
-  const PEInput<Posit<nbits, es> > &operator[](unsigned int i) const {
+
+  const PEInput<ac_int<W, false>> &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < Width; i++) {
+      m &value[i].data;
+    }
+
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < Width; i++) {
+      m &value[i].swapWeights;
+    }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < Width; i++) {
+      if (lhs.value[i] != rhs.value[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+};
+
+template <size_t Width, int W>
+class Pack1D<PEWeight<ac_int<W, false>>, Width> {
+ public:
+  PEWeight<ac_int<W, false>> value[Width];
+
+  static const unsigned int width = PEWeight<ac_int<W, false>>::width * Width;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const { return Pack1D<PEWeight<ac_int<W, false>>, Width>(); }
+
+  PEWeight<ac_int<W, false>> &operator[](unsigned int i) {
+    return this->value[i];
+  }
+
+  const PEWeight<ac_int<W, false>> &operator[](unsigned int i) const {
+    return this->value[i];
+  }
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < Width; i++) {
+      m &value[i].data;
+    }
+
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < Width; i++) {
+      m &value[i].tag;
+    }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned int i = 0; i < Width; i++) {
+      if (lhs.value[i] != rhs.value[i]) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+};
+
+// TODO: is there a way to make this more generic?
+
+template <size_t Width, int nbits, int es>
+class Pack1D<PEInput<Posit<nbits, es>>, Width> {
+ public:
+  PEInput<Posit<nbits, es>> value[Width];
+
+  static const unsigned int width = PEInput<Posit<nbits, es>>::width * Width;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  operator int() const { return Pack1D<PEInput<Posit<nbits, es>>, Width>(); }
+
+  PEInput<Posit<nbits, es>> &operator[](unsigned int i) {
+    return this->value[i];
+  }
+  const PEInput<Posit<nbits, es>> &operator[](unsigned int i) const {
     return this->value[i];
   }
   template <unsigned int Size>
@@ -194,21 +282,21 @@ class Pack1D<PEInput<Posit<nbits, es> >, Width> {
 };
 
 template <size_t Width, int nbits, int es>
-class Pack1D<PEWeight<Posit<nbits, es> >, Width> {
+class Pack1D<PEWeight<Posit<nbits, es>>, Width> {
  public:
-  PEWeight<Posit<nbits, es> > value[Width];
+  PEWeight<Posit<nbits, es>> value[Width];
 
-  static const unsigned int width = PEWeight<Posit<nbits, es> >::width * Width;
+  static const unsigned int width = PEWeight<Posit<nbits, es>>::width * Width;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
-  operator int() const { return Pack1D<PEWeight<Posit<nbits, es> >, Width>(); }
+  operator int() const { return Pack1D<PEWeight<Posit<nbits, es>>, Width>(); }
 
-  PEWeight<Posit<nbits, es> > &operator[](unsigned int i) {
+  PEWeight<Posit<nbits, es>> &operator[](unsigned int i) {
     return this->value[i];
   }
-  const PEWeight<Posit<nbits, es> > &operator[](unsigned int i) const {
+  const PEWeight<Posit<nbits, es>> &operator[](unsigned int i) const {
     return this->value[i];
   }
   template <unsigned int Size>
@@ -268,24 +356,24 @@ class Pack1D<StdFloat<mantissa, exp>, Width> {
 };
 
 template <size_t Width, int mantissa, int exp>
-class Pack1D<PEInput<StdFloat<mantissa, exp> >, Width> {
+class Pack1D<PEInput<StdFloat<mantissa, exp>>, Width> {
  public:
-  PEInput<StdFloat<mantissa, exp> > value[Width];
+  PEInput<StdFloat<mantissa, exp>> value[Width];
 
   static const unsigned int width =
-      PEInput<StdFloat<mantissa, exp> >::width * Width;
+      PEInput<StdFloat<mantissa, exp>>::width * Width;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
   operator int() const {
-    return Pack1D<PEInput<StdFloat<mantissa, exp> >, Width>();
+    return Pack1D<PEInput<StdFloat<mantissa, exp>>, Width>();
   }
 
-  PEInput<StdFloat<mantissa, exp> > &operator[](unsigned int i) {
+  PEInput<StdFloat<mantissa, exp>> &operator[](unsigned int i) {
     return this->value[i];
   }
-  const PEInput<StdFloat<mantissa, exp> > &operator[](unsigned int i) const {
+  const PEInput<StdFloat<mantissa, exp>> &operator[](unsigned int i) const {
     return this->value[i];
   }
   template <unsigned int Size>
@@ -312,24 +400,24 @@ class Pack1D<PEInput<StdFloat<mantissa, exp> >, Width> {
 };
 
 template <size_t Width, int mantissa, int exp>
-class Pack1D<PEWeight<StdFloat<mantissa, exp> >, Width> {
+class Pack1D<PEWeight<StdFloat<mantissa, exp>>, Width> {
  public:
-  PEWeight<StdFloat<mantissa, exp> > value[Width];
+  PEWeight<StdFloat<mantissa, exp>> value[Width];
 
   static const unsigned int width =
-      PEWeight<StdFloat<mantissa, exp> >::width * Width;
+      PEWeight<StdFloat<mantissa, exp>>::width * Width;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
   operator int() const {
-    return Pack1D<PEWeight<StdFloat<mantissa, exp> >, Width>();
+    return Pack1D<PEWeight<StdFloat<mantissa, exp>>, Width>();
   }
 
-  PEWeight<StdFloat<mantissa, exp> > &operator[](unsigned int i) {
+  PEWeight<StdFloat<mantissa, exp>> &operator[](unsigned int i) {
     return this->value[i];
   }
-  const PEWeight<StdFloat<mantissa, exp> > &operator[](unsigned int i) const {
+  const PEWeight<StdFloat<mantissa, exp>> &operator[](unsigned int i) const {
     return this->value[i];
   }
   template <unsigned int Size>
@@ -389,24 +477,24 @@ class Pack1D<Int<i_width, i_signed>, Width> {
 };
 
 template <size_t Width, int i_width, bool i_signed>
-class Pack1D<PEInput<Int<i_width, i_signed> >, Width> {
+class Pack1D<PEInput<Int<i_width, i_signed>>, Width> {
  public:
-  PEInput<Int<i_width, i_signed> > value[Width];
+  PEInput<Int<i_width, i_signed>> value[Width];
 
   static const unsigned int width =
-      PEInput<Int<i_width, i_signed> >::width * Width;
+      PEInput<Int<i_width, i_signed>>::width * Width;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
   operator int() const {
-    return Pack1D<PEInput<Int<i_width, i_signed> >, Width>();
+    return Pack1D<PEInput<Int<i_width, i_signed>>, Width>();
   }
 
-  PEInput<Int<i_width, i_signed> > &operator[](unsigned int i) {
+  PEInput<Int<i_width, i_signed>> &operator[](unsigned int i) {
     return this->value[i];
   }
-  const PEInput<Int<i_width, i_signed> > &operator[](unsigned int i) const {
+  const PEInput<Int<i_width, i_signed>> &operator[](unsigned int i) const {
     return this->value[i];
   }
   template <unsigned int Size>
@@ -433,24 +521,24 @@ class Pack1D<PEInput<Int<i_width, i_signed> >, Width> {
 };
 
 template <size_t Width, int i_width, bool i_signed>
-class Pack1D<PEWeight<Int<i_width, i_signed> >, Width> {
+class Pack1D<PEWeight<Int<i_width, i_signed>>, Width> {
  public:
-  PEWeight<Int<i_width, i_signed> > value[Width];
+  PEWeight<Int<i_width, i_signed>> value[Width];
 
   static const unsigned int width =
-      PEWeight<Int<i_width, i_signed> >::width * Width;
+      PEWeight<Int<i_width, i_signed>>::width * Width;
 
   Pack1D() {}
   Pack1D(const int a) {}
 
   operator int() const {
-    return Pack1D<PEWeight<Int<i_width, i_signed> >, Width>();
+    return Pack1D<PEWeight<Int<i_width, i_signed>>, Width>();
   }
 
-  PEWeight<Int<i_width, i_signed> > &operator[](unsigned int i) {
+  PEWeight<Int<i_width, i_signed>> &operator[](unsigned int i) {
     return this->value[i];
   }
-  const PEWeight<Int<i_width, i_signed> > &operator[](unsigned int i) const {
+  const PEWeight<Int<i_width, i_signed>> &operator[](unsigned int i) const {
     return this->value[i];
   }
   template <unsigned int Size>

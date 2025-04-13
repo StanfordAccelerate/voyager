@@ -48,10 +48,20 @@ class UFloat {
   ac_int<W, true> bits_rep() { return d; }
 
   void set_bits(const ac_int<W, true> &rhs) { d = rhs; }
-  void set_zero() { d = ac_float_rep::zero().data(); }
+
   bool is_zero() const { return d == ac_float_rep::zero().data(); }
 
-  static UFloat one() { return UFloat(ac_float_rep::one()); }
+  static UFloat zero() {
+    UFloat r;
+    r.d = ac_float_rep::zero().data();
+    return r;
+  }
+
+  static UFloat one() {
+    UFloat r;
+    r.d = ac_float_rep::one().data();
+    return r;
+  }
 
   UFloat operator*(const UFloat &rhs) const {
     if constexpr (W == E) {

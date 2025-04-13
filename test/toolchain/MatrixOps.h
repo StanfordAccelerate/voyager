@@ -162,10 +162,14 @@ void MapMatrixOperation(const Operation &operation,
   const auto input_memory = input.memory();
   accelerator_memory_map["inputs"] = get_partition(input_memory.partition());
   matrix_params->INPUT_OFFSET = input_memory.address();
+  matrix_params->input_dtype =
+      get_index_from_type_name<INPUT_DATATYPE>(input.dtype());
 
   const auto weight_memory = weight.memory();
   accelerator_memory_map["weights"] = get_partition(weight_memory.partition());
   matrix_params->WEIGHT_OFFSET = weight_memory.address();
+  matrix_params->weight_dtype =
+      get_index_from_type_name<WEIGHT_DATATYPE>(weight.dtype());
 
   matrix_params->is_mx_op = matrix_op.target().find("mx") != std::string::npos;
 

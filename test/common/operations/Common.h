@@ -4,7 +4,7 @@
 #include <vector>
 
 // clang-format off
-#include "src/DataTypes.h"
+#include "src/datatypes/DataTypes.h"
 // clang-format on
 
 #include "src/ArchitectureParams.h"

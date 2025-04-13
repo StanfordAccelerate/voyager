@@ -4,21 +4,21 @@
 #include <vector>
 
 // clang-format off
-#include "src/DataTypes.h"
+#include "src/datatypes/DataTypes.h"
 // clang-format on
 
 #include "src/ArchitectureParams.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
-template <typename Input, typename Output, typename Scale>
-Output* quantize(std::any input, std::any scale, std::vector<int> shape) {
+template <typename Input, typename Scale>
+Input* quantize(std::any input, std::any scale, std::vector<int> shape) {
   const int size = get_size(shape);
 
   Input* inputs = std::any_cast<Input*>(input);
   Scale* scales = std::any_cast<Scale*>(scale);
 
-  Output* outputs = new Output[size];
+  Input* outputs = new Input[size];
 
   for (int i = 0; i < size; i++) {
     outputs[i] = inputs[i] / (*scales);
@@ -30,10 +30,10 @@ Output* quantize(std::any input, std::any scale, std::vector<int> shape) {
   return outputs;
 }
 
-template <typename Input, typename Output, typename Scale>
-Output* quantize_mx(std::any input, std::any scale,
-                    std::vector<int> input_shape, int block_size, int axis) {
-  spdlog::debug("Performing microscaling quantization operation");
+template <typename Input, typename Scale>
+Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
+                   int block_size, int axis) {
+  spdlog::debug("Performing microscaling quantization operation\n");
 
   // Handle the case of convolutional layers
   if (axis == 1 && input_shape.size() == 4) {
@@ -54,7 +54,7 @@ Output* quantize_mx(std::any input, std::any scale,
   const int num_dims = scale_shape.size();
 
   const int output_size = get_size(input_shape);
-  Output* outputs = new Output[output_size];
+  Input* outputs = new Input[output_size];
 
   // Perform elementwise division with broadcasting
   for (int i = 0; i < output_size; ++i) {
@@ -82,42 +82,41 @@ Output* quantize_mx(std::any input, std::any scale,
 }
 
 template <typename Input, typename Output>
-Output* dequantize(std::any input, std::any scale, int size) {
-  Input* inputs = std::any_cast<Input*>(input);
-  Output* scales = std::any_cast<Output*>(scale);
-
-  Output* outputs = new Output[size];
-
-  for (int i = 0; i < size; i++) {
-    outputs[i] = static_cast<Output>(inputs[i]) * (*scales);
+bool dequantize(std::any input, std::any scale, Output*& output,
+                codegen::Tensor tensor) {
+  if (tensor.dtype() != DataTypes::TypeName<Input>::name()) {
+    return false;
   }
 
-  delete[] inputs;
-  delete[] scales;
+  Input* casted_input = std::any_cast<Input*>(input);
+  Output* casted_scale = std::any_cast<Output*>(scale);
 
-  return outputs;
+  const int size = get_size(tensor);
+  output = new Output[size];
+
+  for (int i = 0; i < size; i++) {
+    output[i] = static_cast<Output>(casted_input[i]) * (*casted_scale);
+  }
+
+  delete[] casted_input;
+  delete[] casted_scale;
+
+  return true;
+}
+
+template <typename Output, typename... Ts>
+Output* dequantize_helper(std::any input, std::any scale,
+                          codegen::Tensor tensor) {
+  Output* output = nullptr;
+  bool matched = (dequantize<Ts, Output>(input, scale, output, tensor) || ...);
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+  return output;
 }
 
 template <typename Output>
 Output* dequantize_tensor(std::any input, std::any scale,
                           codegen::Tensor tensor) {
-  if (tensor.dtype() == "int32") {
-    return dequantize<DataTypes::int32, Output>(input, scale, get_size(tensor));
-  } else if (tensor.dtype() == "int24") {
-    return dequantize<DataTypes::int24, Output>(input, scale, get_size(tensor));
-  } else if (tensor.dtype() == "int8") {
-    return dequantize<DataTypes::int8, Output>(input, scale, get_size(tensor));
-  } else if (tensor.dtype() == "fp8_e4m3") {
-    return dequantize<DataTypes::e4m3, Output>(input, scale, get_size(tensor));
-  } else if (tensor.dtype() == "posit8_1") {
-    return dequantize<DataTypes::posit8, Output>(input, scale,
-                                                 get_size(tensor));
-  } else if (tensor.dtype() == "bfloat16") {
-    return dequantize<DataTypes::bfloat16, Output>(input, scale,
-                                                   get_size(tensor));
-  } else {
-    spdlog::error("No dequantization operation for dtype: {}\n",
-                  tensor.dtype());
-    std::abort();
-  }
+  return dequantize_helper<Output, SUPPORTED_TYPES>(input, scale, tensor);
 }

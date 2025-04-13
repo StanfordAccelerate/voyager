@@ -38,7 +38,7 @@ class CFloat {
 
   void set_bits(uint32_t bits) { std::memcpy(&float_val, &bits, sizeof(bits)); }
 
-  void set_zero() { float_val = 0; }
+  static CFloat zero() { return CFloat(0.0f); }
 
   CFloat abs() const { return std::abs(float_val); }
   CFloat negate() { return -float_val; }

@@ -11,18 +11,23 @@ class StdFloat;
 template <int W, bool S>
 class Int;
 
-#include "IntTypes.h"
-#include "NormalFloat.h"
-#include "PositTypes.h"
-#include "ScaleTypes.h"
-#include "StdFloatTypes.h"
+#include "datatypes/IntTypes.h"
+#include "datatypes/NormalFloat.h"
+#include "datatypes/PositTypes.h"
+#include "datatypes/ScaleTypes.h"
+#include "datatypes/StdFloatTypes.h"
 
 #ifndef __SYNTHESIS__
-#include "CFloat.h"
+#include "datatypes/CFloat.h"
 #endif
 
 namespace DataTypes {
+typedef Int<1, true> int1;
+typedef Int<2, true> int2;
+typedef Int<4, true> int4;
+typedef Int<6, true> int6;
 typedef Int<8, true> int8;
+typedef Int<18, true> int18;
 typedef Int<16, true> int16;
 typedef Int<24, true> int24;
 typedef Int<32, true> int32;
@@ -45,6 +50,26 @@ struct TypeName {
 };
 
 template <>
+struct TypeName<int1> {
+  static std::string name() { return "int1"; }
+};
+
+template <>
+struct TypeName<int2> {
+  static std::string name() { return "int2"; }
+};
+
+template <>
+struct TypeName<int4> {
+  static std::string name() { return "int4"; }
+};
+
+template <>
+struct TypeName<int6> {
+  static std::string name() { return "int6"; }
+};
+
+template <>
 struct TypeName<int8> {
   static std::string name() { return "int8"; }
 };
@@ -52,6 +77,11 @@ struct TypeName<int8> {
 template <>
 struct TypeName<int16> {
   static std::string name() { return "int16"; }
+};
+
+template <>
+struct TypeName<int18> {
+  static std::string name() { return "int18"; }
 };
 
 template <>
@@ -106,6 +136,31 @@ struct TypeName<nf4> {
 
 };  // namespace DataTypes
 
+// clang-format off
+#define SUPPORTED_TYPES          \
+  DataTypes::int1,               \
+  DataTypes::int2,               \
+  DataTypes::int4,               \
+  DataTypes::int6,               \
+  DataTypes::int8,               \
+  DataTypes::int16,              \
+  DataTypes::int18,              \
+  DataTypes::int24,              \
+  DataTypes::int32,              \
+  DataTypes::e4m3,               \
+  DataTypes::e5m2,               \
+  DataTypes::bfloat16,           \
+  DataTypes::fp32,               \
+  DataTypes::posit8,             \
+  DataTypes::nf4,                \
+  DataTypes::fp8_e8m0,           \
+  DataTypes::fp8_e5m3
+// clang-format on
+
+// ================================================================
+// Datatype Indexing
+// ================================================================
+
 template <typename T, typename... Ts>
 struct TypeIndex;
 
@@ -133,3 +188,25 @@ int get_index_from_type_name(const std::string& dtype) {
    ...);
   return index;
 }
+
+// ================================================================
+// Datatype Concatenation
+// ================================================================
+
+// Base case: single tuple
+template <typename... Tuples>
+struct TupleConcat;
+
+template <typename... Ts>
+struct TupleConcat<std::tuple<Ts...>> {
+  using type = std::tuple<Ts...>;
+};
+
+// Recursive case: combine two or more
+template <typename... Ts1, typename... Ts2, typename... Rest>
+struct TupleConcat<std::tuple<Ts1...>, std::tuple<Ts2...>, Rest...> {
+  using type = typename TupleConcat<std::tuple<Ts1..., Ts2...>, Rest...>::type;
+};
+
+template <typename... Tuples>
+using TypeConcat = typename TupleConcat<Tuples...>::type;

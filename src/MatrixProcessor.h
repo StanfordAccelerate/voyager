@@ -6,33 +6,42 @@
 #include "ParamsDeserializer.h"
 #include "SystolicArray.h"
 
-template <typename Input, typename Weight, typename Psum, typename Buffer,
-          typename Scale, int NRows, int NCols, int BufferSize>
-SC_MODULE(MatrixProcessor) {
+template <typename InputTypeTuple, typename WeightTypeTuple, typename Input,
+          typename Weight, typename Psum, typename Buffer, typename Scale,
+          int NRows, int NCols, int BufferSize>
+struct MatrixProcessor;
+
+template <typename... InputTypes, typename... WeightTypes, typename Input,
+          typename Weight, typename Psum, typename Buffer, typename Scale,
+          int NRows, int NCols, int BufferSize>
+struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
+                       Input, Weight, Psum, Buffer, Scale, NRows, NCols,
+                       BufferSize> : public sc_module {
  private:
   Connections::SyncChannel CCS_INIT_S1(weightLoadDone);
   Connections::SyncChannel CCS_INIT_S1(weightSwapDone);
 
-  MultiInputSerializedSkewer<Input, typename Input::decoded, NRows> CCS_INIT_S1(
-      inputSkewer);
+  static constexpr int PE_INPUT_WIDTH =
+      MAX_INPUT_DTYPE_WIDTH + DTYPE_INDEX_WIDTH;
+  static constexpr int PE_WEIGHT_WIDTH =
+      MAX_WEIGHT_DTYPE_WIDTH + DTYPE_INDEX_WIDTH;
+
+  InputSerializedSkewer<Input, NRows> CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<PEInput<Input>, NRows>> CCS_INIT_S1(
       inputSkewerDin);
 
-  WeightSerializedSkewer<Weight, typename Weight::decoded, NCols> CCS_INIT_S1(
-      weightSkewer);
+  WeightSerializedSkewer<Weight, NCols> CCS_INIT_S1(weightSkewer);
   Connections::Combinational<Pack1D<PEWeight<Weight>, NCols>> CCS_INIT_S1(
       weightSkewerDin);
 
-  SerializedSkewer<Psum, Psum, NCols> CCS_INIT_S1(psumInSkewer);
+  SerializedSkewer<Psum, NCols> CCS_INIT_S1(psumInSkewer);
   Connections::Combinational<Pack1D<Psum, NCols>> CCS_INIT_S1(psumInSkewerDin);
 
-  DeserializedSkewer<Psum, Psum, NCols> CCS_INIT_S1(psumOutSkewer);
+  DeserializedSkewer<Psum, NCols> CCS_INIT_S1(psumOutSkewer);
   Connections::Combinational<Pack1D<Psum, NCols>> CCS_INIT_S1(
       psumOutSkewerDout);
 
-  SystolicArray<typename Input::decoded, typename Input::decoded, Psum, NRows,
-                NCols>
-      CCS_INIT_S1(systolicArray);
+  SystolicArray<Input, Weight, Psum, NRows, NCols> CCS_INIT_S1(systolicArray);
 
   MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
 
@@ -46,18 +55,20 @@ SC_MODULE(MatrixProcessor) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<ac_int<IC_PORT_WIDTH, false>> CCS_INIT_S1(inputsChannel);
-  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(weightsChannel);
+  Connections::In<ac_int<INPUT_BUFFER_WIDTH, false>> CCS_INIT_S1(inputsChannel);
+  Connections::In<ac_int<WEIGHT_BUFFER_WIDTH, false>> CCS_INIT_S1(
+      weightsChannel);
   Connections::In<Pack1D<Buffer, NCols>> CCS_INIT_S1(biasChannel);
   Connections::Out<Pack1D<Buffer, NCols>> CCS_INIT_S1(outputsChannel);
 
   Connections::In<int> CCS_INIT_S1(serialParamsIn);
 
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<PEInput<typename Input::decoded>>
-      inputsToSystolicArray[NRows];
-  Connections::Combinational<PEWeight<typename Weight::decoded>>
-      weightsToSystolicArray[NCols];
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(sa_controller_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(process_weight_params);
+
+  Connections::Combinational<PEInput<Input>> inputsToSystolicArray[NRows];
+  Connections::Combinational<PEWeight<Weight>> weightsToSystolicArray[NCols];
   Connections::Combinational<Psum> psumsToSystolicArray[NCols];
   Connections::Combinational<Psum> outputsFromSystolicArray[NCols];
 
@@ -137,28 +148,99 @@ SC_MODULE(MatrixProcessor) {
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 #endif
+
+    SC_THREAD(send_params);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
   }
 
   void process_weights() {
+    process_weight_params.ResetRead();
     weightsChannel.Reset();
     weightSkewerDin.ResetWrite();
 
     wait();
 
     while (true) {
-#pragma hls_pipeline_init_interval 1
-      for (int weight_count = 0; weight_count < NRows; weight_count++) {
-        auto bits = weightsChannel.Pop();
-        Pack1D<PEWeight<Weight>, NCols> weights;
-#pragma hls_unroll yes
-        for (int i = 0; i < NCols; i++) {
-          weights[i].data.set_bits(
-              bits.template slc<Weight::width>(i * Weight::width));
-          weights[i].tag = weight_count;
-        }
+      MatrixParams params = process_weight_params.Pop();
 
-        weightSkewerDin.Push(weights);
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
       }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.weightReuseIndex[0]] = 1;
+      loop_bounds[1][params.weightReuseIndex[1]] = 1;
+
+      // extra loop to control reuse which only occurs during transpose and when
+      // NCols > NRows
+      int rep_bound = 1;
+
+      if (params.has_weight_transpose && NCols > NRows) {
+        if (loop_bounds[0][params.reductionLoopIndex[0]] >= (NCols / NRows)) {
+          // we are able to reuse the weights already in the buffer
+          loop_bounds[0][params.reductionLoopIndex[0]] /= (NCols / NRows);
+          rep_bound = (NCols / NRows);
+        }
+      }
+
+      // extra loop for exploiting L1 buffer reuse.
+      // this loop is used when OX and OY are the innermost L2 loops. when this
+      // occurs, we can move OX and/or OY into the buffer reuse L1 loop
+      int buffer_reuse = 1;
+      if (params.loops[0][params.reductionLoopIndex[0]] == 1) {
+        // OX loop can be absorbed
+        if (params.weightLoopIndex[0] < params.inputXLoopIndex[0]) {
+          buffer_reuse *= loop_bounds[0][params.inputXLoopIndex[0]];
+          loop_bounds[0][params.inputXLoopIndex[0]] = 1;
+        }
+        // OY loop can be absorbed
+        if (params.weightLoopIndex[0] < params.inputYLoopIndex[0]) {
+          buffer_reuse *= loop_bounds[0][params.inputYLoopIndex[0]];
+          loop_bounds[0][params.inputYLoopIndex[0]] = 1;
+        }
+      }
+
+      ac_int<32, false> total_loops =
+          loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
+          loop_bounds[0][3] * loop_bounds[1][0] * loop_bounds[1][1] *
+          loop_bounds[1][2] * loop_bounds[1][3] * loop_bounds[1][4] *
+          buffer_reuse * rep_bound;
+
+#pragma hls_pipeline_init_interval 1
+
+      for (int i = 0; i < total_loops; i++) {
+        for (int weight_count = 0; weight_count < NRows; weight_count++) {
+          Pack1D<PEWeight<Weight>, NCols> weights;
+          auto bits = weightsChannel.Pop();
+
+#pragma hls_unroll yes
+          for (int i = 0; i < NCols; i++) {
+            auto data = bits.template slc<MAX_WEIGHT_DTYPE_WIDTH>(
+                i * MAX_WEIGHT_DTYPE_WIDTH);
+            bool success = (decode_type<WeightTypes, Weight,
+                                        MAX_WEIGHT_DTYPE_WIDTH, WeightTypes...>(
+                                params.weight_dtype, data, weights[i].data) ||
+                            ...);
+#ifndef __SYNTHESIS__
+            if (!success) {
+              std::cerr << "Error: matrix weight dtype '" << params.weight_dtype
+                        << "' is not valid" << std::endl;
+            }
+#endif
+            weights[i].tag = weight_count;
+          }
+
+          weightSkewerDin.Push(weights);
+        }
+      }
+
+      std::cerr << "process_weights done" << std::endl;
     }
   }
 
@@ -171,7 +253,7 @@ SC_MODULE(MatrixProcessor) {
   }
 
   void run() {
-    paramsIn.ResetRead();
+    sa_controller_params.ResetRead();
 
     inputSkewerDin.ResetWrite();
     inputsChannel.Reset();
@@ -192,7 +274,7 @@ SC_MODULE(MatrixProcessor) {
     wait();
 
     while (true) {
-      const MatrixParams params = paramsIn.Pop();
+      const MatrixParams params = sa_controller_params.Pop();
 
 #if SUPPORT_MX
       accumulationBufferParams.Push(params);
@@ -304,17 +386,28 @@ SC_MODULE(MatrixProcessor) {
 
         if (step < totalOps && !stallInputs) {
           auto bits = inputsChannel.Pop();
+
 #pragma hls_unroll yes
           for (int i = 0; i < NRows; i++) {
-            inputs[i].data.set_bits(
-                bits.template slc<Input::width>(i * Input::width));
+            auto data = bits.template slc<MAX_INPUT_DTYPE_WIDTH>(
+                i * MAX_INPUT_DTYPE_WIDTH);
+            bool success = (decode_type<InputTypes, Input,
+                                        MAX_INPUT_DTYPE_WIDTH, InputTypes...>(
+                                params.input_dtype, data, inputs[i].data) ||
+                            ...);
+#ifndef __SYNTHESIS__
+            if (!success) {
+              std::cerr << "Error: matrix input dtype '" << params.input_dtype
+                        << "' is not valid" << std::endl;
+            }
+#endif
           }
         }
 
         Pack1D<Psum, NCols> psum;
 #pragma hls_unroll yes
         for (int i = 0; i < NCols; i++) {
-          psum.value[i].set_zero();
+          psum.value[i] = Psum::zero();
         }
 
 #if !SUPPORT_MX
@@ -325,7 +418,6 @@ SC_MODULE(MatrixProcessor) {
             loop_counters[1][params.fxIndex] == 0 &&
             loop_counters[1][params.fyIndex] == 0;
 
-        // TODO: do we need firstAccumulation?
         if (!firstAccumulation && step < totalOps && !stallInputs) {
           ac_int<int_log2(BufferSize), false> readAddress =
               loop_counters[1][params.weightLoopIndex[1]] *
@@ -575,7 +667,7 @@ SC_MODULE(MatrixProcessor) {
 
 #pragma hls_unroll yes
         for (int i = 0; i < NCols; i++) {
-          previous_accumulation.value[i].set_zero();
+          previous_accumulation.value[i] = Buffer::zero();
         }
 
         if (firstAccumulation) {
@@ -701,4 +793,20 @@ SC_MODULE(MatrixProcessor) {
     }
   }
 #endif
+
+  void send_params() {
+    paramsIn.ResetRead();
+
+    sa_controller_params.ResetWrite();
+    process_weight_params.ResetWrite();
+
+    wait();
+
+    while (true) {
+      MatrixParams params = paramsIn.Pop();
+
+      sa_controller_params.Push(params);
+      process_weight_params.Push(params);
+    }
+  }
 };

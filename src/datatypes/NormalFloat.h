@@ -33,11 +33,10 @@ class NormalFloat4 {
 
   void set_bits(int i) { index = i; }
 
-  void set_zero() { index = 7; }
-
-  static decoded max() {
-    ac_int<6, true> r(31);
-    return decoded(r);
+  static NormalFloat4 zero() {
+    NormalFloat4 r;
+    r.index = 7;
+    return r;
   }
 
 #ifndef __SYNTHESIS__

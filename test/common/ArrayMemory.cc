@@ -1,7 +1,7 @@
 #include "test/common/ArrayMemory.h"
 
 // clang-format off
-#include "src/DataTypes.h"
+#include "src/datatypes/DataTypes.h"
 // clang-format on
 
 #include <fstream>
@@ -10,7 +10,7 @@
 #include "src/ArchitectureParams.h"
 #include "test/common/VerificationTypes.h"
 
-ArrayMemory::ArrayMemory(std::vector<long long> sizes) {
+ArrayMemory::ArrayMemory(std::vector<uint64_t> sizes) {
   memories.reserve(sizes.size());
   try {
     for (const auto size : sizes) {
@@ -100,6 +100,32 @@ std::vector<std::any> ArrayMemory::get_reference_outputs(
   return outputs;
 }
 
+template <typename T>
+bool read_tensor(ArrayMemory* mem, codegen::Tensor tensor, std::any& output) {
+  if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+    return false;
+  }
+
+  const auto& memory = tensor.memory();
+  const int size = get_size(tensor, false);
+
+  T* data = new T[size];
+  mem->read_tensor_from_memory<T>(memory.address(), memory.partition(), size,
+                                  data);
+  output = data;
+  return true;
+}
+
+template <typename... Ts>
+std::any read_tensor_helper(ArrayMemory* mem, codegen::Tensor tensor) {
+  std::any output;
+  bool matched = (read_tensor<Ts>(mem, tensor, output) || ...);
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+  return output;
+}
+
 std::any ArrayMemory::read_tensor(const codegen::Tensor& tensor) {
   int partition = tensor.memory().partition();
 
@@ -123,83 +149,39 @@ std::any ArrayMemory::read_tensor(const codegen::Tensor& tensor) {
       data[0] = scalar;
       return data;
     } else {
-      spdlog::debug("Unsupported data type for scalar tensor: {}",
+      spdlog::debug("Unsupported data type for scalar tensor: {}\n",
                     tensor.dtype());
       std::abort();
     }
   }
 
-  if (tensor.dtype() == "bfloat16") {
-    DataTypes::bfloat16* data = new DataTypes::bfloat16[size];
-    read_tensor_from_memory<DataTypes::bfloat16>(tensor.memory().address(),
-                                                 partition, size, data);
-    return data;
-  } else if (tensor.dtype() == "int8") {
-    DataTypes::int8* data = new DataTypes::int8[size];
-    read_tensor_from_memory<DataTypes::int8>(tensor.memory().address(),
-                                             partition, size, data);
-    return data;
-  } else if (tensor.dtype() == "int24") {
-    DataTypes::int24* data = new DataTypes::int24[size];
-    read_tensor_from_memory<DataTypes::int24>(tensor.memory().address(),
-                                              partition, size, data);
-    return data;
-  } else if (tensor.dtype() == "int32") {
-    DataTypes::int32* data = new DataTypes::int32[size];
-    read_tensor_from_memory<DataTypes::int32>(tensor.memory().address(),
-                                              partition, size, data);
-    return data;
-  } else if (tensor.dtype() == "fp8_e8m0") {
-    DataTypes::fp8_e8m0* data = new DataTypes::fp8_e8m0[size];
-    read_tensor_from_memory<DataTypes::fp8_e8m0>(tensor.memory().address(),
-                                                 partition, size, data);
-    return data;
-  } else if (tensor.dtype() == "fp8_e5m3") {
-    DataTypes::fp8_e5m3* data = new DataTypes::fp8_e5m3[size];
-    read_tensor_from_memory<DataTypes::fp8_e5m3>(tensor.memory().address(),
-                                                 partition, size, data);
-    return data;
-  } else {
-    INPUT_DATATYPE* data = new INPUT_DATATYPE[size];
-    read_tensor_from_memory<INPUT_DATATYPE>(tensor.memory().address(),
-                                            partition, size, data);
-    return data;
+  return read_tensor_helper<SUPPORTED_TYPES>(this, tensor);
+}
+
+template <typename T>
+bool write_tensor(ArrayMemory* mem, codegen::Tensor tensor, std::any data) {
+  if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+    return false;
+  }
+
+  const auto& memory = tensor.memory();
+  const auto size = get_size(tensor, false);
+
+  mem->write_tensor_to_memory<T>(memory.address(), memory.partition(), size,
+                                 std::any_cast<T*>(data));
+  return true;
+}
+
+template <typename... Ts>
+void write_tensor_helper(ArrayMemory* mem, codegen::Tensor tensor,
+                         std::any data) {
+  bool matched = (write_tensor<Ts>(mem, tensor, data) || ...);
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
   }
 }
 
 void ArrayMemory::write_tensor(const codegen::Tensor& tensor,
                                const std::any data) {
-  const auto& tensor_memory = tensor.memory();
-  const uint64_t address = tensor_memory.address();
-  const int partition = tensor_memory.partition();
-
-  int size = 1;
-  for (const auto& dim : tensor.shape()) {
-    size *= dim;
-  }
-
-  const auto dtype = tensor.dtype();
-  if (dtype == "bfloat16") {
-    write_tensor_to_memory<DataTypes::bfloat16>(
-        address, partition, size, std::any_cast<DataTypes::bfloat16*>(data));
-  } else if (dtype == "int8") {
-    write_tensor_to_memory<DataTypes::int8>(
-        address, partition, size, std::any_cast<DataTypes::int8*>(data));
-  } else if (dtype == "int24") {
-    write_tensor_to_memory<DataTypes::int24>(
-        address, partition, size, std::any_cast<DataTypes::int24*>(data));
-  } else if (dtype == "int32") {
-    write_tensor_to_memory<DataTypes::int32>(
-        address, partition, size, std::any_cast<DataTypes::int32*>(data));
-  } else if (dtype == "fp8_e8m0") {
-    write_tensor_to_memory<DataTypes::fp8_e8m0>(
-        address, partition, size, std::any_cast<DataTypes::fp8_e8m0*>(data));
-  } else if (dtype == "fp8_e5m3") {
-    write_tensor_to_memory<DataTypes::fp8_e5m3>(
-        address, partition, size, std::any_cast<DataTypes::fp8_e5m3*>(data));
-  } else {
-    // Default to INPUT_DATATYPE
-    write_tensor_to_memory<INPUT_DATATYPE>(
-        address, partition, size, std::any_cast<INPUT_DATATYPE*>(data));
-  }
+  write_tensor_helper<SUPPORTED_TYPES>(this, tensor, data);
 }
