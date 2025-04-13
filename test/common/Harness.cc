@@ -18,8 +18,7 @@ void register_interface(
     std::deque<sc_lv<Wrapped<int>::width>> *serialMatrixParamsIn,
     std::deque<sc_lv<Wrapped<int>::width>> *serialVectorParamsIn,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *inputAddressRequest,
-    std::deque<sc_lv<Wrapped<ac_int<IC_PORT_WIDTH, false>>::width>>
-        *inputAddressResponse,
+    std::deque<sc_lv<Wrapped<IC_PORT_TYPE>::width>> *inputAddressResponse,
     std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *weightAddressRequest,
     std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
         *weightAddressResponse,

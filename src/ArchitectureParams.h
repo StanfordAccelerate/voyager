@@ -230,9 +230,13 @@ using MatrixWeightTypes = std::tuple<WEIGHT_DATATYPE>;
 #define IC_PORT_WIDTH (IC_DIMENSION * MAX_INPUT_DTYPE_WIDTH)
 #endif
 
+#define IC_PORT_TYPE ac_int<IC_PORT_WIDTH, false>
+
 #ifndef OC_PORT_WIDTH
 #define OC_PORT_WIDTH (OC_DIMENSION * MAX_WEIGHT_DTYPE_WIDTH)
 #endif
+
+#define OC_PORT_TYPE ac_int<OC_PORT_WIDTH, false>
 
 // ================================================================
 // Buffer Configurations

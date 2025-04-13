@@ -94,15 +94,14 @@ SC_MODULE(ProcessingElement) {
     stored_weight.ResetRead();
 
 #pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode bubble
+#pragma hls_pipeline_stall_mode flush
     while (true) {
       PEInput<Input> input = input_in.Pop();
+      Psum psum = psum_in.Pop();
 
       if (input.swapWeights) {
         weight_reg = stored_weight.Pop();
       }
-
-      Psum psum = psum_in.Pop();
 
       input_out.Push(input);
 

@@ -4,21 +4,22 @@
 #include "xtensor/xadapt.hpp"
 #include "xtensor/xarray.hpp"
 
-DataLoader::DataLoader(ArrayMemory* memory, bool is_dut, bool is_cnn)
-    : memory(memory), is_dut(is_dut), is_cnn(is_cnn) {}
+DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut,
+                       bool is_cnn)
+    : memory_interface(memory_interface), is_dut(is_dut), is_cnn(is_cnn) {}
 
 template <typename T>
-bool write_data(ArrayMemory* memory, uint64_t offset, int partition,
+bool write_data(MemoryInterface* memory, uint64_t offset, int partition,
                 int address, float value, std::string dtype) {
   if (dtype == DataTypes::TypeName<T>::name()) {
-    memory->write_data_to_memory<T>(offset, partition, address, value);
+    memory->write_value_to_memory<T>(offset, partition, address, value);
     return true;
   }
   return false;
 }
 
 template <typename... Ts>
-void write_data_helper(ArrayMemory* memory, uint64_t offset, int partition,
+void write_data_helper(MemoryInterface* memory, uint64_t offset, int partition,
                        int address, float value, std::string dtype) {
   bool matched =
       (write_data<Ts>(memory, offset, partition, address, value, dtype) || ...);
@@ -73,8 +74,8 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
 
   int address = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
-    write_data_helper<SUPPORTED_TYPES>(memory, offset, partition, address, *it,
-                                       tensor.dtype());
+    write_data_helper<SUPPORTED_TYPES>(memory_interface, offset, partition,
+                                       address, *it, tensor.dtype());
 
     address++;
     if (replication && address % IC_DIMENSION == packing_factor) {

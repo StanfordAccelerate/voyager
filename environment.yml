@@ -1,15 +1,14 @@
 name: accelerator-env
 channels:
-  - pytorch
   - conda-forge
 dependencies:
   - libprotobuf
-  - python=3.9
-  - pytorch==2.3.1
-  - torchvision==0.18.1
-  - torchaudio==2.3.1
+  - python>=3.9,<3.11
   - pip
   - pip:
+      - torch==2.3.1
+      - torchvision==0.18.1
+      - torchaudio==2.3.1
       - deepdiff
       - xonsh
       - git+https://github.com/mflowgen/mflowgen.git@69412255acc2c509e98105804e5a97d9738ddfe1#egg=mflowgen

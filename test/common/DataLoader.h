@@ -10,13 +10,13 @@
 // clang-format on
 
 #include "src/ArchitectureParams.h"
-#include "test/common/ArrayMemory.h"
+#include "test/common/MemoryInterface.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
 class DataLoader {
  public:
-  DataLoader(ArrayMemory*, bool, bool);
+  DataLoader(MemoryInterface*, bool, bool);
 
   void load_inputs(const codegen::Operation param, std::string data_dir,
                    bool random_data = false);
@@ -27,7 +27,7 @@ class DataLoader {
   float* read_tensor_from_file(const std::string& filename, int size);
 
  private:
-  ArrayMemory* memory;
+  MemoryInterface* memory_interface;
   // special addressing is sometimes needed for DUT memory (ex. replication)
   bool is_dut;
   bool is_cnn;

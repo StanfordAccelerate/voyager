@@ -1,6 +1,7 @@
 #pragma once
 
-template <typename VectorType, int Width, typename... InputTypes>
+template <typename VectorType, typename BufferType, int Width,
+          typename... InputTypes>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -10,10 +11,19 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
 
+  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
+  Connections::SyncOut accumulation_buffer_done[2];
+
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_0_resp_in);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_0_data_out);
+
+  Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
+  Connections::Out<BufferWriteRequest<Pack1D<BufferType, Width>>>
+      accumulation_buffer_write_request[2];
+  Connections::Out<Pack1D<BufferType, Width>> CCS_INIT_S1(
+      accumulationBufferOutput);
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_1_resp_in);
@@ -67,6 +77,12 @@ SC_MODULE(VectorFetchUnit) {
   void fetch_address_0() {
     addr_gen0_params.ResetRead();
     vector_fetch_0_request_out.Reset();
+    accumulation_buffer_read_address[0].Reset();
+    accumulation_buffer_read_address[1].Reset();
+    accumulation_buffer_done[0].Reset();
+    accumulation_buffer_done[1].Reset();
+
+    bool accumulation_buffer_bank = 0;
 
     wait();
 
@@ -144,6 +160,7 @@ SC_MODULE(VectorFetchUnit) {
                      loop_counters[1][2] < loop_ends[1][2];
                      loop_counters[1][2] += loop_steps[1][2]) {
                   ac_int<32, false> address;
+                  bool switch_accumulation_buffer_bank = false;
                   if (params.addr_gen0_mode == 1) {
                     ac_int<11, false> x0 =
                         loop_counters[1][params.addr_gen0_x_loop_idx[1]];
@@ -217,20 +234,53 @@ SC_MODULE(VectorFetchUnit) {
                          indices[3] * loop_bounds[4] * loop_bounds[5] +
                          indices[4] * loop_bounds[5] + indices[5]) *
                         Width;
+                  } else if (params.addr_gen0_mode == 3) {
+                    // read from accumulation buffer
+                    ac_int<11, false> x0 =
+                        loop_counters[1][params.addr_gen0_x_loop_idx[1]];
+                    ac_int<11, false> x1 =
+                        loop_counters[0][params.addr_gen0_x_loop_idx[0]];
+                    ac_int<11, false> y0 =
+                        loop_counters[1][params.addr_gen0_y_loop_idx[1]];
+                    ac_int<11, false> y1 =
+                        loop_counters[0][params.addr_gen0_y_loop_idx[0]];
+                    ac_int<11, false> k0 =
+                        loop_counters[1][params.addr_gen0_k_loop_idx[1]];
+                    ac_int<11, false> k1 =
+                        loop_counters[0][params.addr_gen0_k_loop_idx[0]];
+
+                    address = k0 * Y0 * X0 + y0 * X0 + x0;
+
+                    if (k0 == K0 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
+                      switch_accumulation_buffer_bank = true;
+                    }
                   }
 
-                  bool found =
-                      (fetch_vector_input<InputTypes, Width, InputTypes...>(
-                           params.addr_gen0_dtype, address,
-                           params.VECTOR_OFFSET, vector_fetch_0_request_out) ||
-                       ...);
+                  if (params.addr_gen0_mode == 1 ||
+                      params.addr_gen0_mode == 2) {
+                    bool found =
+                        (fetch_vector_input<InputTypes, Width, InputTypes...>(
+                             params.addr_gen0_dtype, address,
+                             params.VECTOR_OFFSET,
+                             vector_fetch_0_request_out) ||
+                         ...);
 
 #ifndef __SYNTHESIS__
-                  if (!found) {
-                    std::cerr << "Error: vector input 0 dtype '"
-                              << params.addr_gen0_dtype << "' is not valid.\n";
-                  }
+                    if (!found) {
+                      std::cerr << "Error: vector input 0 dtype '"
+                                << params.addr_gen0_dtype
+                                << "' is not valid.\n";
+                    }
 #endif
+                  } else {
+                    accumulation_buffer_read_address[accumulation_buffer_bank]
+                        .Push(address);
+                    if (switch_accumulation_buffer_bank) {
+                      accumulation_buffer_done[accumulation_buffer_bank]
+                          .SyncPush();
+                      accumulation_buffer_bank = !accumulation_buffer_bank;
+                    }
+                  }
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -264,6 +314,13 @@ SC_MODULE(VectorFetchUnit) {
     vector_fetch_0_resp_in.Reset();
     vector_fetch_0_data_out.Reset();
     data_resp_0_params.ResetRead();
+
+    accumulation_buffer_read_data[0].Reset();
+    accumulation_buffer_read_data[1].Reset();
+    accumulation_buffer_write_request[0].Reset();
+    accumulation_buffer_write_request[1].Reset();
+
+    bool accumulation_buffer_bank = 0;
 
     wait();
 
@@ -355,6 +412,87 @@ SC_MODULE(VectorFetchUnit) {
                 }
               }
             }
+          }
+        }
+      } else if (params.addr_gen0_mode == 3) {
+        ac_int<11, false> Y1 =
+            params.addr_gen0_loops[0][params.addr_gen0_y_loop_idx[0]];
+        ac_int<11, false> X1 =
+            params.addr_gen0_loops[0][params.addr_gen0_x_loop_idx[0]];
+        ac_int<11, false> K1 =
+            params.addr_gen0_loops[0][params.addr_gen0_k_loop_idx[0]];
+        ac_int<11, false> Y0 =
+            params.addr_gen0_loops[1][params.addr_gen0_y_loop_idx[1]];
+        ac_int<11, false> X0 =
+            params.addr_gen0_loops[1][params.addr_gen0_x_loop_idx[1]];
+        ac_int<11, false> K0 =
+            params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = loop_starts[0][0];
+             loop_counters[0][0] < loop_ends[0][0];
+             loop_counters[0][0] += loop_steps[0][0]) {
+          for (loop_counters[0][1] = loop_starts[0][1];
+               loop_counters[0][1] < loop_ends[0][1];
+               loop_counters[0][1] += loop_steps[0][1]) {
+            for (loop_counters[0][2] = loop_starts[0][2];
+                 loop_counters[0][2] < loop_ends[0][2];
+                 loop_counters[0][2] += loop_steps[0][2]) {
+              for (loop_counters[1][0] = loop_starts[1][0];
+                   loop_counters[1][0] < loop_ends[1][0];
+                   loop_counters[1][0] += loop_steps[1][0]) {
+                for (loop_counters[1][1] = loop_starts[1][1];
+                     loop_counters[1][1] < loop_ends[1][1];
+                     loop_counters[1][1] += loop_steps[1][1]) {
+                  for (loop_counters[1][2] = loop_starts[1][2];
+                       loop_counters[1][2] < loop_ends[1][2];
+                       loop_counters[1][2] += loop_steps[1][2]) {
+                    Pack1D<BufferType, Width> read_data =
+                        accumulation_buffer_read_data[accumulation_buffer_bank]
+                            .Pop();
+                    accumulationBufferOutput.Push(read_data);
+
+                    ac_int<11, false> x0 =
+                        loop_counters[1][params.addr_gen0_x_loop_idx[1]];
+                    ac_int<11, false> x1 =
+                        loop_counters[0][params.addr_gen0_x_loop_idx[0]];
+                    ac_int<11, false> y0 =
+                        loop_counters[1][params.addr_gen0_y_loop_idx[1]];
+                    ac_int<11, false> y1 =
+                        loop_counters[0][params.addr_gen0_y_loop_idx[0]];
+                    ac_int<11, false> k0 =
+                        loop_counters[1][params.addr_gen0_k_loop_idx[1]];
+                    ac_int<11, false> k1 =
+                        loop_counters[0][params.addr_gen0_k_loop_idx[0]];
+
+                    if (k0 == K0 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
+                      accumulation_buffer_bank = !accumulation_buffer_bank;
+                    }
+                    if (loop_counters[1][2] >=
+                        loop_ends[1][2] - loop_steps[1][2]) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >=
+                      loop_ends[1][1] - loop_steps[1][1]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][0] >= loop_ends[1][0] - loop_steps[1][0]) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_ends[0][2] - loop_steps[0][2]) {
+                break;
+              }
+            }
+            if (loop_counters[0][1] >= loop_ends[0][1] - loop_steps[0][1]) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_ends[0][0] - loop_steps[0][0]) {
+            break;
           }
         }
       } else {

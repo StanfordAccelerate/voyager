@@ -7,247 +7,140 @@ from quantized_training.codegen import param_pb2
 from proto import tiling_pb2
 
 
-def calculate_runtime(architecture, layer, mapping):
-    # time for 1 tile = max(weight loading time, tile size)
-    # time for N non-accumulating tiles:
-    # - time for 1 tile * N non-accumulating tiles
-    # time for N accumulating tiles:
-    # - max(tile latency, tile size) * N accumulating tiles
-    # L1 time = max(L1 computation time, input buffer loading time, weight buffer loading time)
-    # total time = L2 blocks * L1 time
+class RuntimeCalculator:
+    def __init__(self, operation):
+        self.operation = operation
 
-    # time for 1 tile = max(weight loading time, tile size)
+    def calculate_runtime(self, architecture, layer, mapping):
+        # time for 1 tile = max(weight loading time, tile size)
+        # time for N non-accumulating tiles:
+        # - time for 1 tile * N non-accumulating tiles
+        # time for N accumulating tiles:
+        # - max(tile latency, tile size) * N accumulating tiles
+        # L1 time = max(L1 computation time, input buffer loading time, weight buffer loading time)
+        # total time = L2 blocks * L1 time
 
-    # tile_size = innermost loops that use OX and/or OY
+        # time for 1 tile = max(weight loading time, tile size)
 
-    # index of first loop that isn't OX or OY
-    first_non_ox_oy_index = 6
-    for i in range(interstellar.le.NUM):
-        if i == interstellar.le.OX or i == interstellar.le.OY:
-            continue
-        if mapping.loop_orders[i][1] < first_non_ox_oy_index:
-            first_non_ox_oy_index = mapping.loop_orders[i][1]
+        # tile_size = innermost loops that use OX and/or OY
 
-    tile_size = 1
-    tile_count = 1
-    for i in range(interstellar.le.NUM):
-        if mapping.loop_orders[i][1] < first_non_ox_oy_index:
-            tile_size *= mapping.loop_blockings[i][1]
-        else:
-            tile_count *= mapping.loop_blockings[i][1]
+        # index of first loop that isn't OX or OY
+        first_non_ox_oy_index = 6
+        for i in range(interstellar.le.NUM):
+            if i == interstellar.le.OX or i == interstellar.le.OY:
+                continue
+            if mapping.loop_orders[i][1] < first_non_ox_oy_index:
+                first_non_ox_oy_index = mapping.loop_orders[i][1]
 
-    # assume IC is unrolled vertically
-    # does not handle replication
-    weight_loading_time = mapping.loop_partitionings[interstellar.le.IC][0]
+        tile_size = 1
+        tile_count = 1
+        for i in range(interstellar.le.NUM):
+            if mapping.loop_orders[i][1] < first_non_ox_oy_index:
+                tile_size *= mapping.loop_blockings[i][1]
+            else:
+                tile_count *= mapping.loop_blockings[i][1]
 
-    # assume that IC is the outermost loop, from the schedule hint
-    is_accumulating_tile = (
-        mapping.loop_orders[interstellar.le.FX][1]
-        < mapping.loop_orders[interstellar.le.OC][1]
-        or mapping.loop_orders[interstellar.le.FY][1]
-        < mapping.loop_orders[interstellar.le.OC][1]
-    )
+        # assume IC is unrolled vertically
+        # does not handle replication
+        weight_loading_time = mapping.loop_partitionings[interstellar.le.IC][0] + 2
 
-    systolic_array_latency = (
-        mapping.loop_partitionings[interstellar.le.IC][0] * 3
-        + mapping.loop_partitionings[interstellar.le.OC][0]
-    )
-
-    if is_accumulating_tile:
-        time_per_tile = max(systolic_array_latency, weight_loading_time, tile_size)
-    else:
-        time_per_tile = max(weight_loading_time, tile_size)
-
-    computation_l1_time = tile_count * time_per_tile
-
-    input_relevant_loops = [interstellar.le.IC, interstellar.le.OY, interstellar.le.OX]
-    input_buffer_loading_size = 1
-    for loop in input_relevant_loops:
-        input_buffer_loading_size *= mapping.loop_blockings[loop][1]
-    # currently assume that the input buffer is loaded in one cycle
-    input_buffer_loading_time = 1
-
-    weight_relevant_loops = [
-        interstellar.le.IC,
-        interstellar.le.OC,
-        interstellar.le.FY,
-        interstellar.le.FX,
-    ]
-    weight_buffer_loading_size = 1
-    for loop in weight_relevant_loops:
-        weight_buffer_loading_size *= mapping.loop_blockings[loop][1]
-    # currently assume that the weight buffer is loaded in one cycle
-    weight_buffer_loading_time = 1
-
-    # assume that writing out from accumulation buffer will not stall the system
-    l1_time = max(
-        computation_l1_time, input_buffer_loading_time, weight_buffer_loading_time
-    )
-
-    l2_blocks = 1
-    for i in range(interstellar.le.NUM):
-        l2_blocks *= mapping.loop_blockings[i][2]
-
-    # assumes 3 level memory hierarchy
-    total_time = l2_blocks * l1_time
-    return total_time
-
-
-def calculate_cost(architecture, layer, mapping):
-    """
-    Calculate the cost of a given mapping. Print the schedule and loop nest, as well as the number of accesses per level and total energy.
-    """
-    print("*" * 80)
-    print("Details of the mapping:")
-    interstellar.utils.print_tiling(mapping)
-
-    total_cost, total_access_cost, access_list = interstellar.cost_model.get_cost(
-        architecture, mapping, layer
-    )
-
-    valid_mapping = valid = [
-        interstellar.cost_model.valid_blocking_size_current_level(
-            architecture, mapping, layer, i
+        # assume that IC is the outermost loop, from the schedule hint
+        is_accumulating_tile = (
+            mapping.loop_orders[interstellar.le.FX][1]
+            < mapping.loop_orders[interstellar.le.OC][1]
+            or mapping.loop_orders[interstellar.le.FY][1]
+            < mapping.loop_orders[interstellar.le.OC][1]
         )
-        for i in range(3)
-    ]
 
-    print("Valid mapping:", valid_mapping)
-    # print total_cost in scientific notation
-    print("Total energy (pJ): {:.2e}".format(total_cost))
-    print("Total access energy (pJ):", total_access_cost)
-    print("Access breakdown:")
-    print(access_list)
+        systolic_array_latency = (
+            mapping.loop_partitionings[interstellar.le.IC][0] * 3
+            + mapping.loop_partitionings[interstellar.le.OC][0]
+        )
 
-    print("*" * 80)
+        if is_accumulating_tile:
+            time_per_tile = max(systolic_array_latency, weight_loading_time, tile_size)
+        else:
+            time_per_tile = max(weight_loading_time, tile_size)
 
+        computation_l1_time = tile_count * time_per_tile
 
-def find_best_schedule():
-    # Create an accelerator configuration
-    architecture = interstellar.Resource(
-        buf_capacity_list=[
-            [1, 1, 1],  # PE register file
-            [1024 * 16, 1024 * 16, 1024 * 16],  # L1 buffer
-            [12 * 1024 * 1024],  # L2 main memory
-        ],
-        memory_partitions=[[0, 1, 2], [0, 1, 2], [0, 0, 0]],
-        buf_access_cost_list=[[1, 1, 1], [10, 10, 10], [100]],
-        buf_unit_static_cost_list=[[0, 0, 0], [0, 0, 0], [0]],
-        para_count_list=[256, 1, 1],  # 16x16
-        mac_capacity=0,
-        partition_mode=[0, 0, 0],
-        invalid_underutilized=False,
-    )
+        input_relevant_loops = [
+            interstellar.le.IC,
+            interstellar.le.OY,
+            interstellar.le.OX,
+        ]
+        input_buffer_loading_size = 1
+        for loop in input_relevant_loops:
+            input_buffer_loading_size *= mapping.loop_blockings[loop][1]
+        # currently assume that each value in the input buffer is loaded in one cycle
+        input_buffer_loading_time = input_buffer_loading_size
 
-    # submodule_1
-    layer = interstellar.Layer(
-        nifm=64,
-        nofm=64,
-        wofm=56,
-        hofm=56,
-        wfil=3,
-        hfil=3,
-    )
+        weight_relevant_loops = [
+            interstellar.le.IC,
+            interstellar.le.OC,
+            interstellar.le.FY,
+            interstellar.le.FX,
+        ]
+        weight_buffer_loading_size = 1
+        for loop in weight_relevant_loops:
+            weight_buffer_loading_size *= mapping.loop_blockings[loop][1]
+        # currently assume that each value in the weight buffer is loaded in one cycle
+        weight_buffer_loading_time = weight_buffer_loading_size
 
-    # create schedule
-    CK_dataflow = {
-        "schedule_hint": {
-            "IC": {
-                "level0": {"order": 1, "partitioning_size": 16},
-                "level1": {"order": -1},
-                "level2": {"order": 0},
-            },
-            "OC": {"level0": {"order": 0, "partitioning_size": 16}},
-            "FX": {
-                "level0": {"blocking_size": 1, "partitioning_size": 1},
-                "level2": {"blocking_size": 1, "partitioning_size": 1},
-            },
-            "FY": {
-                "level0": {"blocking_size": 1, "partitioning_size": 1},
-                "level2": {"blocking_size": 1, "partitioning_size": 1},
-            },
-        }
-    }
+        # calculate time for vector unit to process values from the accumulation buffer
+        # for now, let's assume that all vector unit operations flow through the vector unit pipeline once.
+        # the only thing that matters then is if the other operand or the outputs are in high precision, which will 2x the time
+        output_relevant_loops = [
+            interstellar.le.OC,
+            interstellar.le.OY,
+            interstellar.le.OX,
+        ]
+        output_size = 1
+        for loop in output_relevant_loops:
+            output_size *= mapping.loop_blockings[loop][1]
+        vector_unit_time = output_size
+        if self.operation.WhichOneof("op_type") == "fused_op":
+            input_precision = (
+                self.operation.fused_op.op_list[0].kwargs["input"].tensor.dtype
+            )
+            requires_high_precision = False
+            # check if any of the operands are in high precision or
+            for i in range(1, len(self.operation.fused_op.op_list)):
+                vector_op = self.operation.fused_op.op_list[i]
+                if "other" in vector_op.kwargs:
+                    if vector_op.kwargs["other"].tensor.dtype != input_precision:
+                        requires_high_precision = True
+                        break
+            if self.operation.output.dtype != input_precision:
+                requires_high_precision = True
 
-    # C|K dataflow
-    schedule = interstellar.extract_input.extract_schedule_info(CK_dataflow, 3)
-    schedule = interstellar.Schedule(
-        schedule["schedule_hint"], schedule["partition_loops"]
-    )
+            if requires_high_precision:
+                vector_unit_time *= 2
 
-    cost, mapping, perf = interstellar.optimizer.opt_optimizer(
-        architecture, layer, schedule, True
-    )
+        vector_unit_time = 1
 
-    calculate_cost(architecture, layer, mapping)
-    # interstellar.utils.print_best_schedule(mapping)
-    # interstellar.utils.print_loop_nest(mapping)
-    # interstellar.cost_model.get_fl_access(0, mapping, layer)
+        # assume that writing out from accumulation buffer will not stall the system
+        l1_time = max(
+            computation_l1_time,
+            input_buffer_loading_time,
+            weight_buffer_loading_time,
+            vector_unit_time,
+        )
 
-    custom_mapping = interstellar.MappingPoint(
-        loop_order_list=[
-            (6, 2, 6),
-            (6, 3, 6),
-            (6, 0, 1),
-            (6, 1, 2),
-            (0, 6, 0),
-            (1, 4, 6),
-            (6, 6, 6),
-        ],
-        loop_blockings_list=[
-            (1, 3, 1),
-            (1, 3, 1),
-            (1, 28, 2),
-            (1, 28, 2),
-            (1, 1, 4),
-            (1, 4, 1),
-            (1, 1, 1),
-        ],
-        loop_partitionings_list=[
-            (1, 1, 1),
-            (1, 1, 1),
-            (1, 1, 1),
-            (1, 1, 1),
-            (16, 1, 1),
-            (16, 1, 1),
-            (1, 1, 1),
-        ],
-        para_loop_dim_list=([[4], [5]], None, None),
-    )
-    # calculate_cost(architecture, layer, custom_mapping)
+        l2_blocks = 1
+        for i in range(interstellar.le.NUM):
+            l2_blocks *= mapping.loop_blockings[i][2]
 
-    # hand-mapped schedule
-    custom_mapping = interstellar.MappingPoint(
-        loop_order_list=[
-            (6, 2, 6),
-            (6, 3, 6),
-            (6, 0, 2),
-            (6, 1, 3),
-            (0, 6, 1),
-            (1, 4, 0),
-            (6, 6, 6),
-        ],
-        loop_blockings_list=[
-            (1, 3, 1),
-            (1, 3, 1),
-            (1, 28, 2),
-            (1, 28, 2),
-            (1, 1, 4),
-            (1, 1, 4),
-            (1, 1, 1),
-        ],
-        loop_partitionings_list=[
-            (1, 1, 1),
-            (1, 1, 1),
-            (1, 1, 1),
-            (1, 1, 1),
-            (16, 1, 1),
-            (16, 1, 1),
-            (1, 1, 1),
-        ],
-        para_loop_dim_list=([[4], [5]], None, None),
-    )
-    calculate_cost(architecture, layer, custom_mapping)
+        # assumes 3 level memory hierarchy
+        total_time = (
+            # initial buffer loading time
+            max(input_buffer_loading_time, weight_buffer_loading_time)
+            + l2_blocks * l1_time
+            # time for last tile to be processed by vector unit
+            + vector_unit_time
+        )
+
+        return total_time
 
 
 def main():
@@ -334,7 +227,7 @@ def main():
     # generate tilings for all matrix operations
     tilings = tiling_pb2.ModelTiling()
     for param in params.ops:
-        if param.WhichOneof('op_type') == 'op':
+        if param.WhichOneof("op_type") == "op":
             matrix_op = param.op
             param_name = matrix_op.name
         else:
@@ -342,7 +235,12 @@ def main():
             param_name = param.fused_op.name
 
         if matrix_op.target not in [
-            "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx"
+            "conv2d",
+            "linear",
+            "matmul",
+            "conv2d_mx",
+            "linear_mx",
+            "matmul_mx",
         ]:
             continue
 
@@ -435,12 +333,14 @@ def main():
 
         print(f"Finding tiling for {param_name}")
 
+        runtime_calculator = RuntimeCalculator(param)
+
         cost, runtime, mapping, perf = interstellar.optimizer.opt_optimizer(
-            architecture, layer, schedule, calculate_runtime, True
+            architecture, layer, schedule, runtime_calculator.calculate_runtime, True
         )
 
-        total_cost, total_access_cost, access_list = (
-            interstellar.cost_model.get_cost(architecture, mapping, layer)
+        total_cost, total_access_cost, access_list = interstellar.cost_model.get_cost(
+            architecture, mapping, layer
         )
 
         interstellar.utils.print_tiling(mapping)

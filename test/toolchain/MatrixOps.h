@@ -357,7 +357,35 @@ void MapMatrixOperation(const Operation &operation,
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
-  vector_params->addr_gen0_mode = 0;  // use matrix unit outputs
+  vector_params->addr_gen0_mode = 3;  // read from accumulation buffer
+  // Set outer loops
+  for (int i = 0; i < 3; i++) {
+    vector_params->addr_gen0_loops[0][i] = tiling.loops[0][i];
+  }
+  vector_params->addr_gen0_y_loop_idx[0] = tiling.y_loop_index[0];
+  vector_params->addr_gen0_x_loop_idx[0] = tiling.x_loop_index[0];
+  vector_params->addr_gen0_k_loop_idx[0] = tiling.weight_loop_index[0];
+
+  // Set inner loops
+  int addressGen0LoopIndex = 0;
+  for (int i = 0; i < 6; i++) {
+    // ignore the loops not present in outputs (reduction, fx, fy)
+    if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
+        i == tiling.y_loop_index[1]) {
+      vector_params->addr_gen0_loops[1][addressGen0LoopIndex] =
+          tiling.loops[1][i];
+      if (i == tiling.y_loop_index[1]) {
+        vector_params->addr_gen0_y_loop_idx[1] = addressGen0LoopIndex;
+      }
+      if (i == tiling.x_loop_index[1]) {
+        vector_params->addr_gen0_x_loop_idx[1] = addressGen0LoopIndex;
+      }
+      if (i == tiling.weight_loop_index[1]) {
+        vector_params->addr_gen0_k_loop_idx[1] = addressGen0LoopIndex;
+      }
+      addressGen0LoopIndex++;
+    }
+  }
 
   codegen::Tensor output;
   if (param.has_output()) {

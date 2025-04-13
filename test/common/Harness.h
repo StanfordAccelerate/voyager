@@ -70,9 +70,8 @@ SC_MODULE(Harness) {
   CombinationalInterface<int> CCS_INIT_S1(serialVectorParamsIn);
 
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
-  sc_fifo<ac_int<IC_PORT_WIDTH, false>> inputDataResponse_fifo;
-  CombinationalInterface<ac_int<IC_PORT_WIDTH, false>> CCS_INIT_S1(
-      inputDataResponse);
+  sc_fifo<IC_PORT_TYPE> inputDataResponse_fifo;
+  CombinationalInterface<IC_PORT_TYPE> CCS_INIT_S1(inputDataResponse);
 
 #if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(

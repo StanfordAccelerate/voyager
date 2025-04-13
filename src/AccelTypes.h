@@ -150,6 +150,8 @@ class Pack1D {
   }
 };
 
+// TODO: is there a way to make this more generic?
+
 template <size_t Width, int W>
 class Pack1D<PEInput<ac_int<W, false>>, Width> {
  public:
@@ -237,8 +239,6 @@ class Pack1D<PEWeight<ac_int<W, false>>, Width> {
     return true;
   }
 };
-
-// TODO: is there a way to make this more generic?
 
 template <size_t Width, int nbits, int es>
 class Pack1D<PEInput<Posit<nbits, es>>, Width> {
@@ -710,17 +710,19 @@ class Pack1D<UFloat<W, E>, Width> {
   }
 };
 
-template <size_t Width>
+template <typename T>
 struct BufferWriteRequest {
   ac_int<16, false> address;
-  ac_int<Width, false> data;
+  T data;
+  bool last;
 
-  static const unsigned int width = 16 + Width;
+  static const unsigned int width = 16 + T::width + 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {
     m & address;
     m & data;
+    m & last;
   }
 
   inline friend void sc_trace(sc_trace_file *tf,
@@ -728,19 +730,89 @@ struct BufferWriteRequest {
                               const std::string &name) {
     sc_trace(tf, bufWrite.address, name + ".address");
     sc_trace(tf, bufWrite.data, name + ".data");
+    sc_trace(tf, bufWrite.last, name + ".last");
   }
 
   inline friend std::ostream &operator<<(ostream &os,
                                          const BufferWriteRequest &bufWrite) {
     os << bufWrite.address << " ";
     os << bufWrite.data << " ";
+    os << bufWrite.last << " ";
 
     return os;
   }
 
   inline friend bool operator==(const BufferWriteRequest &lhs,
                                 const BufferWriteRequest &rhs) {
-    return lhs.address == rhs.address && lhs.data == rhs.data;
+    return lhs.address == rhs.address && lhs.data == rhs.data &&
+           lhs.last == rhs.last;
+  }
+};
+
+struct BufferReadRequest {
+  ac_int<16, false> address;
+  bool last;
+
+  static const unsigned int width = 16 + 1;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m & address;
+    m & last;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf,
+                              const BufferReadRequest &bufRead,
+                              const std::string &name) {
+    sc_trace(tf, bufRead.address, name + ".address");
+    sc_trace(tf, bufRead.last, name + ".last");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os,
+                                         const BufferReadRequest &bufRead) {
+    os << bufRead.address << " ";
+    os << bufRead.last << " ";
+
+    return os;
+  }
+
+  inline friend bool operator==(const BufferReadRequest &lhs,
+                                const BufferReadRequest &rhs) {
+    return lhs.address == rhs.address && lhs.last == rhs.last;
+  }
+};
+
+template <typename T>
+struct BufferReadResponse {
+  T data;
+  bool last;
+
+  static const unsigned int width = T::width + 1;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m & data;
+    m & last;
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf,
+                              const BufferReadResponse &bufWrite,
+                              const std::string &name) {
+    sc_trace(tf, bufWrite.data, name + ".data");
+    sc_trace(tf, bufWrite.last, name + ".last");
+  }
+
+  inline friend std::ostream &operator<<(ostream &os,
+                                         const BufferReadResponse &bufWrite) {
+    os << bufWrite.data << " ";
+    os << bufWrite.last << " ";
+
+    return os;
+  }
+
+  inline friend bool operator==(const BufferReadResponse &lhs,
+                                const BufferReadResponse &rhs) {
+    return lhs.data == rhs.data && lhs.last == rhs.last;
   }
 };
 
