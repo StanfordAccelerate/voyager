@@ -66,8 +66,8 @@ SC_MODULE(Harness) {
   sc_clock CCS_INIT_S1(clk);
   sc_signal<bool> CCS_INIT_S1(rstn);
 
-  CombinationalInterface<int> CCS_INIT_S1(serialMatrixParamsIn);
-  CombinationalInterface<int> CCS_INIT_S1(serialVectorParamsIn);
+  CombinationalInterface<ac_int<64, false>> CCS_INIT_S1(serialMatrixParamsIn);
+  CombinationalInterface<ac_int<64, false>> CCS_INIT_S1(serialVectorParamsIn);
 
   CombinationalInterface<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
   sc_fifo<IC_PORT_TYPE> inputDataResponse_fifo;

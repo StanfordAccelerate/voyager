@@ -25,8 +25,9 @@ SC_MODULE(MatrixUnit) {
 #endif
 
   MatrixParamsRouter<PARAMS_MODULE_COUNT> CCS_INIT_S1(paramsRouter);
-  Connections::In<int> CCS_INIT_S1(serialMatrixParamsIn);
-  Connections::Combinational<int> serialMatrixParams[PARAMS_MODULE_COUNT];
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialMatrixParamsIn);
+  Connections::Combinational<ac_int<64, false>>
+      serialMatrixParams[PARAMS_MODULE_COUNT];
 
   // clang-format off
 #ifdef SIM_InputController

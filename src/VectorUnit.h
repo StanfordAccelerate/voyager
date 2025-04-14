@@ -443,7 +443,7 @@ SC_MODULE(VectorUnit) {
       accumulation_buffer_write_request[2];
   Connections::Combinational<Pack1D<BufferType, Width>>
       accumulationBufferOutput;
-  Connections::In<int> CCS_INIT_S1(serial_params_in);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vector_params);
   Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
       vector_instruction);

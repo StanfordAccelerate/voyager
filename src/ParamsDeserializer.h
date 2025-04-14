@@ -10,6 +10,22 @@
 #include "spdlog/spdlog.h"
 #endif
 
+template <typename T, unsigned int interfaceWidth>
+T getSerializedParams(Connections::In<ac_int<64, false>> &serialParamsIn) {
+  ac_int<((T::width + interfaceWidth - 1) / interfaceWidth) * interfaceWidth,
+         false>
+      serializedParamsPadded;
+  for (int i = 0; i < serializedParamsPadded.width / interfaceWidth; i++) {
+    ac_int<interfaceWidth, false> val = serialParamsIn.Pop();
+    serializedParamsPadded.set_slc(i * interfaceWidth, val);
+  }
+  ac_int<T::width, false> serializedParams =
+      serializedParamsPadded.template slc<T::width>(0);
+  sc_lv<T::width> serializedParamsLV;
+  type_to_vector(serializedParams, T::width, serializedParamsLV);
+  return BitsToType<T>(serializedParamsLV);
+}
+
 // stupid trick to uniquify it
 // otherwise, this module ends up repeated for each subblock in the final top
 // RTL
@@ -18,29 +34,13 @@ SC_MODULE(MatrixParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
   Connections::Out<MatrixParams> CCS_INIT_S1(paramsOut);
 
   SC_CTOR(MatrixParamsDeserializer) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
-  }
-
-  template <typename T, unsigned int interfaceWidth>
-  T getSerializedParams() {
-    ac_int<((T::width + interfaceWidth - 1) / interfaceWidth) * interfaceWidth,
-           false>
-        serializedParamsPadded;
-    for (int i = 0; i < serializedParamsPadded.width / interfaceWidth; i++) {
-      ac_int<interfaceWidth, false> val = serialParamsIn.Pop();
-      serializedParamsPadded.set_slc(i * interfaceWidth, val);
-    }
-    ac_int<T::width, false> serializedParams =
-        serializedParamsPadded.template slc<T::width>(0);
-    sc_lv<T::width> serializedParamsLV;
-    type_to_vector(serializedParams, T::width, serializedParamsLV);
-    return BitsToType<T>(serializedParamsLV);
   }
 
   void run() {
@@ -50,7 +50,8 @@ SC_MODULE(MatrixParamsDeserializer) {
     wait();
 
     while (true) {
-      MatrixParams params = getSerializedParams<MatrixParams, 32>();
+      MatrixParams params =
+          getSerializedParams<MatrixParams, 64>(serialParamsIn);
 
 // This module gets instantiated 3 times:
 // inputController, weightController, matrixProcessor
@@ -72,7 +73,7 @@ SC_MODULE(VectorParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
   Connections::Out<VectorParams> CCS_INIT_S1(vectorParamsOut);
   Connections::Out<VectorInstructionConfig> CCS_INIT_S1(vectorInstructionsOut);
 
@@ -80,22 +81,6 @@ SC_MODULE(VectorParamsDeserializer) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
-  }
-
-  template <typename T, unsigned int interfaceWidth>
-  T getSerializedParams() {
-    ac_int<((T::width + interfaceWidth - 1) / interfaceWidth) * interfaceWidth,
-           false>
-        serializedParamsPadded;
-    for (int i = 0; i < serializedParamsPadded.width / interfaceWidth; i++) {
-      ac_int<interfaceWidth, false> val = serialParamsIn.Pop();
-      serializedParamsPadded.set_slc(i * interfaceWidth, val);
-    }
-    ac_int<T::width, false> serializedParams =
-        serializedParamsPadded.template slc<T::width>(0);
-    sc_lv<T::width> serializedParamsLV;
-    type_to_vector(serializedParams, T::width, serializedParamsLV);
-    return BitsToType<T>(serializedParamsLV);
   }
 
   void run() {
@@ -106,7 +91,8 @@ SC_MODULE(VectorParamsDeserializer) {
     wait();
 
     while (true) {
-      VectorParams vectorParams = getSerializedParams<VectorParams, 32>();
+      VectorParams vectorParams =
+          getSerializedParams<VectorParams, 64>(serialParamsIn);
 
 #ifndef __SYNTHESIS__
       std::ostringstream oss;
@@ -118,7 +104,7 @@ SC_MODULE(VectorParamsDeserializer) {
       vectorParamsOut.Push(vectorParams);
 
       VectorInstructionConfig vectorInstructionConfig =
-          getSerializedParams<VectorInstructionConfig, 32>();
+          getSerializedParams<VectorInstructionConfig, 64>(serialParamsIn);
 
 #ifndef __SYNTHESIS__
       oss << "Vector Instructions: " << std::endl
@@ -136,8 +122,8 @@ SC_MODULE(MatrixParamsRouter) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> CCS_INIT_S1(serialParamsIn);
-  Connections::Out<int> serialMatrixParams[MODULE_COUNT];
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
+  Connections::Out<ac_int<64, false>> serialMatrixParams[MODULE_COUNT];
 
   SC_CTOR(MatrixParamsRouter) {
     SC_THREAD(run);
@@ -154,7 +140,7 @@ SC_MODULE(MatrixParamsRouter) {
     wait();
     while (true) {
       // Matrix Params
-      int serialParam = serialParamsIn.Pop();
+      ac_int<64, false> serialParam = serialParamsIn.Pop();
 #pragma hls_unroll yes
       for (int i = 0; i < MODULE_COUNT; i++) {
         serialMatrixParams[i].Push(serialParam);

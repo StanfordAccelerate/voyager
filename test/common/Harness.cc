@@ -375,8 +375,9 @@ void Harness::reset() {
 }
 
 template <typename T, unsigned int interfaceWidth>
-void sendSerializedParams(T params,
-                          CombinationalInterface<int> *serialParamsIn) {
+void sendSerializedParams(
+    T params,
+    CombinationalInterface<ac_int<interfaceWidth, false>> *serialParamsIn) {
   ac_int<T::width, false> serializedParam;
   vector_to_type(TypeToBits<T>(params), false, &serializedParam);
 
@@ -437,7 +438,7 @@ void Harness::sendParams() {
       }
 
       if (matrixParamsValid) {
-        sendSerializedParams<MatrixParams, 32>(*matrixParams,
+        sendSerializedParams<MatrixParams, 64>(*matrixParams,
                                                &serialMatrixParamsIn);
         matrixUnitStartSignal.SyncPop();
       }
@@ -447,9 +448,9 @@ void Harness::sendParams() {
                                           << "' Started. -----");
 
       if (vectorParamsValid) {
-        sendSerializedParams<VectorParams, 32>(*vectorParams,
+        sendSerializedParams<VectorParams, 64>(*vectorParams,
                                                &serialVectorParamsIn);
-        sendSerializedParams<VectorInstructionConfig, 32>(
+        sendSerializedParams<VectorInstructionConfig, 64>(
             *vectorInstructionConfig, &serialVectorParamsIn);
         vectorUnitStartSignal.SyncPop();
       }
