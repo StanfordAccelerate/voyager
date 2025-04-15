@@ -55,8 +55,8 @@ class MemoryInterface {
 
     int size = get_size(tensor, false);
 
-    if (size ==
-        1) {  // for scalar, we get the arg from the file, not from memory
+    // Read scalar from the file directly
+    if (size == 1) {
       const char* env_var = std::getenv("NETWORK");
       std::string model_name(env_var);
       std::string project_root = std::string(std::getenv("PROJECT_ROOT"));
@@ -84,32 +84,6 @@ class MemoryInterface {
     return read_tensor_helper<SUPPORTED_TYPES>(tensor);
   }
 
-  std::vector<std::any> get_outputs(const codegen::Operation& param) {
-    const auto tensors = get_op_outputs(param);
-    std::vector<std::any> outputs;
-    for (const auto& tensor : tensors) {
-      outputs.push_back(read_tensor(tensor));
-    }
-    return outputs;
-  }
-
-  std::map<std::string, std::any> get_args(const codegen::Operation& param) {
-    std::map<std::string, std::any> kwargs;
-
-    const auto op_list = get_op_list(param);
-
-    for (const auto op : op_list) {
-      for (const auto [key, value] : op.kwargs()) {
-        if (value.has_tensor() && value.tensor().has_memory()) {
-          spdlog::debug("Pushing tensor: {}", value.tensor().node());
-          kwargs[value.tensor().node()] = read_tensor(value.tensor());
-        }
-      }
-    }
-
-    return kwargs;
-  }
-
   template <typename T>
   bool write_tensor_with_type(codegen::Tensor tensor, std::any data) {
     if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
@@ -117,10 +91,41 @@ class MemoryInterface {
     }
 
     const auto& memory = tensor.memory();
-    const auto size = get_size(tensor, false);
+    const uint64_t address = memory.address();
+    const int partition = memory.partition();
+    const int size = get_size(tensor, false);
+    T* casted = std::any_cast<T*>(data);
 
-    write_tensor_to_memory<T>(memory.address(), memory.partition(), size,
-                              std::any_cast<T*>(data));
+    size_t total_bytes = (size * T::width + 7) / 8;
+    char* buffer = new char[total_bytes];
+
+    constexpr int lcm = T::width * 8 / std::gcd(T::width, 8);
+
+    const int num_groups = size * T::width / lcm;
+    const int num_value_per_group = lcm / T::width;
+    const int num_bytes_per_group = lcm / 8;
+    const int num_bits_remaining = size * T::width - num_groups * lcm;
+
+    for (int i = 0; i < num_groups; i++) {
+      ac_int<lcm, false> bits;
+      for (int j = 0; j < num_value_per_group; j++) {
+        bits.set_slc(j * T::width,
+                     static_cast<ac_int<T::width, false>>(
+                         casted[i * num_value_per_group + j].bits_rep()));
+      }
+
+      for (int j = 0; j < num_bytes_per_group; j++) {
+        buffer[i * num_bytes_per_group + j] =
+            static_cast<char>(bits.template slc<8>(j * 8));
+      }
+    }
+
+    // TODO: Handle the remaining bytes
+    assert(num_bits_remaining == 0);
+
+    write_bytes_to_memory(address, partition, total_bytes, buffer);
+    delete[] buffer;
+
     return true;
   }
 
@@ -133,15 +138,6 @@ class MemoryInterface {
   }
 
   void write_tensor(const codegen::Tensor& tensor, const std::any data) {
-    const auto& tensor_memory = tensor.memory();
-    const uint64_t address = tensor_memory.address();
-    const int partition = tensor_memory.partition();
-
-    int size = 1;
-    for (const auto& dim : tensor.shape()) {
-      size *= dim;
-    }
-
     write_tensor_helper<SUPPORTED_TYPES>(tensor, data);
   }
 
@@ -175,36 +171,6 @@ class MemoryInterface {
   }
 
   template <typename T>
-  void write_tensor_to_memory(const uint64_t address, const int partition,
-                              const int size, T* tensor) {
-    size_t total_bytes = (size * T::width + 7) / 8;
-    constexpr size_t width_in_bytes = (T::width + 7) / 8;
-    char* buffer = new char[total_bytes];
-
-    for (size_t i = 0; i < size; i++) {
-      size_t start_bit = i * T::width;
-
-      ac_int<width_in_bytes * 8 + 1, false> value_in_bits =
-          tensor[i].bits_rep();
-
-      for (int byte_offset = 0; byte_offset < (T::width + 7) / 8;
-           byte_offset++) {
-        size_t bit_start = start_bit % 8;
-        size_t bits_to_write =
-            std::min<size_t>(8 - bit_start, T::width - byte_offset * 8);
-        unsigned char mask = (1 << bits_to_write) - 1;
-        buffer[(start_bit / 8) + byte_offset] &= ~(mask << bit_start);
-
-        char data = value_in_bits.template slc<8>(byte_offset * 8) & mask;
-        buffer[(start_bit / 8) + byte_offset] |= data << bit_start;
-      }
-    }
-
-    write_bytes_to_memory(address, partition, total_bytes, buffer);
-    delete[] buffer;
-  }
-
-  template <typename T>
   void write_value_to_memory(const uint64_t address, const int partition,
                              const int index, T value) {
     int start = index * T::width / 8;
@@ -235,6 +201,32 @@ class MemoryInterface {
     }
 
     write_bytes_to_memory(address + start, partition, num_bytes, buffer);
+  }
+
+  std::vector<std::any> get_outputs(const codegen::Operation& param) {
+    const auto tensors = get_op_outputs(param);
+    std::vector<std::any> outputs;
+    for (const auto& tensor : tensors) {
+      outputs.push_back(read_tensor(tensor));
+    }
+    return outputs;
+  }
+
+  std::map<std::string, std::any> get_args(const codegen::Operation& param) {
+    std::map<std::string, std::any> kwargs;
+
+    const auto op_list = get_op_list(param);
+
+    for (const auto op : op_list) {
+      for (const auto [key, value] : op.kwargs()) {
+        if (value.has_tensor() && value.tensor().has_memory()) {
+          spdlog::debug("Pushing tensor: {}", value.tensor().node());
+          kwargs[value.tensor().node()] = read_tensor(value.tensor());
+        }
+      }
+    }
+
+    return kwargs;
   }
 
   virtual std::vector<std::any> get_reference_outputs(

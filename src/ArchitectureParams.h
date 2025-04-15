@@ -114,10 +114,8 @@ using F16 = DataTypes::bfloat16;
 
 // #define INPUT_DATATYPE DataTypes::nf4
 // #define WEIGHT_DATATYPE DataTypes::nf4
-#define INPUT_DATATYPE \
-  DataTypes::int1, DataTypes::int2, DataTypes::nf4, DataTypes::int6
-#define WEIGHT_DATATYPE \
-  DataTypes::int1, DataTypes::int2, DataTypes::nf4, DataTypes::int6
+#define INPUT_DATATYPE DataTypes::int2, DataTypes::nf4, DataTypes::int6
+#define WEIGHT_DATATYPE DataTypes::int2, DataTypes::nf4, DataTypes::int6
 #define ACCUM_DATATYPE DataTypes::int18
 #define ACCUM_BUFFER_DATATYPE DataTypes::bfloat16
 #define VECTOR_DATATYPE DataTypes::bfloat16
