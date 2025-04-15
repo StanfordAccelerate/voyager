@@ -3,6 +3,10 @@ channels:
   - conda-forge
 dependencies:
   - libprotobuf
+  - llvmdev
+  - llvm-tools
+  - clang
+  - clangdev
   - python>=3.9,<3.11
   - pip
   - pip:
@@ -13,6 +17,7 @@ dependencies:
       - xonsh
       - git+https://github.com/mflowgen/mflowgen.git@69412255acc2c509e98105804e5a97d9738ddfe1#egg=mflowgen
       - pandas
+      - compiledb
       - -r quantized-training/requirements.txt
       - -e quantized-training
       - -e interstellar
