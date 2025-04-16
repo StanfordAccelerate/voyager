@@ -328,6 +328,7 @@ SC_MODULE(VectorFetchUnit) {
     accumulation_buffer_read_data[1].Reset();
     accumulation_buffer_write_request[0].Reset();
     accumulation_buffer_write_request[1].Reset();
+    accumulationBufferOutput.Reset();
 
     bool accumulation_buffer_bank = 0;
 

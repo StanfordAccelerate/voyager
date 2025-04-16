@@ -83,6 +83,7 @@ SC_MODULE(InputScaleController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -330,6 +331,7 @@ SC_MODULE(InputScaleController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -541,6 +543,7 @@ SC_MODULE(InputScaleController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }

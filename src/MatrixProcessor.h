@@ -742,6 +742,10 @@ SC_MODULE(MatrixProcessor) {
     weightScaleChannel.Reset();
     accumulation_buffer_done[0].Reset();
     accumulation_buffer_done[1].Reset();
+    accumulation_buffer_read_data[0].Reset();
+    accumulation_buffer_read_data[1].Reset();
+    accumulation_buffer_write_request[0].Reset();
+    accumulation_buffer_write_request[1].Reset();
 
     bool accumulation_buffer_bank = 0;
 

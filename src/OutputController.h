@@ -50,6 +50,7 @@ SC_MODULE(OutputController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 3; j++) {
           loop_bounds[i][j] = params.output_loops[i][j];
         }
