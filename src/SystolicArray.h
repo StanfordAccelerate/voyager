@@ -12,7 +12,7 @@ template <typename Input, typename Weight, typename Psum, int NRows, int NCols>
 SC_MODULE(SystolicArray) {
  private:
   Connections::Combinational<PEInput<Input> > input_wires[NRows][NCols];
-  Connections::Combinational<Psum> psum_wires[NRows - 1][NCols];
+  Connections::Combinational<Psum> psum_wires[NRows][NCols];
   Connections::Combinational<PEWeight<Weight> > weight_wires[NRows][NCols];
 
 // To speed up HLS synthesis, we instantiate arrays of SC_MODULE on
@@ -31,7 +31,7 @@ SC_MODULE(SystolicArray) {
 
   Connections::In<PEInput<Input> > inputs[NRows];
   Connections::In<PEWeight<Weight> > weights[NCols];
-  Connections::In<Psum> psums[NCols];
+  // Connections::In<Psum> psums[NCols];
   Connections::Out<Psum> outputs[NCols];
 
   SC_CTOR(SystolicArray) {
@@ -55,11 +55,7 @@ SC_MODULE(SystolicArray) {
           pe_ptr[i * NCols + j]->input_in(input_wires[i][j - 1]);
         }
 
-        if (i == 0) {
-          pe_ptr[i * NCols + j]->psum_in(psums[j]);
-        } else {
-          pe_ptr[i * NCols + j]->psum_in(psum_wires[i - 1][j]);
-        }
+        pe_ptr[i * NCols + j]->psum_in(psum_wires[i][j]);
 
         if (i == 0) {
           pe_ptr[i * NCols + j]->weight_in(weights[j]);
@@ -73,12 +69,28 @@ SC_MODULE(SystolicArray) {
         if (i == NRows - 1) {
           pe_ptr[i * NCols + j]->psum_out(outputs[j]);
         } else {
-          pe_ptr[i * NCols + j]->psum_out(psum_wires[i][j]);
+          pe_ptr[i * NCols + j]->psum_out(psum_wires[i + 1][j]);
         }
       }
     }
 
     // Tie off unused Connections
+    // first row of array for psums
+    ZeroTieoff<Psum> *psum_wires_tieoff_ptr[NCols];
+    for (int i = 0; i < NCols; i++) {
+#ifdef __SYNTHESIS__
+      psum_wires_tieoff_ptr[i] = &psum_wires_tieoff[i];
+#else
+      psum_wires_tieoff_ptr[i] =
+          new ZeroTieoff<Psum>(sc_gen_unique_name("tieoff"));
+#endif
+      psum_wires_tieoff_ptr[i]->out(psum_wires[0][i]);
+#ifdef CONNECTIONS_FAST_SIM
+      // we need to connect clock and reset if using fast sim
+      psum_wires_tieoff_ptr[i]->clk(clk);
+      psum_wires_tieoff_ptr[i]->rstn(rstn);
+#endif
+    }
 
     // last column of array for inputs
     Tieoff<PEInput<Input> > *inputConnectionTieoff_ptr[NRows];

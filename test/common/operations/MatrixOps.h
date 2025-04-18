@@ -74,13 +74,11 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
 
   Buffer *outputs = new Buffer[X * Y * K];
 
-#if SUPPORT_MX
-  // only used for replication on MX-based designs
+  // only used for replication
   Psum *accumulations = new Psum[X * Y * K];
   for (int i = 0; i < X * Y * K; i++) {
     accumulations[i] = Psum(0.0);
   }
-#endif
 
   // Store biases in the accumulation buffer
   for (int i = 0; i < X * Y; i++) {
@@ -136,7 +134,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
 #if SUPPORT_MX
                         Psum psum = Psum(0.0);
 #else
-                        Psum psum = outputs[output_addr];
+                        Psum psum = accumulations[output_addr];
 #endif
 
                         for (int ic0 = 0; ic0 < IC_UNROLL; ic0++) {
@@ -254,21 +252,38 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                           }
                         }
 #else
-                        outputs[output_addr] = static_cast<Psum>(psum);
 
                         if (tiling.replication) {
-                          if (IC_DIMENSION == 16) {
+                          accumulations[output_addr] = psum;
+                          if (IC_DIMENSION == 4) {
+                            outputs[output_addr] +=
+                                static_cast<Buffer>(accumulations[output_addr]);
+                            accumulations[output_addr] = Psum(0.0);
+                          } else if (IC_DIMENSION == 8) {
+                            if (counters[1][tiling.fx_index] == 1 ||
+                                counters[1][tiling.fx_index] == 3 ||
+                                counters[1][tiling.fx_index] == 5 ||
+                                counters[1][tiling.fx_index] == 6) {
+                              outputs[output_addr] += static_cast<Buffer>(
+                                  accumulations[output_addr]);
+                              accumulations[output_addr] = Psum(0.0);
+                            }
+                          } else if (IC_DIMENSION == 16) {
                             if (counters[1][tiling.fx_index] == 3 ||
                                 counters[1][tiling.fx_index] == 6) {
-                              outputs[output_addr] = static_cast<Buffer>(psum);
+                              outputs[output_addr] += static_cast<Buffer>(
+                                  accumulations[output_addr]);
+                              accumulations[output_addr] = Psum(0.0);
                             }
                           } else if (IC_DIMENSION == 32) {
                             if (counters[1][tiling.fx_index] == 6) {
-                              outputs[output_addr] = static_cast<Buffer>(psum);
+                              outputs[output_addr] += static_cast<Buffer>(
+                                  accumulations[output_addr]);
+                              accumulations[output_addr] = Psum(0.0);
                             }
                           }
                         } else {
-                          outputs[output_addr] = static_cast<Buffer>(psum);
+                          outputs[output_addr] += static_cast<Buffer>(psum);
                         }
 #endif
                       }
