@@ -75,7 +75,7 @@ SC_MODULE(ZeroTieoff) {
     async_reset_signal_is(rstn, false);
 #else
     SC_METHOD(drive);
-    sensitive << out.vld << out.data;
+    sensitive << out.vld << out.dat;
 
 #ifdef CONNECTIONS_SIM_ONLY
     out.disable_spawn();
@@ -85,19 +85,23 @@ SC_MODULE(ZeroTieoff) {
   }
 
   void drive() {
+    T zero;
+    zero.set_zero();
 #ifdef CONNECTIONS_FAST_SIM
     out.Reset();
 
     wait();
 
     while (true) {
-      T zero;
-      zero.set_zero();
       out.Push(zero);
     }
 #else
     out.vld = 1;
-    out.data.set_zero();
+#ifdef __SYNTHESIS__
+    out.dat = Connections::convert_to_lv(zero);
+#else
+    out.dat = zero;
+#endif
 #endif
   }
 };

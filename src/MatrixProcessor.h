@@ -171,9 +171,6 @@ SC_MODULE(MatrixProcessor) {
 
     startSignal.Reset();
 
-    bool accumulation_buffer_bank_delayed = 0;
-    bool accumulation_buffer_bank = 0;
-
     wait();
 
     while (true) {
@@ -203,11 +200,7 @@ SC_MODULE(MatrixProcessor) {
                                    params.loops[1][2] * params.loops[1][3] *
                                    params.loops[1][4] * params.loops[1][5];
 
-      // TODO: Replace oldOutputStep2 with outputStep - 2
       ac_int<32, false> step = 0;
-      ac_int<32, false> outputStep = 0;
-      ac_int<32, false> oldOutputStep = 0;
-      ac_int<32, false> oldOutputStep2 = 0;
 
       // nonAccumulatingTileSize is the number of inputs to send before we
       // start accumulating. For example, for a loop order of (C, K, FX, FY,
@@ -236,9 +229,6 @@ SC_MODULE(MatrixProcessor) {
           CCS_LOG("step " << step << " out of " << totalOps);
         }
 #endif
-        oldOutputStep2 = oldOutputStep;
-        oldOutputStep = outputStep;
-        accumulation_buffer_bank_delayed = accumulation_buffer_bank;
 
         Pack1D<PEInput<Input>, NRows> inputs;
         bool stallInputs = false;

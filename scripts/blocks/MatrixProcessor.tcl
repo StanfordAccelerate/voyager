@@ -42,7 +42,8 @@ proc pre_assembly {} {
 }
 
 proc pre_extract {} {
-  echo "Pre-extract"
+  cycle set accumulation_buffer_read_data.Pop() -from accumulation_buffer_read_address.Push() -equal 2
+  cycle set accumulation_buffer_read_data.Pop()#1 -from accumulation_buffer_read_address.Push()#1 -equal 2
   # global SUPPORT_MX
   # if {$SUPPORT_MX == true} {
   #   cycle set unscaledAccumulationChannel_delayed.Push() -from unscaledAccumulationChannel.Pop() -equal 2

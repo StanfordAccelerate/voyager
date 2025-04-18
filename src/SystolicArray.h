@@ -22,6 +22,7 @@ SC_MODULE(SystolicArray) {
   ProcessingElement<Input, Weight, Psum> pe[NRows * NCols];
   Tieoff<PEInput<Input> > input_wires_tieoff[NRows];
   Tieoff<PEWeight<Input> > weight_wires_tieoff[NCols];
+  ZeroTieoff<Psum> psum_wires_tieoff[NCols];
 
 #endif
 
