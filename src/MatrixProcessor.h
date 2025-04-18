@@ -69,12 +69,6 @@ SC_MODULE(MatrixProcessor) {
   Connections::Combinational<Psum> psumsToSystolicArray[NCols];
   Connections::Combinational<Psum> outputsFromSystolicArray[NCols];
 
-  Connections::Combinational<Pack1D<Psum, NCols>> CCS_INIT_S1(
-      unscaledAccumulationChannel);
-
-  Connections::Combinational<Pack1D<Psum, NCols>> CCS_INIT_S1(
-      unscaledAccumulationChannel_delayed);
-
 #if SUPPORT_MX
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(inputScaleChannel);
   Connections::In<ac_int<Scale::width * NCols, false>> CCS_INIT_S1(
@@ -127,15 +121,9 @@ SC_MODULE(MatrixProcessor) {
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(run);
+    SC_THREAD(push_inputs);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
-
-#ifdef __SYNTHESIS__
-    SC_THREAD(delay_outputs);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-#endif
 
     SC_THREAD(process_accumulation);
     sensitive << clk.pos();
@@ -173,24 +161,18 @@ SC_MODULE(MatrixProcessor) {
     }
   }
 
-  void run() {
+  void push_inputs() {
     paramsIn.ResetRead();
     inputsChannel.Reset();
-    psumOutSkewerDout.ResetRead();
     inputsToSkewer.ResetWrite();
 
     accumulationBufferParams.ResetWrite();
-    unscaledAccumulationChannel.ResetWrite();
     inputSkewerDin.ResetWrite();
 
     startSignal.Reset();
-    doneSignal.Reset();
 
     bool accumulation_buffer_bank_delayed = 0;
     bool accumulation_buffer_bank = 0;
-
-    accumulation_buffer_read_address[0].Reset();
-    accumulation_buffer_read_address[1].Reset();
 
     wait();
 
@@ -293,200 +275,32 @@ SC_MODULE(MatrixProcessor) {
 
         inputSkewerDin.Push(inputs);
 
-        Pack1D<Psum, NCols> outputs;
-        if (psumOutSkewerDout.PopNB(outputs)) {
-        INCR_OUT_STEP:
-          outputStep++;
-          // CCS_LOG("systolic array output: " << outputs);
-          bool output_tile_completed =
-              (loop_counters_out[0][params.reductionLoopIndex[0]] ==
-               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
-              (loop_counters_out[1][params.reductionLoopIndex[1]] ==
-               params.loops[1][params.reductionLoopIndex[1]] - 1) &&
-              (loop_counters_out[1][params.weightLoopIndex[1]] ==
-               params.loops[1][params.weightLoopIndex[1]] - 1) &&
-              (loop_counters_out[1][params.fxIndex] ==
-               params.loops[1][params.fxIndex] - 1) &&
-              (loop_counters_out[1][params.fyIndex] ==
-               params.loops[1][params.fyIndex] - 1) &&
-              (loop_counters_out[1][params.inputXLoopIndex[1]] ==
-               params.loops[1][params.inputXLoopIndex[1]] - 1) &&
-              (loop_counters_out[1][params.inputYLoopIndex[1]] ==
-               params.loops[1][params.inputYLoopIndex[1]] - 1);
-
-          bool isAccumulation =
-              loop_counters_out[0][params.reductionLoopIndex[0]] != 0 ||
-              loop_counters_out[1][params.reductionLoopIndex[1]] != 0 ||
-              loop_counters_out[1][params.fxIndex] != 0 ||
-              loop_counters_out[1][params.fyIndex] != 0;
-
-          if (isAccumulation) {
-            ac_int<int_log2(BufferSize), false> readAddress =
-                loop_counters_out[1][params.weightLoopIndex[1]] *
-                    params.loops[1][params.inputXLoopIndex[1]] *
-                    params.loops[1][params.inputYLoopIndex[1]] +
-                loop_counters_out[1][params.inputYLoopIndex[1]] *
-                    params.loops[1][params.inputXLoopIndex[1]] +
-                loop_counters_out[1][params.inputXLoopIndex[1]];
-
-            accumulation_buffer_read_address[accumulation_buffer_bank].Push(
-                readAddress);
-          }
-
-          if (output_tile_completed) {
-            accumulation_buffer_bank = !accumulation_buffer_bank;
-          }
-
-          unscaledAccumulationChannel.Push(outputs);
-
-          loop_counters_out[1][5]++;
+        step++;
+        loop_counters[1][5]++;
 #pragma hls_unroll yes
-          for (int i = 1; i >= 0; i--) {
+        for (int i = 1; i >= 0; i--) {
 #pragma hls_unroll yes
-            for (int j = 5; j >= 0; j--) {
-              if (loop_counters_out[i][j] == params.loops[i][j]) {
-                loop_counters_out[i][j] = 0;
-                if (j > 0) {
-                  loop_counters_out[i][j - 1]++;
-                } else {
-                  if (i > 0) {
-                    loop_counters_out[i - 1][5]++;
-                  }
+          for (int j = 5; j >= 0; j--) {
+            if (loop_counters[i][j] == params.loops[i][j]) {
+              loop_counters[i][j] = 0;
+              if (j > 0) {
+                loop_counters[i][j - 1]++;
+              } else {
+                if (i > 0) {
+                  loop_counters[i - 1][5]++;
                 }
               }
             }
           }
-        }
-
-        if (!stallInputs) {
-          step++;
-          loop_counters[1][5]++;
-#pragma hls_unroll yes
-          for (int i = 1; i >= 0; i--) {
-#pragma hls_unroll yes
-            for (int j = 5; j >= 0; j--) {
-              if (loop_counters[i][j] == params.loops[i][j]) {
-                loop_counters[i][j] = 0;
-                if (j > 0) {
-                  loop_counters[i][j - 1]++;
-                } else {
-                  if (i > 0) {
-                    loop_counters[i - 1][5]++;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-// when stalling, use wait() to yield control to other processes
-#ifndef __SYNTHESIS__
-        if (stallInputs) {
-          wait();
-        }
-#endif
-      }
-
-      CCS_LOG("draining");
-
-// Drain out any remaining outputs
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      while (outputStep < totalOps) {
-        Pack1D<Psum, NCols> outputs;
-        if (psumOutSkewerDout.PopNB(outputs)) {
-          outputStep++;
-
-          DLOG("outputStep: " << outputStep);
-
-          bool output_tile_completed =
-              (loop_counters_out[0][params.reductionLoopIndex[0]] ==
-               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
-              (loop_counters_out[1][params.reductionLoopIndex[1]] ==
-               params.loops[1][params.reductionLoopIndex[1]] - 1) &&
-              (loop_counters_out[1][params.weightLoopIndex[1]] ==
-               params.loops[1][params.weightLoopIndex[1]] - 1) &&
-              (loop_counters_out[1][params.fxIndex] ==
-               params.loops[1][params.fxIndex] - 1) &&
-              (loop_counters_out[1][params.fyIndex] ==
-               params.loops[1][params.fyIndex] - 1) &&
-              (loop_counters_out[1][params.inputXLoopIndex[1]] ==
-               params.loops[1][params.inputXLoopIndex[1]] - 1) &&
-              (loop_counters_out[1][params.inputYLoopIndex[1]] ==
-               params.loops[1][params.inputYLoopIndex[1]] - 1);
-
-          bool firstAccumulation =
-              loop_counters_out[0][params.reductionLoopIndex[0]] == 0 &&
-              loop_counters_out[1][params.reductionLoopIndex[1]] == 0 &&
-              loop_counters_out[1][params.fxIndex] == 0 &&
-              loop_counters_out[1][params.fyIndex] == 0;
-          if (!firstAccumulation) {
-            ac_int<int_log2(BufferSize), false> readAddress =
-                loop_counters_out[1][params.weightLoopIndex[1]] *
-                    params.loops[1][params.inputXLoopIndex[1]] *
-                    params.loops[1][params.inputYLoopIndex[1]] +
-                loop_counters_out[1][params.inputYLoopIndex[1]] *
-                    params.loops[1][params.inputXLoopIndex[1]] +
-                loop_counters_out[1][params.inputXLoopIndex[1]];
-
-            accumulation_buffer_read_address[accumulation_buffer_bank].Push(
-                readAddress);
-          }
-
-          if (output_tile_completed) {
-            accumulation_buffer_bank = !accumulation_buffer_bank;
-          }
-          unscaledAccumulationChannel.Push(outputs);
-
-          loop_counters_out[1][5]++;
-#pragma hls_unroll yes
-          for (int i = 1; i >= 0; i--) {
-#pragma hls_unroll yes
-            for (int j = 5; j >= 0; j--) {
-              if (loop_counters_out[i][j] == params.loops[i][j]) {
-                loop_counters_out[i][j] = 0;
-                if (j > 0) {
-                  loop_counters_out[i][j - 1]++;
-                } else {
-                  if (i > 0) {
-                    loop_counters_out[i - 1][5]++;
-                  }
-                }
-              }
-            }
-          }
-        } else {
-          wait();
         }
       }
-
-      doneSignal.SyncPush();
-    }
-  }
-
-  void delay_outputs() {
-    unscaledAccumulationChannel.ResetRead();
-    unscaledAccumulationChannel_delayed.ResetWrite();
-
-    wait();
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-    while (true) {
-      unscaledAccumulationChannel_delayed.Push(
-          unscaledAccumulationChannel.Pop());
     }
   }
 
   void process_accumulation() {
     biasChannel.Reset();
-    unscaledAccumulationChannel_delayed.ResetRead();
-#ifndef __SYNTHESIS__
-    unscaledAccumulationChannel.ResetRead();
-#else
-    unscaledAccumulationChannel_delayed.ResetRead();
-#endif
     accumulationBufferParams.ResetRead();
+    psumOutSkewerDout.ResetRead();
 
 #if SUPPORT_MX
     inputScaleChannel.Reset();
@@ -496,8 +310,11 @@ SC_MODULE(MatrixProcessor) {
     accumulation_buffer_done[1].Reset();
     accumulation_buffer_read_data[0].Reset();
     accumulation_buffer_read_data[1].Reset();
+    accumulation_buffer_read_address[0].Reset();
+    accumulation_buffer_read_address[1].Reset();
     accumulation_buffer_write_request[0].Reset();
     accumulation_buffer_write_request[1].Reset();
+    doneSignal.Reset();
 
     bool accumulation_buffer_bank = 0;
 
@@ -568,16 +385,22 @@ SC_MODULE(MatrixProcessor) {
             previous_accumulation = bias;
           }
         } else {
+          ac_int<int_log2(BufferSize), false> readAddress =
+              loop_counters[1][params.weightLoopIndex[1]] *
+                  params.loops[1][params.inputXLoopIndex[1]] *
+                  params.loops[1][params.inputYLoopIndex[1]] +
+              loop_counters[1][params.inputYLoopIndex[1]] *
+                  params.loops[1][params.inputXLoopIndex[1]] +
+              loop_counters[1][params.inputXLoopIndex[1]];
+
+          accumulation_buffer_read_address[accumulation_buffer_bank].Push(
+              readAddress);
+
           previous_accumulation =
               accumulation_buffer_read_data[accumulation_buffer_bank].Pop();
         }
 
-        Pack1D<Psum, NCols> outputs;
-#ifndef __SYNTHESIS__
-        outputs = unscaledAccumulationChannel.Pop();
-#else
-        outputs = unscaledAccumulationChannel_delayed.Pop();
-#endif
+        Pack1D<Psum, NCols> outputs = psumOutSkewerDout.Pop();
 
 #if SUPPORT_MX
         Scale inputScale;
@@ -671,6 +494,7 @@ SC_MODULE(MatrixProcessor) {
           }
         }
       }
+      doneSignal.SyncPush();
     }
   }
 };

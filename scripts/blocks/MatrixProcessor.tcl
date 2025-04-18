@@ -42,12 +42,13 @@ proc pre_assembly {} {
 }
 
 proc pre_extract {} {
-  global SUPPORT_MX
-  if {$SUPPORT_MX == true} {
-    cycle set unscaledAccumulationChannel_delayed.Push() -from unscaledAccumulationChannel.Pop() -equal 2
-  } else {
-    cycle set inputsToSkewer_delayed.Push() -from inputsToSkewer.Pop() -equal 2
-  }
-  # to prevent stuttering issues, schedule inputDin and psumIn to happen in the same cycle
-  cycle set inputSkewerDin.Push() -from psumInSkewerDin.Push() -equal 0
+  echo "Pre-extract"
+  # global SUPPORT_MX
+  # if {$SUPPORT_MX == true} {
+  #   cycle set unscaledAccumulationChannel_delayed.Push() -from unscaledAccumulationChannel.Pop() -equal 2
+  # } else {
+  #   cycle set inputsToSkewer_delayed.Push() -from inputsToSkewer.Pop() -equal 2
+  # }
+  # # to prevent stuttering issues, schedule inputDin and psumIn to happen in the same cycle
+  # cycle set inputSkewerDin.Push() -from psumInSkewerDin.Push() -equal 0
 }
