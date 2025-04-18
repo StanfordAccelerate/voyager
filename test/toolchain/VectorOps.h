@@ -136,24 +136,15 @@ void set_vector_immediate(const float scalar, const int stage,
   }
 }
 
-void MapVectoreduce_operations(const codegen::Operation &param,
-                               std::deque<BaseParams *> &mappedParams,
-                               std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+void MapVectorOperations(const codegen::Operation &param,
+                         std::deque<BaseParams *> &mappedParams,
+                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   VectorParams *vector_params = new VectorParams;
   AcceleratorMemoryMap accelerator_memory_map;
 
-  const auto op_list = get_op_list(param);
+  auto op_list = get_op_list(param);
 
   const auto input = op_list[0].kwargs().at("input").tensor();
-
-  codegen::Tensor output;
-  if (param.has_output()) {
-    output = param.output();
-  } else {
-    assert(op_list.back().target() == "quantize_mx");
-    output = param.outputs().tensors(1);
-  }
-
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
@@ -197,9 +188,12 @@ void MapVectoreduce_operations(const codegen::Operation &param,
   vector_params->addr_gen0_loops[1][1] = input_shape[4];
   vector_params->addr_gen0_loops[1][2] = input_shape[5] / OC_DIMENSION;
 
-  auto reshape_op = op_list[0];
+  codegen::OpOverload reshape_op;
   if (input.has_reshape()) {
     reshape_op = input.reshape();
+  } else if (MEMORY_OPS.find(op_list[0].target()) != MEMORY_OPS.end()) {
+    reshape_op = op_list[0];
+    op_list.erase(op_list.begin());
   }
 
   const auto reshape_kwargs = reshape_op.kwargs();
@@ -228,12 +222,11 @@ void MapVectoreduce_operations(const codegen::Operation &param,
         throw std::invalid_argument(
             "Slice start and end must be multiples of OC_DIMENSION!");
       }
+
       vector_params->addr_gen0_start /= OC_DIMENSION;
       vector_params->addr_gen0_end /= OC_DIMENSION;
     }
-  }
-
-  if (reshape_op.target() == "permute") {
+  } else if (reshape_op.target() == "permute") {
     const auto int_list = reshape_kwargs.at("dims").int_list().values();
     std::vector<int> dims(int_list.begin(), int_list.end());
     const int ndim = input.shape_size();
@@ -350,6 +343,7 @@ void MapVectoreduce_operations(const codegen::Operation &param,
   VECTOR_DATATYPE scale = 1.0;
   vector_params->addr_gen0_dq_scale = scale.bits_rep();
 
+  const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
@@ -537,7 +531,6 @@ void MapVectoreduce_operations(const codegen::Operation &param,
       } else {
         auto self = op.kwargs().at("input").tensor();
         auto tensor = other.tensor();
-        auto tensor_to_load = tensor.has_memory() ? tensor : self;
 
         auto input_shape = get_shape(self);
         auto other_shape = get_shape(tensor);
@@ -552,6 +545,7 @@ void MapVectoreduce_operations(const codegen::Operation &param,
           update_tensor_shape(tensor, other_shape);
         }
 
+        auto tensor_to_load = tensor.has_memory() ? tensor : self;
         auto output_shape = broadcast_shape(input_shape, other_shape);
         squeeze_front_ones(output_shape);
 

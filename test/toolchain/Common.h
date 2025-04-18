@@ -269,18 +269,16 @@ void set_quantize_params(const codegen::Operation &param,
 
     vector_params->quantize_output_mx = true;
     vector_params->SCALE_OFFSET = param.outputs().tensors(0).memory().address();
-  } else {
-    throw std::invalid_argument("Unsupported operation: " + last_op.target());
-  }
 
-  if (last_op.kwargs().contains("quant_code")) {
-    auto code = last_op.kwargs().at("quant_code").tensor();
-    float *array = read_constant_param(code);
+    if (last_op.kwargs().contains("quant_code")) {
+      auto code = last_op.kwargs().at("quant_code").tensor();
+      float *array = read_constant_param(code);
 
-    for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
-      vector_params->output_code[i] = array[i] * 2;
+      for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
+        vector_params->output_code[i] = array[i] * 2;
+      }
+
+      vector_params->use_output_codebook = true;
     }
-
-    vector_params->use_output_codebook = true;
   }
 }

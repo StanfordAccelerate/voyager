@@ -41,6 +41,6 @@ void MapOperation(const Operation &operation,
   } else if (first_op.target() == "calculate_mx_qparam") {
     MapMicroscaling(param, mappedParams, opMemoryMaps);
   } else {
-    MapVectoreduce_operations(param, mappedParams, opMemoryMaps);
+    MapVectorOperations(param, mappedParams, opMemoryMaps);
   }
 }

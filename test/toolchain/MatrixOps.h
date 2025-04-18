@@ -138,18 +138,6 @@ void MapMatrixOperation(const Operation &operation,
 
   Tiling tiling = get_tiling(operation);
 
-  int X = tiling.loops[0][tiling.x_loop_index[0]] *
-          tiling.loops[1][tiling.x_loop_index[1]];
-  int Y = tiling.loops[0][tiling.y_loop_index[0]] *
-          tiling.loops[1][tiling.y_loop_index[1]];
-  int C = tiling.loops[0][tiling.reduction_loop_index[0]] *
-          tiling.loops[1][tiling.reduction_loop_index[1]] * IC_DIMENSION;
-  int K = tiling.loops[0][tiling.weight_loop_index[0]] *
-          tiling.loops[1][tiling.weight_loop_index[1]] * OC_DIMENSION;
-  int FX = tiling.loops[1][tiling.fx_index];
-  int FY = tiling.loops[1][tiling.fy_index];
-  int STRIDE = tiling.stride;
-
   std::ostringstream oss;
   oss << tiling;
   spdlog::info("Using tiling: \n{}\n", oss.str());
@@ -223,8 +211,6 @@ void MapMatrixOperation(const Operation &operation,
   for (int j = 0; j < 5; j++) {
     matrix_params->weightAddressGenLoops[0][j] = tiling.loops[0][j];
   }
-  // matrix_params->weightAddressGenInputXLoopIndex = tiling.x_loop_index[0];
-  // matrix_params->weightAddressGenInputYLoopIndex = tiling.y_loop_index[0];
   matrix_params->weightAddressGenWeightLoopIndex[0] =
       tiling.weight_loop_index[0];
   matrix_params->weightAddressGenReductionLoopIndex[0] =
@@ -409,14 +395,7 @@ void MapMatrixOperation(const Operation &operation,
     }
   }
 
-  codegen::Tensor output;
-  if (param.has_output()) {
-    output = param.output();
-  } else {
-    assert(op_list.back().target() == "quantize_mx");
-    output = param.outputs().tensors(1);
-  }
-
+  const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
