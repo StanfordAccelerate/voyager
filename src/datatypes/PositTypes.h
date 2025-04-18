@@ -8,11 +8,17 @@
 
 #pragma once
 
+#ifndef NO_SYSC
+#include <mc_connections.h>
+#endif
+
 #include <ac_int.h>
 #include <ac_math/ac_inverse_sqrt_pwl.h>
 #include <ac_math/ac_sqrt_pwl.h>
 #include <ac_std_float.h>
 #include <stdint.h>
+
+#include "StdFloatTypes.h"
 
 inline int max(int a, int b) { return a > b ? a : b; }
 

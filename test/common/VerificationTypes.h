@@ -2,6 +2,7 @@
 
 #define NO_SYSC
 
+// IWYU pragma: begin_exports
 #include <iostream>
 #include <map>
 #include <string>
@@ -14,6 +15,7 @@
 #include "spdlog/spdlog.h"
 #include "src/ArchitectureParams.h"
 #include "test/compiler/proto/param.pb.h"
+// IWYU pragma: end_exports
 
 #ifndef NUM_SRAM_BANKS
 #define NUM_SRAM_BANKS 1024

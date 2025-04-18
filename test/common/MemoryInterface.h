@@ -79,18 +79,19 @@ class MemoryInterface {
 
     // Read scalar from the file directly
     if (size == 1) {
+      if (tensor.dtype() != "bfloat16" && tensor.dtype() != "float32") {
+        throw std::runtime_error(
+            "Unsupported tensor dtype for scalar tensor: " + tensor.dtype());
+      }
+
       float* array = read_constant_param(tensor);
 
-      if (tensor.dtype() == "bfloat16" || tensor.dtype() == "float32") {
-        VECTOR_DATATYPE* data = new VECTOR_DATATYPE[1];
-        data[0] = array[0];
-        delete[] array;
-        return data;
-      } else {
-        spdlog::debug("Unsupported data type for scalar tensor: {}",
-                      tensor.dtype());
-        std::abort();
-      }
+      VECTOR_DATATYPE* data = new VECTOR_DATATYPE[1];
+      data[0] = array[0];
+
+      delete[] array;
+
+      return data;
     }
 
     return read_tensor_helper<SUPPORTED_TYPES>(tensor);

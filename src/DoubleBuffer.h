@@ -3,6 +3,8 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include "AccelTypes.h"
+
 #ifndef __SYNTHESIS__
 #include "test/common/AccessCounter.h"
 #endif

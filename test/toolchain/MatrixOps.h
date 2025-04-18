@@ -567,7 +567,7 @@ void MapMatrixOperation(const Operation &operation,
         int scalar = other.int_value();
         set_immediate(scalar, stage, opcode, inst);
       } else if (other.has_tensor() && get_size(other.tensor()) == 1) {
-        float *array = read_constant_param(tensor);
+        float *array = read_constant_param(other.tensor());
         set_immediate(array[0], stage, opcode, inst);
         delete[] array;
       } else {

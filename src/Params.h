@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef NO_SYSC
-#include "TypeToBits.h"
+#include <mc_connections.h>
 #endif
 
 #include "ArchitectureParams.h"

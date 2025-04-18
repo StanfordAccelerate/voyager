@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <cstdlib>
-#include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -16,15 +15,6 @@
 #include "test/common/GoldModel.h"
 #include "test/common/Network.h"
 #include "test/common/Utils.h"
-
-#if __has_include(<filesystem>)
-#include <filesystem>
-#else
-#include <experimental/filesystem>
-namespace std {
-namespace filesystem = experimental::filesystem;
-}
-#endif
 
 Simulation::Simulation() {
   model = get_env_var("NETWORK");

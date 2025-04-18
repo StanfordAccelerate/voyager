@@ -1,15 +1,9 @@
 #pragma once
+#define NO_SYSC
 
 #include <string>
 #include <vector>
 
-#include "test/common/VerificationTypes.h"
-
-#define NO_SYSC
-// clang-format off
-#include "src/datatypes/DataTypes.h"
-// clang-format on
-#include "src/ArchitectureParams.h"
 #include "test/common/ArrayMemory.h"
 #include "test/common/DataLoader.h"
 #include "test/common/Network.h"

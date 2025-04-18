@@ -1,6 +1,5 @@
 #pragma once
 
-#include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 #include "test/compiler/proto/tiling.pb.h"
 

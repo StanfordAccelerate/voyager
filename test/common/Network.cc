@@ -4,6 +4,8 @@
 
 #include <fstream>
 
+#include "test/common/VerificationTypes.h"
+
 using namespace std;
 using namespace google::protobuf;
 

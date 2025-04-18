@@ -1,9 +1,6 @@
 // This file is the main entry point to running event-level SystemC simulations.
 // It can run any model, such as ResNet and mobileBert-Tiny
 // Parameters are passed via environment variables, not arguments.
-#include <iostream>
-#include <string>
-#include <vector>
 
 #include "test/common/Simulation.h"
 

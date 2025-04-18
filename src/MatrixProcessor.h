@@ -3,7 +3,9 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
+#include "Skewer.h"
 #include "SystolicArray.h"
 
 template <typename InputTypeTuple, typename WeightTypeTuple, typename Input,
@@ -18,9 +20,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                        Input, Weight, Psum, Buffer, Scale, NRows, NCols,
                        BufferSize> : public sc_module {
  private:
-  Connections::SyncChannel CCS_INIT_S1(weightLoadDone);
-  Connections::SyncChannel CCS_INIT_S1(weightSwapDone);
-
   InputSerializedSkewer<Input, NRows> CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<PEInput<Input>, NRows>> CCS_INIT_S1(
       inputSkewerDin);
@@ -65,12 +64,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       accumulation_buffer_write_request[2];
   Connections::SyncOut accumulation_buffer_done[2];
 
-  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(sa_controller_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(weight_buffer_params);
+
   Connections::Combinational<MatrixParams> CCS_INIT_S1(
-      accumulationBufferParams);
+      accumulation_buffer_params);
 
   Connections::Combinational<PEInput<Input>> inputsToSystolicArray[NRows];
   Connections::Combinational<PEWeight<Weight>> weightsToSystolicArray[NCols];
@@ -92,7 +92,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   Connections::SyncOut CCS_INIT_S1(startSignal);
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
-  SC_CTOR(MatrixProcessor) /*: inputsToSkewer(4)*/ {
+  SC_CTOR(MatrixProcessor) {
     paramsDeserializer.clk(clk);
     paramsDeserializer.rstn(rstn);
     paramsDeserializer.serialParamsIn(serialParamsIn);
@@ -285,7 +285,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     biasChannel.Reset();
     inputSkewerDin.ResetWrite();
     psumInSkewerDin.ResetWrite();
-    accumulationBufferParams.ResetRead();
+    accumulation_buffer_params.ResetRead();
     inputsToSkewer_delayed.ResetRead();
 
     accumulation_buffer_read_data[0].Reset();
@@ -295,7 +295,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
     wait();
     while (true) {
-      const MatrixParams params = accumulationBufferParams.Pop();
+      const MatrixParams params = accumulation_buffer_params.Pop();
       ac_int<32, false> total_ops = params.loops[0][0] * params.loops[0][1] *
                                     params.loops[0][2] * params.loops[0][3] *
                                     params.loops[1][0] * params.loops[1][1] *
@@ -452,7 +452,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       startSignal.SyncPush();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
-      ac_int<LOOP_WIDTH, false> loop_counters_accum[2][6];
       ac_int<LOOP_WIDTH, false> loop_counters_out[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
@@ -461,7 +460,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_counters[i][j] = 0;
-          loop_counters_accum[i][j] = 0;
           loop_counters_out[i][j] = 0;
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -474,34 +472,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                                     params.loops[1][4] * params.loops[1][5];
 
       ac_int<32, false> step = 0;
-      ac_int<32, false> accum_step = 0;
       ac_int<32, false> output_step = 0;
       ac_int<32, false> last_output_step = 0;
-
-      // accumulation buffer takes 3 cycles to access, so we need to send the
-      // read request 3 cycles in advance. to do this, we create another set
-      // of loop counters and step counter, but start them at 3.
-      constexpr int accumulation_buffer_read_delay = 0;
-      for (int i = 0; i < accumulation_buffer_read_delay; i++) {
-        accum_step++;
-        loop_counters_accum[1][5]++;
-#pragma hls_unroll yes
-        for (int i = 1; i >= 0; i--) {
-#pragma hls_unroll yes
-          for (int j = 5; j >= 0; j--) {
-            if (loop_counters_accum[i][j] == params.loops[i][j]) {
-              loop_counters_accum[i][j] = 0;
-              if (j > 0) {
-                loop_counters_accum[i][j - 1]++;
-              } else {
-                if (i > 0) {
-                  loop_counters_accum[i - 1][5]++;
-                }
-              }
-            }
-          }
-        }
-      }
 
       // non_accumulating_tile_size is the number of inputs to send before we
       // start accumulating. For example, for a loop order of (C, K, FX, FY,
@@ -533,18 +505,17 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
         accumulation_buffer_bank_delayed = accumulation_buffer_bank;
 
-        bool is_accumulating =
-            loop_counters_accum[0][params.reductionLoopIndex[0]] != 0 ||
-            loop_counters_accum[1][params.reductionLoopIndex[1]] != 0 ||
-            loop_counters_accum[1][params.fxIndex] != 0 ||
-            loop_counters_accum[1][params.fyIndex] != 0;
-
         bool stall_inputs = false;
 
 #if !SUPPORT_MX
-        stall_inputs =
-            is_accumulating && accum_step < total_ops &&
-            last_output_step < accum_step - non_accumulating_tile_size + 2;
+        bool is_accumulating =
+            loop_counters[0][params.reductionLoopIndex[0]] != 0 ||
+            loop_counters[1][params.reductionLoopIndex[1]] != 0 ||
+            loop_counters[1][params.fxIndex] != 0 ||
+            loop_counters[1][params.fyIndex] != 0;
+
+        stall_inputs = is_accumulating &&
+                       last_output_step < step - non_accumulating_tile_size + 2;
 #endif
 
         last_output_step = output_step;
@@ -610,14 +581,14 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #if !SUPPORT_MX
           inputsToSkewer.Push(inputs);
 
-          if (is_accumulating && accum_step < total_ops) {
+          if (is_accumulating) {
             ac_int<int_log2(BufferSize), false> readAddress =
-                loop_counters_accum[1][params.weightLoopIndex[1]] *
+                loop_counters[1][params.weightLoopIndex[1]] *
                     params.loops[1][params.inputXLoopIndex[1]] *
                     params.loops[1][params.inputYLoopIndex[1]] +
-                loop_counters_accum[1][params.inputYLoopIndex[1]] *
+                loop_counters[1][params.inputYLoopIndex[1]] *
                     params.loops[1][params.inputXLoopIndex[1]] +
-                loop_counters_accum[1][params.inputXLoopIndex[1]];
+                loop_counters[1][params.inputXLoopIndex[1]];
 
             accumulation_buffer_read_address[accumulation_buffer_bank].Push(
                 readAddress);
@@ -656,13 +627,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                params.loops[1][params.inputYLoopIndex[1]] - 1);
 
 #if SUPPORT_MX
-          // FIXME: why this is inside the if statement?
-          bool is_non_accumulating_tile =
-              loop_counters_out[0][params.reductionLoopIndex[0]] == 0 &&
-              loop_counters_out[1][params.reductionLoopIndex[1]] == 0 &&
-              loop_counters_out[1][params.fxIndex] == 0 &&
-              loop_counters_out[1][params.fyIndex] == 0;
-          if (!is_non_accumulating_tile) {
+          bool is_output_accumulating =
+              loop_counters_out[0][params.reductionLoopIndex[0]] != 0 ||
+              loop_counters_out[1][params.reductionLoopIndex[1]] != 0 ||
+              loop_counters_out[1][params.fxIndex] != 0 ||
+              loop_counters_out[1][params.fyIndex] != 0;
+
+          if (is_output_accumulating) {
             ac_int<int_log2(BufferSize), false> readAddress =
                 loop_counters_out[1][params.weightLoopIndex[1]] *
                     params.loops[1][params.inputXLoopIndex[1]] *
@@ -738,25 +709,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
               }
             }
           }
-
-          accum_step++;
-          loop_counters_accum[1][5]++;
-#pragma hls_unroll yes
-          for (int i = 1; i >= 0; i--) {
-#pragma hls_unroll yes
-            for (int j = 5; j >= 0; j--) {
-              if (loop_counters_accum[i][j] == params.loops[i][j]) {
-                loop_counters_accum[i][j] = 0;
-                if (j > 0) {
-                  loop_counters_accum[i][j - 1]++;
-                } else {
-                  if (i > 0) {
-                    loop_counters_accum[i - 1][5]++;
-                  }
-                }
-              }
-            }
-          }
         }
 
 // when stalling, use wait() to yield control to other processes
@@ -796,12 +748,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                params.loops[1][params.inputYLoopIndex[1]] - 1);
 
 #if SUPPORT_MX
-          bool is_non_accumulating_tile =
-              loop_counters_out[0][params.reductionLoopIndex[0]] == 0 &&
-              loop_counters_out[1][params.reductionLoopIndex[1]] == 0 &&
-              loop_counters_out[1][params.fxIndex] == 0 &&
-              loop_counters_out[1][params.fyIndex] == 0;
-          if (!is_non_accumulating_tile) {
+          bool is_output_accumulating =
+              loop_counters_out[0][params.reductionLoopIndex[0]] != 0 ||
+              loop_counters_out[1][params.reductionLoopIndex[1]] != 0 ||
+              loop_counters_out[1][params.fxIndex] != 0 ||
+              loop_counters_out[1][params.fyIndex] != 0;
+
+          if (is_output_accumulating) {
             ac_int<int_log2(BufferSize), false> readAddress =
                 loop_counters_out[1][params.weightLoopIndex[1]] *
                     params.loops[1][params.inputXLoopIndex[1]] *
@@ -888,7 +841,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #else
     unscaledAccumulationChannel_delayed.ResetRead();
 #endif
-    accumulationBufferParams.ResetRead();
+    accumulation_buffer_params.ResetRead();
     inputScaleChannel.Reset();
     weightScaleChannel.Reset();
     accumulation_buffer_done[0].Reset();
@@ -903,7 +856,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     wait();
 
     while (true) {
-      const MatrixParams params = accumulationBufferParams.Pop();
+      const MatrixParams params = accumulation_buffer_params.Pop();
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 #pragma hls_unroll yes
@@ -1070,7 +1023,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
     sa_controller_params.ResetWrite();
     weight_buffer_params.ResetWrite();
-    accumulationBufferParams.ResetWrite();
+    accumulation_buffer_params.ResetWrite();
 
     wait();
 
@@ -1079,7 +1032,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       sa_controller_params.Push(params);
       weight_buffer_params.Push(params);
-      accumulationBufferParams.Push(params);
+      accumulation_buffer_params.Push(params);
     }
   }
 };

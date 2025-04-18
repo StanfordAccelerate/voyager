@@ -1,18 +1,14 @@
 #pragma once
 
-#include <ac_fixed.h>
+#ifndef NO_SYSC
+#include <mc_connections.h>
+#endif
+
 #include <ac_std_float.h>
 
 #include <string>
 
-// forward declarations
-template <int mantissa, int exp, bool use_dw_impl = false,
-          bool ieee_compliance = true, ac_q_mode Q = AC_RND_CONV>
-class StdFloat;
-
-template <int W, bool S>
-class Int;
-
+// IWYU pragma: begin_exports
 #include "IntTypes.h"
 #include "NormalFloat.h"
 #include "PositTypes.h"
@@ -22,6 +18,7 @@ class Int;
 #ifndef __SYNTHESIS__
 #include "CFloat.h"
 #endif
+// IWYU pragma: end_exports
 
 namespace DataTypes {
 typedef Int<1, true> int1;

@@ -1,6 +1,8 @@
 #pragma once
 #define NO_SYSC
 
+// IWYU pragma: begin_exports
+#include <any>
 #include <vector>
 
 // clang-format off
@@ -10,6 +12,7 @@
 #include "src/ArchitectureParams.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
+// IWYU pragma: end_exports
 
 // Function to compute multi-dimensional indices from a flat index
 inline std::vector<int> get_indices(int flat_idx,

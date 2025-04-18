@@ -1,10 +1,9 @@
+#pragma once
+#define NO_SYSC
+
 #include <deque>
 #include <tuple>
 
-#define NO_SYSC
-// clang-format off
-#include "src/datatypes/DataTypes.h"
-// clang-format on
 #include "src/ArchitectureParams.h"
 
 template <typename T>

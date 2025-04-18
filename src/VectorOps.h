@@ -3,6 +3,10 @@
 #include <ac_math/ac_gelu_pwl.h>
 #include <ac_math/ac_sigmoid_pwl.h>
 
+#include "AccelTypes.h"
+#include "ArchitectureParams.h"
+#include "TypeToBits.h"
+
 using namespace ac_math;
 
 #pragma hls_design ccore

@@ -16,6 +16,7 @@
 #ifndef __TYPETOBITS_H__
 #define __TYPETOBITS_H__
 
+#include <mc_connections.h>
 #include <systemc.h>
 
 /**

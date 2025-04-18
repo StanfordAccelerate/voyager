@@ -5,24 +5,16 @@
 #include <systemc.h>
 
 #include <deque>
-#include <string>
 #include <vector>
 
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
-#include "spdlog/spdlog.h"
 #include "test/common/AccessCounter.h"
 #include "test/common/Network.h"
 #include "test/common/VerificationTypes.h"
 
 #ifndef CFLOAT
 #include "Accelerator.h"
-
-#ifdef SOC_COSIM
-#define CombinationalInterface LoggingCombinational
-#else
-#define CombinationalInterface Connections::Combinational
-#endif
 
 template <typename T>
 class LoggingCombinational : public Connections::Combinational<T> {
@@ -66,12 +58,14 @@ SC_MODULE(Harness) {
   sc_clock CCS_INIT_S1(clk);
   sc_signal<bool> CCS_INIT_S1(rstn);
 
-  CombinationalInterface<int> CCS_INIT_S1(serialMatrixParamsIn);
-  CombinationalInterface<int> CCS_INIT_S1(serialVectorParamsIn);
+  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
+      serialMatrixParamsIn);
+  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
+      serialVectorParamsIn);
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
   sc_fifo<IC_PORT_TYPE> inputDataResponse_fifo;
-  CombinationalInterface<IC_PORT_TYPE> CCS_INIT_S1(inputDataResponse);
+  Connections::Combinational<IC_PORT_TYPE> CCS_INIT_S1(inputDataResponse);
 
 #if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
@@ -81,9 +75,9 @@ SC_MODULE(Harness) {
       inputScaleDataResponse);
 #endif
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(weightAddressRequest);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> weightDataResponse_fifo;
-  CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       weightDataResponse);
 
 #if SUPPORT_MX
@@ -94,35 +88,40 @@ SC_MODULE(Harness) {
       weightScaleDataResponse);
 #endif
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(biasAddressRequest);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> biasDataResponse_fifo;
-  CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       biasDataResponse);
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      vector_fetch_0_request_out);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch0DataResponse_fifo;
-  CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_0_resp_in);
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      vector_fetch_1_request_out);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch1DataResponse_fifo;
-  CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_1_resp_in);
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      vector_fetch_2_request_out);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch2DataResponse_fifo;
-  CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_2_resp_in);
 
-  CombinationalInterface<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      vector_fetch_3_request_out);
   sc_fifo<ac_int<16, false>> vectorFetch3DataResponse_fifo;
-  CombinationalInterface<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp_in);
+  Connections::Combinational<ac_int<16, false>> CCS_INIT_S1(
+      vector_fetch_3_resp_in);
 
-  CombinationalInterface<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_output);
-  CombinationalInterface<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_output_address);
-  CombinationalInterface<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
       scalar_output);
-  CombinationalInterface<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+  Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       scalar_output_address);
 
   Connections::SyncChannel CCS_INIT_S1(matrixUnitStartSignal);
@@ -147,18 +146,19 @@ SC_MODULE(Harness) {
 #endif
 
   template <int Width>
-  void readMemoryRequest(CombinationalInterface<MemoryRequest> * request_out,
-                         sc_fifo<ac_int<Width, false>> * data_fifo);
+  void readMemoryRequest(
+      Connections::Combinational<MemoryRequest> * request_out,
+      sc_fifo<ac_int<Width, false>> * data_fifo);
 
   template <int Width>
   void sendMemoryResponse(
       sc_fifo<ac_int<Width, false>> * data_fifo,
-      CombinationalInterface<ac_int<Width, false>> * response);
+      Connections::Combinational<ac_int<Width, false>> * response);
 
   template <int Width>
   void storeMemoryResponse(
-      CombinationalInterface<ac_int<Width, false>> * data_out,
-      CombinationalInterface<ac_int<ADDRESS_WIDTH, false>> * address_out);
+      Connections::Combinational<ac_int<Width, false>> * data_out,
+      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> * address_out);
 
   void readRequestInputs();
   void sendResponseInputs();

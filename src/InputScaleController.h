@@ -11,7 +11,7 @@ SC_MODULE(InputScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> CCS_INIT_S1(serialParamsIn);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(dataResponse);
@@ -83,6 +83,7 @@ SC_MODULE(InputScaleController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -330,6 +331,7 @@ SC_MODULE(InputScaleController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -541,6 +543,7 @@ SC_MODULE(InputScaleController) {
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }

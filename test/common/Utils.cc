@@ -1,8 +1,7 @@
 #include "test/common/Utils.h"
 
-#include <algorithm>
-#include <string>
-#include <vector>
+#define NO_SYSC
+#include "src/ArchitectureParams.h"
 
 int validateMapping(Tiling tiling) {
   int x0 = tiling.loops[1][tiling.x_loop_index[1]];

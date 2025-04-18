@@ -1,8 +1,4 @@
 #pragma once
-#include <fstream>
-#include <iostream>
-#include <random>
-
 #define NO_SYSC
 
 // clang-format off
@@ -10,6 +6,7 @@
 // clang-format on
 
 #include "src/ArchitectureParams.h"
+#include "test/common/ArrayMemory.h"
 #include "test/common/MemoryInterface.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"

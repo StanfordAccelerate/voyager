@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef NO_SYSC
+#include <mc_connections.h>
+#endif
+
 #include <ac_int.h>
 
 #include <cmath>

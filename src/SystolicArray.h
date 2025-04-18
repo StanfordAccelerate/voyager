@@ -5,7 +5,6 @@
 
 #include "AccelTypes.h"
 #include "ProcessingElement.h"
-#include "Skewer.h"
 #include "Tieoff.h"
 #include "mc_scverify.h"
 

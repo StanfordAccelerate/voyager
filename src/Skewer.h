@@ -4,7 +4,6 @@
 #include <boost/preprocessor/stringize.hpp>
 
 #include "AccelTypes.h"
-#include "ArchitectureParams.h"
 
 #ifndef PE_LATENCY
 #define PE_LATENCY 2

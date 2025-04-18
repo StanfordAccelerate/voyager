@@ -11,44 +11,6 @@
 #ifndef CFLOAT
 #include "test/toolchain/MapOperation.h"
 
-#ifdef SOC_COSIM
-extern bool syscDone;
-void init_checkers();
-void register_interface(
-    std::deque<sc_lv<Wrapped<int>::width>> *serialMatrixParamsIn,
-    std::deque<sc_lv<Wrapped<int>::width>> *serialVectorParamsIn,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *inputAddressRequest,
-    std::deque<sc_lv<Wrapped<IC_PORT_TYPE>::width>> *inputAddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width>> *weightAddressRequest,
-    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
-        *weightAddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vector_fetch_0_request_out,
-    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
-        *vectorFetch0AddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vector_fetch_1_request_out,
-    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
-        *vectorFetch1AddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vector_fetch_2_request_out,
-    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
-        *vectorFetch2AddressResponse,
-    std::deque<sc_lv<Wrapped<MemoryRequest>::width>>
-        *vector_fetch_3_request_out,
-    std::deque<sc_lv<Wrapped<ac_int<16, false>>::width>>
-        *vectorFetch3AddressResponse,
-    std::deque<sc_lv<Wrapped<ac_int<OC_PORT_WIDTH, false>>::width>>
-        *vector_output,
-    std::deque<sc_lv<Wrapped<ac_int<ADDRESS_WIDTH, false>>::width>>
-        *vector_output_address,
-    std::deque<sc_lv<Wrapped<ac_int<SCALE_DATATYPE::width, false>>::width>>
-        *scalar_output,
-    std::deque<sc_lv<Wrapped<ac_int<ADDRESS_WIDTH, false>>::width>>
-        *scalar_output_address);
-// void copy_output(void *sram, int size, int data_size);
-#endif
-
 Harness::Harness(sc_module_name name, std::vector<Operation> operations,
                  char *memory)
     : sc_module(name),
@@ -95,24 +57,6 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.inputScaleDataResponse(inputScaleDataResponse);
   accelerator.weightScaleAddressRequest(weightScaleAddressRequest);
   accelerator.weightScaleDataResponse(weightScaleDataResponse);
-#endif
-
-#ifdef SOC_COSIM
-  init_checkers();
-  register_interface(
-      serialMatrixParamsIn.getDataQueue(), serialVectorParamsIn.getDataQueue(),
-      inputAddressRequest.getDataQueue(), inputDataResponse.getDataQueue(),
-      weightAddressRequest.getDataQueue(), weightDataResponse.getDataQueue(),
-      vector_fetch_0_request_out.getDataQueue(),
-      vector_fetch_0_resp_in.getDataQueue(),
-      vector_fetch_1_request_out.getDataQueue(),
-      vector_fetch_1_resp_in.getDataQueue(),
-      vector_fetch_2_request_out.getDataQueue(),
-      vector_fetch_2_resp_in.getDataQueue(),
-      vector_fetch_3_request_out.getDataQueue(),
-      vector_fetch_3_resp_in.getDataQueue(), vector_output.getDataQueue(),
-      vector_output_address.getDataQueue(), scalar_output.getDataQueue(),
-      scalar_output_address.getDataQueue());
 #endif
 
   SC_CTHREAD(reset, clk);
@@ -215,7 +159,7 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 
 template <int Width>
 void Harness::readMemoryRequest(
-    CombinationalInterface<MemoryRequest> *request_out,
+    Connections::Combinational<MemoryRequest> *request_out,
     sc_fifo<ac_int<Width, false>> *data_fifo) {
   request_out->ResetRead();
 
@@ -250,7 +194,7 @@ void Harness::readMemoryRequest(
 template <int Width>
 void Harness::sendMemoryResponse(
     sc_fifo<ac_int<Width, false>> *data_fifo,
-    CombinationalInterface<ac_int<Width, false>> *response) {
+    Connections::Combinational<ac_int<Width, false>> *response) {
   response->ResetWrite();
 
   wait();
@@ -262,8 +206,8 @@ void Harness::sendMemoryResponse(
 
 template <int Width>
 void Harness::storeMemoryResponse(
-    CombinationalInterface<ac_int<Width, false>> *data_out,
-    CombinationalInterface<ac_int<ADDRESS_WIDTH, false>> *address_out) {
+    Connections::Combinational<ac_int<Width, false>> *data_out,
+    Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> *address_out) {
   data_out->ResetRead();
   address_out->ResetRead();
 
@@ -375,8 +319,9 @@ void Harness::reset() {
 }
 
 template <typename T, unsigned int interfaceWidth>
-void sendSerializedParams(T params,
-                          CombinationalInterface<int> *serialParamsIn) {
+void sendSerializedParams(
+    T params,
+    Connections::Combinational<ac_int<interfaceWidth, false>> *serialParamsIn) {
   ac_int<T::width, false> serializedParam;
   vector_to_type(TypeToBits<T>(params), false, &serializedParam);
 
@@ -437,7 +382,7 @@ void Harness::sendParams() {
       }
 
       if (matrixParamsValid) {
-        sendSerializedParams<MatrixParams, 32>(*matrixParams,
+        sendSerializedParams<MatrixParams, 64>(*matrixParams,
                                                &serialMatrixParamsIn);
         matrixUnitStartSignal.SyncPop();
       }
@@ -447,9 +392,9 @@ void Harness::sendParams() {
                                           << "' Started. -----");
 
       if (vectorParamsValid) {
-        sendSerializedParams<VectorParams, 32>(*vectorParams,
+        sendSerializedParams<VectorParams, 64>(*vectorParams,
                                                &serialVectorParamsIn);
-        sendSerializedParams<VectorInstructionConfig, 32>(
+        sendSerializedParams<VectorInstructionConfig, 64>(
             *vectorInstructionConfig, &serialVectorParamsIn);
         vectorUnitStartSignal.SyncPop();
       }
@@ -479,15 +424,9 @@ void Harness::sendParams() {
 
       accelerator_memory_maps.pop_front();
     }
-
-#ifdef SOC_COSIM
-    syscDone = true;
-#endif
   }
 
-#ifndef SOC_COSIM
   sc_stop();
-#endif
 }
 
 #endif

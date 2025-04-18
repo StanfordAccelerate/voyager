@@ -18,7 +18,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<int> serialParamsIn;
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(dataResponse);
@@ -95,6 +95,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 5; j++) {
           loop_bounds[i][j] = params.weightAddressGenLoops[i][j];
         }
@@ -232,6 +233,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 5; j++) {
           loop_bounds[i][j] = params.weightAddressGenLoops[i][j];
         }
@@ -374,6 +376,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -674,6 +677,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 5; j++) {
           loop_bounds[i][j] = params.weightAddressGenLoops[i][j];
         }
@@ -829,6 +833,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }
@@ -940,6 +945,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_bounds[i][j] = params.loops[i][j];
         }

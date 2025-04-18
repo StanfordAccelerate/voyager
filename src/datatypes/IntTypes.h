@@ -1,13 +1,17 @@
 #pragma once
 
-// clang-format off
+#ifndef NO_SYSC
+#include <mc_connections.h>
+#endif
+
 #include <ac_int.h>
-// clang-format on
 #include <ac_math/ac_inverse_sqrt_pwl.h>
 #include <ac_math/ac_pow_pwl.h>
 #include <ac_math/ac_reciprocal_pwl_vha.h>
 #include <ac_math/ac_sigmoid_pwl.h>
 #include <ac_math/ac_sqrt_pwl.h>
+
+#include "StdFloatTypes.h"
 
 template <int W, bool S>
 class Int {

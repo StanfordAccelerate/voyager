@@ -1,6 +1,13 @@
 #pragma once
 
+#ifndef NO_SYSC
+#include <mc_connections.h>
+#endif
+
 #include <ac_int.h>
+#include <ac_std_float.h>
+
+#include "StdFloatTypes.h"
 
 template <int W, int E>
 class UFloat {

@@ -4,6 +4,7 @@ data
 pybuild
 .direnv
 .vscode
+compile_commands.json
 novas*
 *.fsdb*
 ucli.key

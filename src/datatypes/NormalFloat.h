@@ -1,6 +1,13 @@
 #pragma once
 
+#ifndef NO_SYSC
+#include <mc_connections.h>
+#endif
+
 #include <ac_std_float.h>
+
+#include "IntTypes.h"
+#include "StdFloatTypes.h"
 
 class NormalFloat4 {
  public:

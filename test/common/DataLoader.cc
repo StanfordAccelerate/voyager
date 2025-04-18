@@ -1,8 +1,11 @@
 #include "test/common/DataLoader.h"
 
+#include <fstream>
+#include <iostream>
+
 #include "spdlog/spdlog.h"
+#include "test/common/VerificationTypes.h"
 #include "xtensor/xadapt.hpp"
-#include "xtensor/xarray.hpp"
 
 DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut,
                        bool is_cnn)

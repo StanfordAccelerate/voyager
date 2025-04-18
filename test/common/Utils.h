@@ -1,20 +1,12 @@
 #pragma once
-
 #define NO_SYSC
 
 #include <spdlog/spdlog.h>
 
+#include <any>
 #include <fstream>
 #include <iostream>
-#include <vector>
 
-// clang-format off
-#include "src/datatypes/DataTypes.h"
-// clang-format on
-#include <any>
-
-#include "VerificationTypes.h"
-#include "src/ArchitectureParams.h"
 #include "test/common/Tiling.h"
 
 int validateMapping(Tiling tiling);
