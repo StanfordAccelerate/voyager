@@ -592,6 +592,8 @@ void MapMatrixOperation(const Operation &operation,
         }
       }
     }
+
+    stage++;
   }
 
   // total output count

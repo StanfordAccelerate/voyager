@@ -572,6 +572,8 @@ void MapVectoreduce_operations(const codegen::Operation &param,
         }
       }
     }
+
+    stage++;
   }
 
   // total output count
