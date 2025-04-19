@@ -175,7 +175,7 @@ class MemoryInterface {
 
     constexpr int buf_width = (T::width / 8 + 2) * 8;
     ac_int<buf_width, false> bytes = value.bits_rep();
-    ac_int<buf_width, false> masks = ((1 << T::width) - 1);
+    ac_int<buf_width, false> masks = ((1UL << T::width) - 1);
 
     bytes = bytes << offset;
     masks = masks << offset;

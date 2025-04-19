@@ -160,9 +160,8 @@ void MapVectorOperations(const codegen::Operation &param,
     for (const auto dim : input_shape) {
       if (dim > 1024) {
         spdlog::error("ERROR: input shape dimension is greater than 1024: ");
-
         print_shape(input_shape);
-        throw std::invalid_argument("Invalid input shape dimension!");
+        throw std::invalid_argument("Unsupported input shape dimension!");
       }
     }
 
@@ -171,7 +170,7 @@ void MapVectorOperations(const codegen::Operation &param,
           "ERROR: input last dimension is not a multiple of "
           "OC_DIMENSION: ");
       print_shape(input_shape);
-      throw std::invalid_argument("Invalid input shape dimension!");
+      throw std::invalid_argument("Unsupported input shape dimension!");
     }
   } else {
     input_shape = split_loops(input_shape, 1024);

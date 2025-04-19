@@ -160,5 +160,5 @@ inline bool Int<W, S>::operator<(const Int &rhs) const {
 template <int W, bool S>
 template <int W2, bool S2>
 Int<W2, S2> Int<W, S>::fma(Int<W, S> &b, Int<W2, S2> &c) {
-  return static_cast<Int<W2, S2>>(*this * b) + c;
+  return static_cast<Int<W2, S2> >(*this) * static_cast<Int<W2, S2> >(b) + c;
 }

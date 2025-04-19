@@ -9,7 +9,7 @@
 #define INPUT_DATATYPE DataTypes::posit8
 #define WEIGHT_DATATYPE DataTypes::posit8
 #define ACCUM_DATATYPE DataTypes::bfloat16
-#define VECTOR_DATATYPE ACCUM_DATATYPE
+#define VECTOR_DATATYPE DataTypes::bfloat16
 
 #define SA_INPUT_TYPE INPUT_DATATYPE::decoded
 #define SA_WEIGHT_TYPE WEIGHT_DATATYPE::decoded
@@ -86,21 +86,17 @@ using F9 = StdFloat<3, 5>;
 
 #elif defined(INT8)
 
-using F16 = DataTypes::bfloat16;
-
 #define INPUT_DATATYPE DataTypes::int8
 #define WEIGHT_DATATYPE DataTypes::int8
 #define ACCUM_DATATYPE DataTypes::int24
-#define VECTOR_DATATYPE F16
+#define VECTOR_DATATYPE DataTypes::bfloat16;
 
 #elif defined(INT8_32)
-
-using F16 = DataTypes::bfloat16;
 
 #define INPUT_DATATYPE DataTypes::int8
 #define WEIGHT_DATATYPE DataTypes::int8
 #define ACCUM_DATATYPE DataTypes::int32
-#define VECTOR_DATATYPE F16
+#define VECTOR_DATATYPE DataTypes::bfloat16
 
 #elif defined(MXINT8)
 

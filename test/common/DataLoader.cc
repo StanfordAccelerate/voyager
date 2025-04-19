@@ -22,6 +22,7 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   for (const auto& dim : shape) {
     spdlog::debug("{} ", dim);
   }
+  spdlog::debug("\n");
   spdlog::debug("Datatype: {}\n", tensor.dtype());
   spdlog::debug("Address: {}\n", tensor.memory().address());
   spdlog::debug("Transposed: {}\n", transpose);

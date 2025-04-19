@@ -51,6 +51,7 @@ bool type_cast_helper(std::any &input_ptr, float *codebook,
   }
 
   delete[] inputs;
+
   input_ptr = outputs;
 
   return true;
@@ -130,6 +131,14 @@ std::vector<std::any> run_operation(const Operation &operation,
       cast_input<SaInput, SUPPORTED_TYPES>(input_ptr, input_code, input);
       cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight_code, weight);
 
+      if (input_code != nullptr) {
+        delete[] input_code;
+      }
+
+      if (weight_code != nullptr) {
+        delete[] weight_code;
+      }
+
       // Perform reshape if necessary
       if (input.has_reshape()) {
         input_ptr = reshape_if_needed<SaInput>(input_ptr, input.reshape());
@@ -155,13 +164,6 @@ std::vector<std::any> run_operation(const Operation &operation,
       output_ptr = gemm<SaInput, SaWeight, Psum, AccumBuffer, Scale>(
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
           operation);
-
-      if (input_code != nullptr) {
-        delete[] input_code;
-      }
-      if (weight_code != nullptr) {
-        delete[] weight_code;
-      }
     }
   }
 
