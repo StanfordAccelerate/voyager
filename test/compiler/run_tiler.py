@@ -12,17 +12,14 @@ class RuntimeCalculator:
         self.operation = operation
 
     def calculate_runtime(self, architecture, layer, mapping):
-        # time for 1 tile = max(weight loading time, tile size)
-        # time for N non-accumulating tiles:
-        # - time for 1 tile * N non-accumulating tiles
-        # time for N accumulating tiles:
-        # - max(tile latency, tile size) * N accumulating tiles
-        # L1 time = max(L1 computation time, input buffer loading time, weight buffer loading time)
-        # total time = L2 blocks * L1 time
+        # assume IC is unrolled vertically
+        # does not handle replication
+        sa_weight_loading_time = mapping.loop_partitionings[interstellar.le.IC][0] + 2
 
-        # time for 1 tile = max(weight loading time, tile size)
-
-        # tile_size = innermost loops that use OX and/or OY
+        sa_latency = (
+            mapping.loop_partitionings[interstellar.le.IC][0] * 3
+            + mapping.loop_partitionings[interstellar.le.OC][0]
+        )
 
         # index of first loop that isn't OX or OY
         first_non_ox_oy_index = 6
@@ -32,37 +29,56 @@ class RuntimeCalculator:
             if mapping.loop_orders[i][1] < first_non_ox_oy_index:
                 first_non_ox_oy_index = mapping.loop_orders[i][1]
 
-        tile_size = 1
-        tile_count = 1
+        first_reduction_loop_index = interstellar.le.NUM
+        for i in range(interstellar.le.NUM):
+            if (
+                i == interstellar.le.IC
+                or i == interstellar.le.FX
+                or i == interstellar.le.FY
+            ):
+                if mapping.loop_blockings[i][1] > 1:
+                    if mapping.loop_orders[i][1] < first_reduction_loop_index:
+                        first_reduction_loop_index = mapping.loop_orders[i][1]
+
+        # calculate how big a weight reuse tile is
+        # weights are reused in the OX and OY loops, so a weight reuse tile is product of
+        # all loops from the first loop to the first non-(OX or OY) loop
+        weight_reuse_tile_size = 1
         for i in range(interstellar.le.NUM):
             if mapping.loop_orders[i][1] < first_non_ox_oy_index:
-                tile_size *= mapping.loop_blockings[i][1]
-            else:
-                tile_count *= mapping.loop_blockings[i][1]
+                weight_reuse_tile_size *= mapping.loop_blockings[i][1]
 
-        # assume IC is unrolled vertically
-        # does not handle replication
-        weight_loading_time = mapping.loop_partitionings[interstellar.le.IC][0] + 2
+        # calculate how long it takes to compute a weight_reuse_tile
+        # this is the max of time to load the weights into the systolic array and weight reuse tile size
+        weight_reuse_tile_time = max(sa_weight_loading_time, weight_reuse_tile_size)
 
-        # assume that IC is the outermost loop, from the schedule hint
-        is_accumulating_tile = (
-            mapping.loop_orders[interstellar.le.FX][1]
-            < mapping.loop_orders[interstellar.le.OC][1]
-            or mapping.loop_orders[interstellar.le.FY][1]
-            < mapping.loop_orders[interstellar.le.OC][1]
+        # calculate how big a non-accumulating tile is
+        # a non-accumulating tile is product of all loops from the first non-(OX or OY) loop to the
+        # first non-1 reduction loop
+        num_non_accumulating_tiles = 1
+        for i in range(interstellar.le.NUM):
+            if (
+                mapping.loop_orders[i][1] >= first_non_ox_oy_index
+                and mapping.loop_orders[i][1] < first_reduction_loop_index
+            ):
+                num_non_accumulating_tiles *= mapping.loop_blockings[i][1]
+
+        # calculate how long it takes to perform the computation for a non-accumulating tile
+        # this is the max of systolic array latency and the tile size
+        non_accumulating_tile_time = max(
+            sa_latency, num_non_accumulating_tiles * weight_reuse_tile_time
         )
 
-        systolic_array_latency = (
-            mapping.loop_partitionings[interstellar.le.IC][0] * 3
-            + mapping.loop_partitionings[interstellar.le.OC][0]
-        )
+        # calculate number of remaining L1 tiles
+        num_remaining_l1_tiles = 1
+        for i in range(interstellar.le.NUM):
+            if mapping.loop_orders[i][1] >= first_reduction_loop_index:
+                num_remaining_l1_tiles *= mapping.loop_blockings[i][1]
+        # include the reduction loop at the L2 level
+        num_remaining_l1_tiles *= mapping.loop_blockings[interstellar.le.IC][2]
 
-        if is_accumulating_tile:
-            time_per_tile = max(systolic_array_latency, weight_loading_time, tile_size)
-        else:
-            time_per_tile = max(weight_loading_time, tile_size)
-
-        computation_l1_time = tile_count * time_per_tile
+        # calculate time for computation at the L1 level
+        computation_l1_time = non_accumulating_tile_time * num_remaining_l1_tiles
 
         input_relevant_loops = [
             interstellar.le.IC,
@@ -108,7 +124,12 @@ class RuntimeCalculator:
             for i in range(1, len(self.operation.fused_op.op_list)):
                 vector_op = self.operation.fused_op.op_list[i]
                 if "other" in vector_op.kwargs:
-                    if vector_op.kwargs["other"].tensor.dtype != input_precision:
+                    if "memory" in vector_op.kwargs["other"].tensor:
+                        tensor_to_load = vector_op.kwargs["other"].tensor
+                    else:
+                        tensor_to_load = vector_op.kwargs["input"].tensor
+
+                    if tensor_to_load.dtype != input_precision:
                         requires_high_precision = True
                         break
             if self.operation.output.dtype != input_precision:
@@ -116,8 +137,6 @@ class RuntimeCalculator:
 
             if requires_high_precision:
                 vector_unit_time *= 2
-
-        vector_unit_time = 1
 
         # assume that writing out from accumulation buffer will not stall the system
         l1_time = max(
@@ -129,6 +148,9 @@ class RuntimeCalculator:
 
         l2_blocks = 1
         for i in range(interstellar.le.NUM):
+            # don't count the reduction loop here, since it's counted towards the number of L1 tiles
+            if i == interstellar.le.IC:
+                continue
             l2_blocks *= mapping.loop_blockings[i][2]
 
         # assumes 3 level memory hierarchy
