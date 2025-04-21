@@ -160,6 +160,7 @@ SC_MODULE(OutputController) {
 
                   Pack1D<VectorType, Width> outputs = vector_in.Pop();
 
+#if SUPPORT_CODEBOOK_QUANT
                   if (params.use_output_codebook) {
 #pragma hls_unroll yes
                     for (int i = 0; i < Width; i++) {
@@ -168,21 +169,21 @@ SC_MODULE(OutputController) {
                       VectorType value = outputs[i];
                       value.adjust_exponent(1);
 
-                      Int<MAX_DECODED_DTYPE_WIDTH + 1, true> int_value(value);
-
                       ac_int<4, false> index = 0;
 
-#pragma hls_unroll yes
                       for (int j = 0; j < NUM_CODEBOOK_ENTRIES - 1; j++) {
-                        if (int_value.int_val < params.output_code[j]) {
+                        if (value.float_val <=
+                            typename VectorType::ac_float_rep(
+                                params.output_code[j])) {
                           break;
                         }
                         index++;
                       }
 
-                      outputs[i] = Int<4, true>(index);
+                      outputs[i] = typename VectorType::ac_float_rep(index);
                     }
                   }
+#endif
 
                   bool found =
                       (send_vector_outputs<OutputTypes, Width, VectorType,

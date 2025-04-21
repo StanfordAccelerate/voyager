@@ -125,8 +125,6 @@ using F9 = StdFloat<3, 5>;
 #define INPUT_DTYPE_WIDTH 6
 #define WEIGHT_DTYPE_WIDTH 6
 
-#define DECODED_DTYPE_WIDTH 6
-
 // Number of bits used to represent the data type index
 #define DTYPE_INDEX_WIDTH 2
 
@@ -134,6 +132,7 @@ using F9 = StdFloat<3, 5>;
 #define OC_PORT_WIDTH (OC_DIMENSION * 4)
 
 #define SUPPORT_MX true
+#define SUPPORT_CODEBOOK_QUANT true
 
 #elif defined(CFLOAT)
 
@@ -204,8 +203,8 @@ using F9 = StdFloat<3, 5>;
 // Codebook Quantization
 // ================================================================
 
-#ifndef CODEBOOK_QUANTIZATION
-#define CODEBOOK_QUANTIZATION false
+#ifndef SUPPORT_CODEBOOK_QUANT
+#define SUPPORT_CODEBOOK_QUANT false
 #endif
 
 #ifndef DECODED_INPUT_DTYPE_WIDTH

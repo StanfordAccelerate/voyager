@@ -246,10 +246,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             auto data =
                 bits.template slc<WEIGHT_DTYPE_WIDTH>(i * WEIGHT_DTYPE_WIDTH);
 
+#if SUPPORT_CODEBOOK_QUANT
             if (params.use_weight_codebook) {
               auto value = params.weight_code[data];
               weights[i].data.set_bits(value);
-            } else {
+            } else
+#endif
+            {
               bool success = (decode_type<WeightTypes, Weight,
                                           WEIGHT_DTYPE_WIDTH, WeightTypes...>(
                                   params.weight_dtype, data, weights[i].data) ||
@@ -262,7 +265,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
               }
 #endif
             }
-
             weights[i].tag = weight_count;
           }
 
@@ -552,10 +554,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           for (int i = 0; i < NRows; i++) {
             auto data =
                 bits.template slc<INPUT_DTYPE_WIDTH>(i * INPUT_DTYPE_WIDTH);
+#if SUPPORT_CODEBOOK_QUANT
             if (params.use_input_codebook) {
               auto value = params.input_code[data];
               inputs[i].data.set_bits(value);
-            } else {
+            } else
+#endif
+            {
               bool success = (decode_type<InputTypes, Input, INPUT_DTYPE_WIDTH,
                                           InputTypes...>(
                                   params.input_dtype, data, inputs[i].data) ||
@@ -809,7 +814,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       doneSignal.SyncPush();
     }
   }
-
 #if SUPPORT_MX
   void delay_outputs() {
     unscaledAccumulationChannel.ResetRead();

@@ -39,7 +39,7 @@ bool type_cast_helper(std::any &input_ptr, float *codebook,
       } else {
         unsigned index = 0;
         for (; index < NUM_CODEBOOK_ENTRIES - 1; index++) {
-          if (static_cast<float>(inputs[i]) < codebook[index]) {
+          if (static_cast<float>(inputs[i]) <= codebook[index]) {
             break;
           }
         }
