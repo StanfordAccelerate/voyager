@@ -4,8 +4,8 @@ if { $DATATYPE == "P8_1" } {
   set ACCUM_DATATYPE "DataTypes::bfloat16"
   set VECTOR_DATATYPE "DataTypes::bfloat16"
 
-  set SA_INPUT_TYPE "${INPUT_DATATYPE}::decoded"
-  set SA_WEIGHT_TYPE "${WEIGHT_DATATYPE}::decoded"
+  set SA_INPUT_TYPE "Posit<8, 1>::decoded"
+  set SA_WEIGHT_TYPE "Posit<8, 1>::decoded"
 
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
