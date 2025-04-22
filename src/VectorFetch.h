@@ -111,6 +111,38 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<11, false> K0 =
           params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
 
+      ac_int<11, false> x0_stride = params.addr_gen0_step[1];
+      ac_int<11, false> y0_stride = params.addr_gen0_step[0];
+      ac_int<11, false> padding_x = params.addr_gen0_padding[1];
+      ac_int<11, false> padding_y = params.addr_gen0_padding[0];
+      ac_int<16, false> X, Y, K;
+      ac_int<11, false> x0_offset, y0_offset, k0_offset;
+
+      // stride = 0 means default behavior, stride = inner tile size
+      if (x0_stride == 0) {
+        X = X1 * X0;
+        x0_offset = X0;
+      } else {
+        X = X0 + (X1 - 1) * x0_stride - padding_x;
+        x0_offset = x0_stride;
+      }
+
+      if (y0_stride == 0) {
+        Y = Y1 * Y0;
+        y0_offset = Y0;
+      } else {
+        Y = Y0 + (Y1 - 1) * y0_stride - padding_y;
+        y0_offset = y0_stride;
+      }
+
+      K = K1 * K0 * Width;
+      k0_offset = K0;
+
+      ac_int<11, false> x_min_offset = (padding_x + 2 - 1) / 2;
+      ac_int<11, false> x_max_offset = padding_x / 2;
+      ac_int<11, false> y_min_offset = (padding_y + 2 - 1) / 2;
+      ac_int<11, false> y_max_offset = padding_y / 2;
+
       if (params.has_transpose && BUFSIZE != Width) {
         X1 = X1 * BUFSIZE / Width;
       }
@@ -136,7 +168,7 @@ SC_MODULE(VectorFetchUnit) {
         int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addr_gen0_start;
         loop_ends[i][j] = params.addr_gen0_end;
-        loop_steps[i][j] = params.addr_gen0_step;
+        loop_steps[i][j] = params.addr_gen0_step[j];
       } else if (params.has_permute) {
 #pragma hls_unroll yes
         for (int dim = 0; dim < 6; dim++) {
@@ -159,14 +191,44 @@ SC_MODULE(VectorFetchUnit) {
           for (loop_counters[0][2] = loop_starts[0][2];
                loop_counters[0][2] < loop_ends[0][2];
                loop_counters[0][2] += loop_steps[0][2]) {
+            ac_int<11, false> padded_loop_ends[3];
+
+            if (loop_counters[0][params.addr_gen0_x_loop_idx[0]] == 0) {
+              padded_loop_ends[params.addr_gen0_x_loop_idx[1]] =
+                  loop_ends[1][params.addr_gen0_x_loop_idx[1]] - x_min_offset;
+            } else if (loop_counters[0][params.addr_gen0_x_loop_idx[0]] ==
+                       loop_ends[0][params.addr_gen0_x_loop_idx[1]] - 1) {
+              padded_loop_ends[params.addr_gen0_x_loop_idx[1]] =
+                  loop_ends[1][params.addr_gen0_x_loop_idx[1]] - x_max_offset;
+            } else {
+              padded_loop_ends[params.addr_gen0_x_loop_idx[1]] =
+                  loop_ends[1][params.addr_gen0_x_loop_idx[1]];
+            }
+
+            if (loop_counters[0][params.addr_gen0_y_loop_idx[0]] == 0) {
+              padded_loop_ends[params.addr_gen0_y_loop_idx[1]] =
+                  loop_ends[1][params.addr_gen0_y_loop_idx[1]] - y_min_offset;
+            } else if (loop_counters[0][params.addr_gen0_y_loop_idx[1]] ==
+                       loop_ends[0][params.addr_gen0_y_loop_idx[1]] - 1) {
+              padded_loop_ends[params.addr_gen0_y_loop_idx[1]] =
+                  loop_ends[1][params.addr_gen0_y_loop_idx[1]] - y_max_offset;
+            } else {
+              padded_loop_ends[params.addr_gen0_y_loop_idx[1]] =
+                  loop_ends[1][params.addr_gen0_y_loop_idx[1]];
+            }
+
+            // k is not padded
+            padded_loop_ends[params.addr_gen0_k_loop_idx[1]] =
+                loop_ends[1][params.addr_gen0_k_loop_idx[1]];
+
             for (loop_counters[1][0] = loop_starts[1][0];
-                 loop_counters[1][0] < loop_ends[1][0];
+                 loop_counters[1][0] < padded_loop_ends[0];
                  loop_counters[1][0] += loop_steps[1][0]) {
               for (loop_counters[1][1] = loop_starts[1][1];
-                   loop_counters[1][1] < loop_ends[1][1];
+                   loop_counters[1][1] < padded_loop_ends[1];
                    loop_counters[1][1] += loop_steps[1][1]) {
                 for (loop_counters[1][2] = loop_starts[1][2];
-                     loop_counters[1][2] < loop_ends[1][2];
+                     loop_counters[1][2] < padded_loop_ends[2];
                      loop_counters[1][2] += loop_steps[1][2]) {
                   ac_int<32, false> address;
                   bool switch_accumulation_buffer_bank = false;
@@ -184,15 +246,15 @@ SC_MODULE(VectorFetchUnit) {
                     ac_int<11, false> k1 =
                         loop_counters[0][params.addr_gen0_k_loop_idx[0]];
 
-                    ac_int<16, false> k = k1 * K0 * Width + k0 * Width;
-                    ac_int<16, false> K = K1 * K0 * Width;
-
-                    ac_int<16, false> x = x1 * X0 + x0;
-                    ac_int<16, false> X = X1 * X0;
-
-                    ac_int<16, false> y = y1 * Y0 + y0;
-                    ac_int<16, false> Y = Y1 * Y0;
-
+                    ac_int<16, false> k = k1 * k0_offset * Width + k0 * Width;
+                    ac_int<16, false> x = x1 * x0_offset + x0;
+                    if (x1 != 0) {
+                      x = x - x_min_offset;
+                    }
+                    ac_int<16, false> y = y1 * y0_offset + y0;
+                    if (y1 != 0) {
+                      y = y - y_min_offset;
+                    }
                     if (params.has_transpose) {
                       address = y * K * X + (k + x0) * X + x1 * BUFSIZE;
                     } else {
@@ -356,13 +418,63 @@ SC_MODULE(VectorFetchUnit) {
         }
       }
 
+      ac_int<11, false> Y1 =
+          params.addr_gen0_loops[0][params.addr_gen0_y_loop_idx[0]];
+      ac_int<11, false> X1 =
+          params.addr_gen0_loops[0][params.addr_gen0_x_loop_idx[0]];
+      ac_int<11, false> K1 =
+          params.addr_gen0_loops[0][params.addr_gen0_k_loop_idx[0]];
+      ac_int<11, false> Y0 =
+          params.addr_gen0_loops[1][params.addr_gen0_y_loop_idx[1]];
+      ac_int<11, false> X0 =
+          params.addr_gen0_loops[1][params.addr_gen0_x_loop_idx[1]];
+      ac_int<11, false> K0 =
+          params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
+
+      // the - 1 is required because we only support striding and padding for
+      // the x and y dimension, where the loop index can be x, y, or k
+      ac_int<11, false> padding_x = params.addr_gen0_padding[1];
+      ac_int<11, false> padding_y = params.addr_gen0_padding[0];
+      ac_int<11, false> x0_stride = params.addr_gen0_step[1];
+      ac_int<11, false> y0_stride = params.addr_gen0_step[0];
+      ac_int<16, false> X, Y, K;
+      ac_int<11, false> x0_offset, y0_offset, k0_offset;
+
+      // stride = 0 means default behavior, stride = inner tile size
+      if (x0_stride == 0) {
+        X = X1 * X0;
+        x0_offset = X0;
+      } else {
+        X = X0 + (X1 - 1) * x0_stride - padding_x;
+        x0_offset = x0_stride;
+      }
+
+      if (y0_stride == 0) {
+        Y = Y1 * Y0;
+        y0_offset = Y0;
+      } else {
+        Y = Y0 + (Y1 - 1) * y0_stride - padding_y;
+        y0_offset = y0_stride;
+      }
+
+      K = K1 * K0 * Width;
+      k0_offset = K0;
+
+      ac_int<11, false> x_min_offset = (padding_x + 2 - 1) / 2;
+      ac_int<11, false> x_max_offset = padding_x / 2;
+      ac_int<11, false> y_min_offset = (padding_y + 2 - 1) / 2;
+      ac_int<11, false> y_max_offset = padding_y / 2;
+
+      X = X + x_min_offset + x_max_offset;
+      Y = Y + y_min_offset + y_max_offset;
+
       if (params.has_slicing) {
         int slice_dim = params.addr_gen0_dim;
         int i = slice_dim >= 3 ? 1 : 0;
         int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addr_gen0_start;
         loop_ends[i][j] = params.addr_gen0_end;
-        loop_steps[i][j] = params.addr_gen0_step;
+        loop_steps[i][j] = params.addr_gen0_step[j];
       }
 
       if (params.has_transpose) {
@@ -512,34 +624,99 @@ SC_MODULE(VectorFetchUnit) {
         }
 #endif
       } else {
-        // passthrough
-        ac_int<32, false> num_writes = loop_ends[0][0] * loop_ends[0][1] *
-                                       loop_ends[0][2] * loop_ends[1][0] *
-                                       loop_ends[1][1] * loop_ends[1][2];
-
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < num_writes; i++) {
-          Pack1D<VectorType, Width> full_response;
+        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_ends[0][0];
+             loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_ends[0][1];
+               loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_ends[0][2];
+                 loop_counters[0][2]++) {
+              for (loop_counters[1][0] = 0;
+                   loop_counters[1][0] < loop_ends[1][0];
+                   loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;
+                     loop_counters[1][1] < loop_ends[1][1];
+                     loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;
+                       loop_counters[1][2] < loop_ends[1][2];
+                       loop_counters[1][2]++) {
+                    ac_int<11, false> x0 =
+                        loop_counters[1][params.addr_gen0_x_loop_idx[1]];
+                    ac_int<11, false> x1 =
+                        loop_counters[0][params.addr_gen0_x_loop_idx[0]];
+                    ac_int<11, false> y0 =
+                        loop_counters[1][params.addr_gen0_y_loop_idx[1]];
+                    ac_int<11, false> y1 =
+                        loop_counters[0][params.addr_gen0_y_loop_idx[0]];
+                    ac_int<11, false> k0 =
+                        loop_counters[1][params.addr_gen0_k_loop_idx[1]];
+                    ac_int<11, false> k1 =
+                        loop_counters[0][params.addr_gen0_k_loop_idx[0]];
 
-          bool found = (process_vector_input<InputTypes, Width, VectorType,
-                                             InputTypes...>(
-                            params.addr_gen0_dtype, vector_fetch_0_resp_in,
-                            full_response) ||
-                        ...);
+                    ac_int<16, false> k = k1 * k0_offset * Width + k0 * Width;
+                    ac_int<16, false> x = x1 * x0_offset + x0;
+                    ac_int<16, false> y = y1 * y0_offset + y0;
 
+                    Pack1D<VectorType, Width> full_response;
+
+                    if (x < x_min_offset || x >= X - x_max_offset ||
+                        y < y_min_offset || y >= Y - y_max_offset) {
+#pragma hls_unroll yes
+                      for (int i = 0; i < Width; i++) {
+                        if (params.is_maxpool) {
+                          full_response[i].set_max_neg();
+                        } else {
+                          full_response[i] = VectorType::zero();
+                        }
+                      }
+                    } else {
+                      bool found =
+                          (process_vector_input<InputTypes, Width, VectorType,
+                                                InputTypes...>(
+                               params.addr_gen0_dtype, vector_fetch_0_resp_in,
+                               full_response) ||
+                           ...);
 #ifndef __SYNTHESIS__
-          if (!found) {
-            std::cerr << "Error: vector input 0 dtype '"
-                      << params.addr_gen0_dtype << "' is not valid.\n";
-          }
+                      if (!found) {
+                        std::cerr << "Error: vector input 0 type index '"
+                                  << params.addr_gen0_dtype
+                                  << "' is not valid.\n";
+                      }
 #endif
+                    }
 
-          Pack1D<VectorType, Width> dequantized;
-          vdequantize<VectorType, VectorType, Width>(full_response, dequantized,
-                                                     params.addr_gen0_dq_scale);
+                    Pack1D<VectorType, Width> dequantized;
+                    vdequantize<VectorType, VectorType, Width>(
+                        full_response, dequantized, params.addr_gen0_dq_scale);
 
-          vector_fetch_0_data_out.Push(dequantized);
+                    vector_fetch_0_data_out.Push(dequantized);
+
+                    if (loop_counters[1][2] >=
+                        loop_ends[1][2] - loop_steps[1][2]) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] >=
+                      loop_ends[1][1] - loop_steps[1][1]) {
+                    break;
+                  }
+                }
+                if (loop_counters[1][0] >= loop_ends[1][0] - loop_steps[1][0]) {
+                  break;
+                }
+              }
+              if (loop_counters[0][2] >= loop_ends[0][2] - loop_steps[0][2]) {
+                break;
+              }
+            }
+            if (loop_counters[0][1] >= loop_ends[0][1] - loop_steps[0][1]) {
+              break;
+            }
+          }
+          if (loop_counters[0][0] >= loop_ends[0][0] - loop_steps[0][0]) {
+            break;
+          }
         }
       }
     }

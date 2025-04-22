@@ -41,6 +41,12 @@ void MapPoolingOperation(const codegen::Operation &param,
     vector_params->addr_gen0_k_loop_idx[i] = 0;
   }
 
+  // striding only applied to x and y dimensions
+  vector_params->addr_gen0_step[1] = tiling.stride; // x
+  vector_params->addr_gen0_step[0] = tiling.stride; // y
+  vector_params->addr_gen0_padding[1] = tiling.padding; // x
+  vector_params->addr_gen0_padding[0] = tiling.padding; // y
+
   // output
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -66,6 +72,7 @@ void MapPoolingOperation(const codegen::Operation &param,
                          tiling.loops[1][tiling.x_loop_index[1]];
 
   bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
+  vector_params->is_maxpool = is_max_pool;
 
   // perform max/sum accumulation
   VectorInstructions vinst0;

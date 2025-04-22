@@ -16,6 +16,7 @@ struct Tiling {
   int fy_index;
   int weight_reuse_index[2];
   int stride;
+  int padding;
   bool replication;
 };
 

@@ -213,7 +213,7 @@ void MapVectorOperations(const codegen::Operation &param,
     vector_params->addr_gen0_dim = dim + padded_dims;
     vector_params->addr_gen0_start = start;
     vector_params->addr_gen0_end = end;
-    vector_params->addr_gen0_step = step;
+    vector_params->addr_gen0_step[dim] = step;
 
     // Last dimension needs to be scaled by OC_DIMENSION
     if (vector_params->addr_gen0_dim == 5) {

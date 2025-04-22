@@ -25,6 +25,7 @@ std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   os << "Weight Reuse Index: " << tiling.weight_reuse_index[0] << " "
      << tiling.weight_reuse_index[1] << std::endl;
   os << "Stride: " << tiling.stride << std::endl;
+  os << "Padding: " << tiling.padding << std::endl;
   os << "Replication: " << tiling.replication << std::endl;
   return os;
 }
@@ -465,7 +466,7 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
   int X = input_shape[2];
   int Y = input_shape[3];
 
-  int x0, y0, stride;
+  int x0, y0, stride, padding;
 
   if (kwargs.contains("output_size")) {
     const auto output_size = kwargs.at("output_size").int_list().values();
@@ -478,14 +479,19 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
   } else {
     const auto kernel_size = kwargs.at("kernel_size").int_list().values();
     const auto strides = kwargs.at("stride").int_list().values();
+    const auto paddings = kwargs.at("padding").int_list().values();
 
     x0 = kernel_size[0];
     y0 = kernel_size[1];
     stride = strides[0];
+    padding = paddings[0];
   }
 
-  int x1 = X / x0;
-  int y1 = Y / y0;
+  // calculate ouptut dimension (ignoring padding, which will be handled in hw)
+  int x1 = (X + 2 * padding - x0) / stride + 1;
+  int y1 = (Y + 2 * padding - y0) / stride + 1;
+  // pytorch assumes padding on all direction, not all of the values are used
+  int actual_padding = (x1 - 1) * stride + x0 - X;
   int k0 = K / OC_DIMENSION;
 
   return {
@@ -498,6 +504,7 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
       .fy_index = 2,
       .weight_reuse_index = {4, 5},
       .stride = stride,
+      .padding = actual_padding,
       .replication = false,
   };
 }
