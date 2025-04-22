@@ -2,7 +2,7 @@ name: accelerator-env
 channels:
   - conda-forge
 dependencies:
-  - libprotobuf
+  - libprotobuf==5.29.3
   - llvmdev
   - llvm-tools
   - clang
