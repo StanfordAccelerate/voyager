@@ -447,6 +447,7 @@ void MapMatrixOperation(const Operation &operation,
   inst.op_type = VectorInstructions::vector;
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   inst.vector_op0_src0 = VectorInstructions::from_accumulation_buffer;
+  matrix_params->write_output_to_accum_buffer = true;
 #else
   inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
 #endif
@@ -565,6 +566,19 @@ void MapMatrixOperation(const Operation &operation,
       }
     }
   }
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+  // the double buffered accum buffer doesn't need to be used if there's no
+  // vector operation or if the vector operation does not use high precision
+  if ((vector_params->addr_gen1_mode == 0 ||
+       vector_params->addr_gen1_dtype == 0) &&
+      (vector_params->addr_gen2_mode == 0 ||
+       vector_params->addr_gen2_dtype == 0)) {
+    inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
+    vector_params->addr_gen0_mode = 0;
+    matrix_params->write_output_to_accum_buffer = false;
+  }
+#endif
 
   // total output count
   VectorInstructionConfig *vector_instruction_config =

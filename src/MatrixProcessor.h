@@ -457,7 +457,10 @@ SC_MODULE(MatrixProcessor) {
              params.loops[1][params.fxIndex] - 1) &&
             (loop_counters[1][params.fyIndex] ==
              params.loops[1][params.fyIndex] - 1);
-        if (accumulation_finished && !DOUBLE_BUFFERED_ACCUM_BUFFER) {
+
+        if ((accumulation_finished && !DOUBLE_BUFFERED_ACCUM_BUFFER) ||
+            (accumulation_finished && DOUBLE_BUFFERED_ACCUM_BUFFER &&
+             !params.write_output_to_accum_buffer)) {
           // write out to vector unit directly
           matrixUnitOutputChannel.Push(previous_accumulation);
         } else {
@@ -477,25 +480,27 @@ SC_MODULE(MatrixProcessor) {
         }
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
-        bool output_tile_completed =
-            (loop_counters[0][params.reductionLoopIndex[0]] ==
-             params.loops[0][params.reductionLoopIndex[0]] - 1) &&
-            (loop_counters[1][params.reductionLoopIndex[1]] ==
-             params.loops[1][params.reductionLoopIndex[1]] - 1) &&
-            (loop_counters[1][params.weightLoopIndex[1]] ==
-             params.loops[1][params.weightLoopIndex[1]] - 1) &&
-            (loop_counters[1][params.fxIndex] ==
-             params.loops[1][params.fxIndex] - 1) &&
-            (loop_counters[1][params.fyIndex] ==
-             params.loops[1][params.fyIndex] - 1) &&
-            (loop_counters[1][params.inputXLoopIndex[1]] ==
-             params.loops[1][params.inputXLoopIndex[1]] - 1) &&
-            (loop_counters[1][params.inputYLoopIndex[1]] ==
-             params.loops[1][params.inputYLoopIndex[1]] - 1);
+        if (params.write_output_to_accum_buffer) {
+          bool output_tile_completed =
+              (loop_counters[0][params.reductionLoopIndex[0]] ==
+               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
+              (loop_counters[1][params.reductionLoopIndex[1]] ==
+               params.loops[1][params.reductionLoopIndex[1]] - 1) &&
+              (loop_counters[1][params.weightLoopIndex[1]] ==
+               params.loops[1][params.weightLoopIndex[1]] - 1) &&
+              (loop_counters[1][params.fxIndex] ==
+               params.loops[1][params.fxIndex] - 1) &&
+              (loop_counters[1][params.fyIndex] ==
+               params.loops[1][params.fyIndex] - 1) &&
+              (loop_counters[1][params.inputXLoopIndex[1]] ==
+               params.loops[1][params.inputXLoopIndex[1]] - 1) &&
+              (loop_counters[1][params.inputYLoopIndex[1]] ==
+               params.loops[1][params.inputYLoopIndex[1]] - 1);
 
-        if (output_tile_completed) {
-          accumulation_buffer_done[accumulation_buffer_bank].SyncPush();
-          accumulation_buffer_bank = !accumulation_buffer_bank;
+          if (output_tile_completed) {
+            accumulation_buffer_done[accumulation_buffer_bank].SyncPush();
+            accumulation_buffer_bank = !accumulation_buffer_bank;
+          }
         }
 #endif
 
