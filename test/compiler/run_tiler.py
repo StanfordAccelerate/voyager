@@ -338,6 +338,13 @@ def main():
             height = 1
         elif len(output_shape) == 2:
             width = output_shape[0]
+
+            if output_shape[1] != output_channels:
+                # the input channels and output channels need to be switched.
+                # not sure why this the compiler produces this shape.
+                input_channels = output_channels
+                output_channels = output_shape[1]
+
             height = 1
             if width == 1:
                 print("Fully-connected layer, skipping")
