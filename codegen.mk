@@ -48,7 +48,7 @@ $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt: quantized-training/test/tes
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
 
-$(CODEGEN_DIR)networks/vit/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/vit/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py vit $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
