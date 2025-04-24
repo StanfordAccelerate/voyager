@@ -240,13 +240,21 @@ std::vector<std::any> run_operation(const Operation &operation,
 
       const auto other = op.kwargs().at("other");
 
-      if (other.has_float_value() || other.has_int_value()) {
+      if (other.has_float_value() || other.has_int_value() ||
+          (other.has_tensor() && get_size(other.tensor()) == 1)) {
         input_shape = get_shape(op.kwargs().at("input").tensor());
         other_shape = {1};
 
         other_ptr = new Vector[1];
-        other_ptr[0] =
-            other.has_float_value() ? other.float_value() : other.int_value();
+        if (other.has_float_value()) {
+          other_ptr[0] = other.float_value();
+        } else if (other.has_int_value()) {
+          other_ptr[0] = other.int_value();
+        } else if (other.has_tensor()) {
+          float *array = read_constant_param(other.tensor());
+          other_ptr[0] = array[0];
+          delete[] array;
+        }
       } else {
         auto operand1 = op.kwargs().at("input").tensor();
         auto operand2 = op.kwargs().at("other").tensor();

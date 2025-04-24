@@ -175,22 +175,34 @@ int main(int argc, char* argv[]) {
   int num_finished = 0;
 
   for (int batch = 0; batch < num_batches; batch++) {
-    std::vector<std::future<bool>> results;
+    int start_index = batch * num_threads;
+    int end_index = std::min(start_index + num_threads, num_samples);
 
-    for (int i = 0; i < num_threads; i++) {
-      int sample_index = batch * num_threads + i;
-      if (sample_index >= num_samples) {
-        break;
-      }
-      results.push_back(std::async(std::launch::async, run_sample, model_name,
-                                   data_dir, dataset[sample_index], network));
-    }
-
-    for (int i = 0; i < results.size(); i++) {
-      if (results[i].get()) {
+    if (num_threads == 1) {
+      // Direct call for easier debugging
+      int sample_index = start_index;
+      bool result =
+          run_sample(model_name, data_dir, dataset[sample_index], network);
+      if (result) {
         num_correct++;
       }
       num_finished++;
+
+    } else {
+      // Parallel execution
+      std::vector<std::future<bool>> results;
+      for (int sample_index = start_index; sample_index < end_index;
+           ++sample_index) {
+        results.push_back(std::async(std::launch::async, run_sample, model_name,
+                                     data_dir, dataset[sample_index], network));
+      }
+
+      for (auto& result : results) {
+        if (result.get()) {
+          num_correct++;
+        }
+        num_finished++;
+      }
     }
 
     std::cout << "Accuracy: " << num_correct << "/" << num_finished << " ("
