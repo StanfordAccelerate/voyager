@@ -99,7 +99,7 @@ class RuntimeCalculator:
             for i in range(1, len(self.operation.fused_op.op_list)):
                 vector_op = self.operation.fused_op.op_list[i]
                 if "other" in vector_op.kwargs:
-                    if "memory" in vector_op.kwargs["other"].tensor:
+                    if vector_op.kwargs["other"].tensor.HasField("memory"):
                         tensor_to_load = vector_op.kwargs["other"].tensor
                     else:
                         tensor_to_load = vector_op.kwargs["input"].tensor
