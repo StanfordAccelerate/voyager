@@ -49,7 +49,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
   int IC_UNROLL = IC_DIMENSION;
   int FX_UNROLL = 1;
 
-  if (tiling.replication) {
+  if (tiling.resnet_replication) {
     FX = 7;
     C = 3;
     IC_UNROLL = 3;
@@ -254,7 +254,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                         }
 #else
 
-                        if (tiling.replication) {
+                        if (tiling.resnet_replication) {
                           accumulations[output_addr] = psum;
                           if (IC_DIMENSION == 4) {
                             outputs[output_addr] +=
@@ -330,7 +330,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
   oss << "GEMM Tiling: " << tiling << std::endl;
   spdlog::debug(oss.str());
 
-  if (tiling.replication) {
+  if (tiling.resnet_replication) {
     tiling.loops[1][tiling.fx_index] = tiling.loops[1][tiling.fy_index];
     tiling.loops[1][tiling.reduction_loop_index[1]] = 1;
   }

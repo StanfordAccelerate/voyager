@@ -17,7 +17,7 @@ struct Tiling {
   int weight_reuse_index[2];
   int stride;
   int padding;
-  bool replication;
+  bool resnet_replication;
 };
 
 std::ostream& operator<<(std::ostream& os, const Tiling& tiling);

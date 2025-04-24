@@ -446,7 +446,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                               ac_int<4, false> replicationBound = 1;
                               ac_int<8, false> startingC = NRows - 1;
                               ac_int<8, false> endingC = NRows;
-                              if (params.is_replication) {
+                              if (params.is_resnet_replication) {
                                 startingC = 3 - 1;
                                 endingC = 3;
                                 if (NRows == 4) {
@@ -497,7 +497,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                 ac_int<LOOP_WIDTH, false> C = NRows * C1;
                                 ac_int<LOOP_WIDTH, false> C0 = NRows;
 
-                                if (params.is_replication) {
+                                if (params.is_resnet_replication) {
                                   C = 3;
                                   C0 = 3;
                                   if (NRows == 4) {

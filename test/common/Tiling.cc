@@ -26,7 +26,7 @@ std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
      << tiling.weight_reuse_index[1] << std::endl;
   os << "Stride: " << tiling.stride << std::endl;
   os << "Padding: " << tiling.padding << std::endl;
-  os << "Replication: " << tiling.replication << std::endl;
+  os << "Resnet Replication: " << tiling.resnet_replication << std::endl;
   return os;
 }
 
@@ -63,7 +63,7 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   Tiling accelerator_tiling;
 
   // Interstellar does not emit tilings with replication
-  accelerator_tiling.replication = false;
+  accelerator_tiling.resnet_replication = false;
 
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 6; j++) {
@@ -273,7 +273,7 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
         .fy_index = 2,
         .weight_reuse_index = {4, 5},
         .stride = stride,
-        .replication = true,
+        .resnet_replication = true,
     };
 
     if (IC_DIMENSION < 16) {
@@ -458,7 +458,7 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
       .fy_index = 2,
       .weight_reuse_index = {4, 5},
       .stride = 1,
-      .replication = false,
+      .resnet_replication = false,
   };
 }
 
@@ -517,6 +517,6 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
       .weight_reuse_index = {4, 5},
       .stride = stride,
       .padding = actual_padding,
-      .replication = false,
+      .resnet_replication = false,
   };
 }

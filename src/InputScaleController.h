@@ -53,7 +53,7 @@ SC_MODULE(InputScaleController) {
       const MatrixParams params = fetcherParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_replication) {
+      if (params.is_resnet_replication) {
         FX = 7;
       }
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
@@ -114,7 +114,7 @@ SC_MODULE(InputScaleController) {
                     params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
               }
 
-              if (params.is_replication) {
+              if (params.is_resnet_replication) {
                 loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
               }
 
@@ -123,7 +123,7 @@ SC_MODULE(InputScaleController) {
               ac_int<4, false> y_min_offset = 0;
               ac_int<4, false> y_max_offset = 0;
 
-              if (params.is_replication) {
+              if (params.is_resnet_replication) {
                 if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                   x_min_offset = (FX - 1) / 2;
                   loop_bounds[1][params.inputXLoopIndex[1]] += 1;
@@ -211,7 +211,7 @@ SC_MODULE(InputScaleController) {
                             y0 = y0 * STRIDE;
                           }
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             if (x0 != 0 && x_min_offset == 3) {
                               x0 = x_min_offset + (x0 - 1) * packingFactor;
                             } else {
@@ -227,7 +227,7 @@ SC_MODULE(InputScaleController) {
 
                           ac_int<32, false> address = y * X * C + x * C + c;
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             address = y * (X / packingFactor) * NRows +
                                       (x / packingFactor) * NRows + c;
                           }
@@ -296,7 +296,7 @@ SC_MODULE(InputScaleController) {
       const MatrixParams params = writerParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_replication) {
+      if (params.is_resnet_replication) {
         FX = 7;
       }
 
@@ -362,7 +362,7 @@ SC_MODULE(InputScaleController) {
 
               ac_int<4, false> x_min_offset = fx_bound;
               ac_int<4, false> y_min_offset = fy_bound;
-              if (params.is_replication) {
+              if (params.is_resnet_replication) {
                 // make sure to grab border pixels
                 loop_bounds[1][params.inputXLoopIndex[1]] =
                     STRIDE * X0 / packingFactor + 2;
@@ -405,7 +405,7 @@ SC_MODULE(InputScaleController) {
                           ac_int<LOOP_WIDTH, true> C1 =
                               loop_bounds[1][params.reductionLoopIndex[1]];
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             if (x0 != 0) {
                               x0 = x_min_offset + (x0 - 1) * packingFactor;
                             }
@@ -435,7 +435,7 @@ SC_MODULE(InputScaleController) {
                           ac_int<32, false> address =
                               y0 * (X0 * STRIDE + FX - 1) * C1 + x0 * C1 + c1;
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             address =
                                 y0 * (X0 * STRIDE / packingFactor + 2) * C1 +
                                 loop_counters[1][params.inputXLoopIndex[1]] *
@@ -538,7 +538,7 @@ SC_MODULE(InputScaleController) {
         }
       }
 
-      if (params.is_replication) {
+      if (params.is_resnet_replication) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
@@ -594,7 +594,7 @@ SC_MODULE(InputScaleController) {
                           ac_int<16, false> x = STRIDE * x0 + fx;
                           ac_int<16, false> y = STRIDE * y0 + fy;
                           ac_int<32, false> address;
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             address =
                                 y * (((STRIDE * X0) / packingFactor) + 2) + x0 +
                                 fx;

@@ -161,21 +161,21 @@ static bool should_use_direct_path(const VectorParams *vector_params) {
   //
   // Remember, we need `OC_DIMENSION` elements per cycle on each (active) port
   // to keep up with the matrix unit.
-  const size_t addr_gen1_bw =
-      (vector_params->addr_gen1_mode == 0)
-          ? 0
-          : get_width_from_type_index<VU_INPUT_TYPES>(vector_params->addr_gen1_dtype) *
-                OC_DIMENSION;
-  const size_t addr_gen2_bw =
-      (vector_params->addr_gen2_mode == 0)
-          ? 0
-          : get_width_from_type_index<VU_INPUT_TYPES>(vector_params->addr_gen2_dtype) *
-                OC_DIMENSION;
-  const size_t output_bw =
-      (vector_params->output_mode == 0)
-          ? 0
-          : get_width_from_type_index<OUTPUT_DATATYPES>(vector_params->output_dtype) *
-                OC_DIMENSION;
+  const size_t addr_gen1_bw = (vector_params->addr_gen1_mode == 0)
+                                  ? 0
+                                  : get_width_from_type_index<VU_INPUT_TYPES>(
+                                        vector_params->addr_gen1_dtype) *
+                                        OC_DIMENSION;
+  const size_t addr_gen2_bw = (vector_params->addr_gen2_mode == 0)
+                                  ? 0
+                                  : get_width_from_type_index<VU_INPUT_TYPES>(
+                                        vector_params->addr_gen2_dtype) *
+                                        OC_DIMENSION;
+  const size_t output_bw = (vector_params->output_mode == 0)
+                               ? 0
+                               : get_width_from_type_index<OUTPUT_DATATYPES>(
+                                     vector_params->output_dtype) *
+                                     OC_DIMENSION;
 
   bool should_use_direct_path = true;
   should_use_direct_path &= addr_gen1_bw <= available_bandwidth;
@@ -385,13 +385,13 @@ void MapMatrixOperation(const Operation &operation,
     // FX loop
     matrix_params->weightAddressGenLoops[1][2] =
         tiling.loops[1][tiling.fx_index];
-    if (tiling.replication) {
+    if (tiling.resnet_replication) {
       matrix_params->weightAddressGenLoops[1][2] = 7;
     }
     matrix_params->weightAddressGenFxIndex = 2;
 
     // C0 loop
-    if (tiling.replication) {
+    if (tiling.resnet_replication) {
       matrix_params->weightAddressGenLoops[1][1] = 3;
     } else {
       matrix_params->weightAddressGenLoops[1][1] = IC_DIMENSION;
@@ -405,7 +405,7 @@ void MapMatrixOperation(const Operation &operation,
   }
 
   matrix_params->stride = tiling.stride;
-  matrix_params->is_replication = tiling.replication;
+  matrix_params->is_resnet_replication = tiling.resnet_replication;
 
   // Permute input for transformer attention outputs
   if (input.has_reshape()) {

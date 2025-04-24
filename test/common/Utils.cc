@@ -29,12 +29,14 @@ int validateMapping(Tiling tiling) {
   // TODO(fpedd): The constraint should be c0, not 16. But this is causing
   // issues with the the last 3 conv layers of the ResNet18 model. Need to
   // investigate...
-  if (fx * fy * k0 * (tiling.replication ? 3 : 16) > WEIGHT_BUFFER_SIZE) {
+  if (fx * fy * k0 * (tiling.resnet_replication ? 3 : 16) >
+      WEIGHT_BUFFER_SIZE) {
     std::ostringstream oss;
     oss << "ERROR: Weight buffer tile size violation." << std::endl
         << "Constraint " << WEIGHT_BUFFER_SIZE << " but is " << fx << " * "
-        << fy << " * " << k0 << " * " << (tiling.replication ? 3 : 16) << " = "
-        << fx * fy * k0 * (tiling.replication ? 3 : 16) << std::endl;
+        << fy << " * " << k0 << " * " << (tiling.resnet_replication ? 3 : 16)
+        << " = " << fx * fy * k0 * (tiling.resnet_replication ? 3 : 16)
+        << std::endl;
     spdlog::error(oss.str());
 
     return -1;

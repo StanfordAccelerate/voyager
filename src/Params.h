@@ -68,7 +68,7 @@ struct MatrixParams : BaseParams {
     has_bias = false;
     has_input_transpose = false;
     has_weight_transpose = false;
-    is_replication = false;
+    is_resnet_replication = false;
     has_attn_output_permute = false;
     is_mx_op = false;
     is_fc = false;
@@ -119,7 +119,7 @@ struct MatrixParams : BaseParams {
   bool has_bias;
   bool has_input_transpose;
   bool has_weight_transpose;
-  bool is_replication;
+  bool is_resnet_replication;
   bool has_attn_output_permute;
   bool is_mx_op;
   bool is_fc;
@@ -202,7 +202,7 @@ struct MatrixParams : BaseParams {
     m & has_bias;
     m & has_input_transpose;
     m & has_weight_transpose;
-    m & is_replication;
+    m & is_resnet_replication;
     m & has_attn_output_permute;
     m & is_mx_op;
     m & is_fc;
@@ -292,7 +292,8 @@ struct MatrixParams : BaseParams {
     os << "has_bias: " << params.has_bias << std::endl;
     os << "has_input_transpose: " << params.has_input_transpose << std::endl;
     os << "has_weight_transpose: " << params.has_weight_transpose << std::endl;
-    os << "is_replication: " << params.is_replication << std::endl;
+    os << "is_resnet_replication: " << params.is_resnet_replication
+       << std::endl;
     os << "has_attn_output_permute: " << params.has_attn_output_permute
        << std::endl;
     os << "is_mx_op: " << params.is_mx_op << std::endl;
@@ -358,7 +359,7 @@ struct MatrixParams : BaseParams {
       return false;
     if (lhs.has_input_transpose != rhs.has_input_transpose) return false;
     if (lhs.has_weight_transpose != rhs.has_weight_transpose) return false;
-    if (lhs.is_replication != rhs.is_replication) return false;
+    if (lhs.is_resnet_replication != rhs.is_resnet_replication) return false;
     if (lhs.has_attn_output_permute != rhs.has_attn_output_permute)
       return false;
     if (lhs.is_mx_op != rhs.is_mx_op) return false;

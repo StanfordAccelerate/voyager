@@ -75,7 +75,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       const MatrixParams params = fetcherParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_replication) {
+      if (params.is_resnet_replication) {
         FX = 7;
       }
       ac_int<4, false> FY = params.loops[1][params.fyIndex];
@@ -156,7 +156,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                     params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
               }
 
-              if (params.is_replication) {
+              if (params.is_resnet_replication) {
                 loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
               }
 
@@ -165,7 +165,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
               ac_int<4, false> y_min_offset = 0;
               ac_int<4, false> y_max_offset = 0;
 
-              if (params.is_replication) {
+              if (params.is_resnet_replication) {
                 if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                   x_min_offset = (FX - 1) / 2;
                   loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
@@ -239,7 +239,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                             y0 = y0 * STRIDE;
                           }
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             if (x0 != 0 && x_min_offset == 3) {
                               x0 = x_min_offset +
                                    (x0 - boundaryWords) * packingFactor;
@@ -256,7 +256,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
                           ac_int<32, false> address = y * X * C + x * C + c;
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             address = y * (X / packingFactor) * NRows +
                                       (x / packingFactor) * NRows + c;
                           }
@@ -337,7 +337,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       const MatrixParams params = writerParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_replication) {
+      if (params.is_resnet_replication) {
         FX = 7;
       }
 
@@ -409,7 +409,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
             ac_int<4, false> x_min_offset = fx_bound;
             ac_int<4, false> y_min_offset = fy_bound;
-            if (params.is_replication) {
+            if (params.is_resnet_replication) {
               // make sure to grab border pixels
               loop_bounds[1][params.inputXLoopIndex[1]] =
                   STRIDE * X0 / packingFactor + 2 * boundaryWords;
@@ -455,7 +455,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                           ac_int<LOOP_WIDTH, true> C1 =
                               loop_bounds[1][params.reductionLoopIndex[1]];
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             if (x0 != 0) {
                               x0 = x_min_offset +
                                    (x0 - boundaryWords) * packingFactor;
@@ -498,7 +498,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                           ac_int<32, false> address =
                               y0 * (X0 * STRIDE + FX - 1) * C1 + x0 * C1 + c1;
 
-                          if (params.is_replication) {
+                          if (params.is_resnet_replication) {
                             address =
                                 y0 *
                                     (X0 * STRIDE / packingFactor +
@@ -613,12 +613,12 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
         }
       }
 
-      if (params.is_replication && NRows >= 16) {
+      if (params.is_resnet_replication && NRows >= 16) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
             2;
-      } else if (params.is_replication && NRows == 8) {
+      } else if (params.is_resnet_replication && NRows == 8) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
             (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
              packingFactor) +
@@ -674,7 +674,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                           ac_int<16, false> x = STRIDE * x0 + fx;
                           ac_int<16, false> y = STRIDE * y0 + fy;
                           ac_int<16, false> address;
-                          if (params.is_replication && NRows >= 8) {
+                          if (params.is_resnet_replication && NRows >= 8) {
                             address = y *
                                           (((STRIDE * X0) / packingFactor) +
                                            2 * boundaryWords) *
@@ -799,7 +799,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
         shiftFactor = 2;
       }
 
-      if (params.is_replication && (NRows == 16 || NRows == 32)) {
+      if (params.is_resnet_replication && (NRows == 16 || NRows == 32)) {
         // #pragma hls_pipeline_init_interval 1
         // #pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
@@ -929,7 +929,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
             }
           }
         }
-      } else if (params.is_replication && NRows == 8) {
+      } else if (params.is_resnet_replication && NRows == 8) {
         // no window buffer reuse, but need to combine multiple words together
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
              loop_counters[0][0]++) {
@@ -1019,7 +1019,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       const MatrixParams params = transposerParams.Pop();
 
       ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_replication) {
+      if (params.is_resnet_replication) {
         FX = 7;
       }
 
@@ -1177,7 +1177,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                       params.stride;
                 }
 
-                if (params.is_replication) {
+                if (params.is_resnet_replication) {
                   loop_bounds[1][params.inputXLoopIndex[1]] /= packingFactor;
                 }
 
@@ -1186,7 +1186,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                 ac_int<4, false> y_min_offset = 0;
                 ac_int<4, false> y_max_offset = 0;
 
-                if (params.is_replication) {
+                if (params.is_resnet_replication) {
                   if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
                     x_min_offset = (FX - 1) / 2;
                     loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
