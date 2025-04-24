@@ -521,6 +521,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "--bias",
             "int24",
             "--bf16",
+            "--calibration_steps",
+            "10",
         ]
     elif env_vars["DATATYPE"] == "P8_1":
         quantization_args = [
