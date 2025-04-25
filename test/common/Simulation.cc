@@ -83,6 +83,12 @@ void Simulation::load_data() {
   std::vector<uint64_t> memory_sizes{SRAM_MEMORY_SIZE, REFERENCE_MEMORY_SIZE};
 
   bool is_cnn = model == "resnet18" || model == "resnet50";
+  int num_classes;
+  if (model == "mobilebert" || model == "bert") {
+    num_classes = 2;
+  } else if (model == "resnet18" || model == "resnet50") {
+    num_classes = 1000;
+  }
 
   if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
     memories["gold"] = new ArrayMemory(memory_sizes);
@@ -99,17 +105,6 @@ void Simulation::load_data() {
                          std::string(getenv("CODEGEN_DIR")) + "/networks/" +
                          model + "/" + datatype + "/tensor_files";
 
-  // Fully connected layer, or linear ops with input of a 1D tensor, is run on
-  // the vector unit. Its weight does not need to be transposed. We check if an
-  // op is a FC by checking its output dimension. This should be improved in the
-  // future.
-  int num_classes;
-  if (model == "mobilebert" || model == "bert") {
-    num_classes = 2;
-  } else if (model == "resnet18" || model == "resnet50") {
-    num_classes = 1000;
-  }
-
   const auto operations = network->get_operations(tests, false);
 
   for (const auto& [key, dataloader] : dataLoaders) {
@@ -118,8 +113,8 @@ void Simulation::load_data() {
       dataloader->load_tensor(tensor, data_dir);
     }
 
-    for (const auto& tensor : network->model.parameters()) {
-      dataloader->load_tensor(tensor, data_dir, false);
+    for (const auto& operation : operations) {
+      dataloader->load_parameters(operation.param, data_dir);
     }
 
     // Load the layer's input and output last

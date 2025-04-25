@@ -84,6 +84,21 @@ void DataLoader::load_inputs(const codegen::Operation param,
   }
 }
 
+void DataLoader::load_parameters(const codegen::Operation param,
+                                 std::string data_dir, bool random_data) {
+  const auto op_list = get_op_list(param);
+
+  for (const auto& op : op_list) {
+    for (const auto [key, value] : op.kwargs()) {
+      const auto& tensor = value.tensor();
+      if (value.has_tensor() && tensor.has_memory() &&
+          tensor.node().find("_param_constant") != std::string::npos) {
+        load_tensor(value.tensor(), data_dir, false);
+      }
+    }
+  }
+}
+
 void DataLoader::load_outputs(const codegen::Operation param,
                               std::string data_dir) {
   const auto tensors = get_op_outputs(param);
