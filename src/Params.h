@@ -37,6 +37,7 @@ struct MatrixParams : BaseParams {
     fxIndex = 0;
     fyIndex = 0;
     stride = 1;
+    padding = 0;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 5; j++) {
@@ -52,7 +53,6 @@ struct MatrixParams : BaseParams {
     weightAddressGenFxIndex = 0;
     weightAddressGenFyIndex = 0;
 
-<<<<<<< HEAD
     input_dtype = 0;
     weight_dtype = 0;
 
@@ -64,16 +64,17 @@ struct MatrixParams : BaseParams {
       weight_code[i] = 0;
     }
 
-=======
-    STRIDE = 1;
-    padding = 0;
->>>>>>> a9df284a (Add padding field that uses value from compiler instead of calculating padding from filter size)
     head_size_power_of_two = 0;
 
     has_bias = false;
     has_input_transpose = false;
     has_weight_transpose = false;
+
     is_resnet_replication = false;
+    is_generic_replication = false;
+    num_channels = 0;
+    fx_unrolling_lg2 = 0;
+
     has_attn_output_permute = false;
     is_mx_op = false;
     is_fc = false;
@@ -98,7 +99,7 @@ struct MatrixParams : BaseParams {
   ac_int<3, false> fxIndex;
   ac_int<3, false> fyIndex;
   ac_int<3, false> weightReuseIndex[2];
-  ac_int<2, false> stride;
+  ac_int<5, false> stride;
   ac_int<2, false> padding;
 
   // weight address generator loop
@@ -125,7 +126,12 @@ struct MatrixParams : BaseParams {
   bool has_bias;
   bool has_input_transpose;
   bool has_weight_transpose;
+
   bool is_resnet_replication;
+  bool is_generic_replication;
+  ac_int<2, false> num_channels;
+  ac_int<3, false> fx_unrolling_lg2;
+
   bool has_attn_output_permute;
   bool is_mx_op;
   bool is_fc;
@@ -133,7 +139,7 @@ struct MatrixParams : BaseParams {
 
   static const unsigned int base_width =
       5 * 64 /* OFFSETS */ + (12 + 10) * LOOP_WIDTH /* Loops */ +
-      19 * 3 /* Loop indices */ + 2 /* stride */ + 2 /* padding */ +
+      19 * 3 /* Loop indices */ + 5 /* stride */ + 2 /* padding */ +
       8 /* Head Size */ + 10 * 1 /* Bools */;
 
   static const unsigned int extra_width =
@@ -210,6 +216,9 @@ struct MatrixParams : BaseParams {
     m & has_input_transpose;
     m & has_weight_transpose;
     m & is_resnet_replication;
+    m & is_generic_replication;
+    m & num_channels;
+    m & fx_unrolling_lg2;
     m & has_attn_output_permute;
     m & is_mx_op;
     m & is_fc;
@@ -301,6 +310,10 @@ struct MatrixParams : BaseParams {
     os << "has_weight_transpose: " << params.has_weight_transpose << std::endl;
     os << "is_resnet_replication: " << params.is_resnet_replication
        << std::endl;
+    os << "is_generic_replication: " << params.is_generic_replication
+       << std::endl;
+    os << "num_channels: " << params.num_channels << std::endl;
+    os << "fx_unrolling_lg2: " << params.fx_unrolling_lg2 << std::endl;
     os << "has_attn_output_permute: " << params.has_attn_output_permute
        << std::endl;
     os << "is_mx_op: " << params.is_mx_op << std::endl;

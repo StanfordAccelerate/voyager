@@ -18,8 +18,7 @@ template <typename Input, typename Weight, typename Psum, typename Buffer,
           typename Scale>
 inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                     std::any weight_ptr, std::any weight_scale_ptr,
-                    std::any bias_ptr, const Tiling &tiling,
-                    const int block_size) {
+                    std::any bias_ptr, Tiling tiling, const int block_size) {
   spdlog::debug("Performing GEMM\n");
 
   Input *inputs = std::any_cast<Input *>(input_ptr);
@@ -49,6 +48,17 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
   int IC_UNROLL = IC_DIMENSION;
   int FX_UNROLL = 1;
 
+  if (tiling.generic_replication) {
+    C = tiling.num_channels;
+    FX_UNROLL = tiling.fx_unrolling;
+    FX = FX * FX_UNROLL;
+    tiling.loops[1][tiling.fx_index] = FX;
+  }
+
+  if (C < IC_DIMENSION) {
+    IC_UNROLL = C;
+  }
+
   if (tiling.resnet_replication) {
     FX = 7;
     C = 3;
@@ -63,6 +73,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
     } else if (IC_DIMENSION == 32) {
       FX_UNROLL = 7;
     }
+    tiling.loops[1][tiling.fx_index] = FX;
   }
 
   spdlog::debug("Performing GEMM: {}x{}x{} * {}x{}x{}x{} -> {}x{}x{}\n", Y, X,
@@ -157,7 +168,8 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                             Weight weight = weights[weight_addr];
 #ifdef CHECK_PE
                             int pe_num = ic0 * OC_DIMENSION + oc0;
-                            if (tiling.replication) {
+                            if (tiling.resnet_replication ||
+                                tiling.generic_replication) {
                               pe_num =
                                   ic0 * OC_DIMENSION +
                                   (counters[1][tiling.fx_index] % FX_UNROLL) *
@@ -171,7 +183,8 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                           } else {
 #ifdef CHECK_PE
                             int pe_num = ic0 * OC_DIMENSION + oc0;
-                            if (tiling.replication) {
+                            if (tiling.resnet_replication ||
+                                tiling.generic_replication) {
                               pe_num =
                                   ic0 * OC_DIMENSION +
                                   (counters[1][tiling.fx_index] % FX_UNROLL) *
@@ -284,6 +297,17 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                               accumulations[output_addr] = Psum(0.0);
                             }
                           }
+                        } else if (tiling.generic_replication) {
+                          accumulations[output_addr] = psum;
+                          if (tiling.fx_unrolling == 1 ||
+                              ((counters[1][tiling.fx_index] > 0) &&
+                               (counters[1][tiling.fx_index] %
+                                    tiling.fx_unrolling ==
+                                tiling.fx_unrolling - 1))) {
+                            outputs[output_addr] +=
+                                static_cast<Buffer>(accumulations[output_addr]);
+                            accumulations[output_addr] = Psum(0.0);
+                          }
                         } else {
                           outputs[output_addr] += static_cast<Buffer>(psum);
                         }
@@ -330,11 +354,6 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
   std::ostringstream oss;
   oss << "GEMM Tiling: " << tiling << std::endl;
   spdlog::debug(oss.str());
-
-  if (tiling.resnet_replication) {
-    tiling.loops[1][tiling.fx_index] = tiling.loops[1][tiling.fy_index];
-    tiling.loops[1][tiling.reduction_loop_index[1]] = 1;
-  }
 
   const auto op_list = get_op_list(operation.param);
   const auto matrix_op = op_list.front();

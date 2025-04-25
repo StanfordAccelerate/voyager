@@ -473,6 +473,10 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                   replicationBound = 7;
                                   numPadding = NRows - replicationBound * 3;
                                 }
+                              } else if (params.is_generic_replication) {
+                                endingC = params.num_channels;
+                                replicationBound = 1 << params.fx_unrolling_lg2;
+                                numPadding = NRows - replicationBound;
                               }
 
                               ac_int<LOOP_WIDTH, false> fx_repl = 0;
@@ -497,21 +501,34 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                 ac_int<LOOP_WIDTH, false> C = NRows * C1;
                                 ac_int<LOOP_WIDTH, false> C0 = NRows;
 
-                                if (params.is_resnet_replication) {
-                                  C = 3;
-                                  C0 = 3;
-                                  if (NRows == 4) {
-                                    fx = loop_counters[1][params.fxIndex];
-                                  } else if (NRows == 8) {
-                                    fx = loop_counters[1][params.fxIndex] * 2 +
+                                if (params.is_resnet_replication ||
+                                    params.is_generic_replication) {
+                                  if (params.is_resnet_replication) {
+                                    C = 3;
+                                    C0 = 3;
+                                    if (NRows == 4) {
+                                      fx = loop_counters[1][params.fxIndex];
+                                    } else if (NRows == 8) {
+                                      fx =
+                                          loop_counters[1][params.fxIndex] * 2 +
+                                          fx_repl;
+                                    } else if (NRows == 16) {
+                                      fx =
+                                          loop_counters[1][params.fxIndex] * 4 +
+                                          fx_repl;
+                                    } else if (NRows == 32) {
+                                      fx = fx_repl;
+                                    }
+                                    FX = 7;
+                                  } else {
+                                    C = params.num_channels;
+                                    C0 = params.num_channels;
+                                    fx = loop_counters[1][params.fxIndex] *
+                                             replicationBound +
                                          fx_repl;
-                                  } else if (NRows == 16) {
-                                    fx = loop_counters[1][params.fxIndex] * 4 +
-                                         fx_repl;
-                                  } else if (NRows == 32) {
-                                    fx = fx_repl;
+                                    FX = loop_bounds[1][params.fxIndex] *
+                                         replicationBound;
                                   }
-                                  FX = 7;
                                   if (fx_repl < replicationBound) {
                                     ac_int<16, false> address =
                                         fy * FX * C * K1 + fx * C * K1 +

@@ -18,6 +18,9 @@ struct Tiling {
   int stride;
   int padding;
   bool resnet_replication;
+  bool generic_replication;
+  int num_channels;
+  int fx_unrolling;
 };
 
 std::ostream& operator<<(std::ostream& os, const Tiling& tiling);

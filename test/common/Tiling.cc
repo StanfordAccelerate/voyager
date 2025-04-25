@@ -71,6 +71,8 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
 
   // Interstellar does not emit tilings with replication
   accelerator_tiling.resnet_replication = false;
+  accelerator_tiling.generic_replication = false;
+  accelerator_tiling.fx_unrolling = 1;
 
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 6; j++) {
@@ -252,10 +254,75 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
   int fx = weight_shape[1];
   int fy = weight_shape[0];
   int stride = strides[0];
+  int padding = paddings[0];
 
-  // conv1
+  // conv2d (vit)
   if (input_shape[3] == 3 && input_shape[1] == 224 && input_shape[2] == 224 &&
-      weight_shape[3] == 64 && weight_shape[0] == 7 && weight_shape[1] == 7) {
+      weight_shape[3] == 768 && weight_shape[0] == 16 &&
+      weight_shape[1] == 16) {
+    int fx_unrolling;
+    if (IC_DIMENSION == 4) {
+      fx_unrolling = 1;
+    } else if (IC_DIMENSION == 8) {
+      fx_unrolling = 2;
+    } else if (IC_DIMENSION == 16) {
+      fx_unrolling = 4;
+    } else if (IC_DIMENSION == 32) {
+      fx_unrolling = 8;
+    } else {
+      throw std::runtime_error("replication not supported for IC_DIMENSION=" +
+                               std::to_string(IC_DIMENSION));
+    }
+
+    Tiling tiling = {
+        .loops = {{7, 2, 48, 1, 1, 1}, {1, 1, fy, fx / fx_unrolling, 2, 7}},
+        .x_loop_index = {1, 5},
+        .y_loop_index = {0, 4},
+        .reduction_loop_index = {3, 0},
+        .weight_loop_index = {2, 1},
+        .fx_index = 3,
+        .fy_index = 2,
+        .weight_reuse_index = {4, 5},
+        .stride = stride,
+        .padding = 0,
+        .resnet_replication = false,
+        .generic_replication = true,
+        .num_channels = 3,
+        .fx_unrolling = fx_unrolling,
+    };
+
+    if (IC_DIMENSION < 16) {
+      tiling.loops[1][5] /= 2;
+      tiling.loops[0][0] *= 2;
+    }
+
+    if (OC_DIMENSION < 16) {
+      tiling.loops[0][tiling.weight_loop_index[0]] *= (16 / OC_DIMENSION);
+    } else if (OC_DIMENSION > 16) {
+      int div_factor = OC_DIMENSION / 16;
+      while (tiling.loops[0][tiling.weight_loop_index[0]] > 1 &&
+             div_factor > 1) {
+        tiling.loops[0][tiling.weight_loop_index[0]] /= 2;
+        div_factor /= 2;
+      }
+      while (tiling.loops[1][tiling.weight_loop_index[1]] > 1 &&
+             div_factor > 1) {
+        tiling.loops[1][tiling.weight_loop_index[1]] /= 2;
+        div_factor /= 2;
+      }
+
+      if (div_factor > 1) {
+        spdlog::error("OC_DIMENSION is not a multiple of 16\n");
+        exit(1);
+      }
+    }
+
+    return tiling;
+  }
+  // conv1
+  else if (input_shape[3] == 3 && input_shape[1] == 224 &&
+           input_shape[2] == 224 && weight_shape[3] == 64 &&
+           weight_shape[0] == 7 && weight_shape[1] == 7) {
     int fx;
     if (IC_DIMENSION == 4) {
       fx = 7;
@@ -282,6 +349,8 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
         .stride = stride,
         .padding = 3,
         .resnet_replication = true,
+        .generic_replication = false,
+        .num_channels = 3,
     };
 
     if (IC_DIMENSION < 16) {

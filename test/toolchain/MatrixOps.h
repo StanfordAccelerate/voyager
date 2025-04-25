@@ -387,12 +387,16 @@ void MapMatrixOperation(const Operation &operation,
         tiling.loops[1][tiling.fx_index];
     if (tiling.resnet_replication) {
       matrix_params->weightAddressGenLoops[1][2] = 7;
+    } else if (tiling.generic_replication) {
+      matrix_params->weightAddressGenLoops[1][2] *= tiling.fx_unrolling;
     }
     matrix_params->weightAddressGenFxIndex = 2;
 
     // C0 loop
     if (tiling.resnet_replication) {
       matrix_params->weightAddressGenLoops[1][1] = 3;
+    } else if (tiling.generic_replication) {
+      matrix_params->weightAddressGenLoops[1][1] = tiling.num_channels;
     } else {
       matrix_params->weightAddressGenLoops[1][1] = IC_DIMENSION;
     }
@@ -407,6 +411,9 @@ void MapMatrixOperation(const Operation &operation,
   matrix_params->stride = tiling.stride;
   matrix_params->padding = tiling.padding;
   matrix_params->is_resnet_replication = tiling.resnet_replication;
+  matrix_params->is_generic_replication = tiling.generic_replication;
+  matrix_params->num_channels = tiling.num_channels;
+  matrix_params->fx_unrolling_lg2 = std::log2(tiling.fx_unrolling);
 
   // Permute input for transformer attention outputs
   if (input.has_reshape()) {
