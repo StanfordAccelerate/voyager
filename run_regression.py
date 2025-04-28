@@ -431,7 +431,7 @@ ACCURACY_RESULTS = {
         "CFLOAT": 70.8,
         "INT8": 69.7,
         "MXINT8": 71.0,
-        "P8_1": 69.5,
+        "P8_1": 70.5,
     },
     "resnet50": {
         "E4M3": 67.7,
