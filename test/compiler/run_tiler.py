@@ -201,6 +201,9 @@ def main():
     )
     args = parser.parse_args()
 
+    # Define a cache dictionary
+    cache = {}
+
     # Create an accelerator configuration
     architecture = interstellar.Resource(
         buf_capacity_list=[
@@ -374,15 +377,49 @@ def main():
 
         print(f"Finding tiling for {param_name}")
 
-        runtime_calculator = RuntimeCalculator(param, args.double_buffered_accum_buffer)
-
-        cost, runtime, mapping, perf = interstellar.optimizer.opt_optimizer(
-            architecture, layer, schedule, runtime_calculator.calculate_runtime, True
+        # check if the layer is already in the cache
+        layer_key = (
+            layer.nifm,
+            layer.nofm,
+            layer.wofm,
+            layer.hofm,
+            layer.wfil,
+            layer.hfil,
+            layer.wstd,
+            layer.hstd,
         )
+        if layer_key in cache:
+            print("Layer already in cache")
+            cost, runtime, mapping, perf, total_cost, total_access_cost, access_list = (
+                cache[layer_key]
+            )
+        else:
+            print("Layer not in cache, calling Interstellar optimizer")
+            runtime_calculator = RuntimeCalculator(
+                param, args.double_buffered_accum_buffer
+            )
 
-        total_cost, total_access_cost, access_list = interstellar.cost_model.get_cost(
-            architecture, mapping, layer
-        )
+            cost, runtime, mapping, perf = interstellar.optimizer.opt_optimizer(
+                architecture,
+                layer,
+                schedule,
+                runtime_calculator.calculate_runtime,
+                True,
+            )
+
+            total_cost, total_access_cost, access_list = (
+                interstellar.cost_model.get_cost(architecture, mapping, layer)
+            )
+
+            cache[layer_key] = (
+                cost,
+                runtime,
+                mapping,
+                perf,
+                total_cost,
+                total_access_cost,
+                access_list,
+            )
 
         interstellar.utils.print_tiling(mapping)
         print(f"Runtime: {runtime}")
