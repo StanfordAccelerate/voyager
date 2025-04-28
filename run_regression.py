@@ -62,14 +62,20 @@ def print_test_results(test_results, layers, output_folder):
                 ].to_string(index=False),
                 flush=True,
             )
-            utilization = model_df["Ideal"].sum() / model_df["Runtime"].sum()
-            matrix_runtime = model_df[model_df["RuntimeType"] == "matrix"][
-                "Runtime"
-            ].sum()
-            matrix_ideal = model_df[model_df["RuntimeType"] == "matrix"]["Ideal"].sum()
-            matri_utilization = matrix_ideal / matrix_runtime
+            utilization = (model_df["Ideal"] * model_df["Count"]).sum() / (
+                model_df["Runtime"] * model_df["Count"]
+            ).sum()
+            matrix_runtime = (
+                model_df[model_df["RuntimeType"] == "matrix"]["Runtime"]
+                * model_df[model_df["RuntimeType"] == "matrix"]["Count"]
+            ).sum()
+            matrix_ideal = (
+                model_df[model_df["RuntimeType"] == "matrix"]["Ideal"]
+                * model_df[model_df["RuntimeType"] == "matrix"]["Count"]
+            ).sum()
+            matrix_utilization = matrix_ideal / matrix_runtime
             print(f"Utilization: {utilization:.3f}")
-            print(f"Matrix Utilization: {matri_utilization:.3f}")
+            print(f"Matrix Utilization: {matrix_utilization:.3f}")
 
     # concatentate all sorted model DataFrames into a single DataFrame and save to pickle
     pd.concat(sorted_df).to_pickle(f"{output_folder}/test_results.pkl")
