@@ -46,6 +46,11 @@ class Int {
 
   void set_bits(int i) { int_val = i; }
 
+  template <int W2, bool S2>
+  void set_bits(ac_int<W2, S2> bits) {
+    int_val = bits;
+  }
+
   static Int zero() {
     Int<W, S> r;
     r.int_val = 0;

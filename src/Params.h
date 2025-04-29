@@ -74,6 +74,8 @@ struct MatrixParams : BaseParams {
   }
 #endif
 
+  static constexpr int LOOP_WIDTH = 16;
+
   ac_int<ADDRESS_WIDTH, false> INPUT_OFFSET;
   ac_int<ADDRESS_WIDTH, false> INPUT_SCALE_OFFSET;
   ac_int<ADDRESS_WIDTH, false> WEIGHT_OFFSET;
@@ -81,7 +83,7 @@ struct MatrixParams : BaseParams {
   ac_int<ADDRESS_WIDTH, false> BIAS_OFFSET;
 
   // systolic array loop
-  ac_int<10, false> loops[2][6];
+  ac_int<LOOP_WIDTH, false> loops[2][6];
   ac_int<3, false> inputXLoopIndex[2];
   ac_int<3, false> inputYLoopIndex[2];
   ac_int<3, false> reductionLoopIndex[2];
@@ -92,7 +94,7 @@ struct MatrixParams : BaseParams {
   ac_int<2, false> stride;
 
   // weight address generator loop
-  ac_int<10, false> weightAddressGenLoops[2][5];
+  ac_int<LOOP_WIDTH, false> weightAddressGenLoops[2][5];
   // in the inner loop, there are actually 2 reduction loops: the
   // standard reduction loop and the reduction that is parallelized in
   // the systolic array
@@ -118,9 +120,10 @@ struct MatrixParams : BaseParams {
   bool is_replication;
   bool has_attn_output_permute;
   bool is_mx_op;
+  bool is_fc;
 
   static const unsigned int base_width =
-      5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
+      5 * 64 /* OFFSETS */ + (12 + 10) * LOOP_WIDTH /* Loops */ +
       19 * 3 /* Loop indices */ + 2 /* stride */ + 8 /* Head Size */ +
       8 * 1 /* Bools */;
 
@@ -413,6 +416,7 @@ struct VectorInstructions {
   static const unsigned int from_immediate_0 = 8;
   static const unsigned int from_immediate_1 = 9;
   static const unsigned int from_immediate_2 = 10;
+  static const unsigned int from_simd_matrix_unit = 11;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
@@ -647,10 +651,12 @@ struct VectorParams : BaseParams {
   }
 #endif
 
+  static constexpr int LOOP_WIDTH = 16;
+
   // Address generator 0 (vector input)
   ac_int<2, false> addr_gen0_mode;
   ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN0_OFFSET;
-  ac_int<11, false> addr_gen0_loops[2][3];
+  ac_int<LOOP_WIDTH, false> addr_gen0_loops[2][3];
   ac_int<3, false> addr_gen0_x_loop_idx[2];
   ac_int<3, false> addr_gen0_y_loop_idx[2];
   ac_int<3, false> addr_gen0_k_loop_idx[2];
@@ -660,7 +666,7 @@ struct VectorParams : BaseParams {
   // Address generator 1 (op0src1)
   ac_int<2, false> addr_gen1_mode;
   ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN1_OFFSET;
-  ac_int<11, false> addr_gen1_loops[2][3];
+  ac_int<LOOP_WIDTH, false> addr_gen1_loops[2][3];
   ac_int<3, false> addr_gen1_x_loop_idx[2];
   ac_int<3, false> addr_gen1_y_loop_idx[2];
   ac_int<3, false> addr_gen1_k_loop_idx[2];
@@ -670,7 +676,7 @@ struct VectorParams : BaseParams {
   // Address generator 2 (op3src1)
   ac_int<2, false> addr_gen2_mode;
   ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN2_OFFSET;
-  ac_int<11, false> addr_gen2_loops[2][3];
+  ac_int<LOOP_WIDTH, false> addr_gen2_loops[2][3];
   ac_int<3, false> addr_gen2_x_loop_idx[2];
   ac_int<3, false> addr_gen2_y_loop_idx[2];
   ac_int<3, false> addr_gen2_k_loop_idx[2];
@@ -680,7 +686,7 @@ struct VectorParams : BaseParams {
   // Output address generator
   ac_int<2, false> output_mode;
   ac_int<ADDRESS_WIDTH, false> VECTOR_OUTPUT_OFFSET;
-  ac_int<11, false> output_loops[2][3];
+  ac_int<LOOP_WIDTH, false> output_loops[2][3];
   ac_int<3, false> output_x_loop_idx[2];
   ac_int<3, false> output_y_loop_idx[2];
   ac_int<3, false> output_k_loop_idx[2];
@@ -718,7 +724,7 @@ struct VectorParams : BaseParams {
   // boundaries, 6 3-bit loop indices, a 16-bit dequantize scale, and a 2-bit
   // data type
   static const unsigned int address_gen_width =
-      2 + ADDRESS_WIDTH + 6 * 11 + 6 * 3 + 16 + 4;
+      2 + ADDRESS_WIDTH + 6 * LOOP_WIDTH + 6 * 3 + 16 + 4;
 
   static const unsigned int codebook_params_width =
       1 + (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);

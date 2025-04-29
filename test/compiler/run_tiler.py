@@ -266,6 +266,11 @@ def main():
         ]:
             continue
 
+        # FC doesn't need tiling
+        input = matrix_op.kwargs["input"].tensor
+        if sum(input.shape[:-1]) == 1:
+            continue
+
         is_matmul = matrix_op.target in ["matmul", "matmul_mx"]
         weight = matrix_op.kwargs["other" if is_matmul else "weight"].tensor
         if weight.HasField("reshape"):

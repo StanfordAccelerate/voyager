@@ -21,7 +21,6 @@
 // IWYU pragma: end_exports
 
 namespace DataTypes {
-typedef Int<1, true> int1;
 typedef Int<2, true> int2;
 typedef Int<4, true> int4;
 typedef Int<6, true> int6;
@@ -30,6 +29,7 @@ typedef Int<18, true> int18;
 typedef Int<16, true> int16;
 typedef Int<24, true> int24;
 typedef Int<32, true> int32;
+typedef Int<64, true> int64;
 
 typedef StdFloat<3, 4, false, true, AC_RND_CONV> e4m3;
 typedef StdFloat<2, 5, false, true, AC_RND_CONV> e5m2;
@@ -49,11 +49,6 @@ typedef UFloat<8, 5> fp8_e5m3;
 template <typename T>
 struct TypeName {
   static std::string name() { return "Unknown"; }
-};
-
-template <>
-struct TypeName<int1> {
-  static std::string name() { return "int1"; }
 };
 
 template <>
@@ -97,6 +92,11 @@ struct TypeName<int32> {
 };
 
 template <>
+struct TypeName<int64> {
+  static std::string name() { return "int64"; }
+};
+
+template <>
 struct TypeName<e4m3> {
   static std::string name() { return "fp8_e4m3"; }
 };
@@ -135,7 +135,6 @@ struct TypeName<posit8> {
 
 // clang-format off
 #define SUPPORTED_TYPES          \
-  DataTypes::int1,               \
   DataTypes::int2,               \
   DataTypes::int4,               \
   DataTypes::int6,               \
@@ -144,6 +143,7 @@ struct TypeName<posit8> {
   DataTypes::int18,              \
   DataTypes::int24,              \
   DataTypes::int32,              \
+  DataTypes::int64,              \
   DataTypes::e4m3,               \
   DataTypes::e5m2,               \
   DataTypes::bfloat16,           \

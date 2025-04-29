@@ -122,7 +122,7 @@ void Simulation::load_data() {
       bool has_transpose =
           tensor.shape(0) != num_classes &&
           tensor.node().find("_param_constant") != std::string::npos;
-      dataloader->load_tensor(tensor, data_dir, has_transpose);
+      dataloader->load_tensor(tensor, data_dir, true);
     }
 
     // Load the layer's input and output last

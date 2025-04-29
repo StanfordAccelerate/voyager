@@ -34,14 +34,31 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.weightDataResponse(weightDataResponse);
   accelerator.biasAddressRequest(biasAddressRequest);
   accelerator.biasDataResponse(biasDataResponse);
-  accelerator.vector_fetch_0_request_out(vector_fetch_0_request_out);
-  accelerator.vector_fetch_0_resp_in(vector_fetch_0_resp_in);
-  accelerator.vector_fetch_1_request_out(vector_fetch_1_request_out);
-  accelerator.vector_fetch_1_resp_in(vector_fetch_1_resp_in);
-  accelerator.vector_fetch_2_request_out(vector_fetch_2_request_out);
-  accelerator.vector_fetch_2_resp_in(vector_fetch_2_resp_in);
-  accelerator.vector_fetch_3_request_out(vector_fetch_3_request_out);
-  accelerator.vector_fetch_3_resp_in(vector_fetch_3_resp_in);
+#if SUPPORT_SIMD_MATRIX_UNIT
+  accelerator.serial_simd_matrix_params_in(serial_simd_matrix_params_in);
+  accelerator.simd_matrix_input_req(simd_matrix_input_req);
+  accelerator.simd_matrix_input_resp(simd_matrix_input_resp);
+  accelerator.simd_matrix_weight_req(simd_matrix_weight_req);
+  accelerator.simd_matrix_weight_resp(simd_matrix_weight_resp);
+  accelerator.simd_matrix_bias_req(simd_matrix_bias_req);
+  accelerator.simd_matrix_bias_resp(simd_matrix_bias_resp);
+#if SUPPORT_MX
+  accelerator.simd_matrix_input_scale_req(simd_matrix_input_scale_req);
+  accelerator.simd_matrix_input_scale_resp(simd_matrix_input_scale_resp);
+  accelerator.simd_matrix_weight_scale_req(simd_matrix_weight_scale_req);
+  accelerator.simd_matrix_weight_scale_resp(simd_matrix_weight_scale_resp);
+#endif
+  accelerator.simd_matrix_unit_start_signal(simd_matrix_unit_start_signal);
+  accelerator.simd_matrix_unit_done_signal(simd_matrix_unit_done_signal);
+#endif
+  accelerator.vector_fetch_0_req(vector_fetch_0_req);
+  accelerator.vector_fetch_0_resp(vector_fetch_0_resp);
+  accelerator.vector_fetch_1_req(vector_fetch_1_req);
+  accelerator.vector_fetch_1_resp(vector_fetch_1_resp);
+  accelerator.vector_fetch_2_req(vector_fetch_2_req);
+  accelerator.vector_fetch_2_resp(vector_fetch_2_resp);
+  accelerator.vector_fetch_3_req(vector_fetch_3_req);
+  accelerator.vector_fetch_3_resp(vector_fetch_3_resp);
   accelerator.vector_output(vector_output);
   accelerator.vector_output_address(vector_output_address);
   accelerator.scalar_output(scalar_output);
@@ -97,6 +114,58 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   async_reset_signal_is(rstn, false);
 #endif
 
+  SC_THREAD(readRequestBias);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseBias);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+#if SUPPORT_SIMD_MATRIX_UNIT
+  SC_THREAD(readRequestSIMDMatrixInput);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseSIMDMatrixInput);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(readRequestSIMDMatrixWeight);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseSIMDMatrixWeight);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(readRequestSIMDMatrixBias);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseSIMDMatrixBias);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+#if SUPPORT_MX
+  SC_THREAD(readRequestSIMDMatrixInputScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseSIMDMatrixInputScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(readRequestSIMDMatrixWeightScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(sendResponseSIMDMatrixWeightScale);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+#endif
+#endif
+
   SC_THREAD(readRequestVector0);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
@@ -126,14 +195,6 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   async_reset_signal_is(rstn, false);
 
   SC_THREAD(sendResponseVector3);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-
-  SC_THREAD(readRequestBias);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-
-  SC_THREAD(sendResponseBias);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -231,6 +292,7 @@ void Harness::storeMemoryResponse(
 void Harness::readRequestInputs() {
   readMemoryRequest(&inputAddressRequest, &inputDataResponse_fifo);
 }
+
 void Harness::sendResponseInputs() {
   sendMemoryResponse(&inputDataResponse_fifo, &inputDataResponse);
 }
@@ -240,6 +302,7 @@ void Harness::readRequestInputScale() {
   readMemoryRequest(&inputScaleAddressRequest, &inputScaleDataResponse_fifo);
 #endif
 }
+
 void Harness::sendResponseInputScale() {
 #if SUPPORT_MX
   sendMemoryResponse(&inputScaleDataResponse_fifo, &inputScaleDataResponse);
@@ -249,6 +312,7 @@ void Harness::sendResponseInputScale() {
 void Harness::readRequestWeights() {
   readMemoryRequest(&weightAddressRequest, &weightDataResponse_fifo);
 }
+
 void Harness::sendResponseWeights() {
   sendMemoryResponse(&weightDataResponse_fifo, &weightDataResponse);
 }
@@ -258,49 +322,99 @@ void Harness::readRequestWeightScale() {
   readMemoryRequest(&weightScaleAddressRequest, &weightScaleDataResponse_fifo);
 #endif
 }
+
 void Harness::sendResponseWeightScale() {
 #if SUPPORT_MX
   sendMemoryResponse(&weightScaleDataResponse_fifo, &weightScaleDataResponse);
 #endif
 }
 
-void Harness::readRequestVector0() {
-  readMemoryRequest(&vector_fetch_0_request_out,
-                    &vectorFetch0DataResponse_fifo);
-}
-void Harness::sendResponseVector0() {
-  sendMemoryResponse(&vectorFetch0DataResponse_fifo, &vector_fetch_0_resp_in);
-}
-
-void Harness::readRequestVector1() {
-  readMemoryRequest(&vector_fetch_1_request_out,
-                    &vectorFetch1DataResponse_fifo);
-}
-void Harness::sendResponseVector1() {
-  sendMemoryResponse(&vectorFetch1DataResponse_fifo, &vector_fetch_1_resp_in);
-}
-
-void Harness::readRequestVector2() {
-  readMemoryRequest(&vector_fetch_2_request_out,
-                    &vectorFetch2DataResponse_fifo);
-}
-void Harness::sendResponseVector2() {
-  sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vector_fetch_2_resp_in);
-}
-
-void Harness::readRequestVector3() {
-  readMemoryRequest(&vector_fetch_3_request_out,
-                    &vectorFetch3DataResponse_fifo);
-}
-void Harness::sendResponseVector3() {
-  sendMemoryResponse(&vectorFetch3DataResponse_fifo, &vector_fetch_3_resp_in);
-}
-
 void Harness::readRequestBias() {
   readMemoryRequest(&biasAddressRequest, &biasDataResponse_fifo);
 }
+
 void Harness::sendResponseBias() {
   sendMemoryResponse(&biasDataResponse_fifo, &biasDataResponse);
+}
+
+#if SUPPORT_SIMD_MATRIX_UNIT
+void Harness::readRequestSIMDMatrixInput() {
+  readMemoryRequest(&simd_matrix_input_req, &simd_matrix_input_resp_fifo);
+}
+
+void Harness::sendResponseSIMDMatrixInput() {
+  sendMemoryResponse(&simd_matrix_input_resp_fifo, &simd_matrix_input_resp);
+}
+
+void Harness::readRequestSIMDMatrixWeight() {
+  readMemoryRequest(&simd_matrix_weight_req, &simd_matrix_weight_resp_fifo);
+}
+
+void Harness::sendResponseSIMDMatrixWeight() {
+  sendMemoryResponse(&simd_matrix_weight_resp_fifo, &simd_matrix_weight_resp);
+}
+
+void Harness::readRequestSIMDMatrixBias() {
+  readMemoryRequest(&simd_matrix_bias_req, &simd_matrix_bias_resp_fifo);
+}
+
+void Harness::sendResponseSIMDMatrixBias() {
+  sendMemoryResponse(&simd_matrix_bias_resp_fifo, &simd_matrix_bias_resp);
+}
+
+#if SUPPORT_MX
+void Harness::readRequestSIMDMatrixInputScale() {
+  readMemoryRequest(&simd_matrix_input_scale_req,
+                    &simd_matrix_input_scale_resp_fifo);
+}
+
+void Harness::sendResponseSIMDMatrixInputScale() {
+  sendMemoryResponse(&simd_matrix_input_scale_resp_fifo,
+                     &simd_matrix_input_scale_resp);
+}
+
+void Harness::readRequestSIMDMatrixWeightScale() {
+  readMemoryRequest(&simd_matrix_weight_scale_req,
+                    &simd_matrix_weight_scale_resp_fifo);
+}
+
+void Harness::sendResponseSIMDMatrixWeightScale() {
+  sendMemoryResponse(&simd_matrix_weight_scale_resp_fifo,
+                     &simd_matrix_weight_scale_resp);
+}
+#endif
+#endif
+
+void Harness::readRequestVector0() {
+  readMemoryRequest(&vector_fetch_0_req, &vectorFetch0DataResponse_fifo);
+}
+
+void Harness::sendResponseVector0() {
+  sendMemoryResponse(&vectorFetch0DataResponse_fifo, &vector_fetch_0_resp);
+}
+
+void Harness::readRequestVector1() {
+  readMemoryRequest(&vector_fetch_1_req, &vectorFetch1DataResponse_fifo);
+}
+
+void Harness::sendResponseVector1() {
+  sendMemoryResponse(&vectorFetch1DataResponse_fifo, &vector_fetch_1_resp);
+}
+
+void Harness::readRequestVector2() {
+  readMemoryRequest(&vector_fetch_2_req, &vectorFetch2DataResponse_fifo);
+}
+
+void Harness::sendResponseVector2() {
+  sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vector_fetch_2_resp);
+}
+
+void Harness::readRequestVector3() {
+  readMemoryRequest(&vector_fetch_3_req, &vectorFetch3DataResponse_fifo);
+}
+
+void Harness::sendResponseVector3() {
+  sendMemoryResponse(&vectorFetch3DataResponse_fifo, &vector_fetch_3_resp);
 }
 
 void Harness::storeVectorOutputs() {
@@ -345,6 +459,12 @@ void Harness::sendParams() {
   serialMatrixParamsIn.ResetWrite();
   serialVectorParamsIn.ResetWrite();
 
+#if SUPPORT_SIMD_MATRIX_UNIT
+  simd_matrix_unit_start_signal.ResetRead();
+  simd_matrix_unit_done_signal.ResetRead();
+  serial_simd_matrix_params_in.ResetWrite();
+#endif
+
   wait();
 
   // Iterate through all params, ie all layers
@@ -382,9 +502,15 @@ void Harness::sendParams() {
       }
 
       if (matrixParamsValid) {
-        sendSerializedParams<MatrixParams, 64>(*matrixParams,
-                                               &serialMatrixParamsIn);
-        matrixUnitStartSignal.SyncPop();
+        if (matrixParams->is_fc) {
+          sendSerializedParams<MatrixParams, 64>(*matrixParams,
+                                                 &serial_simd_matrix_params_in);
+          simd_matrix_unit_start_signal.SyncPop();
+        } else {
+          sendSerializedParams<MatrixParams, 64>(*matrixParams,
+                                                 &serialMatrixParamsIn);
+          matrixUnitStartSignal.SyncPop();
+        }
       }
 
       sc_time start = sc_time_stamp();
@@ -403,7 +529,11 @@ void Harness::sendParams() {
                                           << "' Started. -----");
 
       if (matrixParamsValid) {
-        matrixUnitDoneSignal.SyncPop();
+        if (matrixParams->is_fc) {
+          simd_matrix_unit_done_signal.SyncPop();
+        } else {
+          matrixUnitDoneSignal.SyncPop();
+        }
       }
       if (vectorParamsValid) {
         vectorUnitDoneSignal.SyncPop();

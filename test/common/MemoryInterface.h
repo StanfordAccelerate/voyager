@@ -74,24 +74,40 @@ class MemoryInterface {
     return output;
   }
 
+  template <typename T>
+  bool create_scalar_tensor(const codegen::Tensor& tensor, std::any& data,
+                            float* array) {
+    if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+      return false;
+    }
+
+    T* scalar = new T[1];
+    scalar[0] = array[0];
+    data = scalar;
+
+    delete[] array;
+
+    return true;
+  }
+
+  template <typename... Ts>
+  std::any create_scalar_tensor_helper(const codegen::Tensor& tensor,
+                                       float* array) {
+    std::any data;
+    bool matched = (create_scalar_tensor<Ts>(tensor, data, array) || ...);
+    if (!matched) {
+      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+    }
+    return data;
+  }
+
   std::any read_tensor(const codegen::Tensor& tensor) {
     int size = get_size(tensor, false);
 
     // Read scalar from the file directly
     if (size == 1) {
-      if (tensor.dtype() != "bfloat16" && tensor.dtype() != "float32") {
-        throw std::runtime_error(
-            "Unsupported tensor dtype for scalar tensor: " + tensor.dtype());
-      }
-
       float* array = read_constant_param(tensor);
-
-      VECTOR_DATATYPE* data = new VECTOR_DATATYPE[1];
-      data[0] = array[0];
-
-      delete[] array;
-
-      return data;
+      return create_scalar_tensor_helper<SUPPORTED_TYPES>(tensor, array);
     }
 
     return read_tensor_helper<SUPPORTED_TYPES>(tensor);

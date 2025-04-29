@@ -17,6 +17,10 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   const auto shape = get_shape(tensor, false);
   const int size = get_size(shape);
 
+  if (size == 1 && !tensor.has_memory()) {
+    return;
+  }
+
   spdlog::debug("Loading tensor: {}\n", tensor.node());
   spdlog::debug("Shape: ");
   for (const auto& dim : shape) {
@@ -27,12 +31,6 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   spdlog::debug("Address: {}\n", tensor.memory().address());
   spdlog::debug("Transposed: {}\n", transpose);
   spdlog::debug("Replication: {}\n", replication);
-
-  // if size is 1, then it is a scalar, so it should not be
-  // written to memory
-  if (size == 1) {
-    return;
-  }
 
   std::string filename = data_dir + "/" + tensor.node() + ".bin";
   auto array_ptr = read_tensor_from_file(filename, size);

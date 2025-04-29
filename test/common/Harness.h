@@ -93,27 +93,54 @@ SC_MODULE(Harness) {
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       biasDataResponse);
 
+#if SUPPORT_SIMD_MATRIX_UNIT
+  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
+      serial_simd_matrix_params_in);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(simd_matrix_input_req);
+  sc_fifo<OC_PORT_TYPE> simd_matrix_input_resp_fifo;
+  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(simd_matrix_input_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(simd_matrix_weight_req);
+  sc_fifo<OC_PORT_TYPE> simd_matrix_weight_resp_fifo;
+  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(simd_matrix_weight_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(simd_matrix_bias_req);
+  sc_fifo<OC_PORT_TYPE> simd_matrix_bias_resp_fifo;
+  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(simd_matrix_bias_resp);
+
+#if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
-      vector_fetch_0_request_out);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch0DataResponse_fifo;
-  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_0_resp_in);
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
-      vector_fetch_1_request_out);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch1DataResponse_fifo;
-  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_1_resp_in);
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
-      vector_fetch_2_request_out);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch2DataResponse_fifo;
-  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_2_resp_in);
+      simd_matrix_input_scale_req);
+  sc_fifo<ac_int<8, false>> simd_matrix_input_scale_resp_fifo;
+  Connections::Combinational<ac_int<8, false>> CCS_INIT_S1(
+      simd_matrix_input_scale_resp);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
-      vector_fetch_3_request_out);
+      simd_matrix_weight_scale_req);
+  sc_fifo<OC_PORT_TYPE> simd_matrix_weight_scale_resp_fifo;
+  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(
+      simd_matrix_weight_scale_resp);
+#endif
+#endif
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch0DataResponse_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      vector_fetch_0_resp);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_1_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch1DataResponse_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      vector_fetch_1_resp);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_2_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> vectorFetch2DataResponse_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      vector_fetch_2_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
   sc_fifo<ac_int<16, false>> vectorFetch3DataResponse_fifo;
   Connections::Combinational<ac_int<16, false>> CCS_INIT_S1(
-      vector_fetch_3_resp_in);
+      vector_fetch_3_resp);
 
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_output);
@@ -126,6 +153,8 @@ SC_MODULE(Harness) {
 
   Connections::SyncChannel CCS_INIT_S1(matrixUnitStartSignal);
   Connections::SyncChannel CCS_INIT_S1(matrixUnitDoneSignal);
+  Connections::SyncChannel CCS_INIT_S1(simd_matrix_unit_start_signal);
+  Connections::SyncChannel CCS_INIT_S1(simd_matrix_unit_done_signal);
   Connections::SyncChannel CCS_INIT_S1(vectorUnitStartSignal);
   Connections::SyncChannel CCS_INIT_S1(vectorUnitDoneSignal);
 
@@ -139,11 +168,7 @@ SC_MODULE(Harness) {
   AcceleratorMemoryMap currentMemoryMap;
   AccessCounter *accessCounter;
 
-#ifdef SIM_Accelerator
-  CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
-#else
   Accelerator CCS_INIT_S1(accelerator);
-#endif
 
   template <int Width>
   void readMemoryRequest(
@@ -172,6 +197,23 @@ SC_MODULE(Harness) {
   void readRequestWeightScale();
   void sendResponseWeightScale();
 
+  void readRequestBias();
+  void sendResponseBias();
+
+  void readRequestSIMDMatrixInput();
+  void sendResponseSIMDMatrixInput();
+  void readRequestSIMDMatrixWeight();
+  void sendResponseSIMDMatrixWeight();
+  void readRequestSIMDMatrixBias();
+  void sendResponseSIMDMatrixBias();
+
+#if SUPPORT_MX
+  void readRequestSIMDMatrixInputScale();
+  void sendResponseSIMDMatrixInputScale();
+  void readRequestSIMDMatrixWeightScale();
+  void sendResponseSIMDMatrixWeightScale();
+#endif
+
   void readRequestVector0();
   void sendResponseVector0();
 
@@ -183,9 +225,6 @@ SC_MODULE(Harness) {
 
   void readRequestVector3();
   void sendResponseVector3();
-
-  void readRequestBias();
-  void sendResponseBias();
 
   void storeVectorOutputs();
   void storeScalarOutputs();

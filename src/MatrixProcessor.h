@@ -241,10 +241,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           Pack1D<PEWeight<Weight>, NCols> weights;
           auto bits = weightsChannel.Pop();
 
+          constexpr int weight_width = WEIGHT_BUFFER_WIDTH / NCols;
+
 #pragma hls_unroll yes
           for (int i = 0; i < NCols; i++) {
-            auto data =
-                bits.template slc<WEIGHT_DTYPE_WIDTH>(i * WEIGHT_DTYPE_WIDTH);
+            auto data = bits.template slc<weight_width>(i * weight_width);
 
 #if SUPPORT_CODEBOOK_QUANT
             if (params.use_weight_codebook) {
@@ -253,8 +254,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             } else
 #endif
             {
-              bool success = (decode_type<WeightTypes, Weight,
-                                          WEIGHT_DTYPE_WIDTH, WeightTypes...>(
+              bool success = (decode_type<WeightTypes, Weight, weight_width,
+                                          WeightTypes...>(
                                   params.weight_dtype, data, weights[i].data) ||
                               ...);
 #ifndef __SYNTHESIS__
@@ -550,10 +551,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         if (!stall_inputs) {
           auto bits = inputsChannel.Pop();
 
+          constexpr int input_width = INPUT_BUFFER_WIDTH / NRows;
+
 #pragma hls_unroll yes
           for (int i = 0; i < NRows; i++) {
-            auto data =
-                bits.template slc<INPUT_DTYPE_WIDTH>(i * INPUT_DTYPE_WIDTH);
+            auto data = bits.template slc<input_width>(i * input_width);
 #if SUPPORT_CODEBOOK_QUANT
             if (params.use_input_codebook) {
               auto value = params.input_code[data];
@@ -561,10 +563,10 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             } else
 #endif
             {
-              bool success = (decode_type<InputTypes, Input, INPUT_DTYPE_WIDTH,
-                                          InputTypes...>(
-                                  params.input_dtype, data, inputs[i].data) ||
-                              ...);
+              bool success =
+                  (decode_type<InputTypes, Input, input_width, InputTypes...>(
+                       params.input_dtype, data, inputs[i].data) ||
+                   ...);
 #ifndef __SYNTHESIS__
               if (!success) {
                 std::cerr << "Error: matrix input dtype '" << params.input_dtype

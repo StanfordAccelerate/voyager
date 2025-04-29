@@ -21,16 +21,14 @@ SC_MODULE(VectorOpUnit) {
   Connections::In<VectorInstructions> CCS_INIT_S1(reduction_inst_in);
 
   Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(
-      accumulationBufferOutput);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_fetch_0_data_in);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_fetch_1_data_in);
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_fetch_2_data_in);
+      accumulation_buffer_output);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(simd_matrix_unit_data);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_0_data);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_1_data);
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_2_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_response_in);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
+  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
 
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_op_unit_out);
   Connections::Out<ScaleType> CCS_INIT_S1(mx_scale_out);
@@ -85,12 +83,13 @@ SC_MODULE(VectorOpUnit) {
 
   void run_vector_ops() {
     vector_op_inst_in.Reset();
-    accumulationBufferOutput.Reset();
-    vector_fetch_0_data_in.Reset();
-    vector_fetch_1_data_in.Reset();
-    vector_fetch_2_data_in.Reset();
-    vector_fetch_3_request_out.Reset();
-    vector_fetch_3_response_in.Reset();
+    accumulation_buffer_output.Reset();
+    simd_matrix_unit_data.Reset();
+    vector_fetch_0_data.Reset();
+    vector_fetch_1_data.Reset();
+    vector_fetch_2_data.Reset();
+    vector_fetch_3_req.Reset();
+    vector_fetch_3_resp.Reset();
     mx_scale_out.Reset();
     vector_op_unit_out.Reset();
     accumulation_input.ResetWrite();
@@ -120,7 +119,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
           inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
-        Pack1D<BufferType, Width> sa_output = accumulationBufferOutput.Pop();
+        Pack1D<BufferType, Width> sa_output = accumulation_buffer_output.Pop();
 
         Pack1D<VectorType, Width> temp;
         if (inst.vdequantize) {
@@ -140,9 +139,19 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
+      if (inst.vector_op0_src0 == VectorInstructions::from_simd_matrix_unit ||
+          inst.vector_op0_src1 == VectorInstructions::from_simd_matrix_unit) {
+        Pack1D<VectorType, Width> temp = simd_matrix_unit_data.Pop();
+        if (inst.vector_op0_src0 == VectorInstructions::from_simd_matrix_unit) {
+          op0_src0 = temp;
+        } else {
+          op0_src1 = temp;
+        }
+      }
+
       if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0 ||
           inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_0) {
-        Pack1D<VectorType, Width> temp = vector_fetch_0_data_in.Pop();
+        Pack1D<VectorType, Width> temp = vector_fetch_0_data.Pop();
         if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0) {
           op0_src0 = temp;
         } else {
@@ -152,7 +161,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1 ||
           inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_1) {
-        Pack1D<VectorType, Width> temp = vector_fetch_1_data_in.Pop();
+        Pack1D<VectorType, Width> temp = vector_fetch_1_data.Pop();
         if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1) {
           op0_src0 = temp;
         } else {
@@ -162,7 +171,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2 ||
           inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
-        Pack1D<VectorType, Width> temp = vector_fetch_2_data_in.Pop();
+        Pack1D<VectorType, Width> temp = vector_fetch_2_data.Pop();
         if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2) {
           op2_src1 = temp;
         } else {
@@ -264,9 +273,9 @@ SC_MODULE(VectorOpUnit) {
 
           ac_int<32, false> address = value.bits_rep() * 2;
           MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
-          vector_fetch_3_request_out.Push(request);
+          vector_fetch_3_req.Push(request);
 
-          value.set_bits(vector_fetch_3_response_in.Pop());
+          value.set_bits(vector_fetch_3_resp.Pop());
           res1[i] = value;
         }
       } else {
@@ -440,7 +449,10 @@ SC_MODULE(VectorUnit) {
   Connections::Out<BufferWriteRequest<Pack1D<BufferType, Width>>>
       accumulation_buffer_write_request[2];
   Connections::Combinational<Pack1D<BufferType, Width>>
-      accumulationBufferOutput;
+      accumulation_buffer_output;
+
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(simd_matrix_unit_data);
+
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vector_params);
   Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
@@ -454,26 +466,26 @@ SC_MODULE(VectorUnit) {
       accumulation_insts);
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(reduction_insts);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_0_response_in);
+      vector_fetch_0_resp);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_0_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_req);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_1_response_in);
+      vector_fetch_1_resp);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_1_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_req);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_2_response_in);
+      vector_fetch_2_resp);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_2_data);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_response_in);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
+  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_unit_output);
@@ -517,32 +529,33 @@ SC_MODULE(VectorUnit) {
         accumulation_buffer_read_data[0]);
     vector_fetcher.accumulation_buffer_read_data[1](
         accumulation_buffer_read_data[1]);
-    vector_fetcher.accumulationBufferOutput(accumulationBufferOutput);
+    vector_fetcher.accumulation_buffer_output(accumulation_buffer_output);
     vector_fetcher.accumulation_buffer_write_request[0](
         accumulation_buffer_write_request[0]);
     vector_fetcher.accumulation_buffer_write_request[1](
         accumulation_buffer_write_request[1]);
-    vector_fetcher.vector_fetch_0_request_out(vector_fetch_0_request_out);
-    vector_fetcher.vector_fetch_0_resp_in(vector_fetch_0_response_in);
-    vector_fetcher.vector_fetch_0_data_out(vector_fetch_0_data);
-    vector_fetcher.vector_fetch_1_request_out(vector_fetch_1_request_out);
-    vector_fetcher.vector_fetch_1_resp_in(vector_fetch_1_response_in);
-    vector_fetcher.vector_fetch_1_data_out(vector_fetch_1_data);
-    vector_fetcher.vector_fetch_2_request_out(vector_fetch_2_request_out);
-    vector_fetcher.vector_fetch_2_resp_in(vector_fetch_2_response_in);
-    vector_fetcher.vector_fetch_2_data_out(vector_fetch_2_data);
+    vector_fetcher.vector_fetch_0_req(vector_fetch_0_req);
+    vector_fetcher.vector_fetch_0_resp(vector_fetch_0_resp);
+    vector_fetcher.vector_fetch_0_data(vector_fetch_0_data);
+    vector_fetcher.vector_fetch_1_req(vector_fetch_1_req);
+    vector_fetcher.vector_fetch_1_resp(vector_fetch_1_resp);
+    vector_fetcher.vector_fetch_1_data(vector_fetch_1_data);
+    vector_fetcher.vector_fetch_2_req(vector_fetch_2_req);
+    vector_fetcher.vector_fetch_2_resp(vector_fetch_2_resp);
+    vector_fetcher.vector_fetch_2_data(vector_fetch_2_data);
 
     vector_op_unit.clk(clk);
     vector_op_unit.rstn(rstn);
     vector_op_unit.vector_op_inst_in(vector_op_insts);
     vector_op_unit.accumulation_inst_in(accumulation_insts);
     vector_op_unit.reduction_inst_in(reduction_insts);
-    vector_op_unit.accumulationBufferOutput(accumulationBufferOutput);
-    vector_op_unit.vector_fetch_0_data_in(vector_fetch_0_data);
-    vector_op_unit.vector_fetch_1_data_in(vector_fetch_1_data);
-    vector_op_unit.vector_fetch_2_data_in(vector_fetch_2_data);
-    vector_op_unit.vector_fetch_3_request_out(vector_fetch_3_request_out);
-    vector_op_unit.vector_fetch_3_response_in(vector_fetch_3_response_in);
+    vector_op_unit.accumulation_buffer_output(accumulation_buffer_output);
+    vector_op_unit.simd_matrix_unit_data(simd_matrix_unit_data);
+    vector_op_unit.vector_fetch_0_data(vector_fetch_0_data);
+    vector_op_unit.vector_fetch_1_data(vector_fetch_1_data);
+    vector_op_unit.vector_fetch_2_data(vector_fetch_2_data);
+    vector_op_unit.vector_fetch_3_req(vector_fetch_3_req);
+    vector_op_unit.vector_fetch_3_resp(vector_fetch_3_resp);
     vector_op_unit.vector_op_unit_out(vector_unit_output);
     vector_op_unit.mx_scale_out(mx_scale);
 

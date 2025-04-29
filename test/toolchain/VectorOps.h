@@ -401,8 +401,9 @@ void MapVectorOperations(const codegen::Operation &param,
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   if (output.has_reshape()) {
-    vector_params->has_attn_head_permute = output.shape(1) < output.shape(2);
-    vector_params->has_output_permute = output.shape(1) > output.shape(2);
+    vector_params->has_attn_head_permute = true;
+    // vector_params->has_attn_head_permute = output.shape(1) < output.shape(2);
+    // vector_params->has_output_permute = output.shape(1) > output.shape(2);
 
     // if we have permutation, we need to configure the address generators
     // accordingly we need to make sure the output is split into 32x32 blocks
@@ -503,21 +504,6 @@ void MapVectorOperations(const codegen::Operation &param,
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
           param.outputs().tensors(0).memory().address();
-
-      if (op.kwargs().contains("quant_code")) {
-        const auto code = op.kwargs().at("quant_code").tensor();
-        const int size = get_size(code);
-
-        float *array = read_constant_param(code);
-
-        for (int i = 0; i < size; i++) {
-          vector_params->output_code[i] = array[i] * 2;
-        }
-
-        delete[] array;
-
-        vector_params->use_output_codebook = true;
-      }
     } else if (op.kwargs().contains("other") || opcode == "quantize") {
       std::string other_key = opcode == "quantize" ? "scale" : "other";
       const auto other = op.kwargs().at(other_key);
@@ -569,6 +555,21 @@ void MapVectorOperations(const codegen::Operation &param,
                                accelerator_memory_map, vector_params);
         }
       }
+    }
+
+    if (op.kwargs().contains("quant_code")) {
+      const auto code = op.kwargs().at("quant_code").tensor();
+      const int size = get_size(code);
+
+      float *array = read_constant_param(code);
+
+      for (int i = 0; i < size; i++) {
+        vector_params->output_code[i] = array[i] * 2;
+      }
+
+      delete[] array;
+
+      vector_params->use_output_codebook = true;
     }
 
     stage++;

@@ -136,17 +136,46 @@ void MapMatrixOperation(const Operation &operation,
   const auto op_list = get_op_list(param);
   const auto matrix_op = op_list[0];
 
-  Tiling tiling = get_tiling(operation);
-
-  std::ostringstream oss;
-  oss << tiling;
-  spdlog::info("Using tiling: \n{}\n", oss.str());
-
   const auto input = matrix_op.kwargs().at("input").tensor();
 
   bool is_matmul = matrix_op.target().find("matmul") != std::string::npos;
   std::string weight_key = is_matmul ? "other" : "weight";
   const auto weight = matrix_op.kwargs().at(weight_key).tensor();
+
+  Tiling tiling;
+
+  matrix_params->is_fc = is_fc(matrix_op);
+
+  if (matrix_params->is_fc) {
+    bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
+
+    int C1 = is_mx_op ? matrix_op.kwargs().at("block_size").int_value() : 1;
+    int C2 = (is_matmul ? weight.shape(0) : weight.shape(1)) / C1;
+    int K = is_matmul ? weight.shape(1) : weight.shape(0);
+
+    auto k_loops = split_loops({K}, pow(2, 16) - 1);
+    k_loops = adjust_loop_indices(k_loops, OC_DIMENSION);
+    pad_shape_to_ndim(k_loops, 2);
+
+    tiling = {
+        .loops = {{1, 1, k_loops[0], C2, 1, 1}, {C1, k_loops[1], 1, 1, 1, 1}},
+        .x_loop_index = {0, 5},
+        .y_loop_index = {1, 4},
+        .reduction_loop_index = {3, 0},
+        .weight_loop_index = {2, 1},
+        .fx_index = 3,
+        .fy_index = 2,
+        .weight_reuse_index = {4, 5},
+        .stride = 1,
+        .replication = false,
+    };
+  } else {
+    tiling = get_tiling(operation);
+  }
+
+  std::ostringstream oss;
+  oss << tiling;
+  spdlog::info("Using tiling: \n{}\n", oss.str());
 
   const auto input_memory = input.memory();
   accelerator_memory_map["inputs"] = get_partition(input_memory.partition());
@@ -373,33 +402,41 @@ void MapMatrixOperation(const Operation &operation,
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
-  vector_params->addr_gen0_mode = 3;  // read from accumulation buffer
-  // Set outer loops
-  for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen0_loops[0][i] = tiling.loops[0][i];
-  }
-  vector_params->addr_gen0_y_loop_idx[0] = tiling.y_loop_index[0];
-  vector_params->addr_gen0_x_loop_idx[0] = tiling.x_loop_index[0];
-  vector_params->addr_gen0_k_loop_idx[0] = tiling.weight_loop_index[0];
 
-  // Set inner loops
-  int addressGen0LoopIndex = 0;
-  for (int i = 0; i < 6; i++) {
-    // ignore the loops not present in outputs (reduction, fx, fy)
-    if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
-        i == tiling.y_loop_index[1]) {
-      vector_params->addr_gen0_loops[1][addressGen0LoopIndex] =
-          tiling.loops[1][i];
-      if (i == tiling.y_loop_index[1]) {
-        vector_params->addr_gen0_y_loop_idx[1] = addressGen0LoopIndex;
+  // Rescale tiling for vector instructions
+  if (matrix_params->is_fc) {
+    tiling.loops[1][1] /= OC_DIMENSION;
+  }
+
+  if (!matrix_params->is_fc) {
+    vector_params->addr_gen0_mode = 3;  // read from accumulation buffer
+    // Set outer loops
+    for (int i = 0; i < 3; i++) {
+      vector_params->addr_gen0_loops[0][i] = tiling.loops[0][i];
+    }
+    vector_params->addr_gen0_y_loop_idx[0] = tiling.y_loop_index[0];
+    vector_params->addr_gen0_x_loop_idx[0] = tiling.x_loop_index[0];
+    vector_params->addr_gen0_k_loop_idx[0] = tiling.weight_loop_index[0];
+
+    // Set inner loops
+    int addressGen0LoopIndex = 0;
+    for (int i = 0; i < 6; i++) {
+      // ignore the loops not present in outputs (reduction, fx, fy)
+      if (i == tiling.weight_loop_index[1] || i == tiling.x_loop_index[1] ||
+          i == tiling.y_loop_index[1]) {
+        vector_params->addr_gen0_loops[1][addressGen0LoopIndex] =
+            tiling.loops[1][i];
+        if (i == tiling.y_loop_index[1]) {
+          vector_params->addr_gen0_y_loop_idx[1] = addressGen0LoopIndex;
+        }
+        if (i == tiling.x_loop_index[1]) {
+          vector_params->addr_gen0_x_loop_idx[1] = addressGen0LoopIndex;
+        }
+        if (i == tiling.weight_loop_index[1]) {
+          vector_params->addr_gen0_k_loop_idx[1] = addressGen0LoopIndex;
+        }
+        addressGen0LoopIndex++;
       }
-      if (i == tiling.x_loop_index[1]) {
-        vector_params->addr_gen0_x_loop_idx[1] = addressGen0LoopIndex;
-      }
-      if (i == tiling.weight_loop_index[1]) {
-        vector_params->addr_gen0_k_loop_idx[1] = addressGen0LoopIndex;
-      }
-      addressGen0LoopIndex++;
     }
   }
 
@@ -454,7 +491,9 @@ void MapMatrixOperation(const Operation &operation,
   VectorInstructions inst;
   memset(&inst, 0, sizeof(inst));
   inst.op_type = VectorInstructions::vector;
-  inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
+  inst.vector_op0_src0 = matrix_params->is_fc
+                             ? VectorInstructions::from_simd_matrix_unit
+                             : VectorInstructions::from_matrix_unit;
   inst.vdest = VectorInstructions::to_output;
 
   auto inst_map = get_vector_instruction_mapping();

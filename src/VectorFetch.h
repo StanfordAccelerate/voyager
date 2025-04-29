@@ -13,33 +13,30 @@ SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_req);
 
   Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
   Connections::SyncOut accumulation_buffer_done[2];
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_0_resp_in);
-  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_fetch_0_data_out);
+      vector_fetch_0_resp);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_0_data);
 
   Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
   Connections::Out<BufferWriteRequest<Pack1D<BufferType, Width>>>
       accumulation_buffer_write_request[2];
   Connections::Out<Pack1D<BufferType, Width>> CCS_INIT_S1(
-      accumulationBufferOutput);
+      accumulation_buffer_output);
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_1_resp_in);
-  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_fetch_1_data_out);
+      vector_fetch_1_resp);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_1_data);
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_2_resp_in);
-  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_fetch_2_data_out);
+      vector_fetch_2_resp);
+  Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_2_data);
 
   Connections::Combinational<VectorParams> CCS_INIT_S1(addr_gen0_params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(addr_gen1_params);
@@ -48,6 +45,7 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(data_resp_1_params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(data_resp_2_params);
 
+  static constexpr int LOOP_WIDTH = 16;
   static constexpr int BUFSIZE = 1024 / Width < Width ? 1024 / Width : Width;
 
   SC_CTOR(VectorFetchUnit) {
@@ -82,7 +80,7 @@ SC_MODULE(VectorFetchUnit) {
 
   void fetch_address_0() {
     addr_gen0_params.ResetRead();
-    vector_fetch_0_request_out.Reset();
+    vector_fetch_0_req.Reset();
     accumulation_buffer_read_address[0].Reset();
     accumulation_buffer_read_address[1].Reset();
     accumulation_buffer_done[0].Reset();
@@ -95,27 +93,27 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = addr_gen0_params.Pop();
 
-      ac_int<11, false> Y1 =
+      ac_int<LOOP_WIDTH, false> Y1 =
           params.addr_gen0_loops[0][params.addr_gen0_y_loop_idx[0]];
-      ac_int<11, false> X1 =
+      ac_int<LOOP_WIDTH, false> X1 =
           params.addr_gen0_loops[0][params.addr_gen0_x_loop_idx[0]];
-      ac_int<11, false> K1 =
+      ac_int<LOOP_WIDTH, false> K1 =
           params.addr_gen0_loops[0][params.addr_gen0_k_loop_idx[0]];
-      ac_int<11, false> Y0 =
+      ac_int<LOOP_WIDTH, false> Y0 =
           params.addr_gen0_loops[1][params.addr_gen0_y_loop_idx[1]];
-      ac_int<11, false> X0 =
+      ac_int<LOOP_WIDTH, false> X0 =
           params.addr_gen0_loops[1][params.addr_gen0_x_loop_idx[1]];
-      ac_int<11, false> K0 =
+      ac_int<LOOP_WIDTH, false> K0 =
           params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
 
       if (params.has_transpose && BUFSIZE != Width) {
         X1 = X1 * BUFSIZE / Width;
       }
 
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_starts[2][3];
-      ac_int<11, false> loop_ends[2][3];
-      ac_int<11, false> loop_steps[2][3];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_starts[2][3];
+      ac_int<LOOP_WIDTH, false> loop_ends[2][3];
+      ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -168,17 +166,17 @@ SC_MODULE(VectorFetchUnit) {
                   ac_int<32, false> address;
                   bool switch_accumulation_buffer_bank = false;
                   if (params.addr_gen0_mode == 1) {
-                    ac_int<11, false> x0 =
+                    ac_int<LOOP_WIDTH, false> x0 =
                         loop_counters[1][params.addr_gen0_x_loop_idx[1]];
-                    ac_int<11, false> x1 =
+                    ac_int<LOOP_WIDTH, false> x1 =
                         loop_counters[0][params.addr_gen0_x_loop_idx[0]];
-                    ac_int<11, false> y0 =
+                    ac_int<LOOP_WIDTH, false> y0 =
                         loop_counters[1][params.addr_gen0_y_loop_idx[1]];
-                    ac_int<11, false> y1 =
+                    ac_int<LOOP_WIDTH, false> y1 =
                         loop_counters[0][params.addr_gen0_y_loop_idx[0]];
-                    ac_int<11, false> k0 =
+                    ac_int<LOOP_WIDTH, false> k0 =
                         loop_counters[1][params.addr_gen0_k_loop_idx[1]];
-                    ac_int<11, false> k1 =
+                    ac_int<LOOP_WIDTH, false> k1 =
                         loop_counters[0][params.addr_gen0_k_loop_idx[0]];
 
                     ac_int<16, false> k = k1 * K0 * Width + k0 * Width;
@@ -196,12 +194,12 @@ SC_MODULE(VectorFetchUnit) {
                       address = y * X * K + x * K + k;
                     }
                   } else if (params.addr_gen0_mode == 2) {
-                    ac_int<11, false> indices[6] = {
+                    ac_int<LOOP_WIDTH, false> indices[6] = {
                         loop_counters[0][0], loop_counters[0][1],
                         loop_counters[0][2], loop_counters[1][0],
                         loop_counters[1][1], loop_counters[1][2]};
 
-                    ac_int<11, false> loop_bounds[6] = {
+                    ac_int<LOOP_WIDTH, false> loop_bounds[6] = {
                         params.addr_gen0_loops[0][0],
                         params.addr_gen0_loops[0][1],
                         params.addr_gen0_loops[0][2],
@@ -218,7 +216,7 @@ SC_MODULE(VectorFetchUnit) {
                     }
 
                     if (params.has_permute) {
-                      ac_int<11, false> permuted_indices[6];
+                      ac_int<LOOP_WIDTH, false> permuted_indices[6];
 #pragma hls_unroll yes
                       for (int i = 0; i < 6; i++) {
                         permuted_indices[params.addr_gen0_dims[i]] = indices[i];
@@ -242,17 +240,17 @@ SC_MODULE(VectorFetchUnit) {
                         Width;
                   } else if (params.addr_gen0_mode == 3) {
                     // read from accumulation buffer
-                    ac_int<11, false> x0 =
+                    ac_int<LOOP_WIDTH, false> x0 =
                         loop_counters[1][params.addr_gen0_x_loop_idx[1]];
-                    ac_int<11, false> x1 =
+                    ac_int<LOOP_WIDTH, false> x1 =
                         loop_counters[0][params.addr_gen0_x_loop_idx[0]];
-                    ac_int<11, false> y0 =
+                    ac_int<LOOP_WIDTH, false> y0 =
                         loop_counters[1][params.addr_gen0_y_loop_idx[1]];
-                    ac_int<11, false> y1 =
+                    ac_int<LOOP_WIDTH, false> y1 =
                         loop_counters[0][params.addr_gen0_y_loop_idx[0]];
-                    ac_int<11, false> k0 =
+                    ac_int<LOOP_WIDTH, false> k0 =
                         loop_counters[1][params.addr_gen0_k_loop_idx[1]];
-                    ac_int<11, false> k1 =
+                    ac_int<LOOP_WIDTH, false> k1 =
                         loop_counters[0][params.addr_gen0_k_loop_idx[0]];
 
                     address = k0 * Y0 * X0 + y0 * X0 + x0;
@@ -267,8 +265,7 @@ SC_MODULE(VectorFetchUnit) {
                     bool found =
                         (fetch_vector_input<InputTypes, Width, InputTypes...>(
                              params.addr_gen0_dtype, address,
-                             params.ADDRESS_GEN0_OFFSET,
-                             vector_fetch_0_request_out) ||
+                             params.ADDRESS_GEN0_OFFSET, vector_fetch_0_req) ||
                          ...);
 
 #ifndef __SYNTHESIS__
@@ -318,13 +315,13 @@ SC_MODULE(VectorFetchUnit) {
 
   void feed_data_response_0() {
     data_resp_0_params.ResetRead();
-    vector_fetch_0_resp_in.Reset();
-    vector_fetch_0_data_out.Reset();
+    vector_fetch_0_resp.Reset();
+    vector_fetch_0_data.Reset();
     accumulation_buffer_read_data[0].Reset();
     accumulation_buffer_read_data[1].Reset();
     accumulation_buffer_write_request[0].Reset();
     accumulation_buffer_write_request[1].Reset();
-    accumulationBufferOutput.Reset();
+    accumulation_buffer_output.Reset();
 
     bool accumulation_buffer_bank = 0;
 
@@ -333,10 +330,10 @@ SC_MODULE(VectorFetchUnit) {
     while (true) {
       VectorParams params = data_resp_0_params.Pop();
 
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_starts[2][3];
-      ac_int<11, false> loop_ends[2][3];
-      ac_int<11, false> loop_steps[2][3];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_starts[2][3];
+      ac_int<LOOP_WIDTH, false> loop_ends[2][3];
+      ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -382,7 +379,7 @@ SC_MODULE(VectorFetchUnit) {
                     bool found =
                         (process_vector_input<InputTypes, Width, VectorType,
                                               InputTypes...>(
-                             params.addr_gen0_dtype, vector_fetch_0_resp_in,
+                             params.addr_gen0_dtype, vector_fetch_0_resp,
                              full_response) ||
                          ...);
 
@@ -413,7 +410,7 @@ SC_MODULE(VectorFetchUnit) {
                       transposed[col] = buffer[row][col];
                     }
 
-                    vector_fetch_0_data_out.Push(transposed);
+                    vector_fetch_0_data.Push(transposed);
                   }
                 }
               }
@@ -421,17 +418,17 @@ SC_MODULE(VectorFetchUnit) {
           }
         }
       } else if (params.addr_gen0_mode == 3) {
-        ac_int<11, false> Y1 =
+        ac_int<LOOP_WIDTH, false> Y1 =
             params.addr_gen0_loops[0][params.addr_gen0_y_loop_idx[0]];
-        ac_int<11, false> X1 =
+        ac_int<LOOP_WIDTH, false> X1 =
             params.addr_gen0_loops[0][params.addr_gen0_x_loop_idx[0]];
-        ac_int<11, false> K1 =
+        ac_int<LOOP_WIDTH, false> K1 =
             params.addr_gen0_loops[0][params.addr_gen0_k_loop_idx[0]];
-        ac_int<11, false> Y0 =
+        ac_int<LOOP_WIDTH, false> Y0 =
             params.addr_gen0_loops[1][params.addr_gen0_y_loop_idx[1]];
-        ac_int<11, false> X0 =
+        ac_int<LOOP_WIDTH, false> X0 =
             params.addr_gen0_loops[1][params.addr_gen0_x_loop_idx[1]];
-        ac_int<11, false> K0 =
+        ac_int<LOOP_WIDTH, false> K0 =
             params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
 
 #pragma hls_pipeline_init_interval 1
@@ -457,19 +454,19 @@ SC_MODULE(VectorFetchUnit) {
                     Pack1D<BufferType, Width> read_data =
                         accumulation_buffer_read_data[accumulation_buffer_bank]
                             .Pop();
-                    accumulationBufferOutput.Push(read_data);
+                    accumulation_buffer_output.Push(read_data);
 
-                    ac_int<11, false> x0 =
+                    ac_int<LOOP_WIDTH, false> x0 =
                         loop_counters[1][params.addr_gen0_x_loop_idx[1]];
-                    ac_int<11, false> x1 =
+                    ac_int<LOOP_WIDTH, false> x1 =
                         loop_counters[0][params.addr_gen0_x_loop_idx[0]];
-                    ac_int<11, false> y0 =
+                    ac_int<LOOP_WIDTH, false> y0 =
                         loop_counters[1][params.addr_gen0_y_loop_idx[1]];
-                    ac_int<11, false> y1 =
+                    ac_int<LOOP_WIDTH, false> y1 =
                         loop_counters[0][params.addr_gen0_y_loop_idx[0]];
-                    ac_int<11, false> k0 =
+                    ac_int<LOOP_WIDTH, false> k0 =
                         loop_counters[1][params.addr_gen0_k_loop_idx[1]];
-                    ac_int<11, false> k1 =
+                    ac_int<LOOP_WIDTH, false> k1 =
                         loop_counters[0][params.addr_gen0_k_loop_idx[0]];
 
                     if (k0 == K0 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
@@ -514,7 +511,7 @@ SC_MODULE(VectorFetchUnit) {
 
           bool found = (process_vector_input<InputTypes, Width, VectorType,
                                              InputTypes...>(
-                            params.addr_gen0_dtype, vector_fetch_0_resp_in,
+                            params.addr_gen0_dtype, vector_fetch_0_resp,
                             full_response) ||
                         ...);
 
@@ -529,7 +526,7 @@ SC_MODULE(VectorFetchUnit) {
           vdequantize<VectorType, VectorType, Width>(full_response, dequantized,
                                                      params.addr_gen0_dq_scale);
 
-          vector_fetch_0_data_out.Push(dequantized);
+          vector_fetch_0_data.Push(dequantized);
         }
       }
     }
@@ -537,30 +534,30 @@ SC_MODULE(VectorFetchUnit) {
 
   void fetch_address_1() {
     addr_gen1_params.ResetRead();
-    vector_fetch_1_request_out.Reset();
+    vector_fetch_1_req.Reset();
 
     wait();
 
     while (true) {
       VectorParams params = addr_gen1_params.Pop();
 
-      ac_int<11, false> Y1 =
+      ac_int<LOOP_WIDTH, false> Y1 =
           params.addr_gen1_loops[0][params.addr_gen1_y_loop_idx[0]];
-      ac_int<11, false> X1 =
+      ac_int<LOOP_WIDTH, false> X1 =
           params.addr_gen1_loops[0][params.addr_gen1_x_loop_idx[0]];
-      ac_int<11, false> K1 =
+      ac_int<LOOP_WIDTH, false> K1 =
           params.addr_gen1_loops[0][params.addr_gen1_k_loop_idx[0]];
-      ac_int<11, false> Y0 =
+      ac_int<LOOP_WIDTH, false> Y0 =
           params.addr_gen1_loops[1][params.addr_gen1_y_loop_idx[1]];
-      ac_int<11, false> X0 =
+      ac_int<LOOP_WIDTH, false> X0 =
           params.addr_gen1_loops[1][params.addr_gen1_x_loop_idx[1]];
-      ac_int<11, false> K0 =
+      ac_int<LOOP_WIDTH, false> K0 =
           params.addr_gen1_loops[1][params.addr_gen1_k_loop_idx[1]];
 
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_starts[2][3];
-      ac_int<11, false> loop_ends[2][3];
-      ac_int<11, false> loop_steps[2][3];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_starts[2][3];
+      ac_int<LOOP_WIDTH, false> loop_ends[2][3];
+      ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -591,17 +588,17 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = loop_starts[1][2];
                      loop_counters[1][2] < loop_ends[1][2];
                      loop_counters[1][2] += loop_steps[1][2]) {
-                  ac_int<11, false> x0 =
+                  ac_int<LOOP_WIDTH, false> x0 =
                       loop_counters[1][params.addr_gen1_x_loop_idx[1]];
-                  ac_int<11, false> x1 =
+                  ac_int<LOOP_WIDTH, false> x1 =
                       loop_counters[0][params.addr_gen1_x_loop_idx[0]];
-                  ac_int<11, false> y0 =
+                  ac_int<LOOP_WIDTH, false> y0 =
                       loop_counters[1][params.addr_gen1_y_loop_idx[1]];
-                  ac_int<11, false> y1 =
+                  ac_int<LOOP_WIDTH, false> y1 =
                       loop_counters[0][params.addr_gen1_y_loop_idx[0]];
-                  ac_int<11, false> k0 =
+                  ac_int<LOOP_WIDTH, false> k0 =
                       loop_counters[1][params.addr_gen1_k_loop_idx[1]];
-                  ac_int<11, false> k1 =
+                  ac_int<LOOP_WIDTH, false> k1 =
                       loop_counters[0][params.addr_gen1_k_loop_idx[0]];
 
                   ac_int<16, false> k = k1 * K0 * Width + k0 * Width;
@@ -632,8 +629,7 @@ SC_MODULE(VectorFetchUnit) {
                   bool found =
                       (fetch_vector_input<InputTypes, Width, InputTypes...>(
                            params.addr_gen1_dtype, address,
-                           params.ADDRESS_GEN1_OFFSET,
-                           vector_fetch_1_request_out) ||
+                           params.ADDRESS_GEN1_OFFSET, vector_fetch_1_req) ||
                        ...);
 
 #ifndef __SYNTHESIS__
@@ -673,18 +669,18 @@ SC_MODULE(VectorFetchUnit) {
 
   void feed_data_response_1() {
     data_resp_1_params.ResetRead();
-    vector_fetch_1_resp_in.Reset();
-    vector_fetch_1_data_out.Reset();
+    vector_fetch_1_resp.Reset();
+    vector_fetch_1_data.Reset();
 
     wait();
 
     while (true) {
       VectorParams params = data_resp_1_params.Pop();
 
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_starts[2][3];
-      ac_int<11, false> loop_ends[2][3];
-      ac_int<11, false> loop_steps[2][3];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_starts[2][3];
+      ac_int<LOOP_WIDTH, false> loop_ends[2][3];
+      ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -719,8 +715,8 @@ SC_MODULE(VectorFetchUnit) {
 
                   bool found = (process_vector_input<InputTypes, Width,
                                                      VectorType, InputTypes...>(
-                                    params.addr_gen1_dtype,
-                                    vector_fetch_1_resp_in, full_response) ||
+                                    params.addr_gen1_dtype, vector_fetch_1_resp,
+                                    full_response) ||
                                 ...);
 
 #ifndef __SYNTHESIS__
@@ -734,7 +730,7 @@ SC_MODULE(VectorFetchUnit) {
                   vdequantize<VectorType, VectorType, Width>(
                       full_response, dequantized, params.addr_gen1_dq_scale);
 
-                  vector_fetch_1_data_out.Push(dequantized);
+                  vector_fetch_1_data.Push(dequantized);
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
@@ -766,30 +762,30 @@ SC_MODULE(VectorFetchUnit) {
 
   void fetch_address_2() {
     addr_gen2_params.ResetRead();
-    vector_fetch_2_request_out.Reset();
+    vector_fetch_2_req.Reset();
 
     wait();
 
     while (true) {
       VectorParams params = addr_gen2_params.Pop();
 
-      ac_int<11, false> Y1 =
+      ac_int<LOOP_WIDTH, false> Y1 =
           params.addr_gen2_loops[0][params.addr_gen2_y_loop_idx[0]];
-      ac_int<11, false> X1 =
+      ac_int<LOOP_WIDTH, false> X1 =
           params.addr_gen2_loops[0][params.addr_gen2_x_loop_idx[0]];
-      ac_int<11, false> K1 =
+      ac_int<LOOP_WIDTH, false> K1 =
           params.addr_gen2_loops[0][params.addr_gen2_k_loop_idx[0]];
-      ac_int<11, false> Y0 =
+      ac_int<LOOP_WIDTH, false> Y0 =
           params.addr_gen2_loops[1][params.addr_gen2_y_loop_idx[1]];
-      ac_int<11, false> X0 =
+      ac_int<LOOP_WIDTH, false> X0 =
           params.addr_gen2_loops[1][params.addr_gen2_x_loop_idx[1]];
-      ac_int<11, false> K0 =
+      ac_int<LOOP_WIDTH, false> K0 =
           params.addr_gen2_loops[1][params.addr_gen2_k_loop_idx[1]];
 
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_starts[2][3];
-      ac_int<11, false> loop_ends[2][3];
-      ac_int<11, false> loop_steps[2][3];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_starts[2][3];
+      ac_int<LOOP_WIDTH, false> loop_ends[2][3];
+      ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -820,17 +816,17 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = loop_starts[1][2];
                      loop_counters[1][2] < loop_ends[1][2];
                      loop_counters[1][2] += loop_steps[1][2]) {
-                  ac_int<11, false> x0 =
+                  ac_int<LOOP_WIDTH, false> x0 =
                       loop_counters[1][params.addr_gen2_x_loop_idx[1]];
-                  ac_int<11, false> x1 =
+                  ac_int<LOOP_WIDTH, false> x1 =
                       loop_counters[0][params.addr_gen2_x_loop_idx[0]];
-                  ac_int<11, false> y0 =
+                  ac_int<LOOP_WIDTH, false> y0 =
                       loop_counters[1][params.addr_gen2_y_loop_idx[1]];
-                  ac_int<11, false> y1 =
+                  ac_int<LOOP_WIDTH, false> y1 =
                       loop_counters[0][params.addr_gen2_y_loop_idx[0]];
-                  ac_int<11, false> k0 =
+                  ac_int<LOOP_WIDTH, false> k0 =
                       loop_counters[1][params.addr_gen2_k_loop_idx[1]];
-                  ac_int<11, false> k1 =
+                  ac_int<LOOP_WIDTH, false> k1 =
                       loop_counters[0][params.addr_gen2_k_loop_idx[0]];
 
                   ac_int<16, false> k = k1 * K0 * Width + k0 * Width;
@@ -861,8 +857,7 @@ SC_MODULE(VectorFetchUnit) {
                   bool found =
                       (fetch_vector_input<InputTypes, Width, InputTypes...>(
                            params.addr_gen2_dtype, address,
-                           params.ADDRESS_GEN2_OFFSET,
-                           vector_fetch_2_request_out) ||
+                           params.ADDRESS_GEN2_OFFSET, vector_fetch_2_req) ||
                        ...);
 
 #ifndef __SYNTHESIS__
@@ -902,18 +897,18 @@ SC_MODULE(VectorFetchUnit) {
 
   void feed_data_response_2() {
     data_resp_2_params.ResetRead();
-    vector_fetch_2_resp_in.Reset();
-    vector_fetch_2_data_out.Reset();
+    vector_fetch_2_resp.Reset();
+    vector_fetch_2_data.Reset();
 
     wait();
 
     while (true) {
       VectorParams params = data_resp_2_params.Pop();
 
-      ac_int<11, false> loop_counters[2][3];
-      ac_int<11, false> loop_starts[2][3];
-      ac_int<11, false> loop_ends[2][3];
-      ac_int<11, false> loop_steps[2][3];
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_starts[2][3];
+      ac_int<LOOP_WIDTH, false> loop_ends[2][3];
+      ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -948,8 +943,8 @@ SC_MODULE(VectorFetchUnit) {
 
                   bool found = (process_vector_input<InputTypes, Width,
                                                      VectorType, InputTypes...>(
-                                    params.addr_gen2_dtype,
-                                    vector_fetch_2_resp_in, full_response) ||
+                                    params.addr_gen2_dtype, vector_fetch_2_resp,
+                                    full_response) ||
                                 ...);
 
 #ifndef __SYNTHESIS__
@@ -963,7 +958,7 @@ SC_MODULE(VectorFetchUnit) {
                   vdequantize<VectorType, VectorType, Width>(
                       full_response, dequantized, params.addr_gen2_dq_scale);
 
-                  vector_fetch_2_data_out.Push(dequantized);
+                  vector_fetch_2_data.Push(dequantized);
 
                   if (loop_counters[1][2] >=
                       loop_ends[1][2] - loop_steps[1][2]) {
