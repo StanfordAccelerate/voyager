@@ -4,7 +4,7 @@
 #include <systemc.h>
 
 #include "DoubleBuffer.h"
-#include "DualPortDoubleBuffer.h"
+#include "DualPortBuffer.h"
 #include "InputController.h"
 #include "InputScaleController.h"
 #include "MatrixProcessor.h"
@@ -22,6 +22,12 @@ SC_MODULE(MatrixUnit) {
   typedef ac_int<SCALE_PORT_WIDTH, false> SCALE_PORT_TYPE;
 #else
   static constexpr int PARAMS_MODULE_COUNT = 3;
+#endif
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+  static constexpr int ACCUM_BUFFER_BANKS = 2;
+#else
+  static constexpr int ACCUM_BUFFER_BANKS = 1;
 #endif
 
   MatrixParamsRouter<PARAMS_MODULE_COUNT> CCS_INIT_S1(paramsRouter);
@@ -95,25 +101,25 @@ SC_MODULE(MatrixUnit) {
       weightScaleFromBuffer);
 #endif
 
-  MatrixProcessor<InputTypeList, WeightTypeList, SA_INPUT_TYPE,
-                  SA_WEIGHT_TYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                  SCALE_DATATYPE, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
+  MatrixProcessor<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
+                  ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
+                  IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
-
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
       CCS_INIT_S1(biasToSystolicArray);
 
-  DualPortDoubleBuffer<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>,
-                       ACCUM_BUFFER_SIZE>
+  DualPortBuffer<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>, ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(accumulation_buffer);
   Connections::Combinational<ac_int<16, false>>
-      accumulation_buffer_mu_read_address[2];
+      accumulation_buffer_mu_read_address[ACCUM_BUFFER_BANKS];
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
-      accumulation_buffer_mu_read_data[2];
+      accumulation_buffer_mu_read_data[ACCUM_BUFFER_BANKS];
   Connections::Combinational<
       BufferWriteRequest<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>>
-      accumulation_buffer_mu_write_request[2];
-  Connections::SyncChannel accumulation_buffer_mu_done[2];
+      accumulation_buffer_mu_write_request[ACCUM_BUFFER_BANKS];
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+  Connections::SyncChannel accumulation_buffer_mu_done[ACCUM_BUFFER_BANKS];
 
   Connections::In<ac_int<16, false>> accumulation_buffer_vu_read_address[2];
   Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
@@ -122,6 +128,10 @@ SC_MODULE(MatrixUnit) {
       BufferWriteRequest<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>>
       accumulation_buffer_vu_write_request[2];
   Connections::SyncIn accumulation_buffer_vu_done[2];
+#endif
+
+  Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      matrixUnitOutputChannel;
 
   Connections::SyncOut CCS_INIT_S1(startSignal);
   Connections::SyncOut CCS_INIT_S1(doneSignal);
@@ -220,30 +230,37 @@ SC_MODULE(MatrixUnit) {
     matrixProcessor.startSignal(startSignal);
     matrixProcessor.doneSignal(doneSignal);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < ACCUM_BUFFER_BANKS; i++) {
       matrixProcessor.accumulation_buffer_read_address[i](
           accumulation_buffer_mu_read_address[i]);
       matrixProcessor.accumulation_buffer_read_data[i](
           accumulation_buffer_mu_read_data[i]);
       matrixProcessor.accumulation_buffer_write_request[i](
           accumulation_buffer_mu_write_request[i]);
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
       matrixProcessor.accumulation_buffer_done[i](
           accumulation_buffer_mu_done[i]);
+#endif
     }
+
+    matrixProcessor.matrixUnitOutputChannel(matrixUnitOutputChannel);
 
     accumulation_buffer.clk(clk);
     accumulation_buffer.rstn(rstn);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < ACCUM_BUFFER_BANKS; i++) {
       accumulation_buffer.read_address[i * 2](
           accumulation_buffer_mu_read_address[i]);
       accumulation_buffer.read_data[i * 2](accumulation_buffer_mu_read_data[i]);
       accumulation_buffer.write_request[i * 2](
           accumulation_buffer_mu_write_request[i]);
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
       accumulation_buffer.done[i * 2](accumulation_buffer_mu_done[i]);
+#endif
     }
 
-    for (int i = 0; i < 2; i++) {
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+    for (int i = 0; i < ACCUM_BUFFER_BANKS; i++) {
       accumulation_buffer.read_address[i * 2 + 1](
           accumulation_buffer_vu_read_address[i]);
       accumulation_buffer.read_data[i * 2 + 1](
@@ -252,6 +269,7 @@ SC_MODULE(MatrixUnit) {
           accumulation_buffer_vu_write_request[i]);
       accumulation_buffer.done[i * 2 + 1](accumulation_buffer_vu_done[i]);
     }
+#endif
 
 #if SUPPORT_MX
     matrixProcessor.inputScaleChannel(inputScaleFromBuffer);

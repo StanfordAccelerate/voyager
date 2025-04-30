@@ -1,13 +1,6 @@
 .DEFAULT_GOAL := TestRunner
 
-# Build folder format is build/DATATYPE_DIMENSIONxDIMENSION
 export PROJ_ROOT = $(shell pwd)
-# TODO: buffer size info is not in the build dir name currently
-BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)
-CC_BUILD_DIR = $(BUILD_DIR)/cc
-ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
-# Create build dirs automatically
-$(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 # Compilers are different on different machines
 CC := $(CATAPULT_ROOT)/bin/g++
@@ -73,6 +66,12 @@ else
 	override BASE_FLAGS += -DACCUM_BUFFER_SIZE=$(ACCUM_BUFFER_SIZE)
 endif
 
+ifndef DOUBLE_BUFFERED_ACCUM_BUFFER
+	export DOUBLE_BUFFERED_ACCUM_BUFFER = false
+else
+	override BASE_FLAGS += -DDOUBLE_BUFFERED_ACCUM_BUFFER=$(DOUBLE_BUFFERED_ACCUM_BUFFER)
+endif
+
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG -g -O0 -ggdb
 else
@@ -86,6 +85,15 @@ LDFLAGS += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_
 LDLIBS += -L$(CATAPULT_ROOT)/shared/lib/ -L$(CONDA_PREFIX)/lib
 LDFLAGS_NO_SYSC += -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
+
+###########################################################
+# Build Directories
+###########################################################
+BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)
+CC_BUILD_DIR = $(BUILD_DIR)/cc
+ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
+# Create build dirs automatically
+$(info $(shell mkdir -p $(ALL_BUILD_DIRS)))
 
 ###########################################################
 # spdlog
@@ -295,7 +303,7 @@ $(CC_BUILD_DIR)/tiling.pb.o: test/compiler/proto/tiling.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 .PHONY: network-proto
-network-proto: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/model.txt test/compiler/proto/param.pb.cc test/compiler/proto/tiling_pb2.py test/compiler/proto/tiling.pb.cc $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)/tilings.txtpb
+network-proto: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/model.txt test/compiler/proto/param.pb.cc test/compiler/proto/tiling_pb2.py test/compiler/proto/tiling.pb.cc $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)/tilings.txtpb
 
 include codegen.mk
 

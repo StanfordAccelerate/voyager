@@ -136,6 +136,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -206,9 +208,6 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                 loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
               }
 
-// inner memory
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -398,6 +397,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
       ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -427,26 +428,9 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
               loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
             }
 
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              ac_int<32, false> total_writes;
-              if (!params.is_replication) {
-                total_writes =
-                    (loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-                     loop_bounds[1][3] * loop_bounds[1][4]) *
-                    loop_bounds[1][5];
-              } else {
-                total_writes =
-                    loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-                    loop_bounds[1][3] * loop_bounds[1][4] *
-                    ((STRIDE)*X0 / packingFactor +
-                     2 * boundaryWords);  // 2 extra writes for padding
-              }
-
-              // inner memory
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -661,11 +645,6 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              // inner memory
-              ac_int<32, false> total_reads =
-                  loop_bounds[1][0] * loop_bounds[1][1] * loop_bounds[1][2] *
-                  loop_bounds[1][3] * loop_bounds[1][4] * loop_bounds[1][5];
-
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -1175,6 +1154,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
           }
         }
       } else {  // passthrough
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
              loop_counters[0][0]++) {
           for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -1248,9 +1229,6 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                   loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
                 }
 
-// inner memory
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
                 for (loop_counters[1][0] = 0;
                      loop_counters[1][0] < loop_bounds[1][0];
                      loop_counters[1][0]++) {

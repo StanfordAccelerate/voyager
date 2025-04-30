@@ -36,6 +36,10 @@ SC_MODULE(Accelerator) {
   Connections::SyncOut CCS_INIT_S1(matrixUnitStartSignal);
   Connections::SyncOut CCS_INIT_S1(matrixUnitDoneSignal);
 
+  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      CCS_INIT_S1(matrixUnitOutput);
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::Combinational<ac_int<16, false>>
       accumulation_buffer_vu_read_address[2];
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
@@ -44,6 +48,7 @@ SC_MODULE(Accelerator) {
       BufferWriteRequest<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>>
       accumulation_buffer_vu_write_request[2];
   Connections::SyncChannel accumulation_buffer_vu_done[2];
+#endif
 
 #ifdef SIM_VectorUnit
   // clang-format off
@@ -94,7 +99,9 @@ SC_MODULE(Accelerator) {
     matrixUnit.biasDataResponse(biasDataResponse);
     matrixUnit.startSignal(matrixUnitStartSignal);
     matrixUnit.doneSignal(matrixUnitDoneSignal);
+    matrixUnit.matrixUnitOutputChannel(matrixUnitOutput);
 
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
     for (int i = 0; i < 2; i++) {
       matrixUnit.accumulation_buffer_vu_read_address[i](
           accumulation_buffer_vu_read_address[i]);
@@ -104,6 +111,7 @@ SC_MODULE(Accelerator) {
           accumulation_buffer_vu_write_request[i]);
       matrixUnit.accumulation_buffer_vu_done[i](accumulation_buffer_vu_done[i]);
     }
+#endif
 
 #if SUPPORT_MX
     matrixUnit.inputScaleAddressRequest(inputScaleAddressRequest);
@@ -129,7 +137,9 @@ SC_MODULE(Accelerator) {
     vector_unit.scale_address_out(scalar_output_address);
     vector_unit.start(vectorUnitStartSignal);
     vector_unit.done(vectorUnitDoneSignal);
+    vector_unit.matrixUnitOutput(matrixUnitOutput);
 
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
     for (int i = 0; i < 2; i++) {
       vector_unit.accumulation_buffer_read_address[i](
           accumulation_buffer_vu_read_address[i]);
@@ -139,6 +149,7 @@ SC_MODULE(Accelerator) {
           accumulation_buffer_vu_write_request[i]);
       vector_unit.accumulation_buffer_done[i](accumulation_buffer_vu_done[i]);
     }
+#endif
 
     SC_THREAD(run);
     sensitive << clk.pos();

@@ -149,6 +149,10 @@ using F9 = StdFloat<3, 5>;
 // Common Constants
 // ================================================================
 
+#ifndef DOUBLE_BUFFERED_ACCUM_BUFFER
+#define DOUBLE_BUFFERED_ACCUM_BUFFER false
+#endif
+
 #ifndef IC_DIMENSION
 #error "No IC dimension specified!"
 #endif

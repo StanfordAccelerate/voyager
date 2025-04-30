@@ -42,7 +42,7 @@ proc pre_assembly {} {
 }
 
 proc pre_architect {} {
-  global TECHNOLOGY OC_DIMENSION INPUT_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_SIZE WEIGHT_BUFFER_WIDTH ACCUM_BUFFER_DATATYPE ACCUM_BUFFER_SIZE ACCUM_DATATYPE_WIDTH ACC_BUF_C_DATA_REP_NAME SUPPORT_MX
+  global TECHNOLOGY OC_DIMENSION INPUT_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_SIZE WEIGHT_BUFFER_WIDTH ACCUM_BUFFER_DATATYPE ACCUM_BUFFER_SIZE ACCUM_DATATYPE_WIDTH ACC_BUF_C_DATA_REP_NAME SUPPORT_MX DOUBLE_BUFFERED_ACCUM_BUFFER
 
   # Input double buffer
   set double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$INPUT_BUFFER_WIDTH>"
@@ -78,14 +78,19 @@ proc pre_architect {} {
     directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1Run/mem1Run/mem1 -WORD_WIDTH $scale_width
   }
 
-  set accumulation_buffer "DualPortDoubleBuffer<Pack1D<$ACCUM_BUFFER_DATATYPE,${OC_DIMENSION}UL>,$ACCUM_BUFFER_SIZE>"
+  set accumulation_buffer "DualPortBuffer<Pack1D<$ACCUM_BUFFER_DATATYPE,${OC_DIMENSION}UL>,$ACCUM_BUFFER_SIZE>"
   set accumulation_buffer_stripped [string map {" " ""} $accumulation_buffer]
   set memory_width [expr $OC_DIMENSION*$ACCUM_DATATYPE_WIDTH]
   directive set /Accelerator/$accumulation_buffer_stripped/bank0_run/bank0.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $memory_width
-  directive set /Accelerator/$accumulation_buffer_stripped/bank1_run/bank1.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $memory_width
+  if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
+    directive set /Accelerator/$accumulation_buffer_stripped/bank1_run/bank1.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $memory_width
+  }
 }
 
 proc pre_extract {} {
+  global DOUBLE_BUFFERED_ACCUM_BUFFER
   ignore_memory_precedences -from WRITE_BANK_0* -to READ_BANK_0*
-  ignore_memory_precedences -from WRITE_BANK_1* -to READ_BANK_1*
+  if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
+    ignore_memory_precedences -from WRITE_BANK_1* -to READ_BANK_1*
+  }
 }

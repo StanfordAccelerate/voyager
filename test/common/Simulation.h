@@ -21,7 +21,7 @@ class Simulation {
   void run();
   int check_outputs();
   void print_help();
-  void print_ideal_runtime(const codegen::Operation &op);
+  void print_ideal_runtime(const Operation op);
 
  protected:
   std::string model;

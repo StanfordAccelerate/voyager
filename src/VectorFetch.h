@@ -17,19 +17,20 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
 
-  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
-  Connections::SyncOut accumulation_buffer_done[2];
-
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_0_resp_in);
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_0_data_out);
 
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
   Connections::Out<BufferWriteRequest<Pack1D<BufferType, Width>>>
       accumulation_buffer_write_request[2];
   Connections::Out<Pack1D<BufferType, Width>> CCS_INIT_S1(
       accumulationBufferOutput);
+  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
+  Connections::SyncOut accumulation_buffer_done[2];
+#endif
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_1_resp_in);
@@ -83,10 +84,12 @@ SC_MODULE(VectorFetchUnit) {
   void fetch_address_0() {
     addr_gen0_params.ResetRead();
     vector_fetch_0_request_out.Reset();
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
     accumulation_buffer_read_address[0].Reset();
     accumulation_buffer_read_address[1].Reset();
     accumulation_buffer_done[0].Reset();
     accumulation_buffer_done[1].Reset();
+#endif
 
     bool accumulation_buffer_bank = 0;
 
@@ -279,6 +282,7 @@ SC_MODULE(VectorFetchUnit) {
                     }
 #endif
                   } else {
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
                     accumulation_buffer_read_address[accumulation_buffer_bank]
                         .Push(address);
                     if (switch_accumulation_buffer_bank) {
@@ -286,6 +290,7 @@ SC_MODULE(VectorFetchUnit) {
                           .SyncPush();
                       accumulation_buffer_bank = !accumulation_buffer_bank;
                     }
+#endif
                   }
 
                   if (loop_counters[1][2] >=
@@ -320,11 +325,14 @@ SC_MODULE(VectorFetchUnit) {
     data_resp_0_params.ResetRead();
     vector_fetch_0_resp_in.Reset();
     vector_fetch_0_data_out.Reset();
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
     accumulation_buffer_read_data[0].Reset();
     accumulation_buffer_read_data[1].Reset();
     accumulation_buffer_write_request[0].Reset();
     accumulation_buffer_write_request[1].Reset();
     accumulationBufferOutput.Reset();
+#endif
 
     bool accumulation_buffer_bank = 0;
 
@@ -421,6 +429,7 @@ SC_MODULE(VectorFetchUnit) {
           }
         }
       } else if (params.addr_gen0_mode == 3) {
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
         ac_int<11, false> Y1 =
             params.addr_gen0_loops[0][params.addr_gen0_y_loop_idx[0]];
         ac_int<11, false> X1 =
@@ -501,6 +510,7 @@ SC_MODULE(VectorFetchUnit) {
             break;
           }
         }
+#endif
       } else {
         // passthrough
         ac_int<32, false> num_writes = loop_ends[0][0] * loop_ends[0][1] *

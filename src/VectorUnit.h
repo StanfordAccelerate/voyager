@@ -20,8 +20,11 @@ SC_MODULE(VectorOpUnit) {
   Connections::In<VectorInstructions> CCS_INIT_S1(accumulation_inst_in);
   Connections::In<VectorInstructions> CCS_INIT_S1(reduction_inst_in);
 
+  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(matrixUnitOutput);
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(
       accumulationBufferOutput);
+#endif
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_0_data_in);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
@@ -85,7 +88,7 @@ SC_MODULE(VectorOpUnit) {
 
   void run_vector_ops() {
     vector_op_inst_in.Reset();
-    accumulationBufferOutput.Reset();
+    matrixUnitOutput.Reset();
     vector_fetch_0_data_in.Reset();
     vector_fetch_1_data_in.Reset();
     vector_fetch_2_data_in.Reset();
@@ -98,6 +101,10 @@ SC_MODULE(VectorOpUnit) {
     reduction_input.ResetWrite();
     reduction_output_0.ResetRead();
     reduction_output_1.ResetRead();
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+    accumulationBufferOutput.Reset();
+#endif
 
     wait();
 
@@ -120,7 +127,7 @@ SC_MODULE(VectorOpUnit) {
 
       if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
           inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
-        Pack1D<BufferType, Width> sa_output = accumulationBufferOutput.Pop();
+        Pack1D<BufferType, Width> sa_output = matrixUnitOutput.Pop();
 
         Pack1D<VectorType, Width> temp;
         if (inst.vdequantize) {
@@ -139,6 +146,32 @@ SC_MODULE(VectorOpUnit) {
           op0_src1 = temp;
         }
       }
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+      if (inst.vector_op0_src0 ==
+              VectorInstructions::from_accumulation_buffer ||
+          inst.vector_op0_src1 ==
+              VectorInstructions::from_accumulation_buffer) {
+        Pack1D<BufferType, Width> sa_output = accumulationBufferOutput.Pop();
+
+        Pack1D<VectorType, Width> temp;
+        if (inst.vdequantize) {
+          vdequantize<BufferType, VectorType, Width>(sa_output, temp,
+                                                     inst.vector_dq_scale);
+        } else {
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            temp[i] = sa_output[i];
+          }
+        }
+
+        if (inst.vector_op0_src0 ==
+            VectorInstructions::from_accumulation_buffer) {
+          op0_src0 = temp;
+        } else {
+          op0_src1 = temp;
+        }
+      }
+#endif
 
       if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0 ||
           inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_0) {
@@ -434,6 +467,7 @@ SC_MODULE(VectorUnit) {
 
   VectorParamsDeserializer CCS_INIT_S1(param_deserializer);
 
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
   Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
   Connections::SyncOut accumulation_buffer_done[2];
@@ -441,6 +475,10 @@ SC_MODULE(VectorUnit) {
       accumulation_buffer_write_request[2];
   Connections::Combinational<Pack1D<BufferType, Width>>
       accumulationBufferOutput;
+#endif
+
+  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(matrixUnitOutput);
+
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vector_params);
   Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
@@ -507,6 +545,7 @@ SC_MODULE(VectorUnit) {
     vector_fetcher.clk(clk);
     vector_fetcher.rstn(rstn);
     vector_fetcher.params_in(vector_fetch_params);
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
     vector_fetcher.accumulation_buffer_read_address[0](
         accumulation_buffer_read_address[0]);
     vector_fetcher.accumulation_buffer_read_address[1](
@@ -522,6 +561,7 @@ SC_MODULE(VectorUnit) {
         accumulation_buffer_write_request[0]);
     vector_fetcher.accumulation_buffer_write_request[1](
         accumulation_buffer_write_request[1]);
+#endif
     vector_fetcher.vector_fetch_0_request_out(vector_fetch_0_request_out);
     vector_fetcher.vector_fetch_0_resp_in(vector_fetch_0_response_in);
     vector_fetcher.vector_fetch_0_data_out(vector_fetch_0_data);
@@ -537,7 +577,10 @@ SC_MODULE(VectorUnit) {
     vector_op_unit.vector_op_inst_in(vector_op_insts);
     vector_op_unit.accumulation_inst_in(accumulation_insts);
     vector_op_unit.reduction_inst_in(reduction_insts);
+    vector_op_unit.matrixUnitOutput(matrixUnitOutput);
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
     vector_op_unit.accumulationBufferOutput(accumulationBufferOutput);
+#endif
     vector_op_unit.vector_fetch_0_data_in(vector_fetch_0_data);
     vector_op_unit.vector_fetch_1_data_in(vector_fetch_1_data);
     vector_op_unit.vector_fetch_2_data_in(vector_fetch_2_data);

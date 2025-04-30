@@ -71,6 +71,7 @@ struct MatrixParams : BaseParams {
     is_replication = false;
     has_attn_output_permute = false;
     is_mx_op = false;
+    write_output_to_accum_buffer = false;
   }
 #endif
 
@@ -118,11 +119,12 @@ struct MatrixParams : BaseParams {
   bool is_replication;
   bool has_attn_output_permute;
   bool is_mx_op;
+  bool write_output_to_accum_buffer;
 
   static const unsigned int base_width =
       5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
       19 * 3 /* Loop indices */ + 2 /* stride */ + 8 /* Head Size */ +
-      8 * 1 /* Bools */;
+      9 * 1 /* Bools */;
 
   static const unsigned int extra_width =
       2 * DTYPE_INDEX_WIDTH + NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
@@ -199,6 +201,7 @@ struct MatrixParams : BaseParams {
     m & is_replication;
     m & has_attn_output_permute;
     m & is_mx_op;
+    m & write_output_to_accum_buffer;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,
@@ -288,6 +291,8 @@ struct MatrixParams : BaseParams {
     os << "has_attn_output_permute: " << params.has_attn_output_permute
        << std::endl;
     os << "is_mx_op: " << params.is_mx_op << std::endl;
+    os << "write_output_to_accum_buffer: "
+       << params.write_output_to_accum_buffer << std::endl;
     return os;
   }
 
@@ -404,15 +409,16 @@ struct VectorInstructions {
   ac_int<4, false> vector_op3_src1;
 
   static const unsigned int from_matrix_unit = 1;
-  static const unsigned int from_vector_fetch_0 = 2;
-  static const unsigned int from_vector_fetch_1 = 3;
-  static const unsigned int from_vector_fetch_2 = 4;
-  static const unsigned int from_accumulation = 5;
-  static const unsigned int from_reduction_0 = 6;
-  static const unsigned int from_reduction_1 = 7;
-  static const unsigned int from_immediate_0 = 8;
-  static const unsigned int from_immediate_1 = 9;
-  static const unsigned int from_immediate_2 = 10;
+  static const unsigned int from_accumulation_buffer = 2;
+  static const unsigned int from_vector_fetch_0 = 3;
+  static const unsigned int from_vector_fetch_1 = 4;
+  static const unsigned int from_vector_fetch_2 = 5;
+  static const unsigned int from_accumulation = 6;
+  static const unsigned int from_reduction_0 = 7;
+  static const unsigned int from_reduction_1 = 8;
+  static const unsigned int from_immediate_0 = 9;
+  static const unsigned int from_immediate_1 = 10;
+  static const unsigned int from_immediate_2 = 11;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
