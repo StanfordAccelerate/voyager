@@ -30,10 +30,9 @@ SC_MODULE(MatrixUnit) {
   static constexpr int ACCUM_BUFFER_BANKS = 1;
 #endif
 
-  MatrixParamsRouter<PARAMS_MODULE_COUNT> CCS_INIT_S1(paramsRouter);
+  MatrixParamsDeserializer<PARAMS_MODULE_COUNT> CCS_INIT_S1(paramsDeserializer);
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serialMatrixParamsIn);
-  Connections::Combinational<ac_int<64, false>>
-      serialMatrixParams[PARAMS_MODULE_COUNT];
+  Connections::Combinational<MatrixParams> matrixParams[PARAMS_MODULE_COUNT];
 
   InputController<InputTypeList, IC_DIMENSION, IC_PORT_WIDTH,
                   INPUT_BUFFER_WIDTH>
@@ -137,18 +136,18 @@ SC_MODULE(MatrixUnit) {
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
   SC_CTOR(MatrixUnit) {
-    paramsRouter.clk(clk);
-    paramsRouter.rstn(rstn);
-    paramsRouter.serialParamsIn(serialMatrixParamsIn);
+    paramsDeserializer.clk(clk);
+    paramsDeserializer.rstn(rstn);
+    paramsDeserializer.serialParamsIn(serialMatrixParamsIn);
     for (int i = 0; i < PARAMS_MODULE_COUNT; i++) {
-      paramsRouter.serialMatrixParams[i](serialMatrixParams[i]);
+      paramsDeserializer.paramsOut[i](matrixParams[i]);
     }
 
     inputController.clk(clk);
     inputController.rstn(rstn);
     inputController.addressRequest(inputAddressRequest);
     inputController.dataResponse(inputDataResponse);
-    inputController.serialParamsIn(serialMatrixParams[0]);
+    inputController.paramsIn(matrixParams[0]);
     inputController.windowBufferIn(inputsToWindowBuffer);
     inputController.windowBufferOut(inputsFromBuffer);
 
@@ -168,7 +167,7 @@ SC_MODULE(MatrixUnit) {
     inputScaleController.rstn(rstn);
     inputScaleController.addressRequest(inputScaleAddressRequest);
     inputScaleController.dataResponse(inputScaleDataResponse);
-    inputScaleController.serialParamsIn(serialMatrixParams[3]);
+    inputScaleController.paramsIn(matrixParams[3]);
 
     inputScaleBuffer.clk(clk);
     inputScaleBuffer.rstn(rstn);
@@ -186,7 +185,7 @@ SC_MODULE(MatrixUnit) {
     weightController.rstn(rstn);
     weightController.addressRequest(weightAddressRequest);
     weightController.dataResponse(weightDataResponse);
-    weightController.serialParamsIn(serialMatrixParams[1]);
+    weightController.paramsIn(matrixParams[1]);
     weightController.biasAddressRequest(biasAddressRequest);
     weightController.biasDataResponse(biasDataResponse);
     weightController.biasToSystolicArray(biasToSystolicArray);
@@ -207,7 +206,7 @@ SC_MODULE(MatrixUnit) {
     weightScaleController.rstn(rstn);
     weightScaleController.addressRequest(weightScaleAddressRequest);
     weightScaleController.dataResponse(weightScaleDataResponse);
-    weightScaleController.serialParamsIn(serialMatrixParams[4]);
+    weightScaleController.paramsIn(matrixParams[4]);
 
     weightScaleBuffer.clk(clk);
     weightScaleBuffer.rstn(rstn);
@@ -226,7 +225,7 @@ SC_MODULE(MatrixUnit) {
     matrixProcessor.inputsChannel(inputsFromBuffer);
     matrixProcessor.weightsChannel(weightsFromBuffer);
     matrixProcessor.biasChannel(biasToSystolicArray);
-    matrixProcessor.serialParamsIn(serialMatrixParams[2]);
+    matrixProcessor.paramsIn(matrixParams[2]);
     matrixProcessor.startSignal(startSignal);
     matrixProcessor.doneSignal(doneSignal);
 

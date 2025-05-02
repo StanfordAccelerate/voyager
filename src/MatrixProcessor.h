@@ -34,8 +34,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   SystolicArray<Input, Weight, Psum, NRows, NCols> CCS_INIT_S1(systolicArray);
 
-  MatrixParamsDeserializer<1> CCS_INIT_S1(paramsDeserializer);
-
   static constexpr int int_log2(unsigned int n) {
     return (n <= 1) ? 0 : 1 + int_log2(n / 2);
   }
@@ -70,8 +68,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   Connections::SyncOut accumulation_buffer_done[ACCUM_BUFFER_BANKS];
 #endif
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(push_weights_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(
       accumulation_buffer_params);
@@ -91,11 +88,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   Connections::SyncOut CCS_INIT_S1(doneSignal);
 
   SC_CTOR(MatrixProcessor) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.paramsOut(paramsIn);
-
     inputSkewer.clk(clk);
     inputSkewer.rstn(rstn);
     inputSkewer.din(inputSkewerDin);
@@ -250,7 +242,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   }
 
   void push_inputs() {
-    paramsIn.ResetRead();
+    paramsIn.Reset();
     inputsChannel.Reset();
     psumOutSkewerDout.ResetRead();
     push_weights_params.ResetWrite();

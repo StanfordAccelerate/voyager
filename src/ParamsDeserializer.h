@@ -26,16 +26,13 @@ T getSerializedParams(Connections::In<ac_int<64, false>> &serialParamsIn) {
   return BitsToType<T>(serializedParamsLV);
 }
 
-// stupid trick to uniquify it
-// otherwise, this module ends up repeated for each subblock in the final top
-// RTL
-template <int id>
+template <int MODULE_COUNT>
 SC_MODULE(MatrixParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-  Connections::Out<MatrixParams> CCS_INIT_S1(paramsOut);
+  Connections::Out<MatrixParams> paramsOut[MODULE_COUNT];
 
   SC_CTOR(MatrixParamsDeserializer) {
     SC_THREAD(run);
@@ -45,7 +42,10 @@ SC_MODULE(MatrixParamsDeserializer) {
 
   void run() {
     serialParamsIn.Reset();
-    paramsOut.Reset();
+
+    for (int i = 0; i < MODULE_COUNT; i++) {
+      paramsOut[i].Reset();
+    }
 
     wait();
 
@@ -53,18 +53,15 @@ SC_MODULE(MatrixParamsDeserializer) {
       MatrixParams params =
           getSerializedParams<MatrixParams, 64>(serialParamsIn);
 
-// This module gets instantiated 3 times:
-// inputController, weightController, matrixProcessor
-// But we only want to see the print once
 #ifndef __SYNTHESIS__
-      if (static_cast<std::string>(name()).find("matrixProcessor") !=
-          std::string::npos) {
-        std::ostringstream oss;
-        oss << "Matrix Params: " << std::endl << params << std::endl;
-        spdlog::debug(oss.str());
-      }
+      std::ostringstream oss;
+      oss << "Matrix Params: " << std::endl << params << std::endl;
+      spdlog::debug(oss.str());
 #endif
-      paramsOut.Push(params);
+
+      for (int i = 0; i < MODULE_COUNT; i++) {
+        paramsOut[i].Push(params);
+      }
     }
   }
 };
@@ -113,38 +110,6 @@ SC_MODULE(VectorParamsDeserializer) {
 #endif
 
       vectorInstructionsOut.Push(vectorInstructionConfig);
-    }
-  }
-};
-
-template <int MODULE_COUNT>
-SC_MODULE(MatrixParamsRouter) {
-  sc_in<bool> CCS_INIT_S1(clk);
-  sc_in<bool> CCS_INIT_S1(rstn);
-
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-  Connections::Out<ac_int<64, false>> serialMatrixParams[MODULE_COUNT];
-
-  SC_CTOR(MatrixParamsRouter) {
-    SC_THREAD(run);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-  }
-
-  void run() {
-    serialParamsIn.Reset();
-    for (int i = 0; i < MODULE_COUNT; i++) {
-      serialMatrixParams[i].Reset();
-    }
-
-    wait();
-    while (true) {
-      // Matrix Params
-      ac_int<64, false> serialParam = serialParamsIn.Pop();
-#pragma hls_unroll yes
-      for (int i = 0; i < MODULE_COUNT; i++) {
-        serialMatrixParams[i].Push(serialParam);
-      }
     }
   }
 };

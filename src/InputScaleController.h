@@ -11,8 +11,6 @@ SC_MODULE(InputScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(dataResponse);
 
@@ -20,21 +18,14 @@ SC_MODULE(InputScaleController) {
       writeRequest[2];
   Connections::Out<BufferReadRequest> readAddress[2];
 
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
 
-  MatrixParamsDeserializer<3> CCS_INIT_S1(paramsDeserializer);
-
   static constexpr int LOOP_WIDTH = 10;
 
   SC_CTOR(InputScaleController) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.paramsOut(paramsIn);
-
     SC_THREAD(read_params);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -672,7 +663,7 @@ SC_MODULE(InputScaleController) {
   }
 
   void read_params() {
-    paramsIn.ResetRead();
+    paramsIn.Reset();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();

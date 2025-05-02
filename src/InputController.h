@@ -17,8 +17,6 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(dataResponse);
 
@@ -29,7 +27,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   Connections::In<ac_int<BufferWidth, false>> CCS_INIT_S1(windowBufferIn);
   Connections::Out<ac_int<BufferWidth, false>> CCS_INIT_S1(windowBufferOut);
 
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
@@ -38,17 +36,10 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
   Connections::Combinational<ac_int<BufferWidth, false>> transposeOut;
 
-  MatrixParamsDeserializer<0> CCS_INIT_S1(paramsDeserializer);
-
   static constexpr int LOOP_WIDTH = 10;
   static constexpr int DATA_WIDTH = BufferWidth / NRows;
 
   SC_CTOR(InputController) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.paramsOut(paramsIn);
-
     SC_THREAD(read_params);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -1309,7 +1300,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   }
 
   void read_params() {
-    paramsIn.ResetRead();
+    paramsIn.Reset();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();

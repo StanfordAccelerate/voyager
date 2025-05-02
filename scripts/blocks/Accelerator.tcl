@@ -8,6 +8,7 @@ proc pre_compile {} {
     "WeightController<WeightTypeList, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $OC_PORT_WIDTH, $WEIGHT_BUFFER_WIDTH>" \
     "MatrixProcessor<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>" \
     "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>" \
+    "MatrixParamsDeserializer<[expr {$SUPPORT_MX ? 5 : 3}]>" \
   ] {
     solution design set $mapped_block -mapped
   }
@@ -17,6 +18,7 @@ proc pre_libraries {} {
   solution library add {[Block] InputController.v1}
   solution library add {[Block] MatrixProcessor.v1}
   solution library add {[Block] VectorUnit.v1}
+  solution library add {[Block] MatrixParamsDeserializer.v1}
   solution library add {[Block] WeightController.v1}
 }
 
@@ -35,10 +37,14 @@ proc pre_assembly {} {
   set VectorUnitBlock "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>"
   set VectorUnitBlock_stripped [string map {" " ""} $VectorUnitBlock]
 
+  set MatrixParamsDeserializerBlock "MatrixParamsDeserializer<[expr {$SUPPORT_MX ? 5 : 3}]>"
+  set MatrixParamsDeserializerBlock_stripped [string map {" " ""} $MatrixParamsDeserializerBlock]
+
   directive set /Accelerator/$InputControllerBlock_stripped -MAP_TO_MODULE {[Block] InputController.v1}
   directive set /Accelerator/$WeightControllerBlock_stripped -MAP_TO_MODULE {[Block] WeightController.v1}
   directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
   directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
+  directive set /Accelerator/$MatrixParamsDeserializerBlock_stripped -MAP_TO_MODULE {[Block] MatrixParamsDeserializer.v1}
 }
 
 proc pre_architect {} {
