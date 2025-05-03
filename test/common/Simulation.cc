@@ -120,7 +120,7 @@ void Simulation::load_data() {
 
     for (const auto& tensor : network->model.parameters()) {
       bool transpose_weight = true;
-#if !SUPPORT_SIMD_MATRIX_UNIT
+#if !SUPPORT_MVM
       transpose_weight =
           tensor.shape(0) != num_classes &&
           tensor.node().find("_param_constant") != std::string::npos;

@@ -392,8 +392,15 @@ SC_MODULE(VectorFetchUnit) {
 #endif
 
                     Pack1D<VectorType, Width> dequantized;
+#if !SUPPORT_MX
                     vdequantize<VectorType, VectorType, Width>(
                         full_response, dequantized, params.addr_gen0_dq_scale);
+#else
+#pragma hls_unroll yes
+                    for (int i = 0; i < Width; i++) {
+                      dequantized[i] = full_response[i];
+                    }
+#endif
 
                     // We may not use all the data in the response
 #pragma hls_unroll yes
@@ -523,8 +530,15 @@ SC_MODULE(VectorFetchUnit) {
 #endif
 
           Pack1D<VectorType, Width> dequantized;
+#if !SUPPORT_MX
           vdequantize<VectorType, VectorType, Width>(full_response, dequantized,
                                                      params.addr_gen0_dq_scale);
+#else
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            dequantized[i] = full_response[i];
+          }
+#endif
 
           vector_fetch_0_data.Push(dequantized);
         }
@@ -727,8 +741,15 @@ SC_MODULE(VectorFetchUnit) {
 #endif
 
                   Pack1D<VectorType, Width> dequantized;
+#if !SUPPORT_MX
                   vdequantize<VectorType, VectorType, Width>(
                       full_response, dequantized, params.addr_gen1_dq_scale);
+#else
+#pragma hls_unroll yes
+                  for (int i = 0; i < Width; i++) {
+                    dequantized[i] = full_response[i];
+                  }
+#endif
 
                   vector_fetch_1_data.Push(dequantized);
 
@@ -955,8 +976,15 @@ SC_MODULE(VectorFetchUnit) {
 #endif
 
                   Pack1D<VectorType, Width> dequantized;
+#if !SUPPORT_MX
                   vdequantize<VectorType, VectorType, Width>(
                       full_response, dequantized, params.addr_gen2_dq_scale);
+#else
+#pragma hls_unroll yes
+                  for (int i = 0; i < Width; i++) {
+                    dequantized[i] = full_response[i];
+                  }
+#endif
 
                   vector_fetch_2_data.Push(dequantized);
 

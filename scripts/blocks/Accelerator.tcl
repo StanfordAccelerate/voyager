@@ -11,6 +11,9 @@ proc pre_compile {} {
   ] {
     solution design set $mapped_block -mapped
   }
+  if {$SUPPORT_MVM == true} {
+    solution design set "MatrixVectorUnit<nputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>" -mapped
+  }
 }
 
 proc pre_libraries {} {
@@ -18,6 +21,9 @@ proc pre_libraries {} {
   solution library add {[Block] MatrixProcessor.v1}
   solution library add {[Block] VectorUnit.v1}
   solution library add {[Block] WeightController.v1}
+  if {$SUPPORT_MVM == true} {
+    solution library add {[Block] MatrixVectorUnit.v1}
+  }
 }
 
 proc pre_assembly {} {
@@ -39,6 +45,12 @@ proc pre_assembly {} {
   directive set /Accelerator/$WeightControllerBlock_stripped -MAP_TO_MODULE {[Block] WeightController.v1}
   directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
   directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
+
+  if {$SUPPORT_MVM == true} {
+    set MatrixVectorUnitBlock "MatrixVectorUnit<nputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
+    set MatrixVectorUnitBlock_stripped [string map {" " ""} $MatrixVectorUnitBlock]
+    directive set /Accelerator/$MatrixVectorUnitBlock_stripped -MAP_TO_MODULE {[Block] MatrixVectorUnit.v1}
+  }
 }
 
 proc pre_architect {} {

@@ -10,13 +10,13 @@
 template <typename InputTypeTuple, typename WeightTypeTuple, typename Input,
           typename Weight, typename Psum, typename Output, typename Scale,
           int PortWidth, int W, int BS>
-struct SIMDMatrixUnit;
+struct MatrixVectorUnit;
 
 template <typename... InputTypes, typename... WeightTypes, typename Input,
           typename Weight, typename Psum, typename Output, typename Scale,
           int PortWidth, int W, int BS>
-struct SIMDMatrixUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
-                      Input, Weight, Psum, Output, Scale, PortWidth, W, BS>
+struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
+                        Input, Weight, Psum, Output, Scale, PortWidth, W, BS>
     : public sc_module {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -58,7 +58,7 @@ struct SIMDMatrixUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   Connections::SyncOut CCS_INIT_S1(start_signal);
   Connections::SyncOut CCS_INIT_S1(done_signal);
 
-  SC_CTOR(SIMDMatrixUnit) {
+  SC_CTOR(MatrixVectorUnit) {
     params_deserializer.clk(clk);
     params_deserializer.rstn(rstn);
     params_deserializer.serialParamsIn(serial_params_in);
@@ -381,7 +381,7 @@ struct SIMDMatrixUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       MatrixParams params = run_accumulation_param.Pop();
 
-      std::cerr << "SIMDMatrixUnit params: " << std::endl
+      std::cerr << "MatrixVectorUnit params: " << std::endl
                 << params << std::endl;
 
       start_signal.SyncPush();
@@ -390,11 +390,12 @@ struct SIMDMatrixUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       int K1 = params.loops[1][params.weightLoopIndex[1]];
       int C2 = params.loops[0][params.reductionLoopIndex[0]];
       int C1 = params.loops[1][params.reductionLoopIndex[1]];
-      int K = (K2 * K1 + W - 1) / W;
+      int K = K2 * K1;
+      int num_tiles = (K + W - 1) / W;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int k = 0; k < K; k++) {
+      for (int k = 0; k < num_tiles; k++) {
         // Set the outputs to biases if they exist
         Pack1D<Output, W> outputs;
         if (params.has_bias) {
@@ -455,12 +456,15 @@ struct SIMDMatrixUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
 #pragma hls_unroll yes
         for (int i = 0; i < num_blocks; i++) {
-          Pack1D<Output, BS> output_block;
+          ac_int<16, false> address = k * W + i * BS;
+          if (address < K) {
+            Pack1D<Output, BS> output_block;
 #pragma hls_unroll yes
-          for (int j = 0; j < BS; j++) {
-            output_block[j] = outputs[i * BS + j];
+            for (int j = 0; j < BS; j++) {
+              output_block[j] = outputs[i * BS + j];
+            }
+            matrix_out.Push(output_block);
           }
-          matrix_out.Push(output_block);
         }
       }
 

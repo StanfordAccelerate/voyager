@@ -110,7 +110,7 @@ std::vector<std::any> run_operation(const Operation &operation,
     int input_dim = get_size(input_shape) / input_shape.back();
     bool is_fc = input_dim == 1;
 
-#if !SUPPORT_SIMD_MATRIX_UNIT
+#if !SUPPORT_MVM
     if (!is_fc)
 #endif
     {
@@ -162,11 +162,12 @@ std::vector<std::any> run_operation(const Operation &operation,
     }
 
     if (is_fc) {
-#if SUPPORT_SIMD_MATRIX_UNIT
-      output_ptr = simd_matrix_vector_multiply<SaInput, SaWeight, Psum,
-                                               AccumBuffer, Scale, SIMD_WIDTH>(
-          input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
-          operation);
+#if SUPPORT_MVM
+      output_ptr =
+          simd_matrix_vector_multiply<SaInput, SaWeight, Psum, AccumBuffer,
+                                      Scale, MV_UNIT_WIDTH>(
+              input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr,
+              bias_ptr, operation);
 #else
       output_ptr = matrix_vector_multiply<Vector>(input_ptr, weight_ptr,
                                                   bias_ptr, get_shape(weight));

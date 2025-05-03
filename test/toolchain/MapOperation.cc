@@ -21,7 +21,7 @@ void MapOperation(const Operation &operation,
   if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
     const auto &input = first_op.kwargs().at("input").tensor();
 
-#if !SUPPORT_SIMD_MATRIX_UNIT
+#if !SUPPORT_MVM
     if (is_fc(first_op)) {
       MapMatrixVectorMultiply(param, mappedParams, opMemoryMaps);
 

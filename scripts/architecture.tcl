@@ -148,10 +148,8 @@ if { $DATATYPE == "P8_1" } {
   set SA_INPUT_TYPE "DataTypes::int6"
   set SA_WEIGHT_TYPE "DataTypes::int6"
 
-  set INPUT_DTYPE_WIDTH 6
-  set WEIGHT_DTYPE_WIDTH 6
-
   set SUPPORT_MX true
+  set SUPPORT_MVM true
 
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
 
@@ -169,6 +167,10 @@ if { $DATATYPE == "P8_1" } {
 
 if {![info exists SUPPORT_MX]} {
   set SUPPORT_MX false
+}
+
+if {![info exists SUPPORT_MVM]} {
+  set SUPPORT_MVM false
 }
 
 # ================================================================

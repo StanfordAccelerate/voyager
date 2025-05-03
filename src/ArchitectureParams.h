@@ -131,11 +131,11 @@ using F9 = StdFloat<3, 5>;
 #define IC_PORT_WIDTH (IC_DIMENSION * 4)
 #define OC_PORT_WIDTH (OC_DIMENSION * 4)
 
-#define SIMD_WIDTH 128
+#define MV_UNIT_WIDTH 128
 
 #define SUPPORT_MX true
 #define SUPPORT_CODEBOOK_QUANT true
-#define SUPPORT_SIMD_MATRIX_UNIT true
+#define SUPPORT_MVM true
 
 #elif defined(CFLOAT)
 
@@ -166,12 +166,12 @@ using F9 = StdFloat<3, 5>;
 #define SUPPORT_MX false
 #endif
 
-#ifndef SUPPORT_SIMD_MATRIX_UNIT
-#define SUPPORT_SIMD_MATRIX_UNIT false
+#ifndef SUPPORT_MVM
+#define SUPPORT_MVM false
 #endif
 
-#ifndef SIMD_WIDTH
-#define SIMD_WIDTH OC_DIMENSION
+#ifndef MV_UNIT_WIDTH
+#define MV_UNIT_WIDTH OC_DIMENSION
 #endif
 
 // ================================================================

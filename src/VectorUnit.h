@@ -22,8 +22,9 @@ SC_MODULE(VectorOpUnit) {
 
   Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(
       accumulation_buffer_output);
-#if SUPPORT_SIMD_MATRIX_UNIT
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(simd_matrix_unit_data);
+#if SUPPORT_MVM
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      matrix_vector_unit_data);
 #endif
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_0_data);
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_1_data);
@@ -86,8 +87,8 @@ SC_MODULE(VectorOpUnit) {
   void run_vector_ops() {
     vector_op_int.Reset();
     accumulation_buffer_output.Reset();
-#if SUPPORT_SIMD_MATRIX_UNIT
-    simd_matrix_unit_data.Reset();
+#if SUPPORT_MVM
+    matrix_vector_unit_data.Reset();
 #endif
     vector_fetch_0_data.Reset();
     vector_fetch_1_data.Reset();
@@ -143,11 +144,12 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
-#if SUPPORT_SIMD_MATRIX_UNIT
-      if (inst.vector_op0_src0 == VectorInstructions::from_simd_matrix_unit ||
-          inst.vector_op0_src1 == VectorInstructions::from_simd_matrix_unit) {
-        Pack1D<VectorType, Width> temp = simd_matrix_unit_data.Pop();
-        if (inst.vector_op0_src0 == VectorInstructions::from_simd_matrix_unit) {
+#if SUPPORT_MVM
+      if (inst.vector_op0_src0 == VectorInstructions::from_matrix_vector_unit ||
+          inst.vector_op0_src1 == VectorInstructions::from_matrix_vector_unit) {
+        Pack1D<VectorType, Width> temp = matrix_vector_unit_data.Pop();
+        if (inst.vector_op0_src0 ==
+            VectorInstructions::from_matrix_vector_unit) {
           op0_src0 = temp;
         } else {
           op0_src1 = temp;
@@ -457,8 +459,9 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<Pack1D<BufferType, Width>>
       accumulation_buffer_output;
 
-#if SUPPORT_SIMD_MATRIX_UNIT
-  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(simd_matrix_unit_data);
+#if SUPPORT_MVM
+  Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      matrix_vector_unit_data);
 #endif
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
@@ -557,8 +560,8 @@ SC_MODULE(VectorUnit) {
     vector_op_unit.accumulation_inst(accumulation_inst);
     vector_op_unit.reduction_inst(reduction_inst);
     vector_op_unit.accumulation_buffer_output(accumulation_buffer_output);
-#if SUPPORT_SIMD_MATRIX_UNIT
-    vector_op_unit.simd_matrix_unit_data(simd_matrix_unit_data);
+#if SUPPORT_MVM
+    vector_op_unit.matrix_vector_unit_data(matrix_vector_unit_data);
 #endif
     vector_op_unit.vector_fetch_0_data(vector_fetch_0_data);
     vector_op_unit.vector_fetch_1_data(vector_fetch_1_data);

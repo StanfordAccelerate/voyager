@@ -18,8 +18,8 @@ inline bool are_broadcastable(const std::vector<int> &shape1,
   return true;
 }
 
-inline std::vector<int> broadcast_shape(const std::vector<int> &shape1,
-                                        const std::vector<int> &shape2) {
+inline std::vector<int> broadcast_shape(std::vector<int> &shape1,
+                                        std::vector<int> &shape2) {
   if (!are_broadcastable(shape1, shape2)) {
     throw std::invalid_argument("Shapes are not broadcastable");
   }
@@ -35,7 +35,17 @@ inline std::vector<int> broadcast_shape(const std::vector<int> &shape1,
     result_shape[max_size - i] = std::max(dim1, dim2);
   }
 
-  return squeeze_shape(result_shape);
+  for (int i = max_size - 1; i >= 0; --i) {
+    if (result_shape[i] == 1) {
+      result_shape.erase(result_shape.begin() + i);
+      if (i >= max_size - n1)
+        shape1.erase(shape1.begin() + (i - (max_size - n1)));
+      if (i >= max_size - n2)
+        shape2.erase(shape2.begin() + (i - (max_size - n2)));
+    }
+  }
+
+  return result_shape;
 }
 
 void set_vector_addr_gen1(const codegen::Tensor &tensor,
@@ -52,7 +62,8 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_broadcast[i] = input_shape[i] == 1;
+    vector_params->addr_gen1_broadcast[i] =
+        input_shape[i] == 1 && output_shape[i] != 1;
   }
 
   vector_params->addr_gen1_dtype =
@@ -530,14 +541,12 @@ void MapVectorOperations(const codegen::Operation &param,
               factor_out_non_broadcastable_dim(input_shape, other_shape);
           input_shape = result.first;
           other_shape = result.second;
-
-          update_tensor_shape(self, input_shape);
-          update_tensor_shape(tensor, other_shape);
         }
 
-        auto tensor_to_load = tensor.has_memory() ? tensor : self;
         auto output_shape = broadcast_shape(input_shape, other_shape);
-        squeeze_front_ones(output_shape);
+        update_tensor_shape(self, input_shape);
+        update_tensor_shape(tensor, other_shape);
+        auto tensor_to_load = tensor.has_memory() ? tensor : self;
 
         if (stage == 0) {
           inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;

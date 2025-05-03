@@ -33,9 +33,17 @@ $(CODEGEN_DIR)/networks/bert/%/model.txt: quantized-training/test/test_codegen.p
 
 $(CODEGEN_DIR)/networks/llama_prefill/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate --mixed_precision &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode/%/model.txt: quantized-training/test/test_codegen.py
+	mkdir -p $(dir $@)
+	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate &> $(dir $@)codegen.log
+
+$(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt: quantized-training/test/test_codegen.py
+	mkdir -p $(dir $@)
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate --mixed_precision &> $(dir $@)codegen.log
+
+$(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 --remove_duplicate --mixed_precision &> $(dir $@)codegen.log
 

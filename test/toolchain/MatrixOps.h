@@ -492,7 +492,7 @@ void MapMatrixOperation(const Operation &operation,
   memset(&inst, 0, sizeof(inst));
   inst.op_type = VectorInstructions::vector;
   inst.vector_op0_src0 = matrix_params->is_fc
-                             ? VectorInstructions::from_simd_matrix_unit
+                             ? VectorInstructions::from_matrix_vector_unit
                              : VectorInstructions::from_matrix_unit;
   inst.vdest = VectorInstructions::to_output;
 

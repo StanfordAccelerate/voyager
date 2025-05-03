@@ -34,22 +34,22 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.weightDataResponse(weightDataResponse);
   accelerator.biasAddressRequest(biasAddressRequest);
   accelerator.biasDataResponse(biasDataResponse);
-#if SUPPORT_SIMD_MATRIX_UNIT
-  accelerator.serial_simd_matrix_params_in(serial_simd_matrix_params_in);
-  accelerator.simd_matrix_input_req(simd_matrix_input_req);
-  accelerator.simd_matrix_input_resp(simd_matrix_input_resp);
-  accelerator.simd_matrix_weight_req(simd_matrix_weight_req);
-  accelerator.simd_matrix_weight_resp(simd_matrix_weight_resp);
-  accelerator.simd_matrix_bias_req(simd_matrix_bias_req);
-  accelerator.simd_matrix_bias_resp(simd_matrix_bias_resp);
+#if SUPPORT_MVM
+  accelerator.serial_matrix_vector_params_in(serial_matrix_vector_params_in);
+  accelerator.matrix_vector_input_req(matrix_vector_input_req);
+  accelerator.matrix_vector_input_resp(matrix_vector_input_resp);
+  accelerator.matrix_vector_weight_req(matrix_vector_weight_req);
+  accelerator.matrix_vector_weight_resp(matrix_vector_weight_resp);
+  accelerator.matrix_vector_bias_req(matrix_vector_bias_req);
+  accelerator.matrix_vector_bias_resp(matrix_vector_bias_resp);
 #if SUPPORT_MX
-  accelerator.simd_matrix_input_scale_req(simd_matrix_input_scale_req);
-  accelerator.simd_matrix_input_scale_resp(simd_matrix_input_scale_resp);
-  accelerator.simd_matrix_weight_scale_req(simd_matrix_weight_scale_req);
-  accelerator.simd_matrix_weight_scale_resp(simd_matrix_weight_scale_resp);
+  accelerator.matrix_vector_input_scale_req(matrix_vector_input_scale_req);
+  accelerator.matrix_vector_input_scale_resp(matrix_vector_input_scale_resp);
+  accelerator.matrix_vector_weight_scale_req(matrix_vector_weight_scale_req);
+  accelerator.matrix_vector_weight_scale_resp(matrix_vector_weight_scale_resp);
 #endif
-  accelerator.simd_matrix_unit_start_signal(simd_matrix_unit_start_signal);
-  accelerator.simd_matrix_unit_done_signal(simd_matrix_unit_done_signal);
+  accelerator.matrix_vector_unit_start_signal(matrix_vector_unit_start_signal);
+  accelerator.matrix_vector_unit_done_signal(matrix_vector_unit_done_signal);
 #endif
   accelerator.vector_fetch_0_req(vector_fetch_0_req);
   accelerator.vector_fetch_0_resp(vector_fetch_0_resp);
@@ -122,7 +122,7 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-#if SUPPORT_SIMD_MATRIX_UNIT
+#if SUPPORT_MVM
   SC_THREAD(readRequestSIMDMatrixInput);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
@@ -337,50 +337,51 @@ void Harness::sendResponseBias() {
   sendMemoryResponse(&biasDataResponse_fifo, &biasDataResponse);
 }
 
-#if SUPPORT_SIMD_MATRIX_UNIT
+#if SUPPORT_MVM
 void Harness::readRequestSIMDMatrixInput() {
-  readMemoryRequest(&simd_matrix_input_req, &simd_matrix_input_resp_fifo);
+  readMemoryRequest(&matrix_vector_input_req, &matrix_vector_input_resp_fifo);
 }
 
 void Harness::sendResponseSIMDMatrixInput() {
-  sendMemoryResponse(&simd_matrix_input_resp_fifo, &simd_matrix_input_resp);
+  sendMemoryResponse(&matrix_vector_input_resp_fifo, &matrix_vector_input_resp);
 }
 
 void Harness::readRequestSIMDMatrixWeight() {
-  readMemoryRequest(&simd_matrix_weight_req, &simd_matrix_weight_resp_fifo);
+  readMemoryRequest(&matrix_vector_weight_req, &matrix_vector_weight_resp_fifo);
 }
 
 void Harness::sendResponseSIMDMatrixWeight() {
-  sendMemoryResponse(&simd_matrix_weight_resp_fifo, &simd_matrix_weight_resp);
+  sendMemoryResponse(&matrix_vector_weight_resp_fifo,
+                     &matrix_vector_weight_resp);
 }
 
 void Harness::readRequestSIMDMatrixBias() {
-  readMemoryRequest(&simd_matrix_bias_req, &simd_matrix_bias_resp_fifo);
+  readMemoryRequest(&matrix_vector_bias_req, &matrix_vector_bias_resp_fifo);
 }
 
 void Harness::sendResponseSIMDMatrixBias() {
-  sendMemoryResponse(&simd_matrix_bias_resp_fifo, &simd_matrix_bias_resp);
+  sendMemoryResponse(&matrix_vector_bias_resp_fifo, &matrix_vector_bias_resp);
 }
 
 #if SUPPORT_MX
 void Harness::readRequestSIMDMatrixInputScale() {
-  readMemoryRequest(&simd_matrix_input_scale_req,
-                    &simd_matrix_input_scale_resp_fifo);
+  readMemoryRequest(&matrix_vector_input_scale_req,
+                    &matrix_vector_input_scale_resp_fifo);
 }
 
 void Harness::sendResponseSIMDMatrixInputScale() {
-  sendMemoryResponse(&simd_matrix_input_scale_resp_fifo,
-                     &simd_matrix_input_scale_resp);
+  sendMemoryResponse(&matrix_vector_input_scale_resp_fifo,
+                     &matrix_vector_input_scale_resp);
 }
 
 void Harness::readRequestSIMDMatrixWeightScale() {
-  readMemoryRequest(&simd_matrix_weight_scale_req,
-                    &simd_matrix_weight_scale_resp_fifo);
+  readMemoryRequest(&matrix_vector_weight_scale_req,
+                    &matrix_vector_weight_scale_resp_fifo);
 }
 
 void Harness::sendResponseSIMDMatrixWeightScale() {
-  sendMemoryResponse(&simd_matrix_weight_scale_resp_fifo,
-                     &simd_matrix_weight_scale_resp);
+  sendMemoryResponse(&matrix_vector_weight_scale_resp_fifo,
+                     &matrix_vector_weight_scale_resp);
 }
 #endif
 #endif
@@ -459,10 +460,10 @@ void Harness::sendParams() {
   serialMatrixParamsIn.ResetWrite();
   serialVectorParamsIn.ResetWrite();
 
-#if SUPPORT_SIMD_MATRIX_UNIT
-  simd_matrix_unit_start_signal.ResetRead();
-  simd_matrix_unit_done_signal.ResetRead();
-  serial_simd_matrix_params_in.ResetWrite();
+#if SUPPORT_MVM
+  matrix_vector_unit_start_signal.ResetRead();
+  matrix_vector_unit_done_signal.ResetRead();
+  serial_matrix_vector_params_in.ResetWrite();
 #endif
 
   wait();
@@ -502,11 +503,11 @@ void Harness::sendParams() {
       }
 
       if (matrixParamsValid) {
-#if SUPPORT_SIMD_MATRIX_UNIT
+#if SUPPORT_MVM
         if (matrixParams->is_fc) {
-          sendSerializedParams<MatrixParams, 64>(*matrixParams,
-                                                 &serial_simd_matrix_params_in);
-          simd_matrix_unit_start_signal.SyncPop();
+          sendSerializedParams<MatrixParams, 64>(
+              *matrixParams, &serial_matrix_vector_params_in);
+          matrix_vector_unit_start_signal.SyncPop();
         } else
 #endif
         {
@@ -532,9 +533,9 @@ void Harness::sendParams() {
                                           << "' Started. -----");
 
       if (matrixParamsValid) {
-#if SUPPORT_SIMD_MATRIX_UNIT
+#if SUPPORT_MVM
         if (matrixParams->is_fc) {
-          simd_matrix_unit_done_signal.SyncPop();
+          matrix_vector_unit_done_signal.SyncPop();
         } else
 #endif
         {

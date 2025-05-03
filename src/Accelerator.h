@@ -6,7 +6,7 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 #include "MatrixUnit.h"
-#include "SIMDMatrixUnit.h"
+#include "MatrixVectorUnit.h"
 #include "VectorUnit.h"
 #include "mc_scverify.h"
 
@@ -46,37 +46,38 @@ SC_MODULE(Accelerator) {
       accumulation_buffer_vu_write_request[2];
   Connections::SyncChannel accumulation_buffer_vu_done[2];
 
-#if SUPPORT_SIMD_MATRIX_UNIT
-  SIMDMatrixUnit<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
-                 ACCUM_DATATYPE, VECTOR_DATATYPE, SCALE_DATATYPE, OC_PORT_WIDTH,
-                 SIMD_WIDTH, OC_DIMENSION>
-      CCS_INIT_S1(simd_matrix_unit);
+#if SUPPORT_MVM
+  MatrixVectorUnit<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
+                   ACCUM_DATATYPE, VECTOR_DATATYPE, SCALE_DATATYPE,
+                   OC_PORT_WIDTH, MV_UNIT_WIDTH, OC_DIMENSION>
+      CCS_INIT_S1(matrix_vector_unit);
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_simd_matrix_params_in);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(simd_matrix_input_req);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(simd_matrix_weight_req);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(simd_matrix_bias_req);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(
+      serial_matrix_vector_params_in);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_input_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_weight_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_bias_req);
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      simd_matrix_input_resp);
+      matrix_vector_input_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      simd_matrix_weight_resp);
+      matrix_vector_weight_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      simd_matrix_bias_resp);
+      matrix_vector_bias_resp);
 
 #if SUPPORT_MX
-  Connections::Out<MemoryRequest> CCS_INIT_S1(simd_matrix_input_scale_req);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(simd_matrix_weight_scale_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_input_scale_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_weight_scale_req);
 
-  Connections::In<ac_int<8, false>> CCS_INIT_S1(simd_matrix_input_scale_resp);
+  Connections::In<ac_int<8, false>> CCS_INIT_S1(matrix_vector_input_scale_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      simd_matrix_weight_scale_resp);
+      matrix_vector_weight_scale_resp);
 #endif
 
   Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>>
-      simd_matrix_unit_data;
-  Connections::SyncOut CCS_INIT_S1(simd_matrix_unit_start_signal);
-  Connections::SyncOut CCS_INIT_S1(simd_matrix_unit_done_signal);
+      matrix_vector_unit_data;
+  Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_start_signal);
+  Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_done_signal);
 #endif
 
   VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
@@ -140,27 +141,27 @@ SC_MODULE(Accelerator) {
     matrixUnit.weightScaleDataResponse(weightScaleDataResponse);
 #endif
 
-#if SUPPORT_SIMD_MATRIX_UNIT
-    simd_matrix_unit.clk(clk);
-    simd_matrix_unit.rstn(rstn);
-    simd_matrix_unit.serial_params_in(serial_simd_matrix_params_in);
-    simd_matrix_unit.input_req(simd_matrix_input_req);
-    simd_matrix_unit.input_resp(simd_matrix_input_resp);
-    simd_matrix_unit.weight_req(simd_matrix_weight_req);
-    simd_matrix_unit.weight_resp(simd_matrix_weight_resp);
-    simd_matrix_unit.bias_req(simd_matrix_bias_req);
-    simd_matrix_unit.bias_resp(simd_matrix_bias_resp);
+#if SUPPORT_MVM
+    matrix_vector_unit.clk(clk);
+    matrix_vector_unit.rstn(rstn);
+    matrix_vector_unit.serial_params_in(serial_matrix_vector_params_in);
+    matrix_vector_unit.input_req(matrix_vector_input_req);
+    matrix_vector_unit.input_resp(matrix_vector_input_resp);
+    matrix_vector_unit.weight_req(matrix_vector_weight_req);
+    matrix_vector_unit.weight_resp(matrix_vector_weight_resp);
+    matrix_vector_unit.bias_req(matrix_vector_bias_req);
+    matrix_vector_unit.bias_resp(matrix_vector_bias_resp);
 #if SUPPORT_MX
-    simd_matrix_unit.input_scale_req(simd_matrix_input_scale_req);
-    simd_matrix_unit.input_scale_resp(simd_matrix_input_scale_resp);
-    simd_matrix_unit.weight_scale_req(simd_matrix_weight_scale_req);
-    simd_matrix_unit.weight_scale_resp(simd_matrix_weight_scale_resp);
+    matrix_vector_unit.input_scale_req(matrix_vector_input_scale_req);
+    matrix_vector_unit.input_scale_resp(matrix_vector_input_scale_resp);
+    matrix_vector_unit.weight_scale_req(matrix_vector_weight_scale_req);
+    matrix_vector_unit.weight_scale_resp(matrix_vector_weight_scale_resp);
 #endif
-    simd_matrix_unit.matrix_out(simd_matrix_unit_data);
-    simd_matrix_unit.start_signal(simd_matrix_unit_start_signal);
-    simd_matrix_unit.done_signal(simd_matrix_unit_done_signal);
+    matrix_vector_unit.matrix_out(matrix_vector_unit_data);
+    matrix_vector_unit.start_signal(matrix_vector_unit_start_signal);
+    matrix_vector_unit.done_signal(matrix_vector_unit_done_signal);
 
-    vector_unit.simd_matrix_unit_data(simd_matrix_unit_data);
+    vector_unit.matrix_vector_unit_data(matrix_vector_unit_data);
 #endif
 
     vector_unit.clk(clk);

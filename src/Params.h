@@ -420,7 +420,7 @@ struct VectorInstructions {
   static const unsigned int from_immediate_0 = 8;
   static const unsigned int from_immediate_1 = 9;
   static const unsigned int from_immediate_2 = 10;
-  static const unsigned int from_simd_matrix_unit = 11;
+  static const unsigned int from_matrix_vector_unit = 11;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
