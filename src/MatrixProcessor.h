@@ -475,7 +475,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       ac_int<32, false> step = 0;
       ac_int<32, false> output_step = 0;
-      ac_int<32, false> last_output_step = 0;
+      ac_int<32, false> output_step_old = 0;
 
       // non_accumulating_tile_size is the number of inputs to send before we
       // start accumulating. For example, for a loop order of (C, K, FX, FY,
@@ -517,10 +517,10 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             loop_counters[1][params.fyIndex] != 0;
 
         stall_inputs = is_accumulating &&
-                       last_output_step < step - non_accumulating_tile_size + 2;
+                       output_step_old < step - non_accumulating_tile_size + 2;
 #endif
 
-        last_output_step = output_step;
+        output_step_old = output_step;
 
         // std::cerr << "step: " << step << std::endl;
         // std::cerr << "accum_step: " << accum_step << std::endl;

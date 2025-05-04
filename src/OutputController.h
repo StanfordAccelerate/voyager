@@ -65,9 +65,7 @@ SC_MODULE(OutputController) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      while (counter < num_outputs) {
-        counter++;
-
+      while (counter++ < num_outputs) {
 #if SUPPORT_MX
         if (params.quantize_output_mx) {
           ScaleType scale = scale_in.Pop();
