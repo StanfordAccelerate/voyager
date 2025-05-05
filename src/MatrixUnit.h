@@ -95,9 +95,9 @@ SC_MODULE(MatrixUnit) {
       weightScaleFromBuffer);
 #endif
 
-  MatrixProcessor<InputTypeList, WeightTypeList, SA_INPUT_TYPE,
-                  SA_WEIGHT_TYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
-                  SCALE_DATATYPE, IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
+  MatrixProcessor<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
+                  ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
+                  IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
       CCS_INIT_S1(matrixProcessor);
 
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>

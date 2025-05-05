@@ -97,13 +97,17 @@ SC_MODULE(Harness) {
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
       serial_matrix_vector_params_in);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_vector_input_req);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      matrix_vector_input_req);
   sc_fifo<OC_PORT_TYPE> matrix_vector_input_resp_fifo;
-  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(matrix_vector_input_resp);
+  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(
+      matrix_vector_input_resp);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_vector_weight_req);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      matrix_vector_weight_req);
   sc_fifo<OC_PORT_TYPE> matrix_vector_weight_resp_fifo;
-  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(matrix_vector_weight_resp);
+  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(
+      matrix_vector_weight_resp);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_vector_bias_req);
   sc_fifo<OC_PORT_TYPE> matrix_vector_bias_resp_fifo;
@@ -169,7 +173,11 @@ SC_MODULE(Harness) {
   AcceleratorMemoryMap currentMemoryMap;
   AccessCounter *accessCounter;
 
+#ifdef SIM_Accelerator
+  CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);
+#else
   Accelerator CCS_INIT_S1(accelerator);
+#endif
 
   template <int Width>
   void readMemoryRequest(
