@@ -46,7 +46,7 @@ def dump_imagenet(data_dir, output_dir, num_samples):
 
         dir_name = os.path.join(output_dir, f"{label}_{class_id}_{image_id}")
         os.makedirs(dir_name, exist_ok=True)
-        write_tensor_to_file(image, os.path.join(dir_name, "arg0_1.bin"))
+        write_tensor_to_file(image, os.path.join(dir_name, "x.bin"))
 
 
 def main():
