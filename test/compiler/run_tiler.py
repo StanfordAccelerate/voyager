@@ -8,8 +8,9 @@ from proto import tiling_pb2
 
 
 class RuntimeCalculator:
-    def __init__(self, operation):
+    def __init__(self, operation, double_buffered_accum_buffer):
         self.operation = operation
+        self.double_buffered_accum_buffer = double_buffered_accum_buffer
 
     def calculate_runtime(self, architecture, layer, mapping):
         # assume IC is unrolled vertically
@@ -29,17 +30,6 @@ class RuntimeCalculator:
             if mapping.loop_orders[i][1] < first_non_ox_oy_index:
                 first_non_ox_oy_index = mapping.loop_orders[i][1]
 
-        first_reduction_loop_index = interstellar.le.NUM
-        for i in range(interstellar.le.NUM):
-            if (
-                i == interstellar.le.IC
-                or i == interstellar.le.FX
-                or i == interstellar.le.FY
-            ):
-                if mapping.loop_blockings[i][1] > 1:
-                    if mapping.loop_orders[i][1] < first_reduction_loop_index:
-                        first_reduction_loop_index = mapping.loop_orders[i][1]
-
         # calculate how big a weight reuse tile is
         # weights are reused in the OX and OY loops, so a weight reuse tile is product of
         # all loops from the first loop to the first non-(OX or OY) loop
@@ -52,33 +42,16 @@ class RuntimeCalculator:
         # this is the max of time to load the weights into the systolic array and weight reuse tile size
         weight_reuse_tile_time = max(sa_weight_loading_time, weight_reuse_tile_size)
 
-        # calculate how big a non-accumulating tile is
-        # a non-accumulating tile is product of all loops from the first non-(OX or OY) loop to the
-        # first non-1 reduction loop
-        num_non_accumulating_tiles = 1
-        for i in range(interstellar.le.NUM):
-            if (
-                mapping.loop_orders[i][1] >= first_non_ox_oy_index
-                and mapping.loop_orders[i][1] < first_reduction_loop_index
-            ):
-                num_non_accumulating_tiles *= mapping.loop_blockings[i][1]
-
-        # calculate how long it takes to perform the computation for a non-accumulating tile
-        # this is the max of systolic array latency and the tile size
-        non_accumulating_tile_time = max(
-            sa_latency, num_non_accumulating_tiles * weight_reuse_tile_time
-        )
-
         # calculate number of remaining L1 tiles
         num_remaining_l1_tiles = 1
         for i in range(interstellar.le.NUM):
-            if mapping.loop_orders[i][1] >= first_reduction_loop_index:
+            if mapping.loop_orders[i][1] >= first_non_ox_oy_index:
                 num_remaining_l1_tiles *= mapping.loop_blockings[i][1]
         # include the reduction loop at the L2 level
         num_remaining_l1_tiles *= mapping.loop_blockings[interstellar.le.IC][2]
 
         # calculate time for computation at the L1 level
-        computation_l1_time = non_accumulating_tile_time * num_remaining_l1_tiles
+        computation_l1_time = weight_reuse_tile_time * num_remaining_l1_tiles
 
         input_relevant_loops = [
             interstellar.le.IC,
@@ -100,6 +73,8 @@ class RuntimeCalculator:
         weight_buffer_loading_size = 1
         for loop in weight_relevant_loops:
             weight_buffer_loading_size *= mapping.loop_blockings[loop][1]
+        # include the unrolled reduction loop
+        weight_buffer_loading_size *= mapping.loop_partitionings[interstellar.le.IC][0]
         # currently assume that each value in the weight buffer is loaded in one cycle
         weight_buffer_loading_time = weight_buffer_loading_size
 
@@ -115,11 +90,11 @@ class RuntimeCalculator:
         for loop in output_relevant_loops:
             output_size *= mapping.loop_blockings[loop][1]
         vector_unit_time = output_size
+        requires_high_precision = False
         if self.operation.WhichOneof("op_type") == "fused_op":
             input_precision = (
                 self.operation.fused_op.op_list[0].kwargs["input"].tensor.dtype
             )
-            requires_high_precision = False
             # check if any of the operands are in high precision or
             for i in range(1, len(self.operation.fused_op.op_list)):
                 vector_op = self.operation.fused_op.op_list[i]
@@ -138,13 +113,24 @@ class RuntimeCalculator:
             if requires_high_precision:
                 vector_unit_time *= 2
 
-        # assume that writing out from accumulation buffer will not stall the system
-        l1_time = max(
-            computation_l1_time,
-            input_buffer_loading_time,
-            weight_buffer_loading_time,
-            vector_unit_time,
+        using_double_buffer_accum_buffer = (
+            self.double_buffered_accum_buffer and requires_high_precision
         )
+
+        if not using_double_buffer_accum_buffer:
+            # if we are not using double buffered accumulation buffer, the vector unit time should not factor in to the computation of l1_time
+            l1_time = max(
+                computation_l1_time,
+                input_buffer_loading_time,
+                weight_buffer_loading_time,
+            )
+        else:
+            l1_time = max(
+                computation_l1_time,
+                input_buffer_loading_time,
+                weight_buffer_loading_time,
+                vector_unit_time,
+            )
 
         l2_blocks = 1
         for i in range(interstellar.le.NUM):
@@ -153,14 +139,28 @@ class RuntimeCalculator:
                 continue
             l2_blocks *= mapping.loop_blockings[i][2]
 
-        # assumes 3 level memory hierarchy
-        total_time = (
-            # initial buffer loading time
-            max(input_buffer_loading_time, weight_buffer_loading_time)
-            + l2_blocks * l1_time
-            # time for last tile to be processed by vector unit
-            + vector_unit_time
-        )
+        if self.double_buffered_accum_buffer:
+            total_time = (
+                # initial buffer loading time
+                max(input_buffer_loading_time, weight_buffer_loading_time)
+                + l2_blocks * l1_time
+                # time for last tile to be processed by vector unit
+                + vector_unit_time
+            )
+        else:
+            # if there's no double buffered accumulation buffer, we need to account for any extra time taken by the vector unit
+            # this extra time is any stalling that occurs when the vector unit uses high precision
+            if requires_high_precision:
+                extra_vector_unit_time = output_size
+            else:
+                extra_vector_unit_time = 0
+
+            total_time = (
+                # initial buffer loading time
+                max(input_buffer_loading_time, weight_buffer_loading_time)
+                + l2_blocks * l1_time
+                + extra_vector_unit_time
+            )
 
         return total_time
 
@@ -193,6 +193,11 @@ def main():
         type=int,
         required=True,
         help="Size of output buffer (in # elements)",
+    )
+    parser.add_argument(
+        "--double_buffered_accum_buffer",
+        action="store_true",
+        help="Use double buffered accumulation buffer",
     )
     args = parser.parse_args()
 
@@ -360,7 +365,7 @@ def main():
 
         print(f"Finding tiling for {param_name}")
 
-        runtime_calculator = RuntimeCalculator(param)
+        runtime_calculator = RuntimeCalculator(param, args.double_buffered_accum_buffer)
 
         cost, runtime, mapping, perf = interstellar.optimizer.opt_optimizer(
             architecture, layer, schedule, runtime_calculator.calculate_runtime, True
@@ -405,7 +410,7 @@ def main():
 
     # write the tilings to a file
     with open(
-        f"{args.codegen_dir}/{args.IC_dimension}x{args.OC_dimension}_{args.input_buffer_size}x{args.weight_buffer_size}x{args.accum_buffer_size}/tilings.txtpb",
+        f"{args.codegen_dir}/{args.IC_dimension}x{args.OC_dimension}_{args.input_buffer_size}x{args.weight_buffer_size}x{args.accum_buffer_size}_{str(args.double_buffered_accum_buffer).lower()}/tilings.txtpb",
         "w",
     ) as f:
         f.write(text_format.MessageToString(tilings))

@@ -72,6 +72,7 @@ struct MatrixParams : BaseParams {
     has_attn_output_permute = false;
     is_mx_op = false;
     is_fc = false;
+    write_output_to_accum_buffer = false;
   }
 #endif
 
@@ -122,11 +123,12 @@ struct MatrixParams : BaseParams {
   bool has_attn_output_permute;
   bool is_mx_op;
   bool is_fc;
+  bool write_output_to_accum_buffer;
 
   static const unsigned int base_width =
       5 * 64 /* OFFSETS */ + (12 + 10) * LOOP_WIDTH /* Loops */ +
       19 * 3 /* Loop indices */ + 2 /* stride */ + 8 /* Head Size */ +
-      9 * 1 /* Bools */;
+      10 * 1 /* Bools */;
 
   static const unsigned int extra_width =
       2 * DTYPE_INDEX_WIDTH + NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
@@ -204,6 +206,7 @@ struct MatrixParams : BaseParams {
     m & has_attn_output_permute;
     m & is_mx_op;
     m & is_fc;
+    m & write_output_to_accum_buffer;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,
@@ -294,6 +297,8 @@ struct MatrixParams : BaseParams {
        << std::endl;
     os << "is_mx_op: " << params.is_mx_op << std::endl;
     os << "is_fc: " << params.is_fc << std::endl;
+    os << "write_output_to_accum_buffer: "
+       << params.write_output_to_accum_buffer << std::endl;
     return os;
   }
 
@@ -411,16 +416,17 @@ struct VectorInstructions {
   ac_int<4, false> vector_op3_src1;
 
   static const unsigned int from_matrix_unit = 1;
-  static const unsigned int from_vector_fetch_0 = 2;
-  static const unsigned int from_vector_fetch_1 = 3;
-  static const unsigned int from_vector_fetch_2 = 4;
-  static const unsigned int from_accumulation = 5;
-  static const unsigned int from_reduction_0 = 6;
-  static const unsigned int from_reduction_1 = 7;
-  static const unsigned int from_immediate_0 = 8;
-  static const unsigned int from_immediate_1 = 9;
-  static const unsigned int from_immediate_2 = 10;
-  static const unsigned int from_matrix_vector_unit = 11;
+  static const unsigned int from_accumulation_buffer = 2;
+  static const unsigned int from_matrix_vector_unit = 3;
+  static const unsigned int from_vector_fetch_0 = 4;
+  static const unsigned int from_vector_fetch_1 = 5;
+  static const unsigned int from_vector_fetch_2 = 6;
+  static const unsigned int from_accumulation = 7;
+  static const unsigned int from_reduction_0 = 8;
+  static const unsigned int from_reduction_1 = 9;
+  static const unsigned int from_immediate_0 = 10;
+  static const unsigned int from_immediate_1 = 11;
+  static const unsigned int from_immediate_2 = 12;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
@@ -633,12 +639,17 @@ struct VectorParams : BaseParams {
     addr_gen0_dim = 0;
     addr_gen0_start = 0;
     addr_gen0_end = 0;
-    addr_gen0_step = 0;
-
+    for (int i = 0; i < 2; i++) {
+      addr_gen0_step[i] = 0;
+    }
+    for (int i = 0; i < 2; i++) {
+      addr_gen0_padding[i] = 0;
+    }
     has_permute = false;
     for (int i = 0; i < 6; i++) {
       addr_gen0_dims[i] = i;
     }
+    is_maxpool = false;
 
     has_transpose = false;
 
@@ -705,7 +716,9 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addr_gen0_dim;
   ac_int<11, false> addr_gen0_start;
   ac_int<11, false> addr_gen0_end;
-  ac_int<11, false> addr_gen0_step;
+  ac_int<11, false> addr_gen0_step[2];
+  ac_int<11, false> addr_gen0_padding[2];
+  bool is_maxpool;
 
   bool has_permute;
   ac_int<3, false> addr_gen0_dims[6];
@@ -733,11 +746,11 @@ struct VectorParams : BaseParams {
   static const unsigned int codebook_params_width =
       1 + (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
 
-  // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
-  // slicing params + 18-bit reshape params + 4-bit head size + 6 boolean flags
+  // There are 4 address generators in total + 12-bit broadcasting flag + 69-bit
+  // slicing params + 18-bit reshape params + 4-bit head size + 7 boolean flags
   // + 64-bit scale offset
-  static const unsigned int width = 4 * address_gen_width + 12 + 36 + 18 + 4 +
-                                    6 + ADDRESS_WIDTH - 16 +
+  static const unsigned int width = 4 * address_gen_width + 12 + 69 + 18 + 4 +
+                                    7 + ADDRESS_WIDTH - 16 +
                                     codebook_params_width;
 
 #ifndef NO_SYSC
@@ -831,8 +844,13 @@ struct VectorParams : BaseParams {
     m & addr_gen0_dim;
     m & addr_gen0_start;
     m & addr_gen0_end;
-    m & addr_gen0_step;
-
+    for (int i = 0; i < 2; i++) {
+      m& addr_gen0_step[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      m& addr_gen0_padding[i];
+    }
+    m & is_maxpool;
     m & has_permute;
     for (int i = 0; i < 6; i++) {
       m& addr_gen0_dims[i];
@@ -961,7 +979,15 @@ struct VectorParams : BaseParams {
     os << "addr_gen0_dim: " << params.addr_gen0_dim << std::endl;
     os << "addr_gen0_start: " << params.addr_gen0_start << std::endl;
     os << "addr_gen0_end: " << params.addr_gen0_end << std::endl;
-    os << "addr_gen0_step: " << params.addr_gen0_step << std::endl;
+    for (int i = 0; i < 2; i++) {
+      os << "addr_gen0_step[" << i << "]: " << params.addr_gen0_step[i]
+         << std::endl;
+    }
+    for (int i = 0; i < 2; i++) {
+      os << "addr_gen0_padding[" << i << "]: " << params.addr_gen0_padding[i]
+         << std::endl;
+    }
+    os << "is_maxpool: " << params.is_maxpool << std::endl;
 
     os << "has_permute: " << params.has_permute << std::endl;
     for (int i = 0; i < 6; i++) {
@@ -1073,7 +1099,13 @@ struct VectorParams : BaseParams {
     if (lhs.addr_gen0_dim != rhs.addr_gen0_dim) return false;
     if (lhs.addr_gen0_start != rhs.addr_gen0_start) return false;
     if (lhs.addr_gen0_end != rhs.addr_gen0_end) return false;
-    if (lhs.addr_gen0_step != rhs.addr_gen0_step) return false;
+    for (int i = 0; i < 2; i++) {
+      if (lhs.addr_gen0_step[i] != rhs.addr_gen0_step[i]) return false;
+    }
+    for (int i = 0; i < 2; i++) {
+      if (lhs.addr_gen0_padding[i] != rhs.addr_gen0_padding[i]) return false;
+    }
+    if (lhs.is_maxpool != rhs.is_maxpool) return false;
 
     if (lhs.has_permute != rhs.has_permute) return false;
     for (int i = 0; i < 6; i++) {

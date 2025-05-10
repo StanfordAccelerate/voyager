@@ -11,8 +11,6 @@ SC_MODULE(InputScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(dataResponse);
 
@@ -20,21 +18,14 @@ SC_MODULE(InputScaleController) {
       writeRequest[2];
   Connections::Out<BufferReadRequest> readAddress[2];
 
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
 
-  MatrixParamsDeserializer<3> CCS_INIT_S1(paramsDeserializer);
-
   static constexpr int LOOP_WIDTH = 10;
 
   SC_CTOR(InputScaleController) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.paramsOut(paramsIn);
-
     SC_THREAD(read_params);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -94,6 +85,8 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -164,9 +157,6 @@ SC_MODULE(InputScaleController) {
                 loop_bounds[1][params.inputYLoopIndex[1]] += (FY - 1) / 2;
               }
 
-// inner memory
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -348,6 +338,8 @@ SC_MODULE(InputScaleController) {
       ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
       ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
       for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
            loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -380,9 +372,6 @@ SC_MODULE(InputScaleController) {
                 loop_bounds[1][params.inputYLoopIndex[1]] += FY - 1;
               }
 
-              // inner memory
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -567,11 +556,6 @@ SC_MODULE(InputScaleController) {
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              // int total_reads = loop_bounds[1][0] * loop_bounds[1][1] *
-              //                   loop_bounds[1][2] * loop_bounds[1][3] *
-              //                   loop_bounds[1][4] * loop_bounds[1][5];
-              // readControl[bankSel].Push(total_reads);
-              // inner memory
               for (loop_counters[1][0] = 0;
                    loop_counters[1][0] < loop_bounds[1][0];
                    loop_counters[1][0]++) {
@@ -679,7 +663,7 @@ SC_MODULE(InputScaleController) {
   }
 
   void read_params() {
-    paramsIn.ResetRead();
+    paramsIn.Reset();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();

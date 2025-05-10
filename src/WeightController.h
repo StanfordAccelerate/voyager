@@ -18,8 +18,6 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
-
   Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
   Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(dataResponse);
 
@@ -31,7 +29,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(biasDataResponse);
   Connections::Out<Pack1D<Bias, NCols>> CCS_INIT_S1(biasToSystolicArray);
 
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(paramsIn);
+  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
@@ -41,17 +39,10 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
   Connections::Combinational<ac_int<BufferWidth, false>> transposeOut;
 
-  MatrixParamsDeserializer<2> CCS_INIT_S1(paramsDeserializer);
-
   static constexpr int LOOP_WIDTH = 10;
   static constexpr int DATA_WIDTH = BufferWidth / NCols;
 
   SC_CTOR(WeightController) {
-    paramsDeserializer.clk(clk);
-    paramsDeserializer.rstn(rstn);
-    paramsDeserializer.serialParamsIn(serialParamsIn);
-    paramsDeserializer.paramsOut(paramsIn);
-
     SC_THREAD(read_params);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -1034,7 +1025,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
   }
 
   void read_params() {
-    paramsIn.ResetRead();
+    paramsIn.Reset();
     fetcherParams.ResetWrite();
     writerParams.ResetWrite();
     readerParams.ResetWrite();

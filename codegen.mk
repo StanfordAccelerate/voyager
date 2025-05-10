@@ -73,6 +73,6 @@ test/compiler/networks/layertest/CFLOAT/model.txt: quantized-training/test/test_
 ################################################################################
 # Tilings
 ################################################################################
-$(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)/tilings.txtpb: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/model.txt test/compiler/run_tiler.py
+$(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)/tilings.txtpb: $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/model.txt test/compiler/run_tiler.py
 	mkdir -p $(dir $@)
-	python test/compiler/run_tiler.py --codegen_dir $(dir $<) --IC_dimension $(IC_DIMENSION) --OC_dimension $(OC_DIMENSION) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE) > $(dir $@)/tiler.log 2>&1
+	python test/compiler/run_tiler.py --codegen_dir $(dir $<) --IC_dimension $(IC_DIMENSION) --OC_dimension $(OC_DIMENSION) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE) $(if $(filter true,$(DOUBLE_BUFFERED_ACCUM_BUFFER)), --double_buffered_accum_buffer) > $(dir $@)/tiler.log 2>&1

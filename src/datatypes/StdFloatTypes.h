@@ -62,6 +62,8 @@ class StdFloat {
     return r;
   }
 
+  void set_max_neg() { float_val = -ac_float_rep::max(); }
+
   StdFloat abs() const { return float_val.abs(); }
 
   StdFloat negate() const { return -float_val; }
