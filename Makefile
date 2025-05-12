@@ -204,7 +204,6 @@ fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
 sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner
 
-
 .PHONY: fast-sim-debug
 fast-sim-debug: $(CC_BUILD_DIR)/TestRunner-fast network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner-fast

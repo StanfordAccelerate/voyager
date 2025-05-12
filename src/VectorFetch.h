@@ -109,10 +109,10 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<LOOP_WIDTH, false> K0 =
           params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
 
-      ac_int<11, false> x0_stride = params.addr_gen0_step[1];
-      ac_int<11, false> y0_stride = params.addr_gen0_step[0];
-      ac_int<11, false> padding_x = params.addr_gen0_padding[1];
-      ac_int<11, false> padding_y = params.addr_gen0_padding[0];
+      ac_int<11, false> x0_stride = params.stride[1];
+      ac_int<11, false> y0_stride = params.stride[0];
+      ac_int<11, false> padding_x = params.padding[1];
+      ac_int<11, false> padding_y = params.padding[0];
       ac_int<16, false> X, Y, K;
       ac_int<11, false> x0_offset, y0_offset, k0_offset;
 
@@ -166,7 +166,7 @@ SC_MODULE(VectorFetchUnit) {
         int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addr_gen0_start;
         loop_ends[i][j] = params.addr_gen0_end;
-        loop_steps[i][j] = params.addr_gen0_step[j];
+        loop_steps[i][j] = params.addr_gen0_step;
       } else if (params.has_permute) {
 #pragma hls_unroll yes
         for (int dim = 0; dim < 6; dim++) {
@@ -430,10 +430,10 @@ SC_MODULE(VectorFetchUnit) {
 
       // the - 1 is required because we only support striding and padding for
       // the x and y dimension, where the loop index can be x, y, or k
-      ac_int<11, false> padding_x = params.addr_gen0_padding[1];
-      ac_int<11, false> padding_y = params.addr_gen0_padding[0];
-      ac_int<11, false> x0_stride = params.addr_gen0_step[1];
-      ac_int<11, false> y0_stride = params.addr_gen0_step[0];
+      ac_int<11, false> padding_x = params.padding[1];
+      ac_int<11, false> padding_y = params.padding[0];
+      ac_int<11, false> x0_stride = params.stride[1];
+      ac_int<11, false> y0_stride = params.stride[0];
       ac_int<16, false> X, Y, K;
       ac_int<11, false> x0_offset, y0_offset, k0_offset;
 
@@ -471,7 +471,7 @@ SC_MODULE(VectorFetchUnit) {
         int j = slice_dim >= 3 ? slice_dim - 3 : slice_dim;
         loop_starts[i][j] = params.addr_gen0_start;
         loop_ends[i][j] = params.addr_gen0_end;
-        loop_steps[i][j] = params.addr_gen0_step[j];
+        loop_steps[i][j] = params.stride[j];
       }
 
       if (params.has_transpose) {

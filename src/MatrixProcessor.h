@@ -234,14 +234,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     }
   }
 
-  int max3(int a, int b, int c) {
-    if (a > b) {
-      return a > c ? a : c;
-    } else {
-      return b > c ? b : c;
-    }
-  }
-
   void push_inputs() {
     paramsIn.Reset();
     inputsChannel.Reset();
@@ -262,16 +254,12 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       startSignal.SyncPush();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
-      ac_int<LOOP_WIDTH, false> loop_counters_out[2][6];
-      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_counters[i][j] = 0;
-          loop_counters_out[i][j] = 0;
-          loop_bounds[i][j] = params.loops[i][j];
         }
       }
 
@@ -283,8 +271,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       ac_int<32, false> step = 0;
 
-      // Push inputs into the array
-      // Pipelined across tiles
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       while (step < total_ops) {
@@ -393,13 +379,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = accumulation_buffer_params.Pop();
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
-      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
         for (int j = 0; j < 6; j++) {
           loop_counters[i][j] = 0;
-          loop_bounds[i][j] = params.loops[i][j];
         }
       }
 
