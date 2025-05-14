@@ -40,6 +40,16 @@ void vdiv(const Pack1D<T, Width>& op0, const Pack1D<T, Width>& op1,
 }
 
 #pragma hls_design ccore
+template <typename T1, typename T2, typename T3, int Width>
+void vfma(const Pack1D<T1, Width>& op0, const Pack1D<T2, Width>& op1,
+          Pack1D<T3, Width>& res) {
+#pragma hls_unroll yes
+  for (int i = 0; i < Width; i++) {
+    res[i] = op0[i].fma(op1[i], res[i]);
+  }
+}
+
+#pragma hls_design ccore
 template <typename T, int Width>
 void vexp(const Pack1D<T, Width>& op0, Pack1D<T, Width>& res) {
 #pragma hls_unroll yes
@@ -261,24 +271,22 @@ bool process_vector_input(
   return true;
 }
 
-template <typename T, size_t Width, typename VectorType, typename... Ts>
-bool send_vector_outputs(
+template <typename T, size_t N, typename VectorType, unsigned PortWidth,
+          typename... Ts>
+bool send_output_data(
     ac_int<4, false> dtype, bool is_codebook_quant,
-    Pack1D<VectorType, Width> inputs, ac_int<32, false> address,
-    ac_int<ADDRESS_WIDTH, false> offset,
-    Connections::Out<ac_int<OC_PORT_WIDTH, false>>& output_channel,
-    Connections::Out<ac_int<ADDRESS_WIDTH, false>>& address_channel) {
+    Pack1D<VectorType, N> inputs,
+    Connections::Out<ac_int<PortWidth, false>>& output_channel) {
   if (get_type_index<T, Ts...>() != dtype) {
     return false;
   }
 
-  constexpr int num_words =
-      (T::width * Width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
+  constexpr int num_words = (T::width * N + PortWidth - 1) / PortWidth;
 
-  Pack1D<T, Width> outputs;
+  Pack1D<T, N> outputs;
 
 #pragma hls_unroll yes
-  for (int i = 0; i < Width; i++) {
+  for (unsigned i = 0; i < N; i++) {
     if (is_codebook_quant) {
       outputs[i].set_bits(
           inputs[i].float_val.template convert_to_ac_int<T::width, true>());
@@ -287,13 +295,29 @@ bool send_vector_outputs(
     }
   }
 
-  ac_int<T::width * Width, false> bits;
+  ac_int<T::width * N, false> bits;
   bits = BitsToType<decltype(bits)>(TypeToBits(outputs));
 
+  for (unsigned i = 0; i < num_words; i++) {
+    output_channel.Push(bits.template slc<PortWidth>(i * PortWidth));
+  }
+
+  return true;
+}
+
+template <typename T, size_t N, unsigned PortWidth, typename... Ts>
+bool send_output_address(
+    ac_int<4, false> dtype, ac_int<ADDRESS_WIDTH, false> offset,
+    ac_int<32, false> address,
+    Connections::Out<ac_int<ADDRESS_WIDTH, false>>& address_channel) {
+  if (get_type_index<T, Ts...>() != dtype) {
+    return false;
+  }
+
+  constexpr int num_words = (T::width * N + PortWidth - 1) / PortWidth;
+
   for (int i = 0; i < num_words; i++) {
-    output_channel.Push(bits.template slc<OC_PORT_WIDTH>(i * OC_PORT_WIDTH));
-    address_channel.Push(offset + address * T::width / 8 +
-                         i * OC_PORT_WIDTH / 8);
+    address_channel.Push(offset + address * T::width / 8 + i * PortWidth / 8);
   }
 
   return true;

@@ -343,6 +343,89 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                                   bias_ptr, tiling, block_size);
 }
 
+template <typename Input, typename Weight, typename Psum, typename Output,
+          typename Scale, int N>
+inline Output *simd_matrix_vector_multiply(
+    std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
+    std::any weight_scale_ptr, std::any bias_ptr, const Operation &operation) {
+  spdlog::debug("Performing SIMD matrix-vector multiply\n");
+
+  const auto op_list = get_op_list(operation.param);
+  const auto matrix_op = op_list.front();
+
+  const auto input = matrix_op.kwargs().at("input").tensor();
+  const auto output = get_op_outputs(operation.param).back();
+
+  int block_size = 1;
+  if (matrix_op.kwargs().contains("block_size")) {
+    block_size = matrix_op.kwargs().at("block_size").int_value();
+  }
+
+  int C = get_size(input);
+  int K = get_size(output);
+  int C1 = C / block_size;
+  int C0 = block_size;
+
+  Input *inputs = std::any_cast<Input *>(input_ptr);
+  Weight *weights = std::any_cast<Weight *>(weight_ptr);
+  Output *biases = std::any_cast<Output *>(bias_ptr);
+
+  Scale *input_scales = std::any_cast<Scale *>(input_scale_ptr);
+  Scale *weight_scales = std::any_cast<Scale *>(weight_scale_ptr);
+
+  Output *outputs = new Output[K];
+  for (int i = 0; i < K; i++) {
+    outputs[i] = 0.0;
+  }
+
+  for (int k = 0; k < K; k++) {
+    for (int c1 = 0; c1 < C1; c1++) {
+      Psum psum = 0;
+
+      // single microscaling block
+      for (int c0 = 0; c0 < C0; c0++) {
+        int c = c1 * C0 + c0;
+
+        Input input = inputs[c];
+        Weight weight = weights[c * K + k];
+        fused_multiply_add(input, weight, psum);
+      }
+
+      // Rescale the psums
+      if (input_scales && weight_scales) {
+        Scale input_scale = input_scales[c1];
+        Scale weight_scale = weight_scales[c1 * K + k];
+        outputs[k] += static_cast<Output>(input_scale) *
+                      static_cast<Output>(weight_scale) *
+                      static_cast<Output>(psum);
+      } else {
+        outputs[k] += static_cast<Output>(psum);
+      }
+    }
+
+    if (biases != nullptr) {
+      outputs[k] += biases[k];
+    }
+  }
+
+  delete[] inputs;
+  delete[] weights;
+
+  if (biases != nullptr) {
+    delete[] biases;
+  }
+
+  if (input_scales != nullptr) {
+    delete[] input_scales;
+  }
+
+  if (weight_scales != nullptr) {
+    delete[] weight_scales;
+  }
+
+  return outputs;
+}
+
 template <typename Vector>
 inline Vector *matrix_vector_multiply(std::any input_ptr, std::any weight_ptr,
                                       std::any bias_ptr,

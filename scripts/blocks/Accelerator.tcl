@@ -2,7 +2,7 @@ set block "Accelerator"
 set full_block_name "Accelerator"
 
 proc pre_compile {} {
-  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION SUPPORT_MX IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
+  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION SUPPORT_MX SUPPORT_MVM IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
   foreach mapped_block [list \
     "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>" \
     "WeightController<WeightTypeList, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $OC_PORT_WIDTH, $WEIGHT_BUFFER_WIDTH>" \
@@ -12,18 +12,26 @@ proc pre_compile {} {
   ] {
     solution design set $mapped_block -mapped
   }
+  if {$SUPPORT_MVM == true} {
+    global MV_UNIT_WIDTH
+    solution design set "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $OC_DIMENSION>" -mapped
+  }
 }
 
 proc pre_libraries {} {
+  global SUPPORT_MVM
   solution library add {[Block] InputController.v1}
   solution library add {[Block] MatrixProcessor.v1}
   solution library add {[Block] VectorUnit.v1}
   solution library add {[Block] MatrixParamsDeserializer.v1}
   solution library add {[Block] WeightController.v1}
+  if {$SUPPORT_MVM == true} {
+    solution library add {[Block] MatrixVectorUnit.v1}
+  }
 }
 
 proc pre_assembly {} {
-  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION SUPPORT_MX IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
+  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION SUPPORT_MX SUPPORT_MVM IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
 
   set InputControllerBlock "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>"
   set InputControllerBlock_stripped [string map {" " ""} $InputControllerBlock]
@@ -45,6 +53,13 @@ proc pre_assembly {} {
   directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
   directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
   directive set /Accelerator/$MatrixParamsDeserializerBlock_stripped -MAP_TO_MODULE {[Block] MatrixParamsDeserializer.v1}
+
+  if {$SUPPORT_MVM == true} {
+    global MV_UNIT_WIDTH
+    set MatrixVectorUnitBlock "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $OC_DIMENSION>"
+    set MatrixVectorUnitBlock_stripped [string map {" " ""} $MatrixVectorUnitBlock]
+    directive set /Accelerator/$MatrixVectorUnitBlock_stripped -MAP_TO_MODULE {[Block] MatrixVectorUnit.v1}
+  }
 }
 
 proc pre_architect {} {

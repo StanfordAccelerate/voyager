@@ -600,6 +600,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 *quantization_args,
                 "--output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
+                "--weight_persistent",
+                "--use_maxpool_2x2",
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,

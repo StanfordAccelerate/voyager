@@ -6,6 +6,7 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 #include "MatrixUnit.h"
+#include "MatrixVectorUnit.h"
 #include "VectorUnit.h"
 #include "mc_scverify.h"
 
@@ -50,31 +51,59 @@ SC_MODULE(Accelerator) {
   Connections::SyncChannel accumulation_buffer_vu_done[2];
 #endif
 
-#ifdef SIM_VectorUnit
-  // clang-format off
-  CCS_DESIGN((VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE, OC_DIMENSION>)) CCS_INIT_S1(vector_unit);
-  // clang-format on
-#else
+#if SUPPORT_MVM
+  MatrixVectorUnit<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
+                   ACCUM_DATATYPE, VECTOR_DATATYPE, SCALE_DATATYPE,
+                   OC_PORT_WIDTH, MV_UNIT_WIDTH, OC_DIMENSION>
+      CCS_INIT_S1(matrix_vector_unit);
+
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(
+      serial_matrix_vector_params_in);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_input_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_weight_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_bias_req);
+
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_vector_input_resp);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_vector_weight_resp);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_vector_bias_resp);
+
+#if SUPPORT_MX
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_input_scale_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_weight_scale_req);
+
+  Connections::In<ac_int<8, false>> CCS_INIT_S1(matrix_vector_input_scale_resp);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_vector_weight_scale_resp);
+#endif
+
+  Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>>
+      matrix_vector_unit_data;
+  Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_start_signal);
+  Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_done_signal);
+#endif
+
   VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
              OC_DIMENSION>
       CCS_INIT_S1(vector_unit);
-#endif
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serialVectorParamsIn);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_request_out);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_request_out);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_request_out);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_req);
 
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_0_resp_in);
+      vector_fetch_0_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_1_resp_in);
+      vector_fetch_1_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_fetch_2_resp_in);
+      vector_fetch_2_resp);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_request_out);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp_in);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
+  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
@@ -120,17 +149,40 @@ SC_MODULE(Accelerator) {
     matrixUnit.weightScaleDataResponse(weightScaleDataResponse);
 #endif
 
+#if SUPPORT_MVM
+    matrix_vector_unit.clk(clk);
+    matrix_vector_unit.rstn(rstn);
+    matrix_vector_unit.serial_params_in(serial_matrix_vector_params_in);
+    matrix_vector_unit.input_req(matrix_vector_input_req);
+    matrix_vector_unit.input_resp(matrix_vector_input_resp);
+    matrix_vector_unit.weight_req(matrix_vector_weight_req);
+    matrix_vector_unit.weight_resp(matrix_vector_weight_resp);
+    matrix_vector_unit.bias_req(matrix_vector_bias_req);
+    matrix_vector_unit.bias_resp(matrix_vector_bias_resp);
+#if SUPPORT_MX
+    matrix_vector_unit.input_scale_req(matrix_vector_input_scale_req);
+    matrix_vector_unit.input_scale_resp(matrix_vector_input_scale_resp);
+    matrix_vector_unit.weight_scale_req(matrix_vector_weight_scale_req);
+    matrix_vector_unit.weight_scale_resp(matrix_vector_weight_scale_resp);
+#endif
+    matrix_vector_unit.matrix_out(matrix_vector_unit_data);
+    matrix_vector_unit.start_signal(matrix_vector_unit_start_signal);
+    matrix_vector_unit.done_signal(matrix_vector_unit_done_signal);
+
+    vector_unit.matrix_vector_unit_data(matrix_vector_unit_data);
+#endif
+
     vector_unit.clk(clk);
     vector_unit.rstn(rstn);
     vector_unit.serial_params_in(serialVectorParamsIn);
-    vector_unit.vector_fetch_0_request_out(vector_fetch_0_request_out);
-    vector_unit.vector_fetch_0_response_in(vector_fetch_0_resp_in);
-    vector_unit.vector_fetch_1_request_out(vector_fetch_1_request_out);
-    vector_unit.vector_fetch_1_response_in(vector_fetch_1_resp_in);
-    vector_unit.vector_fetch_2_request_out(vector_fetch_2_request_out);
-    vector_unit.vector_fetch_2_response_in(vector_fetch_2_resp_in);
-    vector_unit.vector_fetch_3_request_out(vector_fetch_3_request_out);
-    vector_unit.vector_fetch_3_response_in(vector_fetch_3_resp_in);
+    vector_unit.vector_fetch_0_req(vector_fetch_0_req);
+    vector_unit.vector_fetch_0_resp(vector_fetch_0_resp);
+    vector_unit.vector_fetch_1_req(vector_fetch_1_req);
+    vector_unit.vector_fetch_1_resp(vector_fetch_1_resp);
+    vector_unit.vector_fetch_2_req(vector_fetch_2_req);
+    vector_unit.vector_fetch_2_resp(vector_fetch_2_resp);
+    vector_unit.vector_fetch_3_req(vector_fetch_3_req);
+    vector_unit.vector_fetch_3_resp(vector_fetch_3_resp);
     vector_unit.vector_out(vector_output);
     vector_unit.vector_address_out(vector_output_address);
     vector_unit.scale_out(scalar_output);

@@ -42,10 +42,10 @@ void MapPoolingOperation(const codegen::Operation &param,
   }
 
   // striding only applied to x and y dimensions
-  vector_params->addr_gen0_step[1] = tiling.stride; // x
-  vector_params->addr_gen0_step[0] = tiling.stride; // y
-  vector_params->addr_gen0_padding[1] = tiling.padding; // x
-  vector_params->addr_gen0_padding[0] = tiling.padding; // y
+  vector_params->stride[1] = tiling.stride; // x
+  vector_params->stride[0] = tiling.stride; // y
+  vector_params->padding[1] = tiling.padding; // x
+  vector_params->padding[0] = tiling.padding; // y
 
   // output
   const auto output_memory = output.memory();

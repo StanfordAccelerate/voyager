@@ -148,9 +148,6 @@ if { $DATATYPE == "P8_1" } {
   set SA_INPUT_TYPE "DataTypes::int6"
   set SA_WEIGHT_TYPE "DataTypes::int6"
 
-  set INPUT_DTYPE_WIDTH 6
-  set WEIGHT_DTYPE_WIDTH 6
-
   set SUPPORT_MX true
 
   set ACC_BUF_C_DATA_REP_NAME "float_val.d"
@@ -162,6 +159,8 @@ if { $DATATYPE == "P8_1" } {
 
   set IC_PORT_WIDTH [expr {$IC_DIMENSION * 4}]
   set OC_PORT_WIDTH [expr {$OC_DIMENSION * 4}]
+
+  set MV_UNIT_WIDTH [expr {$IC_DIMENSION * 2}]
 } else {
   puts "Invalid DATATYPE"
   exit 1
@@ -169,6 +168,10 @@ if { $DATATYPE == "P8_1" } {
 
 if {![info exists SUPPORT_MX]} {
   set SUPPORT_MX false
+}
+
+if {![info exists SUPPORT_MVM]} {
+  set SUPPORT_MVM false
 }
 
 # ================================================================

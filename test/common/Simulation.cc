@@ -120,10 +120,13 @@ void Simulation::load_data() {
     }
 
     for (const auto& tensor : network->model.parameters()) {
-      bool has_transpose =
+      bool transpose_weight = true;
+#if !SUPPORT_MVM
+      transpose_weight =
           tensor.shape(0) != num_classes &&
           tensor.node().find("_param_constant") != std::string::npos;
-      dataloader->load_tensor(tensor, data_dir, has_transpose);
+#endif
+      dataloader->load_tensor(tensor, data_dir, transpose_weight);
     }
 
     // Load the layer's input and output last

@@ -106,15 +106,14 @@ std::vector<std::any> run_operation(const Operation &operation,
       bias_ptr = kwargs[bias.node()];
     }
 
-    int dim = 1;
-    for (int i = 0; i < input.shape_size() - 1; i++) {
-      dim *= input.shape(i);
-    }
+    const auto input_shape = get_shape(input);
+    int input_dim = get_size(input_shape) / input_shape.back();
+    bool is_fc = input_dim == 1;
 
-    if (dim == 1) {
-      output_ptr = matrix_vector_multiply<Vector>(input_ptr, weight_ptr,
-                                                  bias_ptr, get_shape(weight));
-    } else {
+#if !SUPPORT_MVM
+    if (!is_fc)
+#endif
+    {
       float *input_code = nullptr;
       if (first_op.kwargs().contains("input_code")) {
         const auto code = first_op.kwargs().at("input_code").tensor();
@@ -147,20 +146,33 @@ std::vector<std::any> run_operation(const Operation &operation,
       if (weight.has_reshape()) {
         weight_ptr = reshape_if_needed<SaWeight>(weight_ptr, weight.reshape());
       }
+    }
 
-      // Fetch microscaling scales
-      std::any input_scale_ptr = static_cast<Scale *>(nullptr);
-      std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
+    // Fetch microscaling scales
+    std::any input_scale_ptr = static_cast<Scale *>(nullptr);
+    std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
 
-      bool is_mx_op = first_op.target().find("mx") != std::string::npos;
-      if (is_mx_op) {
-        const auto input_scale = first_op.kwargs().at("input_scale").tensor();
-        input_scale_ptr = kwargs[input_scale.node()];
+    bool is_mx_op = first_op.target().find("mx") != std::string::npos;
+    if (is_mx_op) {
+      const auto input_scale = first_op.kwargs().at("input_scale").tensor();
+      input_scale_ptr = kwargs[input_scale.node()];
 
-        const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
-        weight_scale_ptr = kwargs[weight_scale.node()];
-      }
+      const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
+      weight_scale_ptr = kwargs[weight_scale.node()];
+    }
 
+    if (is_fc) {
+#if SUPPORT_MVM
+      output_ptr =
+          simd_matrix_vector_multiply<SaInput, SaWeight, Psum, AccumBuffer,
+                                      Scale, MV_UNIT_WIDTH>(
+              input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr,
+              bias_ptr, operation);
+#else
+      output_ptr = matrix_vector_multiply<Vector>(input_ptr, weight_ptr,
+                                                  bias_ptr, get_shape(weight));
+#endif
+    } else {
       output_ptr = gemm<SaInput, SaWeight, Psum, AccumBuffer, Scale>(
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
           operation);
@@ -303,7 +315,12 @@ std::vector<std::any> run_operation(const Operation &operation,
         std::any scale_ptr = kwargs[scale.node()];
         const auto scale_shape = get_shape(scale);
 
-        if (scale.shape_size() == 1) {
+        if (op.kwargs().contains("quant_code")) {
+          const auto code = op.kwargs().at("quant_code").tensor();
+          output_code = read_constant_param(code);
+        }
+
+        if (get_size(scale) == 1) {
           output_ptr =
               quantize<Vector, Vector>(output_ptr, scale_ptr, input_shape);
         } else {
@@ -397,9 +414,8 @@ std::vector<std::any> run_operation(const Operation &operation,
       outputs[i] = reshape_if_needed<Vector>(outputs[i], reshape_op);
     }
 
-    cast_output<Vector, SUPPORTED_TYPES>(
-        outputs[i], i == output_tensors.size() - 1 ? output_code : nullptr,
-        output_tensor);
+    float *codebook = i == output_tensors.size() - 1 ? output_code : nullptr;
+    cast_output<Vector, SUPPORTED_TYPES>(outputs[i], codebook, output_tensor);
   }
 
   if (output_code != nullptr) {

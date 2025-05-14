@@ -1,5 +1,14 @@
 #pragma once
 
+template <typename T, size_t N>
+bool send_input_request(ac_int<ADDRESS_WIDTH, false> offset,
+                        ac_int<32, false> address,
+                        Connections::Out<MemoryRequest>& channel) {
+  MemoryRequest request = {offset + address * T::width / 8, N * T::width / 8};
+  channel.Push(request);
+  return true;
+}
+
 template <typename T, size_t N, typename... Ts>
 bool fetch_matrix_input(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
                         ac_int<ADDRESS_WIDTH, false> offset,
@@ -9,8 +18,7 @@ bool fetch_matrix_input(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
     return false;
   }
 
-  MemoryRequest request = {offset + address * T::width / 8, N * T::width / 8};
-  channel.Push(request);
+  send_input_request<T, N>(offset, address, channel);
   return true;
 }
 

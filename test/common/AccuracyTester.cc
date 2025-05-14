@@ -55,7 +55,12 @@ bool run_sample(std::string model_name, std::string data_dir,
                            model_name + "/" + std::getenv("DATATYPE") +
                            "/tensor_files";
   for (const auto& tensor : model.parameters()) {
-    bool transpose_weight = tensor.shape(0) != num_classes;
+    bool transpose_weight = true;
+#if !SUPPORT_MVM
+    transpose_weight =
+        tensor.shape(0) != num_classes &&
+        tensor.node().find("_param_constant") != std::string::npos;
+#endif
     data_loader->load_tensor(tensor, params_dir, transpose_weight);
   }
 

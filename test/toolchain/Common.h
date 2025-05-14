@@ -287,3 +287,14 @@ void set_quantize_params(const codegen::Operation &param,
     }
   }
 }
+
+bool is_fc(const codegen::OpOverload &op) {
+  const auto input = op.kwargs().at("input").tensor();
+
+  int dim = 1;
+  for (int i = 0; i < input.shape_size() - 1; i++) {
+    dim *= input.shape(i);
+  }
+
+  return dim == 1;
+}

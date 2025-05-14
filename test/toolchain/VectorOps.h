@@ -18,8 +18,8 @@ inline bool are_broadcastable(const std::vector<int> &shape1,
   return true;
 }
 
-inline std::vector<int> broadcast_shape(const std::vector<int> &shape1,
-                                        const std::vector<int> &shape2) {
+inline std::vector<int> broadcast_shape(std::vector<int> &shape1,
+                                        std::vector<int> &shape2) {
   if (!are_broadcastable(shape1, shape2)) {
     throw std::invalid_argument("Shapes are not broadcastable");
   }
@@ -35,7 +35,17 @@ inline std::vector<int> broadcast_shape(const std::vector<int> &shape1,
     result_shape[max_size - i] = std::max(dim1, dim2);
   }
 
-  return squeeze_shape(result_shape);
+  for (int i = max_size - 1; i >= 0; --i) {
+    if (result_shape[i] == 1) {
+      result_shape.erase(result_shape.begin() + i);
+      if (i >= max_size - n1)
+        shape1.erase(shape1.begin() + (i - (max_size - n1)));
+      if (i >= max_size - n2)
+        shape2.erase(shape2.begin() + (i - (max_size - n2)));
+    }
+  }
+
+  return result_shape;
 }
 
 void set_vector_addr_gen1(const codegen::Tensor &tensor,
@@ -52,7 +62,8 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_broadcast[i] = input_shape[i] == 1;
+    vector_params->addr_gen1_broadcast[i] =
+        input_shape[i] == 1 && output_shape[i] != 1;
   }
 
   vector_params->addr_gen1_dtype =
@@ -213,7 +224,7 @@ void MapVectorOperations(const codegen::Operation &param,
     vector_params->addr_gen0_dim = dim + padded_dims;
     vector_params->addr_gen0_start = start;
     vector_params->addr_gen0_end = end;
-    vector_params->addr_gen0_step[dim] = step;
+    vector_params->addr_gen0_step = step;
 
     // Last dimension needs to be scaled by OC_DIMENSION
     if (vector_params->addr_gen0_dim == 5) {
@@ -401,8 +412,9 @@ void MapVectorOperations(const codegen::Operation &param,
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   if (output.has_reshape()) {
-    vector_params->has_attn_head_permute = output.shape(1) < output.shape(2);
-    vector_params->has_output_permute = output.shape(1) > output.shape(2);
+    vector_params->has_attn_head_permute = true;
+    // vector_params->has_attn_head_permute = output.shape(1) < output.shape(2);
+    // vector_params->has_output_permute = output.shape(1) > output.shape(2);
 
     // if we have permutation, we need to configure the address generators
     // accordingly we need to make sure the output is split into 32x32 blocks
@@ -503,21 +515,6 @@ void MapVectorOperations(const codegen::Operation &param,
       vector_params->quantize_output_mx = true;
       vector_params->SCALE_OFFSET =
           param.outputs().tensors(0).memory().address();
-
-      if (op.kwargs().contains("quant_code")) {
-        const auto code = op.kwargs().at("quant_code").tensor();
-        const int size = get_size(code);
-
-        float *array = read_constant_param(code);
-
-        for (int i = 0; i < size; i++) {
-          vector_params->output_code[i] = array[i] * 2;
-        }
-
-        delete[] array;
-
-        vector_params->use_output_codebook = true;
-      }
     } else if (op.kwargs().contains("other") || opcode == "quantize") {
       std::string other_key = opcode == "quantize" ? "scale" : "other";
       const auto other = op.kwargs().at(other_key);
@@ -544,14 +541,12 @@ void MapVectorOperations(const codegen::Operation &param,
               factor_out_non_broadcastable_dim(input_shape, other_shape);
           input_shape = result.first;
           other_shape = result.second;
-
-          update_tensor_shape(self, input_shape);
-          update_tensor_shape(tensor, other_shape);
         }
 
-        auto tensor_to_load = tensor.has_memory() ? tensor : self;
         auto output_shape = broadcast_shape(input_shape, other_shape);
-        squeeze_front_ones(output_shape);
+        update_tensor_shape(self, input_shape);
+        update_tensor_shape(tensor, other_shape);
+        auto tensor_to_load = tensor.has_memory() ? tensor : self;
 
         if (stage == 0) {
           inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
@@ -569,6 +564,21 @@ void MapVectorOperations(const codegen::Operation &param,
                                accelerator_memory_map, vector_params);
         }
       }
+    }
+
+    if (op.kwargs().contains("quant_code")) {
+      const auto code = op.kwargs().at("quant_code").tensor();
+      const int size = get_size(code);
+
+      float *array = read_constant_param(code);
+
+      for (int i = 0; i < size; i++) {
+        vector_params->output_code[i] = array[i] * 2;
+      }
+
+      delete[] array;
+
+      vector_params->use_output_codebook = true;
     }
 
     stage++;

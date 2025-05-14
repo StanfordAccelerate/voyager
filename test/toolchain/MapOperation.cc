@@ -21,14 +21,13 @@ void MapOperation(const Operation &operation,
   if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
     const auto &input = first_op.kwargs().at("input").tensor();
 
-    int dim = 1;
-    for (int i = 0; i < input.shape_size() - 1; i++) {
-      dim *= input.shape(i);
-    }
-
-    if (dim == 1) {
+#if !SUPPORT_MVM
+    if (is_fc(first_op)) {
       MapMatrixVectorMultiply(param, mappedParams, opMemoryMaps);
-    } else {
+
+    } else
+#endif
+    {
       MapMatrixOperation(operation, mappedParams, opMemoryMaps);
     }
   } else if (first_op.target() == "layer_norm") {

@@ -10,8 +10,8 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
 
   const auto input = matrix_op.kwargs().at("input").tensor();
   const auto weight = matrix_op.kwargs().at("weight").tensor();
-  const auto bias = matrix_op.kwargs().at("bias").tensor();
   const auto output = param.output();
+  bool has_bias = matrix_op.kwargs().contains("bias");
 
   int output_dim = weight.shape(0);
   int reduction_dim = weight.shape(1);
@@ -62,25 +62,28 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   }
 
   // bias
-  const auto bias_memory = bias.memory();
-  accelerator_memory_map["vector2"] = get_partition(bias_memory.partition());
-  vector_params->ADDRESS_GEN2_OFFSET = bias_memory.address();
-  vector_params->addr_gen2_mode = true;
-  vector_params->addr_gen2_broadcast = 0b011;
-  vector_params->addr_gen2_dtype =
-      get_index_from_type_name<VU_INPUT_TYPES>(bias.dtype());
+  if (has_bias) {
+    const auto bias = matrix_op.kwargs().at("bias").tensor();
+    const auto bias_memory = bias.memory();
+    accelerator_memory_map["vector2"] = get_partition(bias_memory.partition());
+    vector_params->ADDRESS_GEN2_OFFSET = bias_memory.address();
+    vector_params->addr_gen2_mode = true;
+    vector_params->addr_gen2_broadcast = 0b011;
+    vector_params->addr_gen2_dtype =
+        get_index_from_type_name<VU_INPUT_TYPES>(bias.dtype());
 
-  for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen2_loops[0][i] = 1;
-  }
-  vector_params->addr_gen2_loops[1][0] = 1;
-  vector_params->addr_gen2_loops[1][1] = 1;
-  vector_params->addr_gen2_loops[1][2] = output_dim / OC_DIMENSION;
+    for (int i = 0; i < 3; i++) {
+      vector_params->addr_gen2_loops[0][i] = 1;
+    }
+    vector_params->addr_gen2_loops[1][0] = 1;
+    vector_params->addr_gen2_loops[1][1] = 1;
+    vector_params->addr_gen2_loops[1][2] = output_dim / OC_DIMENSION;
 
-  for (int i = 0; i < 2; i++) {
-    vector_params->addr_gen2_y_loop_idx[i] = 0;
-    vector_params->addr_gen2_x_loop_idx[i] = 1;
-    vector_params->addr_gen2_k_loop_idx[i] = 2;
+    for (int i = 0; i < 2; i++) {
+      vector_params->addr_gen2_y_loop_idx[i] = 0;
+      vector_params->addr_gen2_x_loop_idx[i] = 1;
+      vector_params->addr_gen2_k_loop_idx[i] = 2;
+    }
   }
 
   // output
@@ -127,16 +130,18 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   vector_instruction_config->instCount[1] = reduction_dim;
 
   // inst2 - add bias, write out
-  VectorInstructions vinst2;
-  vinst2.op_type = VectorInstructions::vector;
-  vinst2.vector_op0_src0 = VectorInstructions::from_reduction_0;
-  vinst2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-  vinst2.vector_op2 = VectorInstructions::vadd;
-  vinst2.vdest = VectorInstructions::to_output;
-  vector_instruction_config->inst[2] = vinst2;
-  vector_instruction_config->instCount[2] = 1;
+  if (has_bias) {
+    VectorInstructions vinst2;
+    vinst2.op_type = VectorInstructions::vector;
+    vinst2.vector_op0_src0 = VectorInstructions::from_reduction_0;
+    vinst2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
+    vinst2.vector_op2 = VectorInstructions::vadd;
+    vinst2.vdest = VectorInstructions::to_output;
+    vector_instruction_config->inst[2] = vinst2;
+    vector_instruction_config->instCount[2] = 1;
+  }
 
-  vector_instruction_config->instLen = 3;
+  vector_instruction_config->instLen = has_bias ? 3 : 2;
   vector_instruction_config->instLoopCount = output_dim / OC_DIMENSION;
 
   mappedParams.push_back(vector_params);

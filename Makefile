@@ -72,6 +72,12 @@ else
 	override BASE_FLAGS += -DDOUBLE_BUFFERED_ACCUM_BUFFER=$(DOUBLE_BUFFERED_ACCUM_BUFFER)
 endif
 
+ifndef SUPPORT_MVM
+	export SUPPORT_MVM = false
+else
+	override BASE_FLAGS += -DSUPPORT_MVM=$(SUPPORT_MVM)
+endif
+
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG -g -O0 -ggdb
 else
@@ -126,6 +132,11 @@ ifeq (,$(wildcard test/compiler/proto/tiling.pb.cc))
 PROTOS_DEPENDENCY += test/compiler/proto/tiling.pb.cc
 endif
 
+RTL_DEPENDENCIES =
+ifeq ($(SUPPORT_MVM), true)
+RTL_DEPENDENCIES += $(CATAPULT_BUILD_DIR)/MatrixVectorUnit/MatrixVectorUnit.v1/concat_rtl.v
+endif
+
 # For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
 InputController: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v
@@ -137,6 +148,7 @@ VectorFetchUnit: $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat
 VectorUnit: $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v
 OutputController: $(CATAPULT_BUILD_DIR)/OutputController/OutputController.v1/concat_rtl.v
 VectorOpUnit: $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v
+MatrixVectorUnit: $(CATAPULT_BUILD_DIR)/MatrixVectorUnit/MatrixVectorUnit.v1/concat_rtl.v
 Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 
 $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v: src/InputController.h $(PROTOS_DEPENDENCY)
@@ -161,7 +173,9 @@ $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.
 	BLOCK=VectorOpUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorOpUnit.log
 $(CATAPULT_BUILD_DIR)/OutputController/OutputController.v1/concat_rtl.v: src/OutputController.h $(PROTOS_DEPENDENCY)
 	BLOCK=OutputController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/OutputController.log
-$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: src/Accelerator.h src/DoubleBuffer.h $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
+$(CATAPULT_BUILD_DIR)/MatrixVectorUnit/MatrixVectorUnit.v1/concat_rtl.v: src/MatrixVectorUnit.h $(PROTOS_DEPENDENCY)
+	BLOCK=MatrixVectorUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixVectorUnit.log
+$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: src/Accelerator.h src/DoubleBuffer.h $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v $(PROTOS_DEPENDENCY) $(RTL_DEPENDENCIES)
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log
 
 .PHONY: rtl Accelerator InputController WeightController MatrixProcessor ProcessingElement VectorUnit VectorFetchUnit VectorOpUnit OutputController
@@ -195,7 +209,6 @@ fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner
-
 
 .PHONY: fast-sim-debug
 fast-sim-debug: $(CC_BUILD_DIR)/TestRunner-fast network-proto

@@ -71,9 +71,12 @@ struct MatrixParams : BaseParams {
     is_replication = false;
     has_attn_output_permute = false;
     is_mx_op = false;
+    is_fc = false;
     write_output_to_accum_buffer = false;
   }
 #endif
+
+  static constexpr int LOOP_WIDTH = 16;
 
   ac_int<ADDRESS_WIDTH, false> INPUT_OFFSET;
   ac_int<ADDRESS_WIDTH, false> INPUT_SCALE_OFFSET;
@@ -82,7 +85,7 @@ struct MatrixParams : BaseParams {
   ac_int<ADDRESS_WIDTH, false> BIAS_OFFSET;
 
   // systolic array loop
-  ac_int<10, false> loops[2][6];
+  ac_int<LOOP_WIDTH, false> loops[2][6];
   ac_int<3, false> inputXLoopIndex[2];
   ac_int<3, false> inputYLoopIndex[2];
   ac_int<3, false> reductionLoopIndex[2];
@@ -93,7 +96,7 @@ struct MatrixParams : BaseParams {
   ac_int<2, false> stride;
 
   // weight address generator loop
-  ac_int<10, false> weightAddressGenLoops[2][5];
+  ac_int<LOOP_WIDTH, false> weightAddressGenLoops[2][5];
   // in the inner loop, there are actually 2 reduction loops: the
   // standard reduction loop and the reduction that is parallelized in
   // the systolic array
@@ -119,12 +122,13 @@ struct MatrixParams : BaseParams {
   bool is_replication;
   bool has_attn_output_permute;
   bool is_mx_op;
+  bool is_fc;
   bool write_output_to_accum_buffer;
 
   static const unsigned int base_width =
-      5 * 64 /* OFFSETS */ + (12 + 10) * 10 /* Loops */ +
+      5 * 64 /* OFFSETS */ + (12 + 10) * LOOP_WIDTH /* Loops */ +
       19 * 3 /* Loop indices */ + 2 /* stride */ + 8 /* Head Size */ +
-      9 * 1 /* Bools */;
+      10 * 1 /* Bools */;
 
   static const unsigned int extra_width =
       2 * DTYPE_INDEX_WIDTH + NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
@@ -201,6 +205,7 @@ struct MatrixParams : BaseParams {
     m & is_replication;
     m & has_attn_output_permute;
     m & is_mx_op;
+    m & is_fc;
     m & write_output_to_accum_buffer;
   }
 
@@ -291,6 +296,7 @@ struct MatrixParams : BaseParams {
     os << "has_attn_output_permute: " << params.has_attn_output_permute
        << std::endl;
     os << "is_mx_op: " << params.is_mx_op << std::endl;
+    os << "is_fc: " << params.is_fc << std::endl;
     os << "write_output_to_accum_buffer: "
        << params.write_output_to_accum_buffer << std::endl;
     return os;
@@ -356,6 +362,7 @@ struct MatrixParams : BaseParams {
     if (lhs.has_attn_output_permute != rhs.has_attn_output_permute)
       return false;
     if (lhs.is_mx_op != rhs.is_mx_op) return false;
+    if (lhs.is_fc != rhs.is_fc) return false;
 
     // If all members are equal, return true
     return true;
@@ -410,15 +417,16 @@ struct VectorInstructions {
 
   static const unsigned int from_matrix_unit = 1;
   static const unsigned int from_accumulation_buffer = 2;
-  static const unsigned int from_vector_fetch_0 = 3;
-  static const unsigned int from_vector_fetch_1 = 4;
-  static const unsigned int from_vector_fetch_2 = 5;
-  static const unsigned int from_accumulation = 6;
-  static const unsigned int from_reduction_0 = 7;
-  static const unsigned int from_reduction_1 = 8;
-  static const unsigned int from_immediate_0 = 9;
-  static const unsigned int from_immediate_1 = 10;
-  static const unsigned int from_immediate_2 = 11;
+  static const unsigned int from_matrix_vector_unit = 3;
+  static const unsigned int from_vector_fetch_0 = 4;
+  static const unsigned int from_vector_fetch_1 = 5;
+  static const unsigned int from_vector_fetch_2 = 6;
+  static const unsigned int from_accumulation = 7;
+  static const unsigned int from_reduction_0 = 8;
+  static const unsigned int from_reduction_1 = 9;
+  static const unsigned int from_immediate_0 = 10;
+  static const unsigned int from_immediate_1 = 11;
+  static const unsigned int from_immediate_2 = 12;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
@@ -631,19 +639,22 @@ struct VectorParams : BaseParams {
     addr_gen0_dim = 0;
     addr_gen0_start = 0;
     addr_gen0_end = 0;
-    for (int i = 0; i < 2; i++) {
-      addr_gen0_step[i] = 0;
-    }
-    for (int i = 0; i < 2; i++) {
-      addr_gen0_padding[i] = 0;
-    }
+    addr_gen0_step = 0;
+
     has_permute = false;
     for (int i = 0; i < 6; i++) {
       addr_gen0_dims[i] = i;
     }
-    is_maxpool = false;
 
     has_transpose = false;
+
+    is_maxpool = false;
+    for (int i = 0; i < 2; i++) {
+      stride[i] = 0;
+    }
+    for (int i = 0; i < 2; i++) {
+      padding[i] = 0;
+    }
 
     head_size_power_of_two = 32;
     has_attn_head_permute = false;
@@ -658,10 +669,12 @@ struct VectorParams : BaseParams {
   }
 #endif
 
+  static constexpr int LOOP_WIDTH = 16;
+
   // Address generator 0 (vector input)
   ac_int<2, false> addr_gen0_mode;
   ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN0_OFFSET;
-  ac_int<11, false> addr_gen0_loops[2][3];
+  ac_int<LOOP_WIDTH, false> addr_gen0_loops[2][3];
   ac_int<3, false> addr_gen0_x_loop_idx[2];
   ac_int<3, false> addr_gen0_y_loop_idx[2];
   ac_int<3, false> addr_gen0_k_loop_idx[2];
@@ -671,7 +684,7 @@ struct VectorParams : BaseParams {
   // Address generator 1 (op0src1)
   ac_int<2, false> addr_gen1_mode;
   ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN1_OFFSET;
-  ac_int<11, false> addr_gen1_loops[2][3];
+  ac_int<LOOP_WIDTH, false> addr_gen1_loops[2][3];
   ac_int<3, false> addr_gen1_x_loop_idx[2];
   ac_int<3, false> addr_gen1_y_loop_idx[2];
   ac_int<3, false> addr_gen1_k_loop_idx[2];
@@ -681,7 +694,7 @@ struct VectorParams : BaseParams {
   // Address generator 2 (op3src1)
   ac_int<2, false> addr_gen2_mode;
   ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN2_OFFSET;
-  ac_int<11, false> addr_gen2_loops[2][3];
+  ac_int<LOOP_WIDTH, false> addr_gen2_loops[2][3];
   ac_int<3, false> addr_gen2_x_loop_idx[2];
   ac_int<3, false> addr_gen2_y_loop_idx[2];
   ac_int<3, false> addr_gen2_k_loop_idx[2];
@@ -691,7 +704,7 @@ struct VectorParams : BaseParams {
   // Output address generator
   ac_int<2, false> output_mode;
   ac_int<ADDRESS_WIDTH, false> VECTOR_OUTPUT_OFFSET;
-  ac_int<11, false> output_loops[2][3];
+  ac_int<LOOP_WIDTH, false> output_loops[2][3];
   ac_int<3, false> output_x_loop_idx[2];
   ac_int<3, false> output_y_loop_idx[2];
   ac_int<3, false> output_k_loop_idx[2];
@@ -706,14 +719,16 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addr_gen0_dim;
   ac_int<11, false> addr_gen0_start;
   ac_int<11, false> addr_gen0_end;
-  ac_int<11, false> addr_gen0_step[2];
-  ac_int<11, false> addr_gen0_padding[2];
-  bool is_maxpool;
+  ac_int<11, false> addr_gen0_step;
 
   bool has_permute;
   ac_int<3, false> addr_gen0_dims[6];
 
   bool has_transpose;
+
+  bool is_maxpool;
+  ac_int<8, false> stride[2];
+  ac_int<8, false> padding[2];
 
   // Transformer head permutation
   ac_int<4, false> head_size_power_of_two;
@@ -731,16 +746,16 @@ struct VectorParams : BaseParams {
   // boundaries, 6 3-bit loop indices, a 16-bit dequantize scale, and a 2-bit
   // data type
   static const unsigned int address_gen_width =
-      2 + ADDRESS_WIDTH + 6 * 11 + 6 * 3 + 16 + 4;
+      2 + ADDRESS_WIDTH + 6 * LOOP_WIDTH + 6 * 3 + 16 + 4;
 
   static const unsigned int codebook_params_width =
       1 + (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
 
-  // There are 4 address generators in total + 12-bit broadcasting flag + 69-bit
-  // slicing params + 18-bit reshape params + 4-bit head size + 7 boolean flags
-  // + 64-bit scale offset
-  static const unsigned int width = 4 * address_gen_width + 12 + 69 + 18 + 4 +
-                                    7 + ADDRESS_WIDTH - 16 +
+  // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
+  // slicing params + 32-bit pooling param + 18-bit reshape params + 4-bit head
+  // size + 7 boolean flags + 64-bit scale offset
+  static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
+                                    4 + 7 + ADDRESS_WIDTH - 16 +
                                     codebook_params_width;
 
 #ifndef NO_SYSC
@@ -834,19 +849,22 @@ struct VectorParams : BaseParams {
     m & addr_gen0_dim;
     m & addr_gen0_start;
     m & addr_gen0_end;
-    for (int i = 0; i < 2; i++) {
-      m& addr_gen0_step[i];
-    }
-    for (int i = 0; i < 2; i++) {
-      m& addr_gen0_padding[i];
-    }
-    m & is_maxpool;
+    m & addr_gen0_step;
+
     m & has_permute;
     for (int i = 0; i < 6; i++) {
       m& addr_gen0_dims[i];
     }
 
     m & has_transpose;
+
+    m & is_maxpool;
+    for (int i = 0; i < 2; i++) {
+      m& stride[i];
+    }
+    for (int i = 0; i < 2; i++) {
+      m& padding[i];
+    }
 
     // Transformer head permutation flags
     m & head_size_power_of_two;
@@ -969,15 +987,7 @@ struct VectorParams : BaseParams {
     os << "addr_gen0_dim: " << params.addr_gen0_dim << std::endl;
     os << "addr_gen0_start: " << params.addr_gen0_start << std::endl;
     os << "addr_gen0_end: " << params.addr_gen0_end << std::endl;
-    for (int i = 0; i < 2; i++) {
-      os << "addr_gen0_step[" << i << "]: " << params.addr_gen0_step[i]
-         << std::endl;
-    }
-    for (int i = 0; i < 2; i++) {
-      os << "addr_gen0_padding[" << i << "]: " << params.addr_gen0_padding[i]
-         << std::endl;
-    }
-    os << "is_maxpool: " << params.is_maxpool << std::endl;
+    os << "addr_gen0_step: " << params.addr_gen0_step << std::endl;
 
     os << "has_permute: " << params.has_permute << std::endl;
     for (int i = 0; i < 6; i++) {
@@ -986,6 +996,14 @@ struct VectorParams : BaseParams {
     }
 
     os << "has_transpose: " << params.has_transpose << std::endl;
+
+    os << "is_maxpool: " << params.is_maxpool << std::endl;
+    for (int i = 0; i < 2; i++) {
+      os << "stride[" << i << "]: " << params.stride[i] << std::endl;
+    }
+    for (int i = 0; i < 2; i++) {
+      os << "padding[" << i << "]: " << params.padding[i] << std::endl;
+    }
 
     os << "head_size_power_of_two: " << params.head_size_power_of_two
        << std::endl;
@@ -1089,13 +1107,7 @@ struct VectorParams : BaseParams {
     if (lhs.addr_gen0_dim != rhs.addr_gen0_dim) return false;
     if (lhs.addr_gen0_start != rhs.addr_gen0_start) return false;
     if (lhs.addr_gen0_end != rhs.addr_gen0_end) return false;
-    for (int i = 0; i < 2; i++) {
-      if (lhs.addr_gen0_step[i] != rhs.addr_gen0_step[i]) return false;
-    }
-    for (int i = 0; i < 2; i++) {
-      if (lhs.addr_gen0_padding[i] != rhs.addr_gen0_padding[i]) return false;
-    }
-    if (lhs.is_maxpool != rhs.is_maxpool) return false;
+    if (lhs.addr_gen0_step != rhs.addr_gen0_step) return false;
 
     if (lhs.has_permute != rhs.has_permute) return false;
     for (int i = 0; i < 6; i++) {
@@ -1103,6 +1115,14 @@ struct VectorParams : BaseParams {
     }
 
     if (lhs.has_transpose != rhs.has_transpose) return false;
+
+    if (lhs.is_maxpool != rhs.is_maxpool) return false;
+    for (int i = 0; i < 2; i++) {
+      if (lhs.stride[i] != rhs.stride[i]) return false;
+    }
+    for (int i = 0; i < 2; i++) {
+      if (lhs.padding[i] != rhs.padding[i]) return false;
+    }
 
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
     if (lhs.has_attn_head_permute != rhs.has_attn_head_permute) return false;
