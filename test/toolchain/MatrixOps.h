@@ -126,6 +126,65 @@ void set_immediate(const float scalar, const int stage,
   }
 }
 
+/**
+ * \brief Determine whether we should use the direct path between the matrix
+ * unit and the vector unit.
+ *
+ * Even if we have a double-buffered accumulation buffer, it may still be
+ * profitable to use the direct path. This way, we save on the latency of having
+ * to fully fill the accumulation buffer before even starting to drain it.
+ *
+ * However, the vector unit may not be able to keep up with the matrix unit. The
+ * matrix unit produces `OC_DIMENSION` elements per cycle. If the inputs take
+ * more than one cycle to fetch that many elements, the vector unit (and then
+ * the matrix unit) will stall. The same happens if we can't write that many
+ * elements to the output per cycle.
+ *
+ * This function determines whether it is profitable to use the direct path for
+ * this particular instruction, given the accelerator's configuration. It should
+ * only be called if we have a double-buffered accumulation buffer.
+ */
+static bool should_use_direct_path(const VectorParams *vector_params) {
+  assert(DOUBLE_BUFFERED_ACCUM_BUFFER);
+
+  // This is how much bandwidth we have available, in bits per cycle. It
+  // happens that this value is the same for both inputs and the output.
+  //
+  // If we want to use the direct path without stalling, it had better be the
+  // case that the available bandwidth exceeds the required bandwidth of
+  // producing `OC_DIMENSION` elements per cycle.
+  const size_t available_bandwidth = OC_PORT_WIDTH;
+
+  // How much bandwidth we need for each of the ports, in bits per cycle. If the
+  // address generation is inactive, we don't need any bandwidth. Otherwise, it
+  // depends on the type we're fetching/writing.
+  //
+  // Remember, we need `OC_DIMENSION` elements per cycle on each (active) port
+  // to keep up with the matrix unit.
+  const size_t addr_gen1_bw =
+      (vector_params->addr_gen1_mode == 0)
+          ? 0
+          : get_width_from_type_index<VU_INPUT_TYPES>(vector_params->addr_gen1_dtype) *
+                OC_DIMENSION;
+  const size_t addr_gen2_bw =
+      (vector_params->addr_gen2_mode == 0)
+          ? 0
+          : get_width_from_type_index<VU_INPUT_TYPES>(vector_params->addr_gen2_dtype) *
+                OC_DIMENSION;
+  const size_t output_bw =
+      (vector_params->output_mode == 0)
+          ? 0
+          : get_width_from_type_index<OUTPUT_DATATYPES>(vector_params->output_dtype) *
+                OC_DIMENSION;
+
+  bool should_use_direct_path = true;
+  should_use_direct_path &= addr_gen1_bw <= available_bandwidth;
+  should_use_direct_path &= addr_gen2_bw <= available_bandwidth;
+  should_use_direct_path &= output_bw <= available_bandwidth;
+
+  return should_use_direct_path;
+}
+
 void MapMatrixOperation(const Operation &operation,
                         std::deque<BaseParams *> &mappedParams,
                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
@@ -649,12 +708,7 @@ void MapMatrixOperation(const Operation &operation,
   }
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
-  // the double buffered accum buffer doesn't need to be used if there's no
-  // vector operation or if the vector operation does not use high precision
-  if ((vector_params->addr_gen1_mode == 0 ||
-       vector_params->addr_gen1_dtype == 0) &&
-      (vector_params->addr_gen2_mode == 0 ||
-       vector_params->addr_gen2_dtype == 0)) {
+  if (should_use_direct_path(vector_params)) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
     vector_params->addr_gen0_mode = 0;
     matrix_params->write_output_to_accum_buffer = false;
