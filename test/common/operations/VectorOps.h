@@ -8,8 +8,8 @@
 using namespace ac_math;
 
 const std::set<std::string> unary_ops = {"relu", "relu_", "gelu", "gelu_",
-                                         "silu", "silu_", "sqrt", "sqrt_",
-                                         "neg",  "neg_"};
+                                         "tanh", "tanh_", "silu", "silu_",
+                                         "sqrt", "sqrt_", "neg",  "neg_"};
 const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
                                            "mul", "mul_", "div", "div_"};
 
@@ -31,6 +31,14 @@ inline T silu(T i) {
 }
 
 template <typename T>
+inline T tanh(T i) {
+  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
+  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> output_type;
+  input_type x = i.template to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
+  return ac_tanh_pwl<output_type>(x);
+}
+
+template <typename T>
 inline T *perform_unary_operation(T *input, const std::vector<int> shape,
                                   const std::string opcode) {
   int result_size = get_size(shape);
@@ -42,6 +50,8 @@ inline T *perform_unary_operation(T *input, const std::vector<int> shape,
       result[i] = input[i] < zero ? zero : input[i];
     } else if (opcode == "gelu" || opcode == "gelu_") {
       result[i] = gelu(input[i]);
+    } else if (opcode == "tanh" || opcode == "tanh_") {
+      result[i] = tanh(input[i]);
     } else if (opcode == "silu" || opcode == "silu_") {
       result[i] = silu(input[i]);
     } else if (opcode == "sqrt" || opcode == "sqrt_") {

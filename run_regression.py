@@ -453,6 +453,13 @@ ACCURACY_RESULTS = {
         "MXINT8": 91.0,
         "P8_1": 90.37,
     },
+    "bert": {
+        "E4M3": 93.1,
+        "CFLOAT": 93.2,
+        "INT8": 91.4,
+        "MXINT8": 93.1,
+        "P8_1": 92.8,
+    },
 }
 
 
@@ -486,6 +493,20 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             stderr=subprocess.STDOUT,
         )
 
+    # Dump model parameters
+    if model == "resnet18":
+        model_path = "IMAGENET1K_V1"
+    elif model == "resnet50":
+        model_path = "IMAGENET1K_V2"
+    elif model == "mobilebert" and dataset == "sst2":
+        model_path = "models/mobilebert/mobilebert-tiny-sst2-bf16/"
+    elif model == "mobilebert" and dataset == "squad":
+        model_path = "models/mobilebert/mobilebert-tiny-squad-bf16/"
+    elif model == "bert" and dataset == "sst2":
+        model_path = "JeremiahZ/bert-base-uncased-sst2"
+    else:
+        raise ValueError("Invalid model")
+
     # Generate input samples from dataset
     if dataset == "imagenet":
         imagenet_path = "/sim2/shared/MINOTAUR/nn_data/imagenet_1000/data/"
@@ -511,7 +532,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--dataset",
                 "sst2",
                 "--model_name_or_path",
-                "models/mobilebert/mobilebert-tiny-sst2-bf16/",
+                model_path,
                 "--output_dir",
                 output_data_dir,
             ]
@@ -525,25 +546,13 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--dataset",
                 "squad",
                 "--model_name_or_path",
-                "models/mobilebert/mobilebert-tiny-squad-bf16/",
+                model_path,
                 "--output_dir",
                 output_data_dir,
             ]
         )
     else:
         raise ValueError("Invalid dataset")
-
-    # Dump model parameters
-    if model == "resnet18":
-        model_path = "IMAGENET1K_V1"
-    elif model == "resnet50":
-        model_path = "IMAGENET1K_V2"
-    elif model == "mobilebert" and dataset == "sst2":
-        model_path = "models/mobilebert/mobilebert-tiny-sst2-bf16/"
-    elif model == "mobilebert" and dataset == "squad":
-        model_path = "models/mobilebert/mobilebert-tiny-squad-bf16/"
-    else:
-        raise ValueError("Invalid model")
 
     block_size = max(os.environ["OC_DIMENSION"], os.environ["IC_DIMENSION"])
 
@@ -646,7 +655,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=3 * 60 * 60,
+                timeout=5 * 60 * 60 if model == "bert" else 3 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{dataset} timed out")

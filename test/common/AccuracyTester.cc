@@ -94,7 +94,7 @@ bool run_sample(std::string model_name, std::string data_dir,
 
   // Get ground truth from folder name
   int ground_truth;
-  if (model_name == "mobilebert") {
+  if (model_name == "mobilebert" || model_name == "bert") {
     // last character of folder name is 0 or 1
     ground_truth = sample.back() - '0';
   } else if (model_name == "resnet18" || model_name == "resnet50") {
