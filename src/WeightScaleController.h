@@ -76,87 +76,99 @@ SC_MODULE(WeightScaleController) {
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        ac_int<LOOP_WIDTH, false> k2 = loop_counters
-                            [0][params.weightAddressGenWeightLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> K2 = loop_bounds
-                            [0][params.weightAddressGenWeightLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> k1 = loop_counters
-                            [1][params.weightAddressGenWeightLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> K1 = loop_bounds
-                            [1][params.weightAddressGenWeightLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> C1 = loop_bounds
-                            [1][params.weightAddressGenReductionLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                            [1][params.weightAddressGenReductionLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> fx =
-                            loop_counters[1][params.weightAddressGenFxIndex];
-                        ac_int<LOOP_WIDTH, false> FX =
-                            loop_bounds[1][params.weightAddressGenFxIndex];
-                        ac_int<LOOP_WIDTH, false> fy =
-                            loop_counters[1][params.weightAddressGenFyIndex];
-                        ac_int<LOOP_WIDTH, false> FY =
-                            loop_bounds[1][params.weightAddressGenFyIndex];
-                        ac_int<LOOP_WIDTH, false> c0 = loop_counters
-                            [1][params.weightAddressGenReductionLoopIndex[2]];
-                        ac_int<LOOP_WIDTH, false> C0 = loop_bounds
-                            [1][params.weightAddressGenReductionLoopIndex[2]];
-                        ac_int<LOOP_WIDTH, false> c2 = loop_counters
-                            [0][params.weightAddressGenReductionLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> C2 = loop_bounds
-                            [0][params.weightAddressGenReductionLoopIndex[0]];
+              for (loop_counters[0][4] = 0;
+                   loop_counters[0][4] < loop_bounds[0][4];
+                   loop_counters[0][4]++) {
+                // inner memory
+                for (loop_counters[1][0] = 0;
+                     loop_counters[1][0] < loop_bounds[1][0];
+                     loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;
+                       loop_counters[1][1] < loop_bounds[1][1];
+                       loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;
+                         loop_counters[1][2] < loop_bounds[1][2];
+                         loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;
+                           loop_counters[1][3] < loop_bounds[1][3];
+                           loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;
+                             loop_counters[1][4] < loop_bounds[1][4];
+                             loop_counters[1][4]++) {
+                          ac_int<LOOP_WIDTH, false> k2 = loop_counters
+                              [0][params.weightAddressGenWeightLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> K2 = loop_bounds
+                              [0][params.weightAddressGenWeightLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> k1 = loop_counters
+                              [1][params.weightAddressGenWeightLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> K1 = loop_bounds
+                              [1][params.weightAddressGenWeightLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> C1 = loop_bounds
+                              [1][params.weightAddressGenReductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> c1 = loop_counters
+                              [1][params.weightAddressGenReductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> fx =
+                              loop_counters[1][params.weightAddressGenFxIndex];
+                          ac_int<LOOP_WIDTH, false> FX =
+                              loop_bounds[1][params.weightAddressGenFxIndex];
+                          ac_int<LOOP_WIDTH, false> fy0 =
+                              loop_counters[1]
+                                           [params.weightAddressGenFyIndex[1]];
+                          ac_int<LOOP_WIDTH, false> fy1 =
+                              loop_counters[0]
+                                           [params.weightAddressGenFyIndex[0]];
+                          ac_int<LOOP_WIDTH, false> FY1 =
+                              loop_bounds[0][params.weightAddressGenFyIndex[0]];
+                          ac_int<LOOP_WIDTH, false> c0 = loop_counters
+                              [1][params.weightAddressGenReductionLoopIndex[2]];
+                          ac_int<LOOP_WIDTH, false> C0 = loop_bounds
+                              [1][params.weightAddressGenReductionLoopIndex[2]];
+                          ac_int<LOOP_WIDTH, false> c2 = loop_counters
+                              [0][params.weightAddressGenReductionLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> C2 = loop_bounds
+                              [0][params.weightAddressGenReductionLoopIndex[0]];
 
-                        ac_int<16, false> c = (c2 * C1 * C0 + c1 * C0 + c0);
-                        ac_int<16, false> C = (C2 * C1 * C0);
+                          ac_int<16, false> c = (c2 * C1 * C0 + c1 * C0 + c0);
+                          ac_int<16, false> C = (C2 * C1 * C0);
 
-                        ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
-                        ac_int<16, false> K = K2 * K1 * NCols;
+                          ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
+                          ac_int<16, false> K = K2 * K1 * NCols;
+                          ac_int<16, false> fy = fy0 * FY1 + fy1;
 
-                        if (c % BLOCK_SIZE == 0) {
-                          c = c / BLOCK_SIZE;
-                          C = C / BLOCK_SIZE;
-                          ac_int<32, false> address =
-                              (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
+                          if (c % BLOCK_SIZE == 0) {
+                            c = c / BLOCK_SIZE;
+                            C = C / BLOCK_SIZE;
+                            ac_int<32, false> address =
+                                (fy * FX * C * K) + (fx * C * K) + (c * K) + k;
 
-                          MemoryRequest request = {
-                              params.WEIGHT_SCALE_OFFSET +
-                                  address * Scale::width / 8,
-                              NCols * Scale::width / 8};
-                          addressRequest.Push(request);
+                            MemoryRequest request = {
+                                params.WEIGHT_SCALE_OFFSET +
+                                    address * Scale::width / 8,
+                                NCols * Scale::width / 8};
+                            addressRequest.Push(request);
+                          }
+
+                          if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                            break;
+                          }
                         }
-
-                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
                   break;
                 }
               }
@@ -214,106 +226,113 @@ SC_MODULE(WeightScaleController) {
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              int num_total_writes = loop_bounds[1][0] * loop_bounds[1][1] *
-                                     loop_bounds[1][2] * loop_bounds[1][3] *
-                                     loop_bounds[1][4] / NCols;
-              int num_writes = 0;
-              // inner memory
-              for (loop_counters[1][0] = 0;
-                   loop_counters[1][0] < loop_bounds[1][0];
-                   loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;
-                     loop_counters[1][1] < loop_bounds[1][1];
-                     loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;
-                       loop_counters[1][2] < loop_bounds[1][2];
-                       loop_counters[1][2]++) {
-                    for (loop_counters[1][3] = 0;
-                         loop_counters[1][3] < loop_bounds[1][3];
-                         loop_counters[1][3]++) {
-                      for (loop_counters[1][4] = 0;
-                           loop_counters[1][4] < loop_bounds[1][4];
-                           loop_counters[1][4]++) {
-                        ac_int<LOOP_WIDTH, false> k2 = loop_counters
-                            [0][params.weightAddressGenWeightLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> K2 = loop_bounds
-                            [0][params.weightAddressGenWeightLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> k1 = loop_counters
-                            [1][params.weightAddressGenWeightLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> K1 = loop_bounds
-                            [1][params.weightAddressGenWeightLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> C1 = loop_bounds
-                            [1][params.weightAddressGenReductionLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                            [1][params.weightAddressGenReductionLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> fx =
-                            loop_counters[1][params.weightAddressGenFxIndex];
-                        ac_int<LOOP_WIDTH, false> FX =
-                            loop_bounds[1][params.weightAddressGenFxIndex];
-                        ac_int<LOOP_WIDTH, false> fy =
-                            loop_counters[1][params.weightAddressGenFyIndex];
-                        ac_int<LOOP_WIDTH, false> FY =
-                            loop_bounds[1][params.weightAddressGenFyIndex];
-                        ac_int<LOOP_WIDTH, false> c0 = loop_counters
-                            [1][params.weightAddressGenReductionLoopIndex[2]];
-                        ac_int<LOOP_WIDTH, false> C0 = loop_bounds
-                            [1][params.weightAddressGenReductionLoopIndex[2]];
-                        ac_int<LOOP_WIDTH, false> c2 = loop_counters
-                            [0][params.weightAddressGenReductionLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> C2 = loop_bounds
-                            [0][params.weightAddressGenReductionLoopIndex[0]];
+              for (loop_counters[0][4] = 0;
+                   loop_counters[0][4] < loop_bounds[0][4];
+                   loop_counters[0][4]++) {
+                int num_total_writes = loop_bounds[1][0] * loop_bounds[1][1] *
+                                       loop_bounds[1][2] * loop_bounds[1][3] *
+                                       loop_bounds[1][4] / NCols;
+                int num_writes = 0;
+                // inner memory
+                for (loop_counters[1][0] = 0;
+                     loop_counters[1][0] < loop_bounds[1][0];
+                     loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;
+                       loop_counters[1][1] < loop_bounds[1][1];
+                       loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;
+                         loop_counters[1][2] < loop_bounds[1][2];
+                         loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;
+                           loop_counters[1][3] < loop_bounds[1][3];
+                           loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;
+                             loop_counters[1][4] < loop_bounds[1][4];
+                             loop_counters[1][4]++) {
+                          ac_int<LOOP_WIDTH, false> k2 = loop_counters
+                              [0][params.weightAddressGenWeightLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> K2 = loop_bounds
+                              [0][params.weightAddressGenWeightLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> k1 = loop_counters
+                              [1][params.weightAddressGenWeightLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> K1 = loop_bounds
+                              [1][params.weightAddressGenWeightLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> C1 = loop_bounds
+                              [1][params.weightAddressGenReductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> c1 = loop_counters
+                              [1][params.weightAddressGenReductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> fx =
+                              loop_counters[1][params.weightAddressGenFxIndex];
+                          ac_int<LOOP_WIDTH, false> FX =
+                              loop_bounds[1][params.weightAddressGenFxIndex];
+                          ac_int<LOOP_WIDTH, false> fy0 =
+                              loop_counters[1]
+                                           [params.weightAddressGenFyIndex[1]];
+                          ac_int<LOOP_WIDTH, false> FY1 =
+                              loop_bounds[1][params.weightAddressGenFyIndex[1]];
+                          ac_int<LOOP_WIDTH, false> c0 = loop_counters
+                              [1][params.weightAddressGenReductionLoopIndex[2]];
+                          ac_int<LOOP_WIDTH, false> C0 = loop_bounds
+                              [1][params.weightAddressGenReductionLoopIndex[2]];
+                          ac_int<LOOP_WIDTH, false> c2 = loop_counters
+                              [0][params.weightAddressGenReductionLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> C2 = loop_bounds
+                              [0][params.weightAddressGenReductionLoopIndex[0]];
 
-                        ac_int<16, false> C = C0 * C1;
-                        ac_int<16, false> c = c1 * C0 + c0;
-                        ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
-                        ac_int<16, false> K = K2 * K1 * NCols;
+                          ac_int<16, false> C = C0 * C1;
+                          ac_int<16, false> c = c1 * C0 + c0;
+                          ac_int<16, false> k = k2 * K1 * NCols + k1 * NCols;
+                          ac_int<16, false> K = K2 * K1 * NCols;
 
-                        if (c % BLOCK_SIZE == 0) {
-                          c = c / BLOCK_SIZE;
-                          C = C > BLOCK_SIZE ? static_cast<int>(C / BLOCK_SIZE)
-                                             : 1;
+                          if (c % BLOCK_SIZE == 0) {
+                            c = c / BLOCK_SIZE;
+                            C = C > BLOCK_SIZE
+                                    ? static_cast<int>(C / BLOCK_SIZE)
+                                    : 1;
 
-                          int address = (fy * FX * C * K1) + (fx * C * K1) +
-                                        (c * K1) + k1;
+                            int address = (fy0 * FX * C * K1) + (fx * C * K1) +
+                                          (c * K1) + k1;
 
-                          ac_int<Scale::width * NCols, false> data;
+                            ac_int<Scale::width * NCols, false> data;
 
-                          process_matrix_input<Scale, NCols, PortWidth,
-                                               Scale::width * NCols>(
-                              dataResponse, data);
+                            process_matrix_input<Scale, NCols, PortWidth,
+                                                 Scale::width * NCols>(
+                                dataResponse, data);
 
-                          BufferWriteRequest<
-                              ac_int<Scale::width * NCols, false>>
-                              req;
-                          req.address = address;
-                          req.data = data;
-                          req.last = num_writes == num_total_writes - 1;
-                          writeRequest[bankSel].Push(req);
-                          num_writes++;
+                            BufferWriteRequest<
+                                ac_int<Scale::width * NCols, false>>
+                                req;
+                            req.address = address;
+                            req.data = data;
+                            req.last = num_writes == num_total_writes - 1;
+                            writeRequest[bankSel].Push(req);
+                            num_writes++;
+                          }
+                          if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                            break;
+                          }
                         }
-
-                        // CCS_LOG("c: " << c);
-                        if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                        if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                      if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                         break;
                       }
                     }
-                    if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                    if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                       break;
                     }
                   }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                  if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
                     break;
                   }
                 }
-                if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                bankSel = !bankSel;
+                if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
                   break;
                 }
               }
-              bankSel = !bankSel;
               if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
                 break;
               }
@@ -361,8 +380,8 @@ SC_MODULE(WeightScaleController) {
       loop_bounds[1][params.weightReuseIndex[0]] = 1;
       loop_bounds[1][params.weightReuseIndex[1]] = 1;
 
-      // extra loop to control reuse which only occurs during transpose and when
-      // NCols > NRows
+      // extra loop to control reuse which only occurs during transpose and
+      // when NCols > NRows
       int rep_bound = 1;
       if (params.has_weight_transpose && NCols > NRows) {
         if (loop_bounds[1][0] >= (NCols / NRows)) {
@@ -373,8 +392,8 @@ SC_MODULE(WeightScaleController) {
       }
 
       // extra loop for exploiting L1 buffer reuse.
-      // this loop is used when OX and OY are the innermost L2 loops. when this
-      // occurs, we can move OX and/or OY into the buffer reuse L1 loop
+      // this loop is used when OX and OY are the innermost L2 loops. when
+      // this occurs, we can move OX and/or OY into the buffer reuse L1 loop
       int buffer_reuse = 1;
       if (params.loops[0][params.reductionLoopIndex[0]] == 1) {
         // OX loop can be absorbed
@@ -400,107 +419,113 @@ SC_MODULE(WeightScaleController) {
             for (loop_counters[0][3] = 0;
                  loop_counters[0][3] < loop_bounds[0][3];
                  loop_counters[0][3]++) {
-              for (int reuse = 0; reuse < buffer_reuse; reuse++) {
-                for (int rep = 0; rep < rep_bound; rep++) {
-                  for (loop_counters[1][0] = 0;
-                       loop_counters[1][0] < loop_bounds[1][0];
-                       loop_counters[1][0]++) {
-                    for (loop_counters[1][1] = 0;
-                         loop_counters[1][1] < loop_bounds[1][1];
-                         loop_counters[1][1]++) {
-                      for (loop_counters[1][2] = 0;
-                           loop_counters[1][2] < loop_bounds[1][2];
-                           loop_counters[1][2]++) {
-                        for (loop_counters[1][3] = 0;
-                             loop_counters[1][3] < loop_bounds[1][3];
-                             loop_counters[1][3]++) {
-                          for (loop_counters[1][4] = 0;
-                               loop_counters[1][4] < loop_bounds[1][4];
-                               loop_counters[1][4]++) {
-                            for (loop_counters[1][5] = 0;
-                                 loop_counters[1][5] < loop_bounds[1][5];
-                                 loop_counters[1][5]++) {
-                              ac_int<LOOP_WIDTH, false> k2 =
-                                  loop_counters[0][params.weightLoopIndex[0]];
-                              ac_int<LOOP_WIDTH, false> K2 =
-                                  params.loops[0][params.weightLoopIndex[0]];
-                              ac_int<LOOP_WIDTH, false> k1 =
-                                  loop_counters[1][params.weightLoopIndex[1]];
-                              ac_int<LOOP_WIDTH, false> K1 =
-                                  params.loops[1][params.weightLoopIndex[1]];
-                              ac_int<LOOP_WIDTH, false> C1 =
-                                  params.loops[1][params.reductionLoopIndex[1]];
-                              ac_int<LOOP_WIDTH, false> c1 =
-                                  loop_counters[1]
-                                               [params.reductionLoopIndex[1]];
-                              ac_int<LOOP_WIDTH, false> fx =
-                                  loop_counters[1][params.fxIndex];
-                              ac_int<LOOP_WIDTH, false> FX =
-                                  params.loops[1][params.fxIndex];
-                              ac_int<LOOP_WIDTH, false> fy =
-                                  loop_counters[1][params.fyIndex];
-                              ac_int<LOOP_WIDTH, false> FY =
-                                  params.loops[1][params.fyIndex];
-                              ac_int<16, false> k =
-                                  k2 * K1 * NCols + k1 * NCols;
-                              ac_int<16, false> K = K2 * K1 * NCols;
+              for (loop_counters[0][4] = 0;
+                   loop_counters[0][4] < loop_bounds[0][4];
+                   loop_counters[0][4]++) {
+                for (int reuse = 0; reuse < buffer_reuse; reuse++) {
+                  for (int rep = 0; rep < rep_bound; rep++) {
+                    for (loop_counters[1][0] = 0;
+                         loop_counters[1][0] < loop_bounds[1][0];
+                         loop_counters[1][0]++) {
+                      for (loop_counters[1][1] = 0;
+                           loop_counters[1][1] < loop_bounds[1][1];
+                           loop_counters[1][1]++) {
+                        for (loop_counters[1][2] = 0;
+                             loop_counters[1][2] < loop_bounds[1][2];
+                             loop_counters[1][2]++) {
+                          for (loop_counters[1][3] = 0;
+                               loop_counters[1][3] < loop_bounds[1][3];
+                               loop_counters[1][3]++) {
+                            for (loop_counters[1][4] = 0;
+                                 loop_counters[1][4] < loop_bounds[1][4];
+                                 loop_counters[1][4]++) {
+                              for (loop_counters[1][5] = 0;
+                                   loop_counters[1][5] < loop_bounds[1][5];
+                                   loop_counters[1][5]++) {
+                                ac_int<LOOP_WIDTH, false> k2 =
+                                    loop_counters[0][params.weightLoopIndex[0]];
+                                ac_int<LOOP_WIDTH, false> K2 =
+                                    params.loops[0][params.weightLoopIndex[0]];
+                                ac_int<LOOP_WIDTH, false> k1 =
+                                    loop_counters[1][params.weightLoopIndex[1]];
+                                ac_int<LOOP_WIDTH, false> K1 =
+                                    params.loops[1][params.weightLoopIndex[1]];
+                                ac_int<LOOP_WIDTH, false> C1 =
+                                    params
+                                        .loops[1][params.reductionLoopIndex[1]];
+                                ac_int<LOOP_WIDTH, false> c1 =
+                                    loop_counters[1]
+                                                 [params.reductionLoopIndex[1]];
+                                ac_int<LOOP_WIDTH, false> fx =
+                                    loop_counters[1][params.fxIndex];
+                                ac_int<LOOP_WIDTH, false> FX =
+                                    params.loops[1][params.fxIndex];
+                                ac_int<LOOP_WIDTH, false> fy0 =
+                                    loop_counters[1][params.fyIndex[1]];
+                                ac_int<16, false> k =
+                                    k2 * K1 * NCols + k1 * NCols;
+                                ac_int<16, false> K = K2 * K1 * NCols;
 
-                              ac_int<32, false> address = fy * FX * C1 * K1 +
-                                                          fx * C1 * K1 +
-                                                          c1 * K1 + k1;
+                                ac_int<32, false> address = fy0 * FX * C1 * K1 +
+                                                            fx * C1 * K1 +
+                                                            c1 * K1 + k1;
 
-                              BufferReadRequest req;
-                              req.address = address;
-                              req.last = loop_counters[1][5] ==
-                                             loop_bounds[1][5] - 1 &&
-                                         loop_counters[1][4] ==
-                                             loop_bounds[1][4] - 1 &&
-                                         loop_counters[1][3] ==
-                                             loop_bounds[1][3] - 1 &&
-                                         loop_counters[1][2] ==
-                                             loop_bounds[1][2] - 1 &&
-                                         loop_counters[1][1] ==
-                                             loop_bounds[1][1] - 1 &&
-                                         loop_counters[1][0] ==
-                                             loop_bounds[1][0] - 1 &&
-                                         rep == rep_bound - 1 &&
-                                         reuse == buffer_reuse - 1;
+                                BufferReadRequest req;
+                                req.address = address;
+                                req.last = loop_counters[1][5] ==
+                                               loop_bounds[1][5] - 1 &&
+                                           loop_counters[1][4] ==
+                                               loop_bounds[1][4] - 1 &&
+                                           loop_counters[1][3] ==
+                                               loop_bounds[1][3] - 1 &&
+                                           loop_counters[1][2] ==
+                                               loop_bounds[1][2] - 1 &&
+                                           loop_counters[1][1] ==
+                                               loop_bounds[1][1] - 1 &&
+                                           loop_counters[1][0] ==
+                                               loop_bounds[1][0] - 1 &&
+                                           rep == rep_bound - 1 &&
+                                           reuse == buffer_reuse - 1;
 
-                              readAddress[bankSel].Push(req);
+                                readAddress[bankSel].Push(req);
 
-                              if (loop_counters[1][5] >=
-                                  loop_bounds[1][5] - 1) {
+                                if (loop_counters[1][5] >=
+                                    loop_bounds[1][5] - 1) {
+                                  break;
+                                }
+                              }
+                              if (loop_counters[1][4] >=
+                                  loop_bounds[1][4] - 1) {
                                 break;
                               }
                             }
-                            if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
+                            if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
                               break;
                             }
                           }
-                          if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
+                          if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
                             break;
                           }
                         }
-                        if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
+                        if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
                           break;
                         }
                       }
-                      if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
-                        break;
-                      }
+                    }
+
+                    if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
+                      break;
+                    }
+                    if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
+                      break;
                     }
                   }
-
-                  if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
-                    break;
-                  }
-                  if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
-                    break;
-                  }
+                }
+                bankSel = !bankSel;
+                if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
+                  break;
                 }
               }
-              // std::cout << "Reading ---- " << std::endl;
-              bankSel = !bankSel;
               if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
                 break;
               }

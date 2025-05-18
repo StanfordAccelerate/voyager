@@ -13,7 +13,7 @@ struct Tiling {
   int reduction_loop_index[2];
   int weight_loop_index[2];
   int fx_index;
-  int fy_index;
+  int fy_index[2];
   int weight_reuse_index[2];
   int stride;
   int padding;

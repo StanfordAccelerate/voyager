@@ -223,10 +223,11 @@ void MapMatrixOperation(const Operation &operation,
         .reduction_loop_index = {3, 0},
         .weight_loop_index = {2, 1},
         .fx_index = 3,
-        .fy_index = 2,
+        .fy_index = {4, 2},
         .weight_reuse_index = {4, 5},
         .stride = 1,
-        .replication = false,
+        .resnet_replication = false,
+        .generic_replication = false,
     };
   } else {
     tiling = get_tiling(operation);
@@ -299,9 +300,9 @@ void MapMatrixOperation(const Operation &operation,
     matrix_params->reductionLoopIndex[i] = tiling.reduction_loop_index[i];
     matrix_params->weightLoopIndex[i] = tiling.weight_loop_index[i];
     matrix_params->weightReuseIndex[i] = tiling.weight_reuse_index[i];
+    matrix_params->fyIndex[i] = tiling.fy_index[i];
   }
   matrix_params->fxIndex = tiling.fx_index;
-  matrix_params->fyIndex = tiling.fy_index;
 
   // set outer loop values
   for (int j = 0; j < 5; j++) {
@@ -311,6 +312,7 @@ void MapMatrixOperation(const Operation &operation,
       tiling.weight_loop_index[0];
   matrix_params->weightAddressGenReductionLoopIndex[0] =
       tiling.reduction_loop_index[0];
+  matrix_params->weightAddressGenFyIndex[0] = tiling.fy_index[0];
 
   // if OX and OY loops are the innermost L2 loops, they are irrelevant for
   // weight address generation
@@ -341,8 +343,8 @@ void MapMatrixOperation(const Operation &operation,
 
     // FY loop
     matrix_params->weightAddressGenLoops[1][2] =
-        tiling.loops[1][tiling.fy_index];
-    matrix_params->weightAddressGenFyIndex = 2;
+        tiling.loops[1][tiling.fy_index[1]];
+    matrix_params->weightAddressGenFyIndex[1] = 2;
 
     // K loop
     matrix_params->weightAddressGenLoops[1][1] =
@@ -379,8 +381,8 @@ void MapMatrixOperation(const Operation &operation,
 
     // FY loop
     matrix_params->weightAddressGenLoops[1][3] =
-        tiling.loops[1][tiling.fy_index];
-    matrix_params->weightAddressGenFyIndex = 3;
+        tiling.loops[1][tiling.fy_index[1]];
+    matrix_params->weightAddressGenFyIndex[1] = 3;
 
     // FX loop
     matrix_params->weightAddressGenLoops[1][2] =

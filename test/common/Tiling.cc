@@ -21,7 +21,8 @@ std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   os << "Weight Loop Index: " << tiling.weight_loop_index[0] << " "
      << tiling.weight_loop_index[1] << std::endl;
   os << "FX Index: " << tiling.fx_index << std::endl;
-  os << "FY Index: " << tiling.fy_index << std::endl;
+  os << "FY Index: " << tiling.fy_index[0] << " " << tiling.fy_index[1]
+     << std::endl;
   os << "Weight Reuse Index: " << tiling.weight_reuse_index[0] << " "
      << tiling.weight_reuse_index[1] << std::endl;
   os << "Stride: " << tiling.stride << std::endl;
@@ -81,8 +82,8 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   }
 
   accelerator_tiling.fx_index = -1;
-  accelerator_tiling.fy_index = -1;
   for (int i = 0; i < 2; i++) {
+    accelerator_tiling.fy_index[i] = -1;
     accelerator_tiling.x_loop_index[i] = -1;
     accelerator_tiling.y_loop_index[i] = -1;
     accelerator_tiling.reduction_loop_index[i] = -1;
@@ -105,7 +106,7 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
         accelerator_tiling.fx_index = loop_index;
       } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
                  voyager::Loop::FY) {
-        accelerator_tiling.fy_index = loop_index;
+        accelerator_tiling.fy_index[1] = loop_index;
       } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
                  voyager::Loop::OC) {
         accelerator_tiling.weight_loop_index[1] = loop_index;
@@ -125,8 +126,8 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   while (loop_index >= 1) {
     if (accelerator_tiling.fx_index == -1) {
       accelerator_tiling.fx_index = loop_index;
-    } else if (accelerator_tiling.fy_index == -1) {
-      accelerator_tiling.fy_index = loop_index;
+    } else if (accelerator_tiling.fy_index[1] == -1) {
+      accelerator_tiling.fy_index[1] = loop_index;
     } else if (accelerator_tiling.weight_loop_index[1] == -1) {
       accelerator_tiling.weight_loop_index[1] = loop_index;
     } else if (accelerator_tiling.x_loop_index[1] == -1) {
@@ -145,8 +146,8 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   for (int i = loop_index; i < 6; i++) {
     if (accelerator_tiling.fx_index == -1) {
       accelerator_tiling.fx_index = 5 - i;
-    } else if (accelerator_tiling.fy_index == -1) {
-      accelerator_tiling.fy_index = 5 - i;
+    } else if (accelerator_tiling.fy_index[1] == -1) {
+      accelerator_tiling.fy_index[1] = 5 - i;
     } else if (accelerator_tiling.weight_loop_index[1] == -1) {
       accelerator_tiling.weight_loop_index[1] = 5 - i;
     } else if (accelerator_tiling.x_loop_index[1] == -1) {
@@ -170,45 +171,50 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   }
 
   // L2 level
-  int offset = 0;
+  accelerator_tiling.loops[0][4] = 1;
+  accelerator_tiling.fy_index[0] = 4;
+
+  int offset = 1;
   if (tiling.level_tilings(1).loop_bounds_size() > 0 &&
       tiling.level_tilings(1).loop_bounds(0).loop() != voyager::Loop::IC) {
     // if the first loop is not IC, then we need to manually set the IC loop to
     // 1
     accelerator_tiling.loops[0][3] = 1;
     accelerator_tiling.reduction_loop_index[0] = 3;
-    offset = 1;
+    offset++;
   }
 
   for (int i = 0; i < tiling.level_tilings(1).loop_bounds_size(); i++) {
-    accelerator_tiling.loops[0][3 - offset - i] =
+    accelerator_tiling.loops[0][4 - offset - i] =
         tiling.level_tilings(1).loop_bounds(i).bound();
     if (tiling.level_tilings(1).loop_bounds(i).loop() == voyager::Loop::OC) {
-      accelerator_tiling.weight_loop_index[0] = 3 - offset - i;
+      accelerator_tiling.weight_loop_index[0] = 4 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
                voyager::Loop::OX) {
-      accelerator_tiling.x_loop_index[0] = 3 - offset - i;
+      accelerator_tiling.x_loop_index[0] = 4 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
                voyager::Loop::OY) {
-      accelerator_tiling.y_loop_index[0] = 3 - offset - i;
+      accelerator_tiling.y_loop_index[0] = 4 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
                voyager::Loop::IC) {
-      accelerator_tiling.reduction_loop_index[0] = 3 - offset - i;
+      accelerator_tiling.reduction_loop_index[0] = 4 - offset - i;
     }
   }
 
   // set any unset loop indices
-  for (int i = tiling.level_tilings(1).loop_bounds_size() - 1; i < 3 - offset;
+  for (int i = tiling.level_tilings(1).loop_bounds_size() - 1; i < 4 - offset;
        i++) {
-    accelerator_tiling.loops[0][2 - i - offset] = 1;
+    accelerator_tiling.loops[0][3 - i - offset] = 1;
     if (accelerator_tiling.weight_loop_index[0] == -1) {
-      accelerator_tiling.weight_loop_index[0] = 2 - i - offset;
+      accelerator_tiling.weight_loop_index[0] = 3 - i - offset;
     } else if (accelerator_tiling.x_loop_index[0] == -1) {
-      accelerator_tiling.x_loop_index[0] = 2 - i - offset;
+      accelerator_tiling.x_loop_index[0] = 3 - i - offset;
     } else if (accelerator_tiling.y_loop_index[0] == -1) {
-      accelerator_tiling.y_loop_index[0] = 2 - i - offset;
+      accelerator_tiling.y_loop_index[0] = 3 - i - offset;
     } else if (accelerator_tiling.reduction_loop_index[0] == -1) {
-      accelerator_tiling.reduction_loop_index[0] = 2 - i - offset;
+      accelerator_tiling.reduction_loop_index[0] = 3 - i - offset;
+    } else if (accelerator_tiling.fy_index[0] == -1) {
+      accelerator_tiling.fy_index[0] = 3 - i - offset;
     }
   }
 
@@ -275,13 +281,13 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
     }
 
     Tiling tiling = {
-        .loops = {{7, 2, 48, 1, 1, 1}, {1, 1, fy, fx / fx_unrolling, 2, 7}},
+        .loops = {{7, 1, 24, 1, fy, 1}, {1, 2, 1, fx / fx_unrolling, 2, 14}},
         .x_loop_index = {1, 5},
         .y_loop_index = {0, 4},
         .reduction_loop_index = {3, 0},
         .weight_loop_index = {2, 1},
         .fx_index = 3,
-        .fy_index = 2,
+        .fy_index = {4, 2},
         .weight_reuse_index = {4, 5},
         .stride = stride,
         .padding = 0,
@@ -344,7 +350,7 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
         .reduction_loop_index = {3, 0},
         .weight_loop_index = {2, 1},
         .fx_index = 3,
-        .fy_index = 2,
+        .fy_index = {4, 2},
         .weight_reuse_index = {4, 5},
         .stride = stride,
         .padding = 3,
@@ -454,7 +460,7 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
       .reduction_loop_index = {3, 0},
       .weight_loop_index = {2, 1},
       .fx_index = 3,
-      .fy_index = 2,
+      .fy_index = {4, 2},
       .weight_reuse_index = {4, 5},
       .stride = stride,
       .padding = padding,
@@ -533,7 +539,7 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
       .reduction_loop_index = {3, 0},
       .weight_loop_index = {2, 1},
       .fx_index = 3,
-      .fy_index = 2,
+      .fy_index = {4, 2},
       .weight_reuse_index = {4, 5},
       .stride = 1,
       .padding = 0,
@@ -592,7 +598,7 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
       .reduction_loop_index = {3, 0},
       .weight_loop_index = {2, 1},
       .fx_index = 3,
-      .fy_index = 2,
+      .fy_index = {4, 2},
       .weight_reuse_index = {4, 5},
       .stride = stride,
       .padding = actual_padding,

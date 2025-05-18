@@ -33,9 +33,9 @@ struct MatrixParams : BaseParams {
       reductionLoopIndex[i] = 0;
       weightLoopIndex[i] = 0;
       weightReuseIndex[i] = 0;
+      fyIndex[i] = 0;
     }
     fxIndex = 0;
-    fyIndex = 0;
     stride = 1;
     padding = 0;
 
@@ -50,8 +50,10 @@ struct MatrixParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       weightAddressGenWeightLoopIndex[i] = 0;
     }
+    for (int i = 0; i < 2; i++) {
+      weightAddressGenFyIndex[i] = 0;
+    }
     weightAddressGenFxIndex = 0;
-    weightAddressGenFyIndex = 0;
 
     input_dtype = 0;
     weight_dtype = 0;
@@ -96,8 +98,8 @@ struct MatrixParams : BaseParams {
   ac_int<3, false> inputYLoopIndex[2];
   ac_int<3, false> reductionLoopIndex[2];
   ac_int<3, false> weightLoopIndex[2];
+  ac_int<3, false> fyIndex[2];
   ac_int<3, false> fxIndex;
-  ac_int<3, false> fyIndex;
   ac_int<3, false> weightReuseIndex[2];
   ac_int<5, false> stride;
   ac_int<2, false> padding;
@@ -109,8 +111,8 @@ struct MatrixParams : BaseParams {
   // the systolic array
   ac_int<3, false> weightAddressGenReductionLoopIndex[3];
   ac_int<3, false> weightAddressGenWeightLoopIndex[2];
+  ac_int<3, false> weightAddressGenFyIndex[2];
   ac_int<3, false> weightAddressGenFxIndex;
-  ac_int<3, false> weightAddressGenFyIndex;
 
   ac_int<DTYPE_INDEX_WIDTH, false> input_dtype;
   ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
@@ -139,8 +141,9 @@ struct MatrixParams : BaseParams {
 
   static const unsigned int base_width =
       5 * 64 /* OFFSETS */ + (12 + 10) * LOOP_WIDTH /* Loops */ +
-      19 * 3 /* Loop indices */ + 5 /* stride */ + 2 /* padding */ +
-      8 /* Head Size */ + 10 * 1 /* Bools */;
+      21 * 3 /* Loop indices */ + 5 /* stride */ + 2 /* padding */ +
+      8 /* Head Size */ + 2 /* num_channels */ + 3 /*fx_unrolling_lg2*/ +
+      11 * 1 /* Bools */;
 
   static const unsigned int extra_width =
       2 * DTYPE_INDEX_WIDTH + NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
@@ -174,8 +177,10 @@ struct MatrixParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& weightLoopIndex[i];
     }
+    for (int i = 0; i < 2; i++) {
+      m& fyIndex[i];
+    }
     m & fxIndex;
-    m & fyIndex;
     for (int i = 0; i < 2; i++) {
       m& weightReuseIndex[i];
     }
@@ -193,8 +198,10 @@ struct MatrixParams : BaseParams {
     for (int i = 0; i < 2; i++) {
       m& weightAddressGenWeightLoopIndex[i];
     }
+    for (int i = 0; i < 2; i++) {
+      m& weightAddressGenFyIndex[i];
+    }
     m & weightAddressGenFxIndex;
-    m & weightAddressGenFyIndex;
 
     m & input_dtype;
     m & weight_dtype;
@@ -261,8 +268,10 @@ struct MatrixParams : BaseParams {
       os << "weightLoopIndex[" << i << "]: " << params.weightLoopIndex[i]
          << std::endl;
     }
+    for (int i = 0; i < 2; i++) {
+      os << "fyIndex[" << i << "]: " << params.fyIndex[i] << std::endl;
+    }
     os << "fxIndex: " << params.fxIndex << std::endl;
-    os << "fyIndex: " << params.fyIndex << std::endl;
     for (int i = 0; i < 2; i++) {
       os << "weightReuseIndex[" << i << "]: " << params.weightReuseIndex[i]
          << std::endl;
@@ -283,9 +292,11 @@ struct MatrixParams : BaseParams {
       os << "weightAddressGenWeightLoopIndex[" << i
          << "]: " << params.weightAddressGenWeightLoopIndex[i] << std::endl;
     }
+    for (int i = 0; i < 2; i++) {
+      os << "weightAddressGenFyIndex[" << i
+         << "]: " << params.weightAddressGenFyIndex[i] << std::endl;
+    }
     os << "weightAddressGenFxIndex: " << params.weightAddressGenFxIndex
-       << std::endl;
-    os << "weightAddressGenFyIndex: " << params.weightAddressGenFyIndex
        << std::endl;
 
     os << "input_dtype: " << params.input_dtype << std::endl;
@@ -344,12 +355,15 @@ struct MatrixParams : BaseParams {
       if (lhs.inputYLoopIndex[i] != rhs.inputYLoopIndex[i]) return false;
       if (lhs.reductionLoopIndex[i] != rhs.reductionLoopIndex[i]) return false;
       if (lhs.weightLoopIndex[i] != rhs.weightLoopIndex[i]) return false;
+      if (lhs.fyIndex[i] != rhs.fyIndex[i]) return false;
       if (lhs.weightReuseIndex[i] != rhs.weightReuseIndex[i]) return false;
       if (lhs.weightAddressGenReductionLoopIndex[i] !=
           rhs.weightAddressGenReductionLoopIndex[i])
         return false;
       if (lhs.weightAddressGenWeightLoopIndex[i] !=
           rhs.weightAddressGenWeightLoopIndex[i])
+        return false;
+      if (lhs.weightAddressGenFyIndex[i] != rhs.weightAddressGenFyIndex[i])
         return false;
     }
 
@@ -358,9 +372,8 @@ struct MatrixParams : BaseParams {
       return false;
 
     // Compare other members
-    if (lhs.fxIndex != rhs.fxIndex || lhs.fyIndex != rhs.fyIndex) return false;
-    if ((lhs.weightAddressGenFxIndex != rhs.weightAddressGenFxIndex ||
-         lhs.weightAddressGenFyIndex != rhs.weightAddressGenFyIndex))
+    if (lhs.fxIndex != rhs.fxIndex) return false;
+    if (lhs.weightAddressGenFxIndex != rhs.weightAddressGenFxIndex)
       return false;
     if (lhs.stride != rhs.stride) return false;
     if (lhs.padding != rhs.padding) return false;

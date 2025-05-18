@@ -189,9 +189,9 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       ac_int<32, false> total_loops =
           loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
-          loop_bounds[0][3] * loop_bounds[1][0] * loop_bounds[1][1] *
-          loop_bounds[1][2] * loop_bounds[1][3] * loop_bounds[1][4] *
-          loop_bounds[1][5] * buffer_reuse * rep_bound;
+          loop_bounds[0][3] * loop_bounds[0][4] * loop_bounds[1][0] *
+          loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
+          loop_bounds[1][4] * loop_bounds[1][5] * buffer_reuse * rep_bound;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -263,11 +263,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         }
       }
 
-      ac_int<32, false> total_ops = params.loops[0][0] * params.loops[0][1] *
-                                    params.loops[0][2] * params.loops[0][3] *
-                                    params.loops[1][0] * params.loops[1][1] *
-                                    params.loops[1][2] * params.loops[1][3] *
-                                    params.loops[1][4] * params.loops[1][5];
+      ac_int<32, false> total_ops =
+          params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
+          params.loops[0][3] * params.loops[0][4] * params.loops[1][0] *
+          params.loops[1][1] * params.loops[1][2] * params.loops[1][3] *
+          params.loops[1][4] * params.loops[1][5];
 
       ac_int<32, false> step = 0;
 
@@ -387,11 +387,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         }
       }
 
-      ac_int<32, false> total_ops = params.loops[0][0] * params.loops[0][1] *
-                                    params.loops[0][2] * params.loops[0][3] *
-                                    params.loops[1][0] * params.loops[1][1] *
-                                    params.loops[1][2] * params.loops[1][3] *
-                                    params.loops[1][4] * params.loops[1][5];
+      ac_int<32, false> total_ops =
+          params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
+          params.loops[0][3] * params.loops[0][4] * params.loops[1][0] *
+          params.loops[1][1] * params.loops[1][2] * params.loops[1][3] *
+          params.loops[1][4] * params.loops[1][5];
 
       ac_int<32, false> step = 0;
 
@@ -414,7 +414,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             loop_counters[0][params.reductionLoopIndex[0]] == 0 &&
             loop_counters[1][params.reductionLoopIndex[1]] == 0 &&
             loop_counters[1][params.fxIndex] == 0 &&
-            loop_counters[1][params.fyIndex] == 0;
+            loop_counters[0][params.fyIndex[0]] == 0 &&
+            loop_counters[1][params.fyIndex[1]] == 0;
 
         Pack1D<Buffer, NCols> previous_accumulation;
 
@@ -500,8 +501,10 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
              params.loops[1][params.reductionLoopIndex[1]] - 1) &&
             (loop_counters[1][params.fxIndex] ==
              params.loops[1][params.fxIndex] - 1) &&
-            (loop_counters[1][params.fyIndex] ==
-             params.loops[1][params.fyIndex] - 1);
+            (loop_counters[0][params.fyIndex[0]] ==
+             params.loops[0][params.fyIndex[0]] - 1) &&
+            (loop_counters[1][params.fyIndex[1]] ==
+             params.loops[1][params.fyIndex[1]] - 1);
 
         if ((accumulation_finished && !DOUBLE_BUFFERED_ACCUM_BUFFER) ||
             (accumulation_finished && DOUBLE_BUFFERED_ACCUM_BUFFER &&
@@ -535,8 +538,10 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                params.loops[1][params.weightLoopIndex[1]] - 1) &&
               (loop_counters[1][params.fxIndex] ==
                params.loops[1][params.fxIndex] - 1) &&
-              (loop_counters[1][params.fyIndex] ==
-               params.loops[1][params.fyIndex] - 1) &&
+              (loop_counters[0][params.fyIndex[0]] ==
+               params.loops[0][params.fyIndex[0]] - 1) &&
+              (loop_counters[1][params.fyIndex[1]] ==
+               params.loops[1][params.fyIndex[1]] - 1) &&
               (loop_counters[1][params.inputXLoopIndex[1]] ==
                params.loops[1][params.inputXLoopIndex[1]] - 1) &&
               (loop_counters[1][params.inputYLoopIndex[1]] ==

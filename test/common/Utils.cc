@@ -9,7 +9,7 @@ int validateMapping(Tiling tiling) {
   int c0 = tiling.loops[1][tiling.reduction_loop_index[1]];
   int k0 = tiling.loops[1][tiling.weight_loop_index[1]];
   int fx = tiling.loops[1][tiling.fx_index];
-  int fy = tiling.loops[1][tiling.fy_index];
+  int fy = tiling.loops[1][tiling.fy_index[1]];
   int stride = tiling.stride;
 
   // TODO(fpedd): Fix and re-enable these checks
