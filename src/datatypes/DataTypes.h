@@ -175,6 +175,24 @@ constexpr int get_type_index() {
   return TypeIndex<T, Ts...>::value;
 }
 
+/**
+ * \brief Get the `::width` of a type, given its index into a type sequence.
+ * \tparam Ts The sequence of types.
+ * \param index The index of the type in the sequence.
+ * \return The width of the type.
+ */
+template <typename... Ts>
+size_t get_width_from_type_index(size_t index) {
+  size_t width = ~0;
+  ((index == get_type_index<Ts, Ts...>()
+        ? (width = Ts::width)
+        : ~0),
+   ...);
+  assert(width != ~0 && "Invalid type index");
+  assert(width != 0 && "Type has zero width");
+  return width;
+}
+
 template <typename... Ts>
 int get_index_from_type_name(const std::string& dtype) {
   int index = -1;
