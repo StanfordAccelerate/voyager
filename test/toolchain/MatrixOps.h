@@ -9,6 +9,7 @@
 #include "test/common/Tiling.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
+#include "test/toolchain/ApproximationConstants.h"
 #include "test/toolchain/Common.h"
 
 void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
@@ -190,6 +191,8 @@ void MapMatrixOperation(const Operation &operation,
                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   MatrixParams *matrix_params = new MatrixParams;
   AcceleratorMemoryMap accelerator_memory_map;
+  VectorInstructionConfig *vector_instruction_config =
+      new VectorInstructionConfig;
 
   const auto param = operation.param;
   const auto op_list = get_op_list(param);
@@ -623,6 +626,17 @@ void MapMatrixOperation(const Operation &operation,
     const auto op = op_list[i];
     const std::string opcode = op.target();
 
+    // Grab kwargs that are relevant for some activation functions
+    std::map<std::string, VECTOR_DATATYPE> activation_kwargs;
+    if (unary_ops_with_kwargs.find(op.target()) !=
+        unary_ops_with_kwargs.end()) {
+      for (const auto &[key, value] : op.kwargs()) {
+        if (key != "input") {
+          activation_kwargs[key] = VECTOR_DATATYPE(value.float_value());
+        }
+      }
+    }
+
     // Dequantization doesn't take a stage in the pipeline
     if (opcode == "dequantize") {
       inst.vdequantize = true;
@@ -705,6 +719,270 @@ void MapMatrixOperation(const Operation &operation,
 
         vector_params->use_output_codebook = true;
       }
+      // Copy coefficients from ApproximationConstants.h
+    } else if (opcode == "gelu" || opcode == "gelu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = GELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = GELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = GELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = GELU_CLAMP_MAX;
+    } else if (opcode == "silu" || opcode == "silu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SILU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = SILU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SILU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SILU_CLAMP_MAX;
+    } else if (opcode == "elu" || opcode == "elu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = ELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = ELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = ELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = ELU_CLAMP_MAX;
+    } else if (opcode == "log_sigmoid" || opcode == "log_sigmoid_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = LOGSIGMOID_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              LOGSIGMOID_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = LOGSIGMOID_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = LOGSIGMOID_CLAMP_MAX;
+    } else if (opcode == "tanh" || opcode == "tanh_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = TANH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = TANH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = TANH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = TANH_CLAMP_MAX;
+    } else if (opcode == "tanh_1" || opcode == "tanh_1_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = TANHSHRINK_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              TANHSHRINK_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = TANHSHRINK_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = TANHSHRINK_CLAMP_MAX;
+    } else if (opcode == "softplus" || opcode == "softplus_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SOFTPLUS_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              SOFTPLUS_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SOFTPLUS_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SOFTPLUS_CLAMP_MAX;
+    } else if (opcode == "mish" || opcode == "mish_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = MISH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = MISH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = MISH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = MISH_CLAMP_MAX;
+    } else if (opcode == "selu" || opcode == "selu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = SELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SELU_CLAMP_MAX;
+    } else if (opcode == "celu" || opcode == "celu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = CELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = CELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = CELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = CELU_CLAMP_MAX;
+    } else if (opcode == "sigmoid" || opcode == "sigmoid_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SIGMOID_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = SIGMOID_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SIGMOID_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SIGMOID_CLAMP_MAX;
+    } else if (opcode == "hardsigmoid" || opcode == "hardsigmoid_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDSIGMOID_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDSIGMOID_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDSIGMOID_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDSIGMOID_CLAMP_MAX;
+    } else if (opcode == "hardswish" || opcode == "hardswish_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDSWISH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDSWISH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDSWISH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDSWISH_CLAMP_MAX;
+
+      // Start of activation functions with kwargs
+    } else if (opcode == "hardshrink" || opcode == "hardshrink_") {
+      const VECTOR_DATATYPE lambda = activation_kwargs.at("lambd");
+      const VECTOR_DATATYPE HARDSHRINK_MAXES[NUM_MAXES] = {
+          -lambda, 0.0, 0.0, 0.0, 0.0, lambda};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDSHRINK_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDSHRINK_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDSHRINK_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDSHRINK_CLAMP_MAX;
+    } else if (opcode == "hardtanh" || opcode == "hardtanh_") {
+      const VECTOR_DATATYPE min_val = activation_kwargs.at("min_val");
+      const VECTOR_DATATYPE max_val = activation_kwargs.at("max_val");
+      const VECTOR_DATATYPE HARDTANH_MAXES[NUM_MAXES] = {
+          min_val, max_val, max_val, max_val, max_val, max_val};
+      const VECTOR_DATATYPE HARDTANH_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {min_val, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0},
+          {0.0, 1.0, 0.0},     {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0},
+          {max_val, 0.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDTANH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDTANH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDTANH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDTANH_CLAMP_MAX;
+    } else if (opcode == "leaky_relu" || opcode == "leaky_relu_") {
+      const VECTOR_DATATYPE negative_slope =
+          activation_kwargs.at("negative_slope");
+      const VECTOR_DATATYPE LEAKYRELU_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {0.0, negative_slope, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = LEAKYRELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              LEAKYRELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = LEAKYRELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = LEAKYRELU_CLAMP_MAX;
+    } else if (opcode == "rrelu" || opcode == "rrelu_") {
+      const VECTOR_DATATYPE lower = activation_kwargs.at("lower");
+      const VECTOR_DATATYPE upper = activation_kwargs.at("upper");
+      const VECTOR_DATATYPE alpha = (lower + upper) / VECTOR_DATATYPE(2);
+      const VECTOR_DATATYPE RRELU_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {0.0, alpha, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},   {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = RRELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = RRELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = RRELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = RRELU_CLAMP_MAX;
+    } else if (opcode == "softshrink" || opcode == "softshrink_") {
+      const VECTOR_DATATYPE lambda = activation_kwargs.at("lambd");
+      const VECTOR_DATATYPE SOFTSHRINK_MAXES[NUM_MAXES] = {
+          -lambda, 0.0, 0.0, 0.0, 0.0, lambda};
+      const VECTOR_DATATYPE SOFTSHRINK_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {lambda, 1.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},    {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+          {-lambda, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SOFTSHRINK_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              SOFTSHRINK_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SOFTSHRINK_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SOFTSHRINK_CLAMP_MAX;
+    } else if (opcode == "threshold" || opcode == "threshold_") {
+      const VECTOR_DATATYPE threshold = activation_kwargs.at("threshold");
+      const VECTOR_DATATYPE value = activation_kwargs.at("value");
+      const VECTOR_DATATYPE THRESHOLD_MAXES[NUM_MAXES] = {0.0, 0.0, 0.0,
+                                                          0.0, 0.0, threshold};
+      const VECTOR_DATATYPE THRESHOLD_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {value, 0.0, 0.0}, {value, 0.0, 0.0}, {value, 0.0, 0.0},
+          {value, 0.0, 0.0}, {value, 0.0, 0.0}, {value, 0.0, 0.0},
+          {0.0, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = THRESHOLD_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              THRESHOLD_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = THRESHOLD_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = THRESHOLD_CLAMP_MAX;
     } else if (op.kwargs().contains("other") || opcode == "quantize") {
       std::string other_key = opcode == "quantize" ? "scale" : "other";
       const auto other = op.kwargs().at(other_key);
@@ -754,8 +1032,6 @@ void MapMatrixOperation(const Operation &operation,
 #endif
 
   // total output count
-  VectorInstructionConfig *vector_instruction_config =
-      new VectorInstructionConfig;
   vector_instruction_config->inst[0] = inst;
   vector_instruction_config->instCount[0] = 1;
   vector_instruction_config->instLen = 1;

@@ -27,7 +27,7 @@ ACCURACY_RESULTS = {
         "CFLOAT": 80.4,
         "INT8": 79.2,
         "MXINT8": 81.1,
-        "P8_1": 79.4,
+        "P8_1": 81.4,
     },
     "mobilebert": {
         "E4M3": 90.6,
@@ -46,8 +46,8 @@ ACCURACY_RESULTS = {
     "vit": {
         "E4M3": 83.8,
         "CFLOAT": 84.1,
-        "INT8": 75.4,
-        "MXINT8": 84.0,
+        "INT8": 76.8,
+        "MXINT8": 82.8,
         "P8_1": 84.0,
     },
 }

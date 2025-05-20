@@ -16,6 +16,7 @@ SC_MODULE(VectorPipeline) {
 
   // Inputs
   Connections::In<VectorInstructions> instr;
+  Connections::In<ApproxUnitConfig> approx_unit_config_in;
   Connections::In<Pack1D<BufferType, Width>> matrix_unit_output;
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
@@ -49,6 +50,9 @@ SC_MODULE(VectorPipeline) {
   Connections::Combinational<Pack1D<StageInput, 3>> stage1_input;
   Connections::Combinational<Pack1D<StageInput, 3>> stage2_input;
   Connections::Combinational<Pack1D<StageInput, 2>> stage3_input;
+
+  Connections::Combinational<ApproxUnitConfig> approx_unit_config_stage0;
+  Connections::Combinational<ApproxUnitConfig> approx_unit_config_stage1;
 
   SC_CTOR(VectorPipeline) {
     SC_THREAD(router);
@@ -91,6 +95,9 @@ SC_MODULE(VectorPipeline) {
 #endif
     stage0_input.ResetWrite();
 
+    approx_unit_config_in.Reset();
+    approx_unit_config_stage0.ResetWrite();
+
     wait();
 
 #pragma hls_pipeline_init_interval 1
@@ -99,6 +106,11 @@ SC_MODULE(VectorPipeline) {
       VectorInstructions inst = instr.Pop();
       decltype(inst.inst_count) total_values = inst.inst_count;
       decltype(inst.inst_count) counter = 0;
+
+      ApproxUnitConfig approx_unit_config;
+      if (inst.vector_op1 == VectorInstructions::vpoly) {
+        approx_unit_config = approx_unit_config_in.Pop();
+      }
 
       while (counter++ < total_values) {
         // Vector unit inputs
@@ -270,6 +282,9 @@ SC_MODULE(VectorPipeline) {
         transactions[3] = {inst.vector_op3, inst.immediate2, op3_src1};
 
         stage0_input.Push(transactions);
+        if (inst.vector_op1 == VectorInstructions::vpoly) {
+          approx_unit_config_stage0.Push(approx_unit_config);
+        }
       }
     }
   }
@@ -277,6 +292,8 @@ SC_MODULE(VectorPipeline) {
   void stage0() {
     stage0_input.ResetRead();
     stage1_input.ResetWrite();
+    approx_unit_config_stage0.ResetRead();
+    approx_unit_config_stage1.ResetWrite();
 
     wait();
 
@@ -312,12 +329,18 @@ SC_MODULE(VectorPipeline) {
       stage1_data[1] = transactions[2];
       stage1_data[2] = transactions[3];
       stage1_input.Push(stage1_data);
+
+      if (transactions[1].op == VectorInstructions::vpoly) {
+        ApproxUnitConfig approx_unit_config = approx_unit_config_stage0.Pop();
+        approx_unit_config_stage1.Push(approx_unit_config);
+      }
     }
   }
 
   void stage1() {
     stage1_input.ResetRead();
     stage2_input.ResetWrite();
+    approx_unit_config_stage1.ResetRead();
 
     wait();
 
@@ -330,27 +353,15 @@ SC_MODULE(VectorPipeline) {
       Pack1D<VectorType, Width> res1;
 
       // Stage 1: exp, abs, activations
-      if (op1 == VectorInstructions::vexp) {
-        res1 = vexp<VectorType, Width>(op1_src0);
+      if (op1 == VectorInstructions::vpoly) {
+        ApproxUnitConfig approx_unit_config = approx_unit_config_stage1.Pop();
+        res1 = vpoly<VectorType, Width>(
+            op1_src0, approx_unit_config.maxes, approx_unit_config.ranges,
+            approx_unit_config.clamp_min, approx_unit_config.clamp_max);
       } else if (op1 == VectorInstructions::vabs) {
         res1 = vabs<VectorType, Width>(op1_src0);
       } else if (op1 == VectorInstructions::vrelu) {
         res1 = vrelu<VectorType, Width>(op1_src0);
-        // } else if (op1 == VectorInstructions::vgelu) {
-        //   res1 = vgelu<VectorType, Width>(op1_src0);
-      } else if (op1 == VectorInstructions::vsilu) {
-        res1 = vsilu<VectorType, Width>(op1_src0);
-        // } else if (op1 == VectorInstructions::vmap) {
-        //   for (int i = 0; i < Width; i++) {
-        //     DataTypes::bfloat16 value = op1_src0[i];
-
-        //     ac_int<32, false> address = value.bits_rep() * 2;
-        //     MemoryRequest request = {input.VMAP_OFFSET + address, 2};
-        //     vector_fetch_3_req.Push(request);
-
-        //     value.set_bits(vector_fetch_3_resp.Pop());
-        //     res1[i] = value;
-        //   }
       } else {
         res1 = op1_src0;
       }

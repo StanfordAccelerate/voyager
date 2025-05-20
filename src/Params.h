@@ -514,12 +514,10 @@ struct VectorInstructions {
 
   // Stage 1: exp, abs, activations
   ac_int<3, false> vector_op1;
-  static const unsigned int vexp = 1;
+  static const unsigned int vpoly = 1;
   static const unsigned int vabs = 2;
   static const unsigned int vrelu = 3;
-  static const unsigned int vgelu = 4;
-  static const unsigned int vsilu = 5;
-  static const unsigned int vmap = 6;
+  static const unsigned int vmap = 4;
 
   // Stage 2: add, mult, square, div
   ac_int<2, false> vector_op2;
@@ -1249,6 +1247,84 @@ struct VectorParams : BaseParams {
   }
 };
 
+struct ApproxUnitConfig {
+#ifndef __SYNTHESIS__
+  ApproxUnitConfig() {
+    for (int i = 0; i < NUM_MAXES; i++) {
+      maxes[i] = 0;
+    }
+    for (int i = 0; i < NUM_RANGES; i++) {
+      for (int j = 0; j < NUM_COEFFS; j++) {
+        ranges[i][j] = 0;
+      }
+    }
+    clamp_min = 0;
+    clamp_max = 0;
+  }
+#endif
+
+  VECTOR_DATATYPE maxes[NUM_MAXES];
+  VECTOR_DATATYPE ranges[NUM_RANGES][NUM_COEFFS];
+
+  ac_int<1, false> clamp_min;
+  ac_int<1, false> clamp_max;
+
+  static const unsigned int width =
+      16 * (NUM_MAXES + NUM_RANGES * NUM_COEFFS) + 2;
+
+#ifndef NO_SYSC
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size>& m) {
+    for (int i = 0; i < NUM_MAXES; i++) {
+      m& maxes[i];
+    }
+    for (int i = 0; i < NUM_RANGES; i++) {
+      for (int j = 0; j < NUM_COEFFS; j++) {
+        m& ranges[i][j];
+      }
+    }
+    m & clamp_min;
+    m & clamp_max;
+  }
+
+  inline friend void sc_trace(sc_trace_file* tf, const ApproxUnitConfig& config,
+                              const std::string& name) {
+    // TODO
+  }
+
+#endif
+
+  inline friend std::ostream& operator<<(std::ostream& os,
+                                         const ApproxUnitConfig& config) {
+    for (int i = 0; i < NUM_MAXES; i++) {
+      os << "maxes[" << i << "]: " << config.maxes[i] << std::endl;
+    }
+    for (int i = 0; i < NUM_RANGES; i++) {
+      for (int j = 0; j < NUM_COEFFS; j++) {
+        os << "range[" << i << "][" << j << "]: " << config.ranges[i][j]
+           << std::endl;
+      }
+    }
+    os << "clamp_min: " << config.clamp_min << std::endl;
+    os << "clamp_max: " << config.clamp_max << std::endl;
+    return os;
+  }
+
+  inline friend bool operator==(const ApproxUnitConfig& lhs,
+                                const ApproxUnitConfig& rhs) {
+    for (int i = 0; i < NUM_MAXES; i++) {
+      if (lhs.maxes[i] != rhs.maxes[i]) return false;
+    }
+    for (int i = 0; i < NUM_RANGES; i++) {
+      for (int j = 0; j < NUM_COEFFS; j++) {
+        if (lhs.ranges[i][j] != rhs.ranges[i][j]) return false;
+      }
+    }
+
+    return true;
+  }
+};
+
 struct VectorInstructionConfig : BaseParams {
 #ifndef __SYNTHESIS__
   VectorInstructionConfig() {
@@ -1264,9 +1340,10 @@ struct VectorInstructionConfig : BaseParams {
   ac_int<20, false> instCount[8];
   ac_int<3, false> instLen;
   ac_int<16, false> instLoopCount;
+  ApproxUnitConfig approx;
 
   static const unsigned int width =
-      VectorInstructions::width * 8 + 20 * 8 + 3 + 16;
+      VectorInstructions::width * 8 + 20 * 8 + 3 + 16 + ApproxUnitConfig::width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -1349,6 +1426,17 @@ struct VectorInstructionConfig : BaseParams {
     }
     m & instLen;
     m & instLoopCount;
+
+    for (int i = 0; i < NUM_MAXES; i++) {
+      m & approx.maxes[i];
+    }
+    for (int i = 0; i < NUM_RANGES; i++) {
+      for (int j = 0; j < NUM_COEFFS; j++) {
+        m & approx.ranges[i][j];
+      }
+    }
+    m & approx.clamp_min;
+    m & approx.clamp_max;
   }
 
   inline friend void sc_trace(sc_trace_file* tf,
@@ -1378,6 +1466,7 @@ struct VectorInstructionConfig : BaseParams {
     }
     if (lhs.instLen != rhs.instLen || lhs.instLoopCount != rhs.instLoopCount)
       return false;
+    if (!(lhs.approx == rhs.approx)) return false;
 
     return true;
   }

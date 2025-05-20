@@ -80,6 +80,9 @@ SC_MODULE(VectorUnit) {
       vector_unit_output);
   Connections::Combinational<ScaleType> CCS_INIT_S1(mx_scale);
 
+  Connections::Combinational<ApproxUnitConfig> CCS_INIT_S1(
+      approx_unit_config);
+
   // Internal connections between submodules
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_input;
 
@@ -187,7 +190,7 @@ SC_MODULE(VectorUnit) {
     pipeline.vector_unit_output(vector_unit_output);
     pipeline.reducer_input(reducer_input);
     pipeline.accumulator_input(accumulator_input);
-
+    pipeline.approx_unit_config_in(approx_unit_config);
     // Reducer
     reducer.clk(clk);
     reducer.rstn(rstn);
@@ -266,6 +269,7 @@ SC_MODULE(VectorUnit) {
     accumulator_instr.ResetWrite();
     reducer_instr.ResetWrite();
     router_instruction.ResetWrite();
+    approx_unit_config.ResetWrite();
 
     start.Reset();
 
@@ -285,6 +289,10 @@ SC_MODULE(VectorUnit) {
           for (ac_int<20, false> count = 0;; count++) {
             if (inst.op_type == VectorInstructions::vector) {
               pipeline_instr.Push(inst);
+              if (inst.vector_op1 == VectorInstructions::vpoly) {
+                approx_unit_config.Push(
+                    vector_inst_config.approx);
+              }
             } else if (inst.op_type == VectorInstructions::accumulation) {
               accumulator_instr.Push(inst);
             } else {
