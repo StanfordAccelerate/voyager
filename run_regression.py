@@ -19,14 +19,8 @@ from quantized_training.codegen import param_pb2
 SKIP_LAYERS = defaultdict(
     list,
     {
-        "resnet18": [
-            "quantize_default_20_fused",
-            "quantize_default_1_fused",
-        ],
-        "resnet50": [
-            "quantize_default_53_fused",
-            "quantize_default_1_fused",
-        ],
+        "resnet18": [],
+        "resnet50": [],
         "mobilebert": [],
         "bert": ["tanh"],
     },
