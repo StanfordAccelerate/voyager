@@ -51,7 +51,9 @@ def process_qa_dataset(model_name_or_path, dataset, data_dir):
         # Some of the questions have lots of whitespace on the left, which is not useful and will make the
         # truncation of the context fail (the tokenized question will take a lots of space). So we remove that
         # left whitespace
-        examples[question_column_name] = [q.lstrip() for q in examples[question_column_name]]
+        examples[question_column_name] = [
+            q.lstrip() for q in examples[question_column_name]
+        ]
 
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
@@ -105,7 +107,9 @@ def process_qa_dataset(model_name_or_path, dataset, data_dir):
         desc="Running tokenizer on validation dataset",
     )
 
-    eval_dataset_for_model = eval_dataset.remove_columns(["example_id", "offset_mapping"])
+    eval_dataset_for_model = eval_dataset.remove_columns(
+        ["example_id", "offset_mapping"]
+    )
     eval_dataloader = DataLoader(
         eval_dataset_for_model, collate_fn=default_data_collator, batch_size=1
     )
@@ -122,8 +126,7 @@ def process_qa_dataset(model_name_or_path, dataset, data_dir):
     for step, batch in enumerate(tqdm(eval_dataloader)):
         with torch.no_grad():
             embedding_output = embeddings(
-                input_ids=batch["input_ids"],
-                token_type_ids=batch["token_type_ids"]
+                input_ids=batch["input_ids"], token_type_ids=batch["token_type_ids"]
             )
         attention_mask = (1.0 - batch["attention_mask"]) * torch.finfo(torch.float).min
 
@@ -134,7 +137,9 @@ def process_qa_dataset(model_name_or_path, dataset, data_dir):
 
 
 def process_glue_dataset(model_name_or_path, task_name, data_dir):
-    model = AutoModelForSequenceClassification.from_pretrained(model_name_or_path).eval()
+    model = AutoModelForSequenceClassification.from_pretrained(
+        model_name_or_path
+    ).eval()
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     raw_datasets = load_dataset("glue", task_name)
@@ -144,9 +149,13 @@ def process_glue_dataset(model_name_or_path, task_name, data_dir):
     def preprocess_function(examples):
         # Tokenize the texts
         texts = (
-            (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
+            (examples[sentence1_key],)
+            if sentence2_key is None
+            else (examples[sentence1_key], examples[sentence2_key])
         )
-        result = tokenizer(*texts, padding="max_length", max_length=128, truncation=True)
+        result = tokenizer(
+            *texts, padding="max_length", max_length=128, truncation=True
+        )
         result["labels"] = examples["label"]
         return result
 
@@ -162,7 +171,9 @@ def process_glue_dataset(model_name_or_path, task_name, data_dir):
     for index in range(3):
         print(f"Sample {index} of the training set: {eval_dataset[index]}.")
 
-    eval_dataloader = DataLoader(eval_dataset, collate_fn=default_data_collator, batch_size=1)
+    eval_dataloader = DataLoader(
+        eval_dataset, collate_fn=default_data_collator, batch_size=1
+    )
 
     if isinstance(model, MobileBertPreTrainedModel):
         embeddings = model.mobilebert.embeddings
@@ -173,23 +184,26 @@ def process_glue_dataset(model_name_or_path, task_name, data_dir):
 
     for step, batch in enumerate(tqdm(eval_dataloader)):
         embedding_output = embeddings(
-            input_ids=batch["input_ids"],
-            token_type_ids=batch["token_type_ids"]
+            input_ids=batch["input_ids"], token_type_ids=batch["token_type_ids"]
         )
         attention_mask = (1.0 - batch["attention_mask"]) * torch.finfo(torch.float).min
         label = int(batch["labels"].item())
 
         folder = os.path.join(data_dir, f"{step}_{label}")
         os.makedirs(folder, exist_ok=True)
-        write_tensor_to_file(embedding_output, os.path.join(folder, "arg0_1.bin"))
-        write_tensor_to_file(attention_mask, os.path.join(folder, "arg1_1.bin"))
+        write_tensor_to_file(
+            embedding_output, os.path.join(folder, "hidden_states.bin")
+        )
+        write_tensor_to_file(attention_mask, os.path.join(folder, "attention_mask.bin"))
 
 
 def main():
     torch.set_num_threads(32)
 
     parser = argparse.ArgumentParser(description="Generate datafiles from model.")
-    parser.add_argument("--model_name_or_path", required=True, help="Path to model directory.")
+    parser.add_argument(
+        "--model_name_or_path", required=True, help="Path to model directory."
+    )
     parser.add_argument("--dataset", default="sst2", help="Dataset to dump.")
     parser.add_argument("--output_dir", required=True, help="Path to output files.")
     args = parser.parse_args()
