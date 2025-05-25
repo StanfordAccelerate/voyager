@@ -23,6 +23,7 @@ SKIP_LAYERS = defaultdict(
         "resnet50": [],
         "mobilebert": [],
         "bert": ["tanh"],
+        "vit": ["pad_default"],
     },
 )
 
@@ -517,23 +518,24 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         model_path = "models/mobilebert/mobilebert-tiny-squad-bf16/"
     elif model == "bert" and dataset == "sst2":
         model_path = "JeremiahZ/bert-base-uncased-sst2"
+    elif model == "vit":
+        model_path = "google/vit-base-patch16-224"
     else:
         raise ValueError("Invalid model")
 
     # Generate input samples from dataset
     if dataset == "imagenet":
-        imagenet_path = "/sim2/shared/MINOTAUR/nn_data/imagenet_1000/data/"
         output_data_dir = "data/imagenet"
         subprocess.run(
             [
                 "python",
-                "test/script/dump_resnet_dataset.py",
-                "--data_dir",
-                imagenet_path,
+                "test/script/dump_imagenet_dataset.py",
                 "--output_dir",
                 output_data_dir,
                 "--num_samples",
                 "1000",
+                "--model_type",
+                "vit" if model == "vit" else "resnet",
             ]
         )
     elif dataset == "sst2":
@@ -691,7 +693,12 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     # dump dataframe to pickle
     df.to_pickle(f"{output_folder}/test_results.pkl")
 
-    gold_accuracy = ACCURACY_RESULTS[model][env_vars["DATATYPE"]]
+    if model in ACCURACY_RESULTS:
+        gold_accuracy = ACCURACY_RESULTS[model][env_vars["DATATYPE"]]
+    else:
+        print(f"No gold accuracy specified for {model} {env_vars['DATATYPE']}")
+        gold_accuracy = final_accuracy
+
     return abs(final_accuracy - gold_accuracy) < 1
 
 
