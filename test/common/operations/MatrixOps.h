@@ -236,7 +236,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                             }
 
                           } else {
-                            if (tiling.replication) {
+                            if (tiling.resnet_replication) {
                               accumulations[output_addr] += psum;
                               if (IC_DIMENSION == 4) {
                                 Buffer scaled_psum = static_cast<Buffer>(
@@ -268,6 +268,18 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                   outputs[output_addr] += scaled_psum;
                                   accumulations[output_addr] = Psum(0.0);
                                 }
+                              }
+                            } else if (tiling.generic_replication) {
+                              accumulations[output_addr] += psum;
+                              if (tiling.fx_unrolling == 1 ||
+                                  ((counters[1][tiling.fx_index] > 0) &&
+                                   (counters[1][tiling.fx_index] %
+                                        tiling.fx_unrolling ==
+                                    tiling.fx_unrolling - 1))) {
+                                Buffer scaled_psum = static_cast<Buffer>(
+                                    accumulations[output_addr]);
+                                outputs[output_addr] += scaled_psum;
+                                accumulations[output_addr] = Psum(0.0);
                               }
                             } else {
                               // use a scale factor of 1 to directly convert the
