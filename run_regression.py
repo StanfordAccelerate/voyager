@@ -519,39 +519,15 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     elif model == "bert" and dataset == "sst2":
         model_path = "JeremiahZ/bert-base-uncased-sst2"
     elif model == "vit":
-        model_path = "google/vit-base-patch16-224"
+        model_path = "timm/vit_base_patch16_224.augreg2_in21k_ft_in1k"
     else:
         raise ValueError("Invalid model")
 
     # Generate input samples from dataset
     if dataset == "imagenet":
         output_data_dir = "data/imagenet"
-        subprocess.run(
-            [
-                "python",
-                "test/script/dump_imagenet_dataset.py",
-                "--output_dir",
-                output_data_dir,
-                "--num_samples",
-                "1000",
-                "--model_type",
-                "vit" if model == "vit" else "resnet",
-            ]
-        )
     elif dataset == "sst2":
         output_data_dir = "data/sst2"
-        subprocess.run(
-            [
-                "python",
-                "test/script/dump_bert_dataset.py",
-                "--dataset",
-                "sst2",
-                "--model_name_or_path",
-                model_path,
-                "--output_dir",
-                output_data_dir,
-            ]
-        )
     elif dataset == "squad":
         output_data_dir = "data/squad"
         subprocess.run(
@@ -612,6 +588,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         ]
     else:
         raise ValueError("Invalid datatype")
+    
+    subprocess.run(
+        ["mkdir", "-p", f"{env_vars['CODEGEN_DIR']}/networks/{model}/{env_vars['DATATYPE']}"])
 
     with open(f"{output_folder}/{model}_{dataset}_compiler.log", "w") as stdout_file:
         subprocess.run(
@@ -624,12 +603,24 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--transpose_weight",
                 "--weight_persistent",
                 *quantization_args,
-                "--output_dir",
+                "--model_output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
+                "--dump_dataset",
+                "--dataset_output_dir",
+                output_data_dir,
+                "--evaluate",
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
         )
+
+    subprocess.run(
+        [
+            "mkdir",
+            "-p",
+            f"{env_vars['CODEGEN_DIR']}/networks/{model}/{env_vars['DATATYPE']}/{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}"
+        ]
+    )
 
     with open(f"{output_folder}/{model}_{dataset}_tiler.log", "w") as stdout_file:
         subprocess.run(
@@ -839,7 +830,6 @@ def main():
     layer_counts = {}
 
     # Add codegen layers
-    layers = {}
     if args.tests is None:
         all_models = []
         if args.models is not None:
@@ -850,8 +840,9 @@ def main():
         for network in all_models:
             env_vars = os.environ.copy()
             env_vars["NETWORK"] = network
-            subprocess.run(["make", "network-proto"], env=env_vars)
-            add_layers(network, layers, layer_counts, args.uniquify_layers)
+        if args.sims != "accuracy":
+                subprocess.run(["make", "network-proto"], env=env_vars)
+                add_layers(network, layers, layer_counts, args.uniquify_layers)
     else:
         assert (
             len(args.models) == 1
