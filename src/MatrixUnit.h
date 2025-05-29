@@ -145,17 +145,17 @@ SC_MODULE(MatrixUnit) {
 
     inputController.clk(clk);
     inputController.rstn(rstn);
-    inputController.addressRequest(inputAddressRequest);
-    inputController.dataResponse(inputDataResponse);
-    inputController.paramsIn(matrixParams[0]);
-    inputController.windowBufferIn(inputsToWindowBuffer);
-    inputController.windowBufferOut(inputsFromBuffer);
+    inputController.input_req(inputAddressRequest);
+    inputController.input_resp(inputDataResponse);
+    inputController.params_in(matrixParams[0]);
+    inputController.window_buffer_in(inputsToWindowBuffer);
+    inputController.window_buffer_out(inputsFromBuffer);
 
     inputBuffer.clk(clk);
     inputBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      inputController.writeRequest[i](inputBufferWriteReq[i]);
-      inputController.readAddress[i](inputBufferReadAddress[i]);
+      inputController.input_write_request[i](inputBufferWriteReq[i]);
+      inputController.input_read_address[i](inputBufferReadAddress[i]);
 
       inputBuffer.writeRequest[i](inputBufferWriteReq[i]);
       inputBuffer.readAddress[i](inputBufferReadAddress[i]);
@@ -165,15 +165,15 @@ SC_MODULE(MatrixUnit) {
 #if SUPPORT_MX
     inputScaleController.clk(clk);
     inputScaleController.rstn(rstn);
-    inputScaleController.addressRequest(inputScaleAddressRequest);
-    inputScaleController.dataResponse(inputScaleDataResponse);
-    inputScaleController.paramsIn(matrixParams[3]);
+    inputScaleController.scale_req(inputScaleAddressRequest);
+    inputScaleController.scale_resp(inputScaleDataResponse);
+    inputScaleController.params_in(matrixParams[3]);
 
     inputScaleBuffer.clk(clk);
     inputScaleBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      inputScaleController.writeRequest[i](inputScaleWriteRequest[i]);
-      inputScaleController.readAddress[i](inputScaleReadAddress[i]);
+      inputScaleController.scale_write_request[i](inputScaleWriteRequest[i]);
+      inputScaleController.scale_read_address[i](inputScaleReadAddress[i]);
 
       inputScaleBuffer.writeRequest[i](inputScaleWriteRequest[i]);
       inputScaleBuffer.readAddress[i](inputScaleReadAddress[i]);

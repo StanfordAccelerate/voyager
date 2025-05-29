@@ -658,7 +658,6 @@ struct VectorParams : BaseParams {
 
     head_size_power_of_two = 32;
     has_attn_head_permute = false;
-    has_output_permute = false;
 
     quantize_output_mx = false;
     SCALE_OFFSET = 0;
@@ -733,7 +732,6 @@ struct VectorParams : BaseParams {
   // Transformer head permutation
   ac_int<4, false> head_size_power_of_two;
   bool has_attn_head_permute;
-  bool has_output_permute;
 
   bool quantize_output_mx;
   ac_int<ADDRESS_WIDTH, false> SCALE_OFFSET;
@@ -753,9 +751,9 @@ struct VectorParams : BaseParams {
 
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
   // slicing params + 32-bit pooling param + 18-bit reshape params + 4-bit head
-  // size + 7 boolean flags + 64-bit scale offset
+  // size + 6 boolean flags + 64-bit scale offset
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
-                                    4 + 7 + ADDRESS_WIDTH - 16 +
+                                    4 + 6 + ADDRESS_WIDTH - 16 +
                                     codebook_params_width;
 
 #ifndef NO_SYSC
@@ -869,7 +867,6 @@ struct VectorParams : BaseParams {
     // Transformer head permutation flags
     m & head_size_power_of_two;
     m & has_attn_head_permute;
-    m & has_output_permute;
 
     m & quantize_output_mx;
     m & SCALE_OFFSET;
@@ -1009,7 +1006,6 @@ struct VectorParams : BaseParams {
        << std::endl;
     os << "has_attn_head_permute: " << params.has_attn_head_permute
        << std::endl;
-    os << "has_output_permute: " << params.has_output_permute << std::endl;
 
     os << "quantize_output_mx: " << params.quantize_output_mx << std::endl;
     os << "SCALE_OFFSET: " << params.SCALE_OFFSET << std::endl;
@@ -1126,7 +1122,6 @@ struct VectorParams : BaseParams {
 
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
     if (lhs.has_attn_head_permute != rhs.has_attn_head_permute) return false;
-    if (lhs.has_output_permute != rhs.has_output_permute) return false;
 
     if (lhs.quantize_output_mx != rhs.quantize_output_mx) return false;
     if (lhs.SCALE_OFFSET != rhs.SCALE_OFFSET) return false;

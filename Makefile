@@ -154,39 +154,55 @@ Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v: src/InputController.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=InputController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/InputController.log
+
 $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v: src/WeightController.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=WeightController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/WeightController.log
+
 $(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v: src/ProcessingElement.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=ProcessingElement catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/ProcessingElement.log
-$(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
+
+$(CATAPULT_BUILD_DIR)/SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)/ProcessingElement/ProcessingElement.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=SystolicArrayRow catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/SystolicArrayRow.log
+
+$(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicArray.h $(CATAPULT_BUILD_DIR)/SystolicArrayRow/SystolicArrayRow.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=SystolicArray catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/SystolicArray.log
+
 $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixProcessor catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixProcessor.log
+
 $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v: src/VectorUnit.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixParamsDeserializer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer.log
+
 $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v: $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/OutputController/OutputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorParamsDeserializer/VectorParamsDeserializer.v1/concat_rtl.v
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorUnit.log
+
 $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v: src/VectorFetch.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorFetchUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorFetchUnit.log
+
 $(CATAPULT_BUILD_DIR)/VectorParamsDeserializer/VectorParamsDeserializer.v1/concat_rtl.v: src/VectorUnit.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorParamsDeserializer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorParamsDeserializer.log
+
 $(CATAPULT_BUILD_DIR)/VectorOpUnit/VectorOpUnit.v1/concat_rtl.v: src/VectorUnit.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorOpUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorOpUnit.log
+
 $(CATAPULT_BUILD_DIR)/OutputController/OutputController.v1/concat_rtl.v: src/OutputController.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=OutputController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/OutputController.log
+
 $(CATAPULT_BUILD_DIR)/MatrixVectorUnit/MatrixVectorUnit.v1/concat_rtl.v: src/MatrixVectorUnit.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixVectorUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixVectorUnit.log
+
 $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: src/Accelerator.h src/DoubleBuffer.h $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v $(RTL_DEPENDENCIES) $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log

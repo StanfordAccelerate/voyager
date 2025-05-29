@@ -14,9 +14,11 @@ SC_MODULE(OutputController) {
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
   Connections::Combinational<VectorParams> CCS_INIT_S1(send_data_params);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(send_address_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(quantizer_params);
 
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_in);
+  Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      quantized_data);
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
@@ -30,25 +32,116 @@ SC_MODULE(OutputController) {
   static constexpr int LOOP_WIDTH = 16;
 
   SC_CTOR(OutputController) {
-    SC_THREAD(send_data);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
     SC_THREAD(send_address);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(send_params);
+    SC_THREAD(send_data);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(quantizer);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
 
+  void quantizer() {
+    vector_in.Reset();
+    quantizer_params.ResetRead();
+    quantized_data.ResetWrite();
+
+    wait();
+
+    while (true) {
+      VectorParams params = quantizer_params.Pop();
+
+      ac_int<32, false> num_outputs =
+          params.output_loops[0][0] * params.output_loops[0][1] *
+          params.output_loops[0][2] * params.output_loops[1][0] *
+          params.output_loops[1][1] * params.output_loops[1][2];
+
+      ac_int<32, false> counter = 0;
+
+#if SUPPORT_CODEBOOK_QUANT
+      if (params.use_output_codebook) {
+        //         constexpr int fr_bits = 7;
+        //         using ac_fixed_t =
+        //             ac_fixed<MAX_DECODED_DTYPE_WIDTH + fr_bits,
+        //             MAX_DECODED_DTYPE_WIDTH,
+        //                      true, AC_RND_CONV, AC_SAT>;
+
+        //         ac_fixed_t midpoints[NUM_CODEBOOK_ENTRIES - 1];
+        // #pragma hls_unroll yes
+        //         for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
+        //           midpoints[i].set_slc(fr_bits - 1, params.output_code[i]);
+        //         }
+
+        using ac_float_t = typename StdFloat<7, 5>::ac_float_rep;
+
+        ac_float_t midpoints[NUM_CODEBOOK_ENTRIES - 1];
+
+#pragma hls_unroll yes
+        for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
+          StdFloat<7, 5> value = ac_float_t(params.output_code[i]);
+          value.adjust_exponent(-1);
+          midpoints[i] = value.float_val;
+        }
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (counter++ < num_outputs) {
+          Pack1D<VectorType, Width> outputs = vector_in.Pop();
+
+          Pack1D<ac_float_t, Width> ac_float_outputs;
+          Pack1D<ac_int<4, false>, Width> indices;
+
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            // auto converted_val =
+            //     outputs[i]
+            //         .template to_ac_fixed<MAX_DECODED_DTYPE_WIDTH + fr_bits,
+            //                               MAX_DECODED_DTYPE_WIDTH, true,
+            //                               AC_RND_CONV, AC_SAT>();
+
+            ac_float_outputs[i] = ac_float_t(outputs[i].float_val);
+            indices[i] = 0;
+          }
+
+          for (int j = 0; j < NUM_CODEBOOK_ENTRIES - 1; j++) {
+#pragma hls_unroll yes
+            for (int i = 0; i < Width; i++) {
+              indices[i] += ac_float_outputs[i] > midpoints[j];
+            }
+          }
+
+          Pack1D<VectorType, Width> float_indices;
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            float_indices[i] = ac_float_t(indices[i]);
+          }
+
+          quantized_data.Push(float_indices);
+        }
+      } else
+#endif
+      {
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (counter++ < num_outputs) {
+          // Pass through
+          Pack1D<VectorType, Width> outputs = vector_in.Pop();
+          quantized_data.Push(outputs);
+        }
+      }
+    }
+  }
+
   void send_data() {
     send_data_params.ResetRead();
-    vector_in.Reset();
+    quantized_data.ResetRead();
     scale_in.Reset();
-    vector_out.Reset();
     scale_out.Reset();
+    vector_out.Reset();
     done.Reset();
 
     wait();
@@ -73,31 +166,7 @@ SC_MODULE(OutputController) {
         }
 #endif
 
-        Pack1D<VectorType, Width> outputs = vector_in.Pop();
-
-#if SUPPORT_CODEBOOK_QUANT
-        if (params.use_output_codebook) {
-          for (int i = 0; i < Width; i++) {
-            // Codebook midpoints are scaled by 2, so we scale the
-            // values to quantize by 2 as well
-            VectorType value = outputs[i];
-            value.adjust_exponent(1);
-
-            ac_int<4, false> index = 0;
-
-#pragma hls_unroll yes
-            for (int j = 0; j < NUM_CODEBOOK_ENTRIES - 1; j++) {
-              if (value.float_val <=
-                  typename VectorType::ac_float_rep(params.output_code[j])) {
-                break;
-              }
-              index++;
-            }
-
-            outputs[i] = typename VectorType::ac_float_rep(index);
-          }
-        }
-#endif
+        Pack1D<VectorType, Width> outputs = quantized_data.Pop();
 
         bool found = (send_output_data<OutputTypes, Width, VectorType,
                                        OC_PORT_WIDTH, OutputTypes...>(
@@ -118,14 +187,18 @@ SC_MODULE(OutputController) {
   }
 
   void send_address() {
-    send_address_params.ResetRead();
+    params_in.Reset();
+    send_data_params.ResetWrite();
+    quantizer_params.ResetWrite();
     vector_address_out.Reset();
     scale_address_out.Reset();
 
     wait();
 
     while (true) {
-      VectorParams params = send_address_params.Pop();
+      VectorParams params = params_in.Pop();
+      send_data_params.Push(params);
+      quantizer_params.Push(params);
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -138,24 +211,36 @@ SC_MODULE(OutputController) {
         }
       }
 
+      ac_int<LOOP_WIDTH, false> Y1 =
+          params.output_loops[0][params.output_y_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> X1 =
+          params.output_loops[0][params.output_x_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> K2 =
+          params.output_loops[0][params.output_k_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> Y0 =
+          params.output_loops[1][params.output_y_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> X0 =
+          params.output_loops[1][params.output_x_loop_idx[1]];
+      ac_int<16, false> K1 =
+          params.output_loops[1][params.output_k_loop_idx[1]] * Width;
+
+      ac_int<16, false> X = X0 * X1;
+      ac_int<16, false> K = K2 * K1;
+
+      ac_int<16, false> loop_bound_4 = params.output_loops[1][2];
+      ac_int<16, false> loop_bound_3 = params.output_loops[1][1] * loop_bound_4;
+      ac_int<16, false> loop_bound_2 = params.output_loops[1][0] * loop_bound_3;
+      ac_int<16, false> loop_bound_1 = params.output_loops[0][2] * loop_bound_2;
+      ac_int<16, false> loop_bound_0 = params.output_loops[0][1] * loop_bound_1;
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (loop_counters[0][0] = 0; loop_counters[0][0] <= loop_bounds[0][0];
-           loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0; loop_counters[0][1] <= loop_bounds[0][1];
-             loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0;
-               loop_counters[0][2] <= loop_bounds[0][2];
-               loop_counters[0][2]++) {
-            for (loop_counters[1][0] = 0;
-                 loop_counters[1][0] <= loop_bounds[1][0];
-                 loop_counters[1][0]++) {
-              for (loop_counters[1][1] = 0;
-                   loop_counters[1][1] <= loop_bounds[1][1];
-                   loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;
-                     loop_counters[1][2] <= loop_bounds[1][2];
-                     loop_counters[1][2]++) {
+      for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
+            for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+              for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
                   ac_int<32, false> address;
                   if (params.output_mode == 1) {
                     ac_int<LOOP_WIDTH, false> x0 =
@@ -171,27 +256,9 @@ SC_MODULE(OutputController) {
                     ac_int<LOOP_WIDTH, false> k2 =
                         loop_counters[0][params.output_k_loop_idx[0]];
 
-                    ac_int<LOOP_WIDTH, false> X0 =
-                        params.output_loops[1][params.output_x_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> X1 =
-                        params.output_loops[0][params.output_x_loop_idx[0]];
-                    ac_int<LOOP_WIDTH, false> Y0 =
-                        params.output_loops[1][params.output_y_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> Y1 =
-                        params.output_loops[0][params.output_y_loop_idx[0]];
-                    ac_int<LOOP_WIDTH, false> K2 =
-                        params.output_loops[0][params.output_k_loop_idx[0]];
-                    ac_int<LOOP_WIDTH, false> K1 =
-                        params.output_loops[1][params.output_k_loop_idx[1]];
-
-                    ac_int<32, false> k = k2 * K1 * Width + k1 * Width;
-                    ac_int<32, false> K = K2 * K1 * Width;
-
-                    ac_int<32, false> x = x0 + x1 * X0;
-                    ac_int<32, false> X = X0 * X1;
-
-                    ac_int<32, false> y = y0 + y1 * Y0;
-                    ac_int<32, false> Y = Y0 * Y1;
+                    ac_int<32, false> y = y1 * Y0 + y0;
+                    ac_int<32, false> x = x1 * X0 + x0;
+                    ac_int<32, false> k = k2 * K1 + k1 * Width;
 
                     ac_int<8, false> head_size = params.head_size_power_of_two;
                     ac_int<16, false> mask = (1 << head_size) - 1;
@@ -201,42 +268,17 @@ SC_MODULE(OutputController) {
                       // + k % head_size
                       address = (((k >> head_size) * X) << head_size) +
                                 (x << head_size) + (k & mask);
-                    } else if (params.has_output_permute) {
-                      address = ((k >> head_size) * K) + ((y & mask) * K * 4) +
-                                (k & mask) + (y >> head_size * K / 4);
                     } else {
                       address = y * X * K + x * K + k;
                     }
                   } else if (params.output_mode == 2) {
-                    ac_int<LOOP_WIDTH, false> loop_0 = loop_counters[0][0];
-                    ac_int<LOOP_WIDTH, false> loop_1 = loop_counters[0][1];
-                    ac_int<LOOP_WIDTH, false> loop_2 = loop_counters[0][2];
-                    ac_int<LOOP_WIDTH, false> loop_3 = loop_counters[1][0];
-                    ac_int<LOOP_WIDTH, false> loop_4 = loop_counters[1][1];
-                    ac_int<LOOP_WIDTH, false> loop_5 = loop_counters[1][2];
-
-                    ac_int<LOOP_WIDTH, false> loop_bound_0 =
-                        params.output_loops[0][0];
-                    ac_int<LOOP_WIDTH, false> loop_bound_1 =
-                        params.output_loops[0][1];
-                    ac_int<LOOP_WIDTH, false> loop_bound_2 =
-                        params.output_loops[0][2];
-                    ac_int<LOOP_WIDTH, false> loop_bound_3 =
-                        params.output_loops[1][0];
-                    ac_int<LOOP_WIDTH, false> loop_bound_4 =
-                        params.output_loops[1][1];
-                    ac_int<LOOP_WIDTH, false> loop_bound_5 =
-                        params.output_loops[1][2];
-
-                    address =
-                        (loop_0 * loop_bound_1 * loop_bound_2 * loop_bound_3 *
-                             loop_bound_4 * loop_bound_5 +
-                         loop_1 * loop_bound_2 * loop_bound_3 * loop_bound_4 *
-                             loop_bound_5 +
-                         loop_2 * loop_bound_3 * loop_bound_4 * loop_bound_5 +
-                         loop_3 * loop_bound_4 * loop_bound_5 +
-                         loop_4 * loop_bound_5 + loop_5) *
-                        Width;
+                    address = (loop_counters[0][0] * loop_bound_0 +
+                               loop_counters[0][1] * loop_bound_1 +
+                               loop_counters[0][2] * loop_bound_2 +
+                               loop_counters[1][0] * loop_bound_3 +
+                               loop_counters[1][1] * loop_bound_4 +
+                               loop_counters[1][2]) *
+                              Width;
                   }
 
 #if SUPPORT_MX
@@ -261,44 +303,30 @@ SC_MODULE(OutputController) {
                   }
 #endif
 
-                  if (loop_counters[1][2] >= loop_bounds[1][2]) {
+                  if (loop_counters[1][2] == loop_bounds[1][2]) {
                     break;
                   }
                 }
-                if (loop_counters[1][1] >= loop_bounds[1][1]) {
+                if (loop_counters[1][1] == loop_bounds[1][1]) {
                   break;
                 }
               }
-              if (loop_counters[1][0] >= loop_bounds[1][0]) {
+              if (loop_counters[1][0] == loop_bounds[1][0]) {
                 break;
               }
             }
-            if (loop_counters[0][2] >= loop_bounds[0][2]) {
+            if (loop_counters[0][2] == loop_bounds[0][2]) {
               break;
             }
           }
-          if (loop_counters[0][1] >= loop_bounds[0][1]) {
+          if (loop_counters[0][1] == loop_bounds[0][1]) {
             break;
           }
         }
-        if (loop_counters[0][0] >= loop_bounds[0][0]) {
+        if (loop_counters[0][0] == loop_bounds[0][0]) {
           break;
         }
       }
-    }
-  }
-
-  void send_params() {
-    params_in.Reset();
-    send_data_params.ResetWrite();
-    send_address_params.ResetWrite();
-
-    wait();
-
-    while (true) {
-      VectorParams params = params_in.Pop();
-      send_data_params.Push(params);
-      send_address_params.Push(params);
     }
   }
 };
