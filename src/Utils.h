@@ -82,21 +82,28 @@ bool decode_type(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
 }
 
 #pragma hls_design ccore
+template <typename Psum, typename Scale, typename Buffer>
+Buffer dequantize_mx_op(const Psum psum, const Scale input_scale,
+                        const Scale weight_scale, const Buffer prev_accum,
+                        bool is_mx_op) {
+  Buffer output = (Buffer)psum;
+  if (is_mx_op) {
+    output *= (Buffer)input_scale * (Buffer)weight_scale;
+  }
+  return output + prev_accum;
+}
+
 template <typename Psum, typename Scale, typename Buffer, int N>
 Pack1D<Buffer, N> dequantize_mx(const Pack1D<Psum, N>& psums,
                                 const Scale input_scale,
                                 const Pack1D<Scale, N>& weight_scales,
-                                const Pack1D<Buffer, N>& prev_accum,
+                                const Pack1D<Buffer, N>& prev_accums,
                                 bool is_mx_op) {
   Pack1D<Buffer, N> outputs;
 #pragma hls_unroll yes
   for (int i = 0; i < N; i++) {
-    outputs[i] = static_cast<Buffer>(psums[i]);
-    if (is_mx_op) {
-      outputs[i] *= static_cast<Buffer>(input_scale) *
-                    static_cast<Buffer>(weight_scales[i]);
-    }
-    outputs[i] += prev_accum[i];
+    outputs[i] = dequantize_mx_op(psums[i], input_scale, weight_scales[i],
+                                  prev_accums[i], is_mx_op);
   }
   return outputs;
 }

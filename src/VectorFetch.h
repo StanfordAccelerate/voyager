@@ -296,7 +296,7 @@ SC_MODULE(VectorFetchUnit) {
 
                   if (params.addr_gen0_mode == 1 ||
                       params.addr_gen0_mode == 2) {
-                    if (in_bound) {
+                    if (params.has_transpose || in_bound) {
                     FETCH_ADDRESS_0:
                       bool found =
                           (fetch_vector_input<InputTypes, Width, InputTypes...>(
@@ -520,7 +520,7 @@ SC_MODULE(VectorFetchUnit) {
 #pragma hls_unroll yes
             for (int i = 0; i < Width; i++) {
               if (params.is_maxpool) {
-                full_response[i].set_max_neg();
+                full_response[i] = VectorType::min();
               } else {
                 full_response[i] = VectorType::zero();
               }

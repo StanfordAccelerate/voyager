@@ -33,14 +33,8 @@ SC_MODULE(SystolicArrayRow) {
 
 #ifdef __SYNTHESIS__
   SC_HAS_PROCESS(SystolicArrayRow);
-  SystolicArrayRow()
-      : sc_module(sc_gen_unique_name("SystolicArrayRow"))
-#else
-  SC_CTOR(SystolicArrayRow)
-#endif
-  {
+  SystolicArrayRow() : sc_module(sc_gen_unique_name("SystolicArrayRow")) {
     for (int j = 0; j < NCols; j++) {
-#ifdef __SYNTHESIS__
       pe[j].clk(clk);
       pe[j].rstn(rstn);
 
@@ -56,7 +50,18 @@ SC_MODULE(SystolicArrayRow) {
 
       pe[j].psum_in(psums_in[j]);
       pe[j].psum_out(psums_out[j]);
-#else
+    }
+
+#ifdef CONNECTIONS_FAST_SIM
+    input_tieoff.clk(clk);
+    input_tieoff.rstn(rstn);
+#endif
+    input_tieoff.in(input_wires[NCols - 1]);
+  }
+
+#else  // !__SYNTHESIS__
+  SC_CTOR(SystolicArrayRow) {
+    for (int j = 0; j < NCols; j++) {
       pe_ptr[j] =
           new ProcessingElement<Input, Weight, Psum>(sc_gen_unique_name("pe"));
 
@@ -75,17 +80,8 @@ SC_MODULE(SystolicArrayRow) {
 
       pe_ptr[j]->psum_in(psums_in[j]);
       pe_ptr[j]->psum_out(psums_out[j]);
-#endif
     }
 
-    // tie off unused connection for last input
-#ifdef __SYNTHESIS__
-#ifdef CONNECTIONS_FAST_SIM
-    input_tieoff.clk(clk);
-    input_tieoff.rstn(rstn);
-#endif
-    input_tieoff.in(input_wires[NCols - 1]);
-#else
     input_tieoff_ptr =
         new Tieoff<PEInput<Input>>(sc_gen_unique_name("input_tieoff"));
 #ifdef CONNECTIONS_FAST_SIM
@@ -93,8 +89,8 @@ SC_MODULE(SystolicArrayRow) {
     input_tieoff_ptr->rstn(rstn);
 #endif
     input_tieoff_ptr->in(input_wires[NCols - 1]);
-#endif
   };
+#endif  // !__SYNTHESIS__
 };
 
 template <typename Input, typename Weight, typename Psum, int NRows, int NCols>
@@ -125,8 +121,9 @@ SC_MODULE(SystolicArray) {
   Connections::Out<Psum> outputs[NCols];
 
   SC_CTOR(SystolicArray) {
-    for (int i = 0; i < NRows; i++) {
 #ifdef __SYNTHESIS__
+    // Instantiate and connect SA rows
+    for (int i = 0; i < NRows; i++) {
       sa_rows[i].clk(clk);
       sa_rows[i].rstn(rstn);
       sa_rows[i].input(inputs[i]);
@@ -139,7 +136,6 @@ SC_MODULE(SystolicArray) {
         }
 
         sa_rows[i].weights_out[j](weight_wires[i][j]);
-
         sa_rows[i].psums_in[j](psum_wires[i][j]);
 
         if (i == NRows - 1) {
@@ -148,10 +144,31 @@ SC_MODULE(SystolicArray) {
           sa_rows[i].psums_out[j](psum_wires[i + 1][j]);
         }
       }
-#else
+    }
+
+    // Tie first row of psum wires to zero
+    for (int i = 0; i < NCols; i++) {
+#ifdef CONNECTIONS_FAST_SIM
+      psum_wires_tieoff[i].clk(clk);
+      psum_wires_tieoff[i].rstn(rstn);
+#endif
+      psum_wires_tieoff[i].out(psum_wires[0][i]);
+    }
+
+    // Tie last row of weight wires
+    for (int i = 0; i < NCols; i++) {
+#ifdef CONNECTIONS_FAST_SIM
+      weight_wires_tieoff[i].clk(clk);
+      weight_wires_tieoff[i].rstn(rstn);
+#endif
+      weight_wires_tieoff[i].in(weight_wires[NRows - 1][i]);
+    }
+
+#else  // !__SYNTHESIS__
+    // Instantiate and connect SA rows
+    for (int i = 0; i < NRows; i++) {
       sa_rows_ptr[i] = new SystolicArrayRow<Input, Weight, Psum, NCols>(
           sc_gen_unique_name("row"));
-
       sa_rows_ptr[i]->clk(clk);
       sa_rows_ptr[i]->rstn(rstn);
       sa_rows_ptr[i]->input(inputs[i]);
@@ -164,7 +181,6 @@ SC_MODULE(SystolicArray) {
         }
 
         sa_rows_ptr[i]->weights_out[j](weight_wires[i][j]);
-
         sa_rows_ptr[i]->psums_in[j](psum_wires[i][j]);
 
         if (i == NRows - 1) {
@@ -173,47 +189,29 @@ SC_MODULE(SystolicArray) {
           sa_rows_ptr[i]->psums_out[j](psum_wires[i + 1][j]);
         }
       }
-#endif
     }
 
-    // Tie the first row of psum wires to zero
+    // Tie first row of psum wires to zero
     for (int i = 0; i < NCols; i++) {
-#ifdef __SYNTHESIS__
-#ifdef CONNECTIONS_FAST_SIM
-      psum_wires_tieoff[i].clk(clk);
-      psum_wires_tieoff[i].rstn(rstn);
-#endif
-      psum_wires_tieoff[i].out(psum_wires[0][i]);
-#else
       psum_wires_tieoff_ptr[i] =
-          new ZeroTieoff<Psum>(sc_gen_unique_name("tieoff"));
+          new ZeroTieoff<Psum>(sc_gen_unique_name("psum_tieoff"));
 #ifdef CONNECTIONS_FAST_SIM
-      // we need to connect clock and reset if using fast sim
       psum_wires_tieoff_ptr[i]->clk(clk);
       psum_wires_tieoff_ptr[i]->rstn(rstn);
 #endif
       psum_wires_tieoff_ptr[i]->out(psum_wires[0][i]);
-#endif
     }
 
-    // Tie the last row of weight wires
+    // Tie last row of weight wires
     for (int i = 0; i < NCols; i++) {
-#ifdef __SYNTHESIS__
-#ifdef CONNECTIONS_FAST_SIM
-      weight_wires_tieoff[i].clk(clk);
-      weight_wires_tieoff[i].rstn(rstn);
-#endif
-      weight_wires_tieoff[i].in(weight_wires[NRows - 1][i]);
-#else
       weight_wires_tieoff_pt[i] =
-          new Tieoff<PEWeight<Input>>(sc_gen_unique_name("tieoff"));
-      weight_wires_tieoff_pt[i]->in(weight_wires[NRows - 1][i]);
+          new Tieoff<PEWeight<Input>>(sc_gen_unique_name("weight_tieoff"));
 #ifdef CONNECTIONS_FAST_SIM
-      // we need to connect clock and reset if using fast sim
       weight_wires_tieoff_pt[i]->clk(clk);
       weight_wires_tieoff_pt[i]->rstn(rstn);
 #endif
-#endif
+      weight_wires_tieoff_pt[i]->in(weight_wires[NRows - 1][i]);
     }
+#endif  // __SYNTHESIS__
   }
 };
