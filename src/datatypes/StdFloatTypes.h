@@ -4,6 +4,7 @@
 #include <mc_connections.h>
 #endif
 
+#include <ac_math/ac_gelu_pwl.h>
 #include <ac_math/ac_inverse_sqrt_pwl.h>
 #include <ac_math/ac_pow_pwl.h>
 #include <ac_math/ac_reciprocal_pwl.h>
@@ -50,6 +51,11 @@ class StdFloat {
     return float_val.template convert_to_ac_fixed<WFX, IFX, SFX, QFX, OFX>();
   }
 
+  template <int width, bool is_signed = true>
+  ac_int<width, is_signed> to_ac_int() const {
+    return float_val.template convert_to_ac_int<width, is_signed>();
+  }
+
   ac_int<width, false> bits_rep() { return float_val.d; }
 
   void set_bits(int i) { float_val.d = i; }
@@ -62,12 +68,23 @@ class StdFloat {
     return r;
   }
 
-  void set_max_neg() { float_val = -ac_float_rep::max(); }
+  static StdFloat one() {
+    StdFloat r;
+    r.float_val = ac_float_rep::one();
+    return r;
+  }
+
+  static StdFloat min() {
+    StdFloat r;
+    r.float_val = ac_float_rep::min();
+    return r;
+  }
 
   StdFloat abs() const { return float_val.abs(); }
 
   StdFloat negate() const { return -float_val; }
 
+#pragma hls_design ccore
   StdFloat exponential() const {
     return ac_math::ac_exp_pwl<ac_float_rep>(float_val);
   }
@@ -82,13 +99,26 @@ class StdFloat {
 
   StdFloat inv_sqrt() const { return sqrt().reciprocal(); }
 
-  StdFloat max1() const {
-    ac_float_rep one = ac_float_rep::one();
-    return float_val > one ? one : float_val;
-  }
-
   StdFloat relu() const {
     return float_val.neg() ? ac_float_rep::zero() : float_val;
+  }
+
+#pragma hls_design ccore
+  StdFloat gelu() const {
+    typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
+    typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> output_type;
+
+    input_type x = to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
+    return ac_math::ac_gelu_pwl<output_type>(x);
+  }
+
+#pragma hls_design ccore
+  StdFloat silu() const {
+    typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
+    typedef ac_fixed<15, 3, false, AC_RND, AC_SAT> output_type;
+
+    input_type x = to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
+    return x * ac_math::ac_sigmoid_pwl<output_type>(x);
   }
 
   ac_int<e_width, false> unbiased_exponent() const {

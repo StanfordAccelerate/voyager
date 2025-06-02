@@ -1,6 +1,5 @@
 set block "WeightController"
 set full_block_name "WeightController<WeightTypeList, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $OC_PORT_WIDTH, $WEIGHT_BUFFER_WIDTH>"
-set clock_multiplier 1.4
 
 proc pre_architect {} {
   global IC_DIMENSION OC_DIMENSION

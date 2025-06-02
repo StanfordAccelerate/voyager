@@ -16,7 +16,7 @@ SC_MODULE(VectorOpUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<VectorInstructions> CCS_INIT_S1(vector_op_int);
+  Connections::In<VectorInstructions> CCS_INIT_S1(vector_op_inst);
   Connections::In<VectorInstructions> CCS_INIT_S1(accumulation_inst);
   Connections::In<VectorInstructions> CCS_INIT_S1(reduction_inst);
 
@@ -38,6 +38,12 @@ SC_MODULE(VectorOpUnit) {
 
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_op_unit_out);
   Connections::Out<ScaleType> CCS_INIT_S1(mx_scale_out);
+
+  Connections::Combinational<VectorInstructions> CCS_INIT_S1(quantizer_inst);
+  Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      quantizer_input);
+  Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
+      vector_op3_src1);
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       accumulation_input);
@@ -78,6 +84,10 @@ SC_MODULE(VectorOpUnit) {
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
+    SC_THREAD(quantizer);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
     SC_THREAD(run_accumulation);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -88,7 +98,7 @@ SC_MODULE(VectorOpUnit) {
   }
 
   void run_vector_ops() {
-    vector_op_int.Reset();
+    vector_op_inst.Reset();
     matrixUnitOutput.Reset();
 #if SUPPORT_MVM
     matrix_vector_unit_data.Reset();
@@ -98,8 +108,9 @@ SC_MODULE(VectorOpUnit) {
     vector_fetch_2_data.Reset();
     vector_fetch_3_req.Reset();
     vector_fetch_3_resp.Reset();
-    mx_scale_out.Reset();
-    vector_op_unit_out.Reset();
+    quantizer_inst.ResetWrite();
+    quantizer_input.ResetWrite();
+    vector_op3_src1.ResetWrite();
     accumulation_input.ResetWrite();
     accumulation_output.ResetRead();
     reduction_input.ResetWrite();
@@ -112,15 +123,13 @@ SC_MODULE(VectorOpUnit) {
     wait();
 
 #pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode bubble
+#pragma hls_pipeline_stall_mode flush
     while (true) {
-      VectorInstructions inst = vector_op_int.Pop();
+      VectorInstructions inst = vector_op_inst.Pop();
 
       Pack1D<VectorType, Width> res0;
       Pack1D<VectorType, Width> res1;
       Pack1D<VectorType, Width> res2;
-      Pack1D<VectorType, Width> res3;
-      ScaleType scale;
 
       // Vector unit inputs
       Pack1D<VectorType, Width> op0_src0;
@@ -273,13 +282,6 @@ SC_MODULE(VectorOpUnit) {
         }
       }
 
-      if (inst.vector_op3_src1 == VectorInstructions::from_immediate_2) {
-#pragma hls_unroll yes
-        for (int i = 0; i < Width; i++) {
-          op3_src1[i].set_bits(inst.immediate2);
-        }
-      }
-
       // Stage 0: add, sub, mult
       if (inst.vector_op0 == VectorInstructions::vadd ||
           inst.vector_op0 == VectorInstructions::vsub) {
@@ -291,7 +293,7 @@ SC_MODULE(VectorOpUnit) {
         }
         vadd<VectorType, Width>(op0_src0, op0_src1, res0);
       } else if (inst.vector_op0 == VectorInstructions::vmult) {
-        vmult<VectorType, Width>(op0_src0, op0_src1, res0);
+        vmul<VectorType, Width>(op0_src0, op0_src1, res0);
       } else {
         res0 = op0_src0;
       }
@@ -307,17 +309,17 @@ SC_MODULE(VectorOpUnit) {
         vgelu<VectorType, Width>(res0, res1);
       } else if (inst.vector_op1 == VectorInstructions::vsilu) {
         vsilu<VectorType, Width>(res0, res1);
-      } else if (inst.vector_op1 == VectorInstructions::vmap) {
-        for (int i = 0; i < Width; i++) {
-          DataTypes::bfloat16 value = res0[i];
+        // } else if (inst.vector_op1 == VectorInstructions::vmap) {
+        //   for (int i = 0; i < Width; i++) {
+        //     DataTypes::bfloat16 value = res0[i];
 
-          ac_int<32, false> address = value.bits_rep() * 2;
-          MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
-          vector_fetch_3_req.Push(request);
+        //     ac_int<32, false> address = value.bits_rep() * 2;
+        //     MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
+        //     vector_fetch_3_req.Push(request);
 
-          value.set_bits(vector_fetch_3_resp.Pop());
-          res1[i] = value;
-        }
+        //     value.set_bits(vector_fetch_3_resp.Pop());
+        //     res1[i] = value;
+        //   }
       } else {
         res1 = res0;
       }
@@ -330,16 +332,56 @@ SC_MODULE(VectorOpUnit) {
         if (inst.vector_op2 == VectorInstructions::vsquare) {
           op2_src1 = res1;
         }
-        vmult<VectorType, Width>(res1, op2_src1, res2);
+        vmul<VectorType, Width>(res1, op2_src1, res2);
       } else {
         res2 = res1;
       }
 
-      // Stage 3: div, quantize
+      // Write outputs
+      if (inst.vdest == VectorInstructions::to_output) {
+        quantizer_inst.Push(inst);
+        quantizer_input.Push(res2);
+        if (inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
+          vector_op3_src1.Push(op3_src1);
+        }
+      } else if (inst.vdest == VectorInstructions::to_reduce) {
+        reduction_input.Push(res2);
+      } else if (inst.vdest == VectorInstructions::to_accumulate) {
+        accumulation_input.Push(res2);
+      }
+    }
+  }
+
+  void quantizer() {
+    vector_op_unit_out.Reset();
+    mx_scale_out.Reset();
+    quantizer_inst.ResetRead();
+    quantizer_input.ResetRead();
+    vector_op3_src1.ResetRead();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (true) {
+      VectorInstructions inst = quantizer_inst.Pop();
+      Pack1D<VectorType, Width> res2 = quantizer_input.Pop();
+      Pack1D<VectorType, Width> res3;
+      Pack1D<VectorType, Width> op3_src1;
+
+      if (inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
+        op3_src1 = vector_op3_src1.Pop();
+      }
+
+      if (inst.vector_op3_src1 == VectorInstructions::from_immediate_2) {
+#pragma hls_unroll yes
+        for (int i = 0; i < Width; i++) {
+          op3_src1[i].set_bits(inst.immediate2);
+        }
+      }
+
 #if SUPPORT_MX
       if (inst.vector_op3 == VectorInstructions::vquantize_mx) {
-        vquantize_mx<VectorType, ScaleType, Width>(res2, scale,
-                                                   inst.immediate2);
+        ScaleType scale = calculate_mx_scale<VectorType, ScaleType, Width>(
+            res2, inst.immediate2);
 
 #pragma hls_unroll yes
         for (int i = 0; i < Width; i++) {
@@ -350,6 +392,7 @@ SC_MODULE(VectorOpUnit) {
       }
 #endif
 
+      // Stage 3: div, quantize
       if (inst.vector_op3 == VectorInstructions::vdiv ||
           inst.vector_op3 == VectorInstructions::vquantize_mx) {
         vdiv<VectorType, Width>(res2, op3_src1, res3);
@@ -357,14 +400,7 @@ SC_MODULE(VectorOpUnit) {
         res3 = res2;
       }
 
-      // Write outputs
-      if (inst.vdest == VectorInstructions::to_output) {
-        vector_op_unit_out.Push(res3);
-      } else if (inst.vdest == VectorInstructions::to_reduce) {
-        reduction_input.Push(res3);
-      } else if (inst.vdest == VectorInstructions::to_accumulate) {
-        accumulation_input.Push(res3);
-      }
+      vector_op_unit_out.Push(res3);
     }
   }
 
@@ -433,10 +469,10 @@ SC_MODULE(VectorOpUnit) {
           Pack1D<VectorType, Width> op = reduction_input.Pop();
 
           if (inst.reduce_op == VectorInstructions::radd) {
-            VectorType sum = adder_tree(op);
+            VectorType sum = tree_sum(op);
             output = (j == 0) ? sum : output + sum;
           } else if (inst.reduce_op == VectorInstructions::rmax) {
-            VectorType max = treemax(op);
+            VectorType max = tree_max(op);
             output = (output < max || j == 0) ? max : output;
           }
         }
@@ -594,7 +630,7 @@ SC_MODULE(VectorUnit) {
 
     vector_op_unit.clk(clk);
     vector_op_unit.rstn(rstn);
-    vector_op_unit.vector_op_int(vector_op_inst);
+    vector_op_unit.vector_op_inst(vector_op_inst);
     vector_op_unit.accumulation_inst(accumulation_inst);
     vector_op_unit.reduction_inst(reduction_inst);
     vector_op_unit.matrixUnitOutput(matrixUnitOutput);

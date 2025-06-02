@@ -2,8 +2,8 @@
 
 #include <systemc.h>
 
-#include "AccelTypes.h"
-#include "ArchitectureParams.h"
+#include "../AccelTypes.h"
+#include "../ArchitectureParams.h"
 #include "VectorOps.h"
 
 template <typename VectorType, typename ScaleType, int Width,
@@ -64,18 +64,6 @@ SC_MODULE(OutputController) {
 
 #if SUPPORT_CODEBOOK_QUANT
       if (params.use_output_codebook) {
-        //         constexpr int fr_bits = 7;
-        //         using ac_fixed_t =
-        //             ac_fixed<MAX_DECODED_DTYPE_WIDTH + fr_bits,
-        //             MAX_DECODED_DTYPE_WIDTH,
-        //                      true, AC_RND_CONV, AC_SAT>;
-
-        //         ac_fixed_t midpoints[NUM_CODEBOOK_ENTRIES - 1];
-        // #pragma hls_unroll yes
-        //         for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
-        //           midpoints[i].set_slc(fr_bits - 1, params.output_code[i]);
-        //         }
-
         using ac_float_t = typename StdFloat<7, 5>::ac_float_rep;
 
         ac_float_t midpoints[NUM_CODEBOOK_ENTRIES - 1];
@@ -97,12 +85,6 @@ SC_MODULE(OutputController) {
 
 #pragma hls_unroll yes
           for (int i = 0; i < Width; i++) {
-            // auto converted_val =
-            //     outputs[i]
-            //         .template to_ac_fixed<MAX_DECODED_DTYPE_WIDTH + fr_bits,
-            //                               MAX_DECODED_DTYPE_WIDTH, true,
-            //                               AC_RND_CONV, AC_SAT>();
-
             ac_float_outputs[i] = ac_float_t(outputs[i].float_val);
             indices[i] = 0;
           }

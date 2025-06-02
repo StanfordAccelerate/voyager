@@ -1,34 +1,12 @@
 #pragma once
 
-#include <ac_math/ac_gelu_pwl.h>
-#include <ac_math/ac_sigmoid_pwl.h>
-
 #include "test/common/operations/Common.h"
-
-using namespace ac_math;
 
 const std::set<std::string> unary_ops = {"relu", "relu_", "gelu", "gelu_",
                                          "silu", "silu_", "sqrt", "sqrt_",
                                          "neg",  "neg_"};
 const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
                                            "mul", "mul_", "div", "div_"};
-
-template <typename T>
-inline T gelu(T i) {
-  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
-  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> output_type;
-  input_type x = i.template to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
-  return ac_gelu_pwl<output_type>(x);
-}
-
-template <typename T>
-inline T silu(T i) {
-  typedef ac_fixed<15, 7, true, AC_RND, AC_SAT> input_type;
-  typedef ac_fixed<30, 3, false, AC_RND, AC_SAT> output_type;
-  input_type x = i.template to_ac_fixed<15, 7, true, AC_RND, AC_SAT>();
-  output_type y = ac_sigmoid_pwl<output_type>(x);
-  return x * y;
-}
 
 template <typename T>
 inline T *perform_unary_operation(T *input, const std::vector<int> shape,
@@ -38,12 +16,11 @@ inline T *perform_unary_operation(T *input, const std::vector<int> shape,
 
   for (int i = 0; i < result_size; ++i) {
     if (opcode == "relu" || opcode == "relu_") {
-      T zero = T(0);
-      result[i] = input[i] < zero ? zero : input[i];
+      result[i] = input[i].relu();
     } else if (opcode == "gelu" || opcode == "gelu_") {
-      result[i] = gelu(input[i]);
+      result[i] = input[i].gelu();
     } else if (opcode == "silu" || opcode == "silu_") {
-      result[i] = silu(input[i]);
+      result[i] = input[i].silu();
     } else if (opcode == "sqrt" || opcode == "sqrt_") {
       result[i] = input[i].sqrt();
     } else if (opcode == "neg" || opcode == "neg_") {

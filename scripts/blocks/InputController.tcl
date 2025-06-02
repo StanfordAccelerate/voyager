@@ -1,6 +1,5 @@
 set block "InputController"
 set full_block_name "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>"
-set clock_multiplier 1.2
 
 proc pre_architect {} {
   global full_block_name

@@ -7,8 +7,8 @@
 #include "ArchitectureParams.h"
 #include "MatrixUnit.h"
 #include "MatrixVectorUnit.h"
-#include "VectorUnit.h"
 #include "mc_scverify.h"
+#include "vector_unit/main.h"
 
 SC_MODULE(Accelerator) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -189,7 +189,7 @@ SC_MODULE(Accelerator) {
     vector_unit.scale_address_out(scalar_output_address);
     vector_unit.start(vectorUnitStartSignal);
     vector_unit.done(vectorUnitDoneSignal);
-    vector_unit.matrixUnitOutput(matrixUnitOutput);
+    vector_unit.matrix_unit_output(matrixUnitOutput);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     for (int i = 0; i < 2; i++) {
