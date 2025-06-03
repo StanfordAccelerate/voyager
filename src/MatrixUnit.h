@@ -183,18 +183,18 @@ SC_MODULE(MatrixUnit) {
 
     weightController.clk(clk);
     weightController.rstn(rstn);
-    weightController.addressRequest(weightAddressRequest);
-    weightController.dataResponse(weightDataResponse);
-    weightController.paramsIn(matrixParams[1]);
-    weightController.biasAddressRequest(biasAddressRequest);
-    weightController.biasDataResponse(biasDataResponse);
-    weightController.biasToSystolicArray(biasToSystolicArray);
+    weightController.weight_req(weightAddressRequest);
+    weightController.weight_resp(weightDataResponse);
+    weightController.params_in(matrixParams[1]);
+    weightController.bias_req(biasAddressRequest);
+    weightController.bias_resp(biasDataResponse);
+    weightController.bias_data(biasToSystolicArray);
 
     weightBuffer.clk(clk);
     weightBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      weightController.writeRequest[i](weightBufferWriteReq[i]);
-      weightController.readAddress[i](weightBufferReadAddress[i]);
+      weightController.write_request[i](weightBufferWriteReq[i]);
+      weightController.read_request[i](weightBufferReadAddress[i]);
 
       weightBuffer.writeRequest[i](weightBufferWriteReq[i]);
       weightBuffer.readAddress[i](weightBufferReadAddress[i]);
@@ -204,15 +204,15 @@ SC_MODULE(MatrixUnit) {
 #if SUPPORT_MX
     weightScaleController.clk(clk);
     weightScaleController.rstn(rstn);
-    weightScaleController.addressRequest(weightScaleAddressRequest);
-    weightScaleController.dataResponse(weightScaleDataResponse);
-    weightScaleController.paramsIn(matrixParams[4]);
+    weightScaleController.weight_scale_req(weightScaleAddressRequest);
+    weightScaleController.weight_scale_resp(weightScaleDataResponse);
+    weightScaleController.params_in(matrixParams[4]);
 
     weightScaleBuffer.clk(clk);
     weightScaleBuffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      weightScaleController.writeRequest[i](weightScaleWriteRequest[i]);
-      weightScaleController.readAddress[i](weightScaleReadAddress[i]);
+      weightScaleController.write_request[i](weightScaleWriteRequest[i]);
+      weightScaleController.read_request[i](weightScaleReadAddress[i]);
 
       weightScaleBuffer.writeRequest[i](weightScaleWriteRequest[i]);
       weightScaleBuffer.readAddress[i](weightScaleReadAddress[i]);

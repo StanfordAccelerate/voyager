@@ -178,8 +178,8 @@ SC_MODULE(VectorUnit) {
     pipeline.reducer_output_0(reducer_output_0);
     pipeline.reducer_output_1(reducer_output_1);
 
-    pipeline.output(vector_unit_output);
     pipeline.mx_scale(mx_scale);
+    pipeline.vector_unit_output(vector_unit_output);
 
     pipeline.reducer_input(reducer_input);
     pipeline.accumulator_input(accumulator_input);

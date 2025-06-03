@@ -8,6 +8,6 @@ proc pre_architect {} {
   set weight_controller_stripped [string map {" " ""} $full_block_name]
 
   if {$IC_DIMENSION < 64 && $OC_DIMENSION < 64} {
-    directive set /$weight_controller_stripped/$weight_controller_stripped:transposer/transposer/while:if:transposeBuffer:rsc -MAP_TO_MODULE {[Register]}
+    directive set /$weight_controller_stripped/$weight_controller_stripped:transposer/transposer/while:if:transpose_buffer:rsc -MAP_TO_MODULE {[Register]}
   }
 }

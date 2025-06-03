@@ -92,9 +92,11 @@ proc pre_architect {} {
   if {$SUPPORT_MX == true} {
     global SCALE_DATATYPE SCALE_DATATYPE_WIDTH
 
-    set input_scale_double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$SCALE_DATATYPE_WIDTH>"
-    directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
-    directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+    if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
+      set input_scale_double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$SCALE_DATATYPE_WIDTH>"
+      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+    }
 
     set scale_width [expr $SCALE_DATATYPE_WIDTH*$OC_DIMENSION]
 

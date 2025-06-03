@@ -12,17 +12,17 @@ SC_MODULE(WeightScaleController) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(dataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(weight_scale_req);
+  Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(weight_scale_resp);
 
   Connections::Out<BufferWriteRequest<ac_int<Scale::width * NCols, false>>>
-      writeRequest[2];
-  Connections::Out<BufferReadRequest> readAddress[2];
+      write_request[2];
+  Connections::Out<BufferReadRequest> read_request[2];
 
-  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
+  Connections::In<MatrixParams> CCS_INIT_S1(params_in);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcher_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(writer_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(reader_params);
 
   static constexpr int LOOP_WIDTH = 10;
   static constexpr int BLOCK_SIZE = NRows > NCols ? NRows : NCols;
@@ -46,13 +46,13 @@ SC_MODULE(WeightScaleController) {
   }
 
   void fetcher() {
-    addressRequest.Reset();
-    fetcherParams.ResetRead();
+    weight_scale_req.Reset();
+    fetcher_params.ResetRead();
 
     wait();
 
     while (true) {
-      const MatrixParams params = fetcherParams.Pop();
+      const MatrixParams params = fetcher_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][5];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
@@ -128,7 +128,7 @@ SC_MODULE(WeightScaleController) {
 
                           send_input_request<Scale, NCols>(
                               params.WEIGHT_SCALE_OFFSET, address,
-                              addressRequest);
+                              weight_scale_req);
                         }
 
                         if (loop_counters[1][4] == loop_bounds[1][4]) {
@@ -171,17 +171,17 @@ SC_MODULE(WeightScaleController) {
   }
 
   void writer() {
-    writerParams.ResetRead();
-    dataResponse.Reset();
-    writeRequest[0].Reset();
-    writeRequest[1].Reset();
+    writer_params.ResetRead();
+    weight_scale_resp.Reset();
+    write_request[0].Reset();
+    write_request[1].Reset();
 
     bool bankSel = 0;
 
     wait();
 
     while (true) {
-      const MatrixParams params = writerParams.Pop();
+      const MatrixParams params = writer_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][5];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
@@ -261,7 +261,7 @@ SC_MODULE(WeightScaleController) {
                           ac_int<Scale::width * NCols, false> data;
                           process_matrix_input<Scale, NCols, PortWidth,
                                                Scale::width * NCols>(
-                              dataResponse, data);
+                              weight_scale_resp, data);
 
                           BufferWriteRequest<
                               ac_int<Scale::width * NCols, false>>
@@ -269,7 +269,7 @@ SC_MODULE(WeightScaleController) {
                           req.address = address;
                           req.data = data;
                           req.last = num_writes == num_total_writes - 1;
-                          writeRequest[bankSel].Push(req);
+                          write_request[bankSel].Push(req);
                           num_writes++;
                         }
 
@@ -314,17 +314,17 @@ SC_MODULE(WeightScaleController) {
   }
 
   void reader() {
-    readerParams.ResetRead();
+    reader_params.ResetRead();
 
-    readAddress[0].Reset();
-    readAddress[1].Reset();
+    read_request[0].Reset();
+    read_request[1].Reset();
 
     bool bankSel = 0;
 
     wait();
 
     while (true) {
-      const MatrixParams params = readerParams.Pop();
+      const MatrixParams params = reader_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
@@ -432,7 +432,7 @@ SC_MODULE(WeightScaleController) {
                                          rep == rep_bound - 1 &&
                                          reuse == buffer_reuse - 1;
 
-                              readAddress[bankSel].Push(req);
+                              read_request[bankSel].Push(req);
 
                               if (loop_counters[1][5] ==
                                   loop_bounds[1][5] - 1) {
@@ -488,20 +488,20 @@ SC_MODULE(WeightScaleController) {
   }
 
   void read_params() {
-    paramsIn.Reset();
-    fetcherParams.ResetWrite();
-    writerParams.ResetWrite();
-    readerParams.ResetWrite();
+    params_in.Reset();
+    fetcher_params.ResetWrite();
+    writer_params.ResetWrite();
+    reader_params.ResetWrite();
 
     wait();
 
     while (true) {
-      const MatrixParams params = paramsIn.Pop();
+      const MatrixParams params = params_in.Pop();
 
       if (params.is_mx_op) {
-        fetcherParams.Push(params);
-        writerParams.Push(params);
-        readerParams.Push(params);
+        fetcher_params.Push(params);
+        writer_params.Push(params);
+        reader_params.Push(params);
       }
     }
   }

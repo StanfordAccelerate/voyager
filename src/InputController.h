@@ -19,6 +19,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(input_req);
   Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(input_resp);
+  sc_fifo<bool> fetcher_done;
 
   Connections::Out<BufferWriteRequest<ac_int<BufferWidth, false>>>
       input_write_request[2];
@@ -34,7 +35,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   Connections::Combinational<MatrixParams> CCS_INIT_S1(winder_buffer_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposer_params);
 
-  Connections::Combinational<ac_int<BufferWidth, false>> transposeOut;
+  Connections::Combinational<ac_int<BufferWidth, false>> transpose_out;
 
   static constexpr int LOOP_WIDTH = 10;
   static constexpr int DATA_WIDTH = BufferWidth / NRows;
@@ -212,6 +213,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                             if (params.has_input_transpose) {
                               address =
                                   (c + (x % NRows)) * X + (x / NRows) * NRows;
+                            } else {
+                              fetcher_done.write(false);
                             }
 
                             (fetch_matrix_input<InputTypes, NRows,
@@ -261,12 +264,13 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
           break;
         }
       }
+      fetcher_done.write(true);
     }
   }
 
   void writer() {
     writer_params.ResetRead();
-    transposeOut.ResetRead();
+    transpose_out.ResetRead();
 
     input_write_request[0].Reset();
     input_write_request[1].Reset();
@@ -375,7 +379,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                       InputTypes...>(params.input_dtype, data),
                              ...);
                           } else {
-                            data = transposeOut.Pop();
+                            data = transpose_out.Pop();
                           }
 
                           ac_int<LOOP_WIDTH> orig_x0 =
@@ -852,7 +856,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   void transposer() {
     transposer_params.ResetRead();
     input_resp.Reset();
-    transposeOut.ResetWrite();
+    transpose_out.ResetWrite();
 
     wait();
 
@@ -875,44 +879,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex] = 1;
 
-      ac_int<LOOP_WIDTH, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
-      ac_int<16, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
-      ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
-      ac_int<16, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
-      ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      ac_int<4, false> FY = params.loops[1][params.fyIndex];
-
-      if (params.is_replication) {
-        FX = 7;
-      }
-
-      bool is_downsample = FX == 1 && FY == 1;
-
-      ac_int<16, false> IX0 = X0 * params.stride;
-      ac_int<16, false> IY0 = Y0 * params.stride;
-
-      ac_int<16, false> x_bound = is_downsample ? X0 : IX0;
-      ac_int<16, false> y_bound = is_downsample ? Y0 : IY0;
-
-      if (params.is_replication) {
-        x_bound /= packing_factor;
-      }
-
-      ac_int<4, false> x_padding = (FX - 1) / 2;
-      ac_int<4, false> y_padding = (FY - 1) / 2;
-      ac_int<LOOP_WIDTH, false> x_boundary =
-          params.is_replication ? ac_int<4, false>(boundary_words) : x_padding;
-
-      ac_int<LOOP_WIDTH, false> x_bound_no_pad = x_bound;
-      ac_int<LOOP_WIDTH, false> x_bound_pad_one_side = x_bound + x_boundary;
-      ac_int<LOOP_WIDTH, false> x_bound_pad_both = x_bound + x_boundary * 2;
-
-      ac_int<LOOP_WIDTH, false> y_bound_no_pad = y_bound;
-      ac_int<LOOP_WIDTH, false> y_bound_pad_one_side = y_bound + y_padding;
-      ac_int<LOOP_WIDTH, false> y_bound_pad_both = y_bound + y_padding * 2;
-
       if (params.has_input_transpose && NRows <= 32) {
-        ac_int<DATA_WIDTH> transposeBuffer[NRows][NRows];
+        ac_int<DATA_WIDTH> transpose_buffer[NRows][NRows];
 
         ac_int<32, false> total_count =
             loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
@@ -942,7 +910,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
 #pragma hls_unroll yes
             for (int dim = 0; dim < NRows; dim++) {
-              transposeBuffer[dim][c0] =
+              transpose_buffer[dim][c0] =
                   bits.template slc<DATA_WIDTH>(dim * DATA_WIDTH);
             }
           }
@@ -953,115 +921,29 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
 #pragma hls_unroll yes
             for (int dim = 0; dim < NRows; dim++) {
-              transposed.set_slc(dim * DATA_WIDTH, transposeBuffer[c0][dim]);
+              transposed.set_slc(dim * DATA_WIDTH, transpose_buffer[c0][dim]);
             }
-            transposeOut.Push(transposed);
+            transpose_out.Push(transposed);
           }
         }
+
       } else {  // passthrough
-        for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-              for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
-                bool x_pad_left =
-                    loop_counters[0][params.inputXLoopIndex[0]] != 0;
-                bool x_pad_right =
-                    loop_counters[0][params.inputXLoopIndex[0]] != X1 - 1;
-
-                ac_int<4, false> x_min_offset =
-                    x_pad_left ? x_padding : ac_int<4, false>(0);
-
-                if (x_pad_left && x_pad_right) {
-                  loop_bounds[1][params.inputXLoopIndex[1]] = x_bound_pad_both;
-                } else if (x_pad_left || x_pad_right) {
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      x_bound_pad_one_side;
-                } else {
-                  loop_bounds[1][params.inputXLoopIndex[1]] = x_bound_no_pad;
-                }
-
-                bool y_pad_left =
-                    loop_counters[0][params.inputYLoopIndex[0]] != 0;
-                bool y_pad_right =
-                    loop_counters[0][params.inputYLoopIndex[0]] != Y1 - 1;
-
-                ac_int<4, false> y_min_offset =
-                    y_pad_left ? y_padding : ac_int<4, false>(0);
-
-                if (y_pad_left && y_pad_right) {
-                  loop_bounds[1][params.inputYLoopIndex[1]] = y_bound_pad_both;
-                } else if (y_pad_left || y_pad_right) {
-                  loop_bounds[1][params.inputYLoopIndex[1]] =
-                      y_bound_pad_one_side;
-                } else {
-                  loop_bounds[1][params.inputYLoopIndex[1]] = y_bound_no_pad;
-                }
-
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-                for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
-                  for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
-                    for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
-                      for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
-                        for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
-                          for (loop_counters[1][5] = 0;;
-                               loop_counters[1][5]++) {
-                            ac_int<BufferWidth, false> bits = 0;
+        while (!fetcher_done.read()) {
+          ac_int<BufferWidth, false> bits = 0;
 
-                            bool success =
-                                (process_matrix_input<InputTypes, NRows,
-                                                      PortWidth, BufferWidth,
-                                                      InputTypes...>(
-                                     params.input_dtype, input_resp, bits) ||
-                                 ...);
+          bool success = (process_matrix_input<InputTypes, NRows, PortWidth,
+                                               BufferWidth, InputTypes...>(
+                              params.input_dtype, input_resp, bits) ||
+                          ...);
 #ifndef __SYNTHESIS__
-                            if (!success) {
-                              std::cerr << "Error: matrix input dtype '"
-                                        << params.input_dtype
-                                        << "' is not valid" << std::endl;
-                            }
+          if (!success) {
+            std::cerr << "Error: matrix input dtype '" << params.input_dtype
+                      << "' is not valid" << std::endl;
+          }
 #endif
-                            transposeOut.Push(bits);
-
-                            if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
-                              break;
-                            }
-                          }
-                          if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
-                            break;
-                          }
-                        }
-                        if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
-                          break;
-                        }
-                      }
-                      if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
-                        break;
-                      }
-                    }
-                    if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
-                      break;
-                    }
-                  }
-                  if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
-                    break;
-                  }
-                }
-                if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
-                  break;
-                }
-              }
-              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
-                break;
-              }
-            }
-            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
-              break;
-            }
-          }
-          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
-            break;
-          }
+          transpose_out.Push(bits);
         }
       }
     }
