@@ -8,7 +8,8 @@
 #include "Broadcaster.h"
 #include "VectorOps.h"
 
-template <typename VectorType, typename BufferType, int Width>
+template <typename VectorType, typename BufferType, typename ScaleType,
+          int Width>
 SC_MODULE(VectorPipeline) {
   sc_in<bool> clk;
   sc_in<bool> rstn;
@@ -37,9 +38,8 @@ SC_MODULE(VectorPipeline) {
   Connections::In<Pack1D<VectorType, Width>> reducer_output_1;
 
   // Outputs to other submodules
-  Connections::Out<VectorInstructions> quantizer_instr;
-  Connections::Out<Pack1D<VectorType, Width>> quantizer_input;
-  Connections::Out<Pack1D<VectorType, Width>> quantizer_scale;
+  Connections::Out<Pack1D<VectorType, Width>> output;
+  Connections::Out<ScaleType> mx_scale;
 
   Connections::Out<Pack1D<VectorType, Width>> reducer_input;
   Connections::Out<Pack1D<VectorType, Width>> accumulator_input;
@@ -61,14 +61,13 @@ SC_MODULE(VectorPipeline) {
     vector_fetch_2_data.Reset();
     vector_fetch_3_req.Reset();
     vector_fetch_3_resp.Reset();
-    quantizer_instr.Reset();
-    quantizer_input.Reset();
-    quantizer_scale.Reset();
     accumulator_input.Reset();
     accumulator_output.Reset();
     reducer_input.Reset();
     reducer_output_0.Reset();
     reducer_output_1.Reset();
+    mx_scale.Reset();
+    output.Reset();
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     accumulation_buffer_output.Reset();
 #endif
@@ -83,6 +82,7 @@ SC_MODULE(VectorPipeline) {
       Pack1D<VectorType, Width> res0;
       Pack1D<VectorType, Width> res1;
       Pack1D<VectorType, Width> res2;
+      Pack1D<VectorType, Width> res3;
 
       // Vector unit inputs
       Pack1D<VectorType, Width> op0_src0;
@@ -235,6 +235,13 @@ SC_MODULE(VectorPipeline) {
         }
       }
 
+      if (inst.vector_op3_src1 == VectorInstructions::from_immediate_2) {
+#pragma hls_unroll yes
+        for (int i = 0; i < Width; i++) {
+          op3_src1[i].set_bits(inst.immediate2);
+        }
+      }
+
       // Stage 0: add, sub, mult
       if (inst.vector_op0 == VectorInstructions::vadd ||
           inst.vector_op0 == VectorInstructions::vsub) {
@@ -258,21 +265,21 @@ SC_MODULE(VectorPipeline) {
         res1 = vabs<VectorType, Width>(res0);
       } else if (inst.vector_op1 == VectorInstructions::vrelu) {
         res1 = vrelu<VectorType, Width>(res0);
-      // } else if (inst.vector_op1 == VectorInstructions::vgelu) {
-      //   res1 = vgelu<VectorType, Width>(res0);
+        // } else if (inst.vector_op1 == VectorInstructions::vgelu) {
+        //   res1 = vgelu<VectorType, Width>(res0);
       } else if (inst.vector_op1 == VectorInstructions::vsilu) {
         res1 = vsilu<VectorType, Width>(res0);
-      // } else if (inst.vector_op1 == VectorInstructions::vmap) {
-      //   for (int i = 0; i < Width; i++) {
-      //     DataTypes::bfloat16 value = res0[i];
+        // } else if (inst.vector_op1 == VectorInstructions::vmap) {
+        //   for (int i = 0; i < Width; i++) {
+        //     DataTypes::bfloat16 value = res0[i];
 
-      //     ac_int<32, false> address = value.bits_rep() * 2;
-      //     MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
-      //     vector_fetch_3_req.Push(request);
+        //     ac_int<32, false> address = value.bits_rep() * 2;
+        //     MemoryRequest request = {inst.VMAP_OFFSET + address, 2};
+        //     vector_fetch_3_req.Push(request);
 
-      //     value.set_bits(vector_fetch_3_resp.Pop());
-      //     res1[i] = value;
-      //   }
+        //     value.set_bits(vector_fetch_3_resp.Pop());
+        //     res1[i] = value;
+        //   }
       } else {
         res1 = res0;
       }
@@ -292,11 +299,29 @@ SC_MODULE(VectorPipeline) {
 
       // Write outputs
       if (inst.vdest == VectorInstructions::to_output) {
-        quantizer_instr.Push(inst);
-        quantizer_input.Push(res2);
-        if (inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
-          quantizer_scale.Push(op3_src1);
+#if SUPPORT_MX
+        if (inst.vector_op3 == VectorInstructions::vquantize_mx) {
+          ScaleType scale = calculate_mx_scale<VectorType, ScaleType, Width>(
+              res2, inst.immediate2);
+
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            op3_src1[i] = scale;
+          }
+
+          mx_scale.Push(scale);
         }
+#endif
+
+        // Stage 3: div, quantize
+        if (inst.vector_op3 == VectorInstructions::vdiv ||
+            inst.vector_op3 == VectorInstructions::vquantize_mx) {
+          res3 = vdiv<VectorType, Width>(res2, op3_src1);
+        } else {
+          res3 = res2;
+        }
+
+        output.Push(res3);
       } else if (inst.vdest == VectorInstructions::to_reduce) {
         reducer_input.Push(res2);
       } else if (inst.vdest == VectorInstructions::to_accumulate) {

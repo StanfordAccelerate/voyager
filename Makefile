@@ -199,10 +199,6 @@ $(CATAPULT_BUILD_DIR)/VectorAccumulator/VectorAccumulator.v1/concat_rtl.v: src/v
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorAccumulator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorAccumulator.log
 
-$(CATAPULT_BUILD_DIR)/VectorQuantizer/VectorQuantizer.v1/concat_rtl.v: src/vector_unit/Quantizer.h $(PROTOS_DEPENDENCY)
-	mkdir -p $(CATAPULT_BUILD_DIR)
-	BLOCK=VectorQuantizer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorQuantizer.log
-
 $(CATAPULT_BUILD_DIR)/OutputController/OutputController.v1/concat_rtl.v: src/vector_unit/OutputController.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=OutputController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/OutputController.log
@@ -212,7 +208,6 @@ $(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v: \
     $(CATAPULT_BUILD_DIR)/VectorPipeline/VectorPipeline.v1/concat_rtl.v \
 	$(CATAPULT_BUILD_DIR)/VectorReducer/VectorReducer.v1/concat_rtl.v \
 	$(CATAPULT_BUILD_DIR)/VectorAccumulator/VectorAccumulator.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/VectorQuantizer/VectorQuantizer.v1/concat_rtl.v \
     $(CATAPULT_BUILD_DIR)/OutputController/OutputController.v1/concat_rtl.v \
     $(CATAPULT_BUILD_DIR)/VectorParamsDeserializer/VectorParamsDeserializer.v1/concat_rtl.v \
 	src/vector_unit/main.h $(PROTOS_DEPENDENCY)
@@ -227,7 +222,7 @@ $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: src/Accelerator.h
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log
 
-.PHONY: rtl Accelerator InputController WeightController MatrixProcessor ProcessingElement VectorUnit VectorParamsDeserializer VectorFetchUnit VectorPipeline VectorReducer VectorAccumulator VectorQuantizer OutputController MatrixVectorUnit
+.PHONY: rtl Accelerator InputController WeightController MatrixProcessor ProcessingElement VectorUnit VectorParamsDeserializer VectorFetchUnit VectorPipeline VectorReducer VectorAccumulator OutputController MatrixVectorUnit
 
 # Run RTL simulation
 .PHONY: rtl-sim

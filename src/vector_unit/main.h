@@ -7,7 +7,6 @@
 #include "Accumulator.h"
 #include "Broadcaster.h"
 #include "OutputController.h"
-#include "Quantizer.h"
 #include "Reducer.h"
 #include "VectorFetch.h"
 #include "VectorOps.h"
@@ -88,10 +87,9 @@ SC_MODULE(VectorUnit) {
   // Submodules
   VectorFetchUnit<VectorType, BufferType, Width, VU_INPUT_TYPES> CCS_INIT_S1(
       fetcher);
-  VectorPipeline<VectorType, BufferType, Width> CCS_INIT_S1(pipeline);
+  VectorPipeline<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(pipeline);
   VectorReducer<VectorType, Width> CCS_INIT_S1(reducer);
   VectorAccumulator<VectorType, Width> CCS_INIT_S1(accumulator);
-  VectorQuantizer<VectorType, ScaleType, Width> CCS_INIT_S1(quantizer);
   OutputController<VectorType, ScaleType, Width, OUTPUT_DATATYPES> CCS_INIT_S1(
       output_controller);
 
@@ -103,10 +101,6 @@ SC_MODULE(VectorUnit) {
       output_controller_params);
 
   // Internal connections between submodules
-  Connections::Combinational<VectorInstructions> quantizer_instr;
-  Connections::Combinational<Pack1D<VectorType, Width>> quantizer_input;
-  Connections::Combinational<Pack1D<VectorType, Width>> quantizer_scale;
-
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_input;
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_input;
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_output;
@@ -123,7 +117,6 @@ SC_MODULE(VectorUnit) {
       : pipeline("pipeline"),
         reducer("reducer"),
         accumulator("accumulator"),
-        quantizer("quantizer"),
         fetcher("fetcher"),
         output_controller("output_controller") {
     // Param deserializer
@@ -185,9 +178,8 @@ SC_MODULE(VectorUnit) {
     pipeline.reducer_output_0(reducer_output_0);
     pipeline.reducer_output_1(reducer_output_1);
 
-    pipeline.quantizer_instr(quantizer_instr);
-    pipeline.quantizer_input(quantizer_input);
-    pipeline.quantizer_scale(quantizer_scale);
+    pipeline.output(vector_unit_output);
+    pipeline.mx_scale(mx_scale);
 
     pipeline.reducer_input(reducer_input);
     pipeline.accumulator_input(accumulator_input);
@@ -221,15 +213,6 @@ SC_MODULE(VectorUnit) {
     accumulator.instr(accumulator_instr);
     accumulator.input(accumulator_input);
     accumulator.output(accumulator_output);
-
-    // Quantizer
-    quantizer.clk(clk);
-    quantizer.rstn(rstn);
-    quantizer.instr(quantizer_instr);
-    quantizer.input(quantizer_input);
-    quantizer.scale(quantizer_scale);
-    quantizer.output(vector_unit_output);
-    quantizer.mx_scale(mx_scale);
 
     // Output controller
     output_controller.clk(clk);

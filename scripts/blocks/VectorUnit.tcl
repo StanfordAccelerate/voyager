@@ -6,21 +6,19 @@ proc pre_libraries {} {
   solution library add {[Block] VectorPipeline.v1}
   solution library add {[Block] VectorReducer.v1}
   solution library add {[Block] VectorAccumulator.v1}
-  solution library add {[Block] VectorQuantizer.v1}
   solution library add {[Block] OutputController.v1}
   solution library add {[Block] VectorParamsDeserializer.v1}
 }
 
 proc pre_assembly {} {
-  global full_block_name
+  global full_block_name VECTOR_DATATYPE ACCUM_BUFFER_DATATYPE OC_DIMENSION VU_INPUT_TYPES SCALE_DATATYPE OUTPUT_DATATYPES
   set full_block_name_stripped [string map {" " ""} $full_block_name]
 
-  global VECTOR_DATATYPE ACCUM_BUFFER_DATATYPE OC_DIMENSION VU_INPUT_TYPES SCALE_DATATYPE OUTPUT_DATATYPES
   set vector_fetch_name "VectorFetchUnit<$VECTOR_DATATYPE,$ACCUM_BUFFER_DATATYPE,$OC_DIMENSION,$VU_INPUT_TYPES>"
   set vector_fetch_name_stripped [string map {" " ""} $vector_fetch_name]
   directive set /$full_block_name_stripped/$vector_fetch_name_stripped -MAP_TO_MODULE {[Block] VectorFetchUnit.v1}
 
-  set vector_pipeline_name "VectorPipeline<$VECTOR_DATATYPE,$ACCUM_BUFFER_DATATYPE,$OC_DIMENSION>"
+  set vector_pipeline_name "VectorPipeline<$VECTOR_DATATYPE,$ACCUM_BUFFER_DATATYPE,$SCALE_DATATYPE,$OC_DIMENSION>"
   set vector_pipeline_name_stripped [string map {" " ""} $vector_pipeline_name]
   directive set /$full_block_name_stripped/$vector_pipeline_name_stripped -MAP_TO_MODULE {[Block] VectorPipeline.v1}
 
@@ -31,10 +29,6 @@ proc pre_assembly {} {
   set vector_accumulator_name "VectorAccumulator<$VECTOR_DATATYPE,$OC_DIMENSION>"
   set vector_accumulator_name_stripped [string map {" " ""} $vector_accumulator_name]
   directive set /$full_block_name_stripped/$vector_accumulator_name_stripped -MAP_TO_MODULE {[Block] VectorAccumulator.v1}
-
-  set vector_quantizer_name "VectorQuantizer<$VECTOR_DATATYPE,$SCALE_DATATYPE,$OC_DIMENSION>"
-  set vector_quantizer_name_stripped [string map {" " ""} $vector_quantizer_name]
-  directive set /$full_block_name_stripped/$vector_quantizer_name_stripped -MAP_TO_MODULE {[Block] VectorQuantizer.v1}
 
   set output_controller_name "OutputController<$VECTOR_DATATYPE,$SCALE_DATATYPE,$OC_DIMENSION,$OUTPUT_DATATYPES>"
   set output_controller_name_stripped [string map {" " ""} $output_controller_name]
