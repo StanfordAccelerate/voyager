@@ -113,7 +113,10 @@ SC_MODULE(VectorPipeline) {
           vdequantize<BufferType, VectorType, Width>(sa_output, temp,
                                                      inst.vector_dq_scale);
         } else {
-          temp = sa_output;
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            temp[i] = sa_output[i];
+          }
         }
 
         if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit) {
@@ -134,7 +137,10 @@ SC_MODULE(VectorPipeline) {
           vdequantize<BufferType, VectorType, Width>(sa_output, temp,
                                                      inst.vector_dq_scale);
         } else {
-          temp = sa_output;
+#pragma hls_unroll yes
+          for (int i = 0; i < Width; i++) {
+            temp[i] = sa_output[i];
+          }
         }
 
         if (inst.vector_op0_src0 ==
