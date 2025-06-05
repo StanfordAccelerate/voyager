@@ -307,7 +307,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       std::cerr << "process inputs done" << std::endl;
     }
   }
-
+#if SUPPORT_MX
   void process_input_scales() {
     input_scale_param.ResetRead();
     input_scale_resp.Reset();
@@ -349,10 +349,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-      std::cerr << "process inputs done" << std::endl;
+      std::cerr << "process input scales done" << std::endl;
     }
   }
-
+#endif
   void fetch_weights() {
     fetch_weight_param.ResetRead();
     weight_req.Reset();
