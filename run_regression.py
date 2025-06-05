@@ -15,6 +15,25 @@ from google.protobuf.json_format import MessageToDict
 from quantized_training.codegen import param_pb2
 
 
+def set_default_env_vars(env_vars):
+    env_vars.setdefault("INPUT_BUFFER_SIZE", "1024")
+    env_vars.setdefault("WEIGHT_BUFFER_SIZE", "1024")
+    env_vars.setdefault("ACCUM_BUFFER_SIZE", "1024")
+    env_vars.setdefault("DOUBLE_BUFFERED_ACCUM_BUFFER", "false")
+    env_vars.setdefault("SUPPORT_MVM", "false")
+
+
+def get_build_folder(env_vars):
+    return (
+        f"build/"
+        f"{env_vars['DATATYPE']}_"
+        f"{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_"
+        f"{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_"
+        f"{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}_"
+        f"{env_vars['SUPPORT_MVM']}"
+    )
+
+
 def print_test_results(test_results, layers, output_folder):
     columns = ["Model", "Layer", "Status", "Runtime", "Ideal", "RuntimeType", "Count"]
     if len(test_results[0]) == 3:
@@ -253,14 +272,8 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
     # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an
     # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
-    if "INPUT_BUFFER_SIZE" not in env_vars:
-        env_vars["INPUT_BUFFER_SIZE"] = "1024"
-    if "WEIGHT_BUFFER_SIZE" not in env_vars:
-        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-    if "ACCUM_BUFFER_SIZE" not in env_vars:
-        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-    if "DOUBLE_BUFFERED_ACCUM_BUFFER" not in env_vars:
-        env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] = "false"
+    set_default_env_vars(env_vars)
+    build_folder = get_build_folder(env_vars)
 
     # we occasionally see the test fail due to filesystem issues ("no rule to make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
@@ -268,7 +281,7 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
             try:
                 subprocess.run(
                     ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
-                    cwd=f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+                    cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
                     env=env_vars,
                     stdout=stdout_file,
                     stderr=subprocess.STDOUT,
@@ -380,19 +393,12 @@ def run_rtl_tests(
         env_vars["TESTS"] = test
         env_vars["SIMS"] = "gold,accelerator"
         env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
-
-        if "INPUT_BUFFER_SIZE" not in env_vars:
-            env_vars["INPUT_BUFFER_SIZE"] = "1024"
-        if "WEIGHT_BUFFER_SIZE" not in env_vars:
-            env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-        if "ACCUM_BUFFER_SIZE" not in env_vars:
-            env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-        if "DOUBLE_BUFFERED_ACCUM_BUFFER" not in env_vars:
-            env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] = "false"
+        set_default_env_vars(env_vars)
+        build_folder = get_build_folder(env_vars)
 
         subprocess.run(
             ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "build"],
-            cwd=f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+            cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
             env=env_vars,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
@@ -465,15 +471,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
 
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
-
-    if "INPUT_BUFFER_SIZE" not in env_vars:
-        env_vars["INPUT_BUFFER_SIZE"] = "1024"
-    if "WEIGHT_BUFFER_SIZE" not in env_vars:
-        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-    if "ACCUM_BUFFER_SIZE" not in env_vars:
-        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-    if "DOUBLE_BUFFERED_ACCUM_BUFFER" not in env_vars:
-        env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] = "false"
+    set_default_env_vars(env_vars)
+    build_folder = get_build_folder(env_vars)
 
     # Build AccuracyTester binary
     subprocess.run(["make", "clean"], env=env_vars)
@@ -637,7 +636,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         try:
             subprocess.run(
                 [
-                    f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}/cc/AccuracyTester",
+                    f"{build_folder}/cc/AccuracyTester",
                     model,
                     output_data_dir,
                     str(num_processes),

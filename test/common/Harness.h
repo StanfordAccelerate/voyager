@@ -116,14 +116,16 @@ SC_MODULE(Harness) {
 #if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
       matrix_vector_input_scale_req);
-  sc_fifo<ac_int<8, false>> matrix_vector_input_scale_resp_fifo;
-  Connections::Combinational<ac_int<8, false>> CCS_INIT_S1(
+  sc_fifo<ac_int<MVU_SCALE_PORT_WIDTH, false>>
+      matrix_vector_input_scale_resp_fifo;
+  Connections::Combinational<ac_int<MVU_SCALE_PORT_WIDTH, false>> CCS_INIT_S1(
       matrix_vector_input_scale_resp);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
       matrix_vector_weight_scale_req);
-  sc_fifo<OC_PORT_TYPE> matrix_vector_weight_scale_resp_fifo;
-  Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(
+  sc_fifo<ac_int<MVU_SCALE_PORT_WIDTH, false>>
+      matrix_vector_weight_scale_resp_fifo;
+  Connections::Combinational<ac_int<MVU_SCALE_PORT_WIDTH, false>> CCS_INIT_S1(
       matrix_vector_weight_scale_resp);
 #endif
 

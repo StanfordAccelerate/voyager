@@ -120,11 +120,15 @@ void Simulation::load_data() {
     }
 
     for (const auto& tensor : network->model.parameters()) {
+#ifdef LLM_DECODE
+      bool transpose_weight = false;
+#else
       bool transpose_weight = true;
 #if !SUPPORT_MVM
       transpose_weight =
           tensor.shape(0) != num_classes &&
           tensor.node().find("_param_constant") != std::string::npos;
+#endif
 #endif
       dataloader->load_tensor(tensor, data_dir, transpose_weight);
     }

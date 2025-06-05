@@ -35,23 +35,22 @@ proc pre_assembly {} {
 
   set InputControllerBlock "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>"
   set InputControllerBlock_stripped [string map {" " ""} $InputControllerBlock]
+  directive set /Accelerator/$InputControllerBlock_stripped -MAP_TO_MODULE {[Block] InputController.v1}
 
   set WeightControllerBlock "WeightController<WeightTypeList, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $OC_PORT_WIDTH, $WEIGHT_BUFFER_WIDTH>"
   set WeightControllerBlock_stripped [string map {" " ""} $WeightControllerBlock]
+  directive set /Accelerator/$WeightControllerBlock_stripped -MAP_TO_MODULE {[Block] WeightController.v1}
 
   set MatrixProcessorBlock "MatrixProcessor<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
   set MatrixProcessorBlock_stripped [string map {" " ""} $MatrixProcessorBlock]
+  directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
 
   set VectorUnitBlock "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>"
   set VectorUnitBlock_stripped [string map {" " ""} $VectorUnitBlock]
+  directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
 
   set MatrixParamsDeserializerBlock "MatrixParamsDeserializer<[expr {$SUPPORT_MX ? 5 : 3}]>"
   set MatrixParamsDeserializerBlock_stripped [string map {" " ""} $MatrixParamsDeserializerBlock]
-
-  directive set /Accelerator/$InputControllerBlock_stripped -MAP_TO_MODULE {[Block] InputController.v1}
-  directive set /Accelerator/$WeightControllerBlock_stripped -MAP_TO_MODULE {[Block] WeightController.v1}
-  directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
-  directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
   directive set /Accelerator/$MatrixParamsDeserializerBlock_stripped -MAP_TO_MODULE {[Block] MatrixParamsDeserializer.v1}
 
   if {$SUPPORT_MVM == true} {

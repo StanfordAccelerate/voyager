@@ -713,13 +713,11 @@ class Pack1D<UFloat<W, E>, Width> {
 template <typename T, size_t Width>
 class Transaction {
  public:
-  decltype(VectorInstructions::vector_op0) op;
-  decltype(VectorInstructions::immediate0) immediate;
+  ac_int<3, false> op;
+  ac_int<16, false> immediate;
   Pack1D<T, Width> payload;
 
-  static const unsigned int width =
-      decltype(VectorInstructions::vector_op0)::width +
-      decltype(VectorInstructions::immediate0)::width + Pack1D<T, Width>::width;
+  static const unsigned int width = 3 + 16 + Pack1D<T, Width>::width;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size> &m) {

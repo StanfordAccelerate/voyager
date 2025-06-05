@@ -408,13 +408,14 @@ SC_MODULE(VectorFetchUnit) {
             params.addr_gen0_loops[0][0] * params.addr_gen0_loops[0][1] *
             params.addr_gen0_loops[0][2] * params.addr_gen0_loops[1][0] *
             params.addr_gen0_loops[1][1];
+        ac_int<32, false> counter = 0;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       TRANSPOSE_OUTER:
-        for (int i = 0; i < total_values; i++) {
+        while (counter++ < total_values) {
         TRANSPOSE_READ:
-          for (int col = 0; col < Width; col++) {
+          for (ac_int<10, false> col = 0;; col++) {
             Pack1D<VectorType, Width> full_response;
 
             bool found = (process_vector_input<InputTypes, Width, VectorType,
@@ -439,10 +440,14 @@ SC_MODULE(VectorFetchUnit) {
             for (int row = 0; row < BUFSIZE; row++) {
               buffer[row][col] = dequantized[row];
             }
+
+            if (col == Width - 1) {
+              break;
+            }
           }
 
         TRANSPOSE_WRITE:
-          for (int row = 0; row < BUFSIZE; row++) {
+          for (ac_int<10, false> row = 0;; row++) {
             Pack1D<VectorType, Width> transposed;
 #pragma hls_unroll yes
             for (int col = 0; col < Width; col++) {
@@ -450,6 +455,10 @@ SC_MODULE(VectorFetchUnit) {
             }
 
             vector_fetch_0_data.Push(transposed);
+
+            if (row == BUFSIZE - 1) {
+              break;
+            }
           }
         }
       }
