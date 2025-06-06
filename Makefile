@@ -179,7 +179,7 @@ $(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/Matri
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixProcessor catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixProcessor.log
 
-$(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v: src/VectorUnit.h $(PROTOS_DEPENDENCY)
+$(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v: src/ParamsDeserializer.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixParamsDeserializer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer.log
 
