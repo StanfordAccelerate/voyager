@@ -7,7 +7,6 @@
 using namespace ac_math;
 
 #pragma hls_design ccore
-#pragma hls_ccore_type combinational
 template <typename T>
 T add(T op0, T op1) {
   return op0 + op1;
@@ -25,7 +24,6 @@ Pack1D<T, Width> vadd(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
 }
 
 #pragma hls_design ccore
-#pragma hls_ccore_type combinational
 template <typename T>
 T mul(T op0, T op1) {
   return op0 * op1;

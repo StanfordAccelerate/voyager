@@ -18,13 +18,16 @@ SC_MODULE(VectorAccumulator) {
   Connections::Out<Pack1D<VectorType, Width>> output_to_pipeline;
   Connections::Out<Pack1D<VectorType, Width>> output_to_memory;
 
-#if defined(CLOCK_PERIOD) && (CLOCK_PERIOD < 5)
-  static constexpr int sum_n = 4;
+#ifdef CLOCK_PERIOD
+  static constexpr double clock_period = CLOCK_PERIOD;
 #else
-  static constexpr int sum_n = 1;
+  static constexpr double clock_period = 5.0;  // Default to 5 ns if not defined
 #endif
+  static constexpr int sum_n = (clock_period < 1)   ? 5
+                               : (clock_period < 5) ? 4
+                                                    : 1;
   static constexpr int sum_last = sum_n - 1;
-  static constexpr int max_n = 1;
+  static constexpr int max_n = (clock_period < 5) ? 2 : 1;
   static constexpr int max_last = max_n - 1;
 
   static_assert(sum_n > 0, "Pipeline size sum_n must be greater than 0");
