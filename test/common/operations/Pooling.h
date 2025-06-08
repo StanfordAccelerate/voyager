@@ -34,14 +34,12 @@ T *pooling(std::any input_ptr, const std::vector<int> &input_shape,
               if (is_max_pool) {
                 value = std::max(value, input);
               } else {
-                value += input;
+                value += input * T(1.0 / (kernel_size * kernel_size));
               }
             }
           }
         }
-        if (!is_max_pool) {
-          value *= T(1.0 / (kernel_size * kernel_size));
-        }
+
         output[y * output_width * input_depth + x * input_depth + d] = value;
       }
     }

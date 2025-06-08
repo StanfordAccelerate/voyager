@@ -7,7 +7,7 @@
 #include "test/toolchain/MatrixOps.h"
 #include "test/toolchain/MatrixVectorMultiply.h"
 #include "test/toolchain/Microscaling.h"
-#include "test/toolchain/Pooling.h"
+#include "test/toolchain/Pooling2.h"
 #include "test/toolchain/Softmax3.h"
 #include "test/toolchain/VectorOps.h"
 
