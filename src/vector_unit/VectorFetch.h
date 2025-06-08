@@ -192,7 +192,7 @@ SC_MODULE(VectorFetchUnit) {
 #pragma hls_unroll yes
       for (int i = 0; i < 6; i++) {
         if (params.addr_gen0_broadcast[i]) {
-          loop_bounds[i] = 1;
+          loop_bounds[i] = i == 5 ? Width : 1;
         }
       }
 
@@ -602,7 +602,7 @@ SC_MODULE(VectorFetchUnit) {
       }
 
       if (params.addr_gen1_broadcast[2]) {
-        K = 1;
+        K = Width;
       }
 
 #pragma hls_pipeline_init_interval 1
@@ -765,8 +765,9 @@ SC_MODULE(VectorFetchUnit) {
       if (params.addr_gen2_broadcast[1]) {
         X = 1;
       }
+
       if (params.addr_gen2_broadcast[2]) {
-        K = 1;
+        K = Width;
       }
 
 #pragma hls_pipeline_init_interval 1

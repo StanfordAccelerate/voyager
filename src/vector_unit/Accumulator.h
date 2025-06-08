@@ -15,7 +15,8 @@ SC_MODULE(VectorAccumulator) {
   Connections::In<Pack1D<VectorType, Width>> input;
 
   // Outputs
-  Connections::Out<Pack1D<VectorType, Width>> output;
+  Connections::Out<Pack1D<VectorType, Width>> output_to_pipeline;
+  Connections::Out<Pack1D<VectorType, Width>> output_to_memory;
 
   static constexpr int sum_n = 4;
   static constexpr int sum_last = sum_n - 1;
@@ -34,7 +35,8 @@ SC_MODULE(VectorAccumulator) {
   void run_accumulation() {
     instr.Reset();
     input.Reset();
-    output.Reset();
+    output_to_pipeline.Reset();
+    output_to_memory.Reset();
 
     wait();
 
@@ -126,7 +128,11 @@ SC_MODULE(VectorAccumulator) {
         }
       }
 
-      output.Push(outputs);
+      if (inst.rdest == VectorInstructions::to_memory) {
+        output_to_memory.Push(outputs);
+      } else {
+        output_to_pipeline.Push(outputs);
+      }
     }
   }
 };

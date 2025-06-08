@@ -41,11 +41,17 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(vector_params);
   Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
       vector_instruction);
+  Connections::Combinational<VectorInstructionConfig> CCS_INIT_S1(
+      router_instruction);
 
   // Instruction channels
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(pipeline_instr);
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(accumulator_instr);
   Connections::Combinational<VectorInstructions> CCS_INIT_S1(reducer_instr);
+
+  Connections::Combinational<VectorParams> CCS_INIT_S1(vector_fetch_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(
+      output_controller_params);
 
   // Vector fetch ports
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
@@ -66,20 +72,37 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_fetch_2_data);
 
+  // Vector Pipeline
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
   Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
 
-  // Output
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       vector_unit_output);
   Connections::Combinational<ScaleType> CCS_INIT_S1(mx_scale);
 
-  // External memory output
+  // Internal connections between submodules
+  Connections::Combinational<Pack1D<VectorType, Width>> reducer_input;
+
+  Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_0;
+  Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_1;
+  Connections::Combinational<Pack1D<VectorType, Width>> reducer_to_memory;
+
+  Connections::Combinational<ac_int<16, false>> broadcast_count_0;
+  Connections::Combinational<ac_int<16, false>> broadcast_count_1;
+  Connections::Combinational<Pack1D<VectorType, Width>> broadcast_input_0;
+  Connections::Combinational<Pack1D<VectorType, Width>> broadcast_input_1;
+
+  Connections::Combinational<Pack1D<VectorType, Width>> accumulator_input;
+  Connections::Combinational<Pack1D<VectorType, Width>> accumulator_to_pipeline;
+  Connections::Combinational<Pack1D<VectorType, Width>> accumulator_to_memory;
+
+  // Output Controller
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_address_out);
   Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scale_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(scale_address_out);
+  Connections::Combinational<Pack1D<VectorType, Width>> outputs_to_memory;
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
@@ -87,31 +110,14 @@ SC_MODULE(VectorUnit) {
   // Submodules
   VectorFetchUnit<VectorType, BufferType, Width, VU_INPUT_TYPES> CCS_INIT_S1(
       fetcher);
-  VectorPipeline<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(pipeline);
+  VectorPipeline<VectorType, BufferType, ScaleType, Width> CCS_INIT_S1(
+      pipeline);
   VectorReducer<VectorType, Width> CCS_INIT_S1(reducer);
+  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(broadcaster_0);
+  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(broadcaster_1);
   VectorAccumulator<VectorType, Width> CCS_INIT_S1(accumulator);
   OutputController<VectorType, ScaleType, Width, OUTPUT_DATATYPES> CCS_INIT_S1(
       output_controller);
-
-  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(broadcaster_0);
-  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(broadcaster_1);
-
-  Connections::Combinational<VectorParams> CCS_INIT_S1(vector_fetch_params);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(
-      output_controller_params);
-
-  // Internal connections between submodules
-  Connections::Combinational<Pack1D<VectorType, Width>> reducer_input;
-  Connections::Combinational<Pack1D<VectorType, Width>> accumulator_input;
-  Connections::Combinational<Pack1D<VectorType, Width>> accumulator_output;
-
-  Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_0;
-  Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_1;
-
-  Connections::Combinational<ac_int<16, false>> broadcast_count_0;
-  Connections::Combinational<ac_int<16, false>> broadcast_count_1;
-  Connections::Combinational<Pack1D<VectorType, Width>> broadcast_input_0;
-  Connections::Combinational<Pack1D<VectorType, Width>> broadcast_input_1;
 
   SC_CTOR(VectorUnit)
       : pipeline("pipeline"),
@@ -174,13 +180,11 @@ SC_MODULE(VectorUnit) {
     pipeline.vector_fetch_2_data(vector_fetch_2_data);
     pipeline.vector_fetch_3_req(vector_fetch_3_req);
     pipeline.vector_fetch_3_resp(vector_fetch_3_resp);
-    pipeline.accumulator_output(accumulator_output);
+    pipeline.accumulator_output(accumulator_to_pipeline);
     pipeline.reducer_output_0(reducer_output_0);
     pipeline.reducer_output_1(reducer_output_1);
-
     pipeline.mx_scale(mx_scale);
     pipeline.vector_unit_output(vector_unit_output);
-
     pipeline.reducer_input(reducer_input);
     pipeline.accumulator_input(accumulator_input);
 
@@ -194,6 +198,7 @@ SC_MODULE(VectorUnit) {
     reducer.output_0(broadcast_input_0);
     reducer.count_1(broadcast_count_1);
     reducer.output_1(broadcast_input_1);
+    reducer.output_to_memory(reducer_to_memory);
 
     broadcaster_0.clk(clk);
     broadcaster_0.rstn(rstn);
@@ -212,13 +217,14 @@ SC_MODULE(VectorUnit) {
     accumulator.rstn(rstn);
     accumulator.instr(accumulator_instr);
     accumulator.input(accumulator_input);
-    accumulator.output(accumulator_output);
+    accumulator.output_to_pipeline(accumulator_to_pipeline);
+    accumulator.output_to_memory(accumulator_to_memory);
 
     // Output controller
     output_controller.clk(clk);
     output_controller.rstn(rstn);
     output_controller.params_in(output_controller_params);
-    output_controller.vector_in(vector_unit_output);
+    output_controller.vector_in(outputs_to_memory);
     output_controller.scale_in(mx_scale);
     output_controller.vector_out(vector_out);
     output_controller.vector_address_out(vector_address_out);
@@ -232,6 +238,10 @@ SC_MODULE(VectorUnit) {
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(send_instructions);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(route_outputs);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -255,6 +265,7 @@ SC_MODULE(VectorUnit) {
     pipeline_instr.ResetWrite();
     accumulator_instr.ResetWrite();
     reducer_instr.ResetWrite();
+    router_instruction.ResetWrite();
 
     start.Reset();
 
@@ -262,16 +273,16 @@ SC_MODULE(VectorUnit) {
 
     while (true) {
       VectorInstructionConfig vector_inst_config = vector_instruction.Pop();
+      router_instruction.Push(vector_inst_config);
       start.SyncPush();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int loop = 0; loop < vector_inst_config.instLoopCount; loop++) {
-        for (int i = 0; i < 8; i++) {
+      for (decltype(vector_inst_config.instLoopCount) loop = 0;; loop++) {
+        for (decltype(vector_inst_config.instLen) i = 0;; i++) {
           VectorInstructions inst = vector_inst_config.inst[i];
 
-          for (int count = 0; count < vector_inst_config.instCount[i];
-               count++) {
+          for (ac_int<20, false> count = 0;; count++) {
             if (inst.op_type == VectorInstructions::vector) {
               pipeline_instr.Push(inst);
             } else if (inst.op_type == VectorInstructions::accumulation) {
@@ -279,11 +290,69 @@ SC_MODULE(VectorUnit) {
             } else {
               reducer_instr.Push(inst);
             }
+
+            if (count == vector_inst_config.instCount[i] - 1) {
+              break;
+            }
           }
 
-          if (i >= vector_inst_config.instLen - 1) {
+          if (i == vector_inst_config.instLen - 1) {
             break;
           }
+        }
+
+        if (loop == vector_inst_config.instLoopCount - 1) {
+          break;
+        }
+      }
+    }
+  }
+
+  void route_outputs() {
+    router_instruction.ResetRead();
+    vector_unit_output.ResetRead();
+    reducer_to_memory.ResetRead();
+    accumulator_to_memory.ResetRead();
+    outputs_to_memory.ResetWrite();
+
+    wait();
+
+    while (1) {
+      VectorInstructionConfig vector_inst_config = router_instruction.Pop();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (decltype(vector_inst_config.instLoopCount) loop = 0;; loop++) {
+        for (decltype(vector_inst_config.instLen) i = 0;; i++) {
+          VectorInstructions inst = vector_inst_config.inst[i];
+
+          if (inst.vdest == VectorInstructions::to_output ||
+              inst.rdest == VectorInstructions::to_memory) {
+            for (ac_int<20, false> count = 0;; count++) {
+              Pack1D<VectorType, Width> outputs;
+              if (inst.op_type == VectorInstructions::vector) {
+                outputs = vector_unit_output.Pop();
+              } else if (inst.op_type == VectorInstructions::accumulation) {
+                outputs = accumulator_to_memory.Pop();
+              } else if (inst.op_type == VectorInstructions::reduction) {
+                outputs = reducer_to_memory.Pop();
+              }
+
+              outputs_to_memory.Push(outputs);
+
+              if (count == vector_inst_config.instCount[i] - 1) {
+                break;
+              }
+            }
+          }
+
+          if (i == vector_inst_config.instLen - 1) {
+            break;
+          }
+        }
+
+        if (loop == vector_inst_config.instLoopCount - 1) {
+          break;
         }
       }
     }

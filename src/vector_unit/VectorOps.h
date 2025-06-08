@@ -7,12 +7,13 @@
 using namespace ac_math;
 
 #pragma hls_design ccore
+#pragma hls_ccore_type combinational
 template <typename T>
 T add(T op0, T op1) {
   return op0 + op1;
 }
 
-#pragma hls_design ccore
+// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vadd(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   Pack1D<T, Width> res;
@@ -24,12 +25,13 @@ Pack1D<T, Width> vadd(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
 }
 
 #pragma hls_design ccore
+#pragma hls_ccore_type combinational
 template <typename T>
 T mul(T op0, T op1) {
   return op0 * op1;
 }
 
-#pragma hls_design ccore
+// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vmul(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   Pack1D<T, Width> res;
@@ -50,7 +52,7 @@ T div(T op0, T op1) {
   return op0 / op1;
 }
 
-#pragma hls_design ccore
+// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vdiv(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   Pack1D<T, Width> res;
@@ -61,7 +63,7 @@ Pack1D<T, Width> vdiv(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   return res;
 }
 
-#pragma hls_design ccore
+// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vexp(const Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -94,7 +96,7 @@ Pack1D<T, Width> vrelu(Pack1D<T, Width> op0) {
   return res;
 }
 
-#pragma hls_design ccore
+// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vgelu(Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -105,7 +107,7 @@ Pack1D<T, Width> vgelu(Pack1D<T, Width> op0) {
   return res;
 }
 
-#pragma hls_design ccore
+// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vsilu(Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;

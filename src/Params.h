@@ -465,9 +465,10 @@ struct VectorInstructions {
   ac_int<1, false> rduplicate;
   ac_int<1, false> rbroadcast;  // broadcast by immediate0
 
-  ac_int<1, false> rdest;
-  static const unsigned int to_op0 = 0;
-  static const unsigned int to_op2 = 1;
+  ac_int<2, false> rdest;
+  static const unsigned int to_op0 = 1;
+  static const unsigned int to_op2 = 2;
+  static const unsigned int to_memory = 3;
 
   ac_int<2, false> vdest;
   static const unsigned int to_output = 1;
@@ -479,7 +480,7 @@ struct VectorInstructions {
   ac_int<16, false> immediate2;
   ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 176;
+  static const unsigned int width = 177;
 
 #ifndef NO_SYSC
   template <unsigned int Size>

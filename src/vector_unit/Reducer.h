@@ -17,6 +17,7 @@ SC_MODULE(VectorReducer) {
   Connections::Out<ac_int<16, false>> count_1;
   Connections::Out<Pack1D<VectorType, Width>> output_0;
   Connections::Out<Pack1D<VectorType, Width>> output_1;
+  Connections::Out<Pack1D<VectorType, Width>> output_to_memory;
 
   static constexpr int N = 2;
   static constexpr int last = N - 1;
@@ -36,6 +37,7 @@ SC_MODULE(VectorReducer) {
     count_1.Reset();
     output_0.Reset();
     output_1.Reset();
+    output_to_memory.Reset();
 
     wait();
 
@@ -43,7 +45,6 @@ SC_MODULE(VectorReducer) {
       VectorInstructions inst = instr.Pop();
 
       Pack1D<VectorType, Width> res;
-      VectorType output;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -83,44 +84,40 @@ SC_MODULE(VectorReducer) {
           }
         }
 
+        VectorType output;
         if (inst.reduce_op == VectorInstructions::radd) {
           output = tree_sum(acc_old);
         } else if (inst.reduce_op == VectorInstructions::rmax) {
           output = tree_max(acc_old);
         }
 
-        if (inst.rduplicate) {
+        if (inst.rsqrt) {
+          output = output.sqrt();
+        }
+
+        if (inst.rreciprocal) {
+          output = output.reciprocal();
+        }
+
+        res[i] = output;
+        if (inst.rduplicate || i == Width - 1) {
           break;
-        } else {
-          res[i] = output;
-          if (i == Width - 1) {
-            break;
-          }
         }
       }
 
-      if (inst.rsqrt) {
-        output = output.sqrt();
-      }
-
-      if (inst.rreciprocal) {
-        output = output.reciprocal();
-      }
-
-      // Duplicate the scalar result into a vector
-      if (inst.rduplicate) {
 #pragma hls_unroll yes
-        for (int i = 0; i < Width; i++) {
-          res[i] = output;
-        }
+      for (int i = 0; i < Width; i++) {
+        res[i] = res[0];
       }
 
-      if (inst.rdest == 0) {
+      if (inst.rdest == VectorInstructions::to_op0) {
         count_0.Push(inst.immediate0);
         output_0.Push(res);
-      } else {
+      } else if (inst.rdest == VectorInstructions::to_op2) {
         count_1.Push(inst.immediate0);
         output_1.Push(res);
+      } else if (inst.rdest == VectorInstructions::to_memory) {
+        output_to_memory.Push(res);
       }
     }
   }
