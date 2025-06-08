@@ -42,6 +42,8 @@ SC_MODULE(VectorAccumulator) {
 
     while (true) {
       VectorInstructions inst = instr.Pop();
+      decltype(inst.inst_count) total_values = inst.inst_count;
+      decltype(inst.inst_count) counter = 0;
 
       Pack1D<VectorType, Width> outputs;
 

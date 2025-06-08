@@ -328,7 +328,9 @@ SC_MODULE(VectorUnit) {
 
           if (inst.vdest == VectorInstructions::to_output ||
               inst.rdest == VectorInstructions::to_memory) {
-            for (ac_int<20, false> count = 0;; count++) {
+            ac_int<32, false> loop_bound =
+                vector_inst_config.instCount[i] * inst.inst_count - 1;
+            for (ac_int<32, false> count = 0;; count++) {
               Pack1D<VectorType, Width> outputs;
               if (inst.op_type == VectorInstructions::vector) {
                 outputs = vector_unit_output.Pop();
@@ -340,7 +342,7 @@ SC_MODULE(VectorUnit) {
 
               outputs_to_memory.Push(outputs);
 
-              if (count == vector_inst_config.instCount[i] - 1) {
+              if (count == loop_bound) {
                 break;
               }
             }

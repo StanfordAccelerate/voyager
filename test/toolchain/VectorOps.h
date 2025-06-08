@@ -421,8 +421,8 @@ void MapVectorOperations(const codegen::Operation &param,
   }
 
   VectorInstructions inst;
-  memset(&inst, 0, sizeof(inst));
   inst.op_type = VectorInstructions::vector;
+  inst.inst_count = get_size(output) / OC_DIMENSION;
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
@@ -585,7 +585,7 @@ void MapVectorOperations(const codegen::Operation &param,
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
   vector_instruction_config->inst[0] = inst;
-  vector_instruction_config->instCount[0] = get_size(output) / OC_DIMENSION;
+  vector_instruction_config->instCount[0] = 1;
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;
 

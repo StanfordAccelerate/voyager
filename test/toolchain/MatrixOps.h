@@ -161,21 +161,21 @@ static bool should_use_direct_path(const VectorParams *vector_params) {
   //
   // Remember, we need `OC_DIMENSION` elements per cycle on each (active) port
   // to keep up with the matrix unit.
-  const size_t addr_gen1_bw =
-      (vector_params->addr_gen1_mode == 0)
-          ? 0
-          : get_width_from_type_index<VU_INPUT_TYPES>(vector_params->addr_gen1_dtype) *
-                OC_DIMENSION;
-  const size_t addr_gen2_bw =
-      (vector_params->addr_gen2_mode == 0)
-          ? 0
-          : get_width_from_type_index<VU_INPUT_TYPES>(vector_params->addr_gen2_dtype) *
-                OC_DIMENSION;
-  const size_t output_bw =
-      (vector_params->output_mode == 0)
-          ? 0
-          : get_width_from_type_index<OUTPUT_DATATYPES>(vector_params->output_dtype) *
-                OC_DIMENSION;
+  const size_t addr_gen1_bw = (vector_params->addr_gen1_mode == 0)
+                                  ? 0
+                                  : get_width_from_type_index<VU_INPUT_TYPES>(
+                                        vector_params->addr_gen1_dtype) *
+                                        OC_DIMENSION;
+  const size_t addr_gen2_bw = (vector_params->addr_gen2_mode == 0)
+                                  ? 0
+                                  : get_width_from_type_index<VU_INPUT_TYPES>(
+                                        vector_params->addr_gen2_dtype) *
+                                        OC_DIMENSION;
+  const size_t output_bw = (vector_params->output_mode == 0)
+                               ? 0
+                               : get_width_from_type_index<OUTPUT_DATATYPES>(
+                                     vector_params->output_dtype) *
+                                     OC_DIMENSION;
 
   bool should_use_direct_path = true;
   should_use_direct_path &= addr_gen1_bw <= available_bandwidth;
@@ -560,8 +560,13 @@ void MapMatrixOperation(const Operation &operation,
   }
 
   VectorInstructions inst;
-  memset(&inst, 0, sizeof(inst));
   inst.op_type = VectorInstructions::vector;
+  inst.inst_count = tiling.loops[0][tiling.x_loop_index[0]] *
+                    tiling.loops[1][tiling.x_loop_index[1]] *
+                    tiling.loops[0][tiling.y_loop_index[0]] *
+                    tiling.loops[1][tiling.y_loop_index[1]] *
+                    tiling.loops[0][tiling.weight_loop_index[0]] *
+                    tiling.loops[1][tiling.weight_loop_index[1]];
 
   if (matrix_params->is_fc) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_vector_unit;
@@ -719,13 +724,7 @@ void MapMatrixOperation(const Operation &operation,
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
   vector_instruction_config->inst[0] = inst;
-  vector_instruction_config->instCount[0] =
-      tiling.loops[0][tiling.x_loop_index[0]] *
-      tiling.loops[1][tiling.x_loop_index[1]] *
-      tiling.loops[0][tiling.y_loop_index[0]] *
-      tiling.loops[1][tiling.y_loop_index[1]] *
-      tiling.loops[0][tiling.weight_loop_index[0]] *
-      tiling.loops[1][tiling.weight_loop_index[1]];
+  vector_instruction_config->instCount[0] = 1;
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;
 

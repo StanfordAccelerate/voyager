@@ -111,7 +111,7 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   vinst0.op_type = VectorInstructions::reduction;
   vinst0.reduce_count = reduction_dim / OC_DIMENSION;
   vinst0.reduce_op = VectorInstructions::radd;
-  vinst0.rdest = 0;
+  vinst0.rdest = VectorInstructions::to_op0;
   vinst0.immediate0 = 1;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;

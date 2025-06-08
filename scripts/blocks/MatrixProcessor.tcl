@@ -2,7 +2,6 @@ set block "MatrixProcessor"
 set full_block_name "MatrixProcessor<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
 set full_block_name_stripped [string map {" " ""} $full_block_name]
 
-
 proc pre_analyze {} {
   global CATAPULT_BUILD_DIR ROOT
 
@@ -47,12 +46,4 @@ proc pre_extract {} {
   if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
     cycle set accumulation_buffer_read_data.Pop()#1 -from accumulation_buffer_read_address.Push()#1 -equal 2
   }
-  # global SUPPORT_MX
-  # if {$SUPPORT_MX == true} {
-  #   cycle set unscaledAccumulationChannel_delayed.Push() -from unscaledAccumulationChannel.Pop() -equal 2
-  # } else {
-  #   cycle set inputsToSkewer_delayed.Push() -from inputsToSkewer.Pop() -equal 2
-  # }
-  # # to prevent stuttering issues, schedule inputDin and psumIn to happen in the same cycle
-  # cycle set inputSkewerDin.Push() -from psumInSkewerDin.Push() -equal 0
 }

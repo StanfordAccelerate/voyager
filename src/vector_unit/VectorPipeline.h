@@ -97,173 +97,180 @@ SC_MODULE(VectorPipeline) {
 #pragma hls_pipeline_stall_mode flush
     while (true) {
       VectorInstructions inst = instr.Pop();
+      decltype(inst.inst_count) total_values = inst.inst_count;
+      decltype(inst.inst_count) counter = 0;
 
-      // Vector unit inputs
-      Pack1D<VectorType, Width> op0_src0;
-      Pack1D<VectorType, Width> op0_src1;
-      Pack1D<VectorType, Width> op2_src1;
-      Pack1D<VectorType, Width> op3_src1;
+      while (counter++ < total_values) {
+        // Vector unit inputs
+        Pack1D<VectorType, Width> op0_src0;
+        Pack1D<VectorType, Width> op0_src1;
+        Pack1D<VectorType, Width> op2_src1;
+        Pack1D<VectorType, Width> op3_src1;
 
-      if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
-          inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
-        Pack1D<BufferType, Width> sa_output = matrix_unit_output.Pop();
+        if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit ||
+            inst.vector_op0_src1 == VectorInstructions::from_matrix_unit) {
+          Pack1D<BufferType, Width> sa_output = matrix_unit_output.Pop();
 
-        Pack1D<VectorType, Width> temp;
-        if (inst.vdequantize) {
-          vdequantize<BufferType, VectorType, Width>(sa_output, temp,
-                                                     inst.vector_dq_scale);
-        } else {
+          Pack1D<VectorType, Width> temp;
+          if (inst.vdequantize) {
+            vdequantize<BufferType, VectorType, Width>(sa_output, temp,
+                                                       inst.vector_dq_scale);
+          } else {
 #pragma hls_unroll yes
-          for (int i = 0; i < Width; i++) {
-            temp[i] = sa_output[i];
+            for (int i = 0; i < Width; i++) {
+              temp[i] = sa_output[i];
+            }
+          }
+
+          if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
           }
         }
-
-        if (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit) {
-          op0_src0 = temp;
-        } else {
-          op0_src1 = temp;
-        }
-      }
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
-      if (inst.vector_op0_src0 ==
-              VectorInstructions::from_accumulation_buffer ||
-          inst.vector_op0_src1 ==
-              VectorInstructions::from_accumulation_buffer) {
-        Pack1D<BufferType, Width> sa_output = accumulation_buffer_output.Pop();
+        if (inst.vector_op0_src0 ==
+                VectorInstructions::from_accumulation_buffer ||
+            inst.vector_op0_src1 ==
+                VectorInstructions::from_accumulation_buffer) {
+          Pack1D<BufferType, Width> sa_output =
+              accumulation_buffer_output.Pop();
 
-        Pack1D<VectorType, Width> temp;
-        if (inst.vdequantize) {
-          vdequantize<BufferType, VectorType, Width>(sa_output, temp,
-                                                     inst.vector_dq_scale);
-        } else {
+          Pack1D<VectorType, Width> temp;
+          if (inst.vdequantize) {
+            vdequantize<BufferType, VectorType, Width>(sa_output, temp,
+                                                       inst.vector_dq_scale);
+          } else {
 #pragma hls_unroll yes
-          for (int i = 0; i < Width; i++) {
-            temp[i] = sa_output[i];
+            for (int i = 0; i < Width; i++) {
+              temp[i] = sa_output[i];
+            }
+          }
+
+          if (inst.vector_op0_src0 ==
+              VectorInstructions::from_accumulation_buffer) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
           }
         }
-
-        if (inst.vector_op0_src0 ==
-            VectorInstructions::from_accumulation_buffer) {
-          op0_src0 = temp;
-        } else {
-          op0_src1 = temp;
-        }
-      }
 #endif
 
 #if SUPPORT_MVM
-      if (inst.vector_op0_src0 == VectorInstructions::from_matrix_vector_unit ||
-          inst.vector_op0_src1 == VectorInstructions::from_matrix_vector_unit) {
-        Pack1D<VectorType, Width> temp = matrix_vector_unit_data.Pop();
         if (inst.vector_op0_src0 ==
-            VectorInstructions::from_matrix_vector_unit) {
-          op0_src0 = temp;
-        } else {
-          op0_src1 = temp;
+                VectorInstructions::from_matrix_vector_unit ||
+            inst.vector_op0_src1 ==
+                VectorInstructions::from_matrix_vector_unit) {
+          Pack1D<VectorType, Width> temp = matrix_vector_unit_data.Pop();
+          if (inst.vector_op0_src0 ==
+              VectorInstructions::from_matrix_vector_unit) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
+          }
         }
-      }
 #endif
 
-      if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0 ||
-          inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_0) {
-        Pack1D<VectorType, Width> temp = vector_fetch_0_data.Pop();
-        if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0) {
-          op0_src0 = temp;
-        } else {
-          op0_src1 = temp;
+        if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0 ||
+            inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_0) {
+          Pack1D<VectorType, Width> temp = vector_fetch_0_data.Pop();
+          if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_0) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
+          }
         }
-      }
 
-      if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1 ||
-          inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_1) {
-        Pack1D<VectorType, Width> temp = vector_fetch_1_data.Pop();
-        if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1) {
-          op0_src0 = temp;
-        } else {
-          op0_src1 = temp;
+        if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1 ||
+            inst.vector_op0_src1 == VectorInstructions::from_vector_fetch_1) {
+          Pack1D<VectorType, Width> temp = vector_fetch_1_data.Pop();
+          if (inst.vector_op0_src0 == VectorInstructions::from_vector_fetch_1) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
+          }
         }
-      }
 
-      if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2 ||
-          inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
-        Pack1D<VectorType, Width> temp = vector_fetch_2_data.Pop();
-        if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2) {
-          op2_src1 = temp;
-        } else {
-          op3_src1 = temp;
+        if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2 ||
+            inst.vector_op3_src1 == VectorInstructions::from_vector_fetch_2) {
+          Pack1D<VectorType, Width> temp = vector_fetch_2_data.Pop();
+          if (inst.vector_op2_src1 == VectorInstructions::from_vector_fetch_2) {
+            op2_src1 = temp;
+          } else {
+            op3_src1 = temp;
+          }
         }
-      }
 
-      if (inst.vector_op0_src0 == VectorInstructions::from_accumulation ||
-          inst.vector_op0_src1 == VectorInstructions::from_accumulation ||
-          inst.vector_op2_src1 == VectorInstructions::from_accumulation) {
-        Pack1D<VectorType, Width> temp = accumulator_output.Pop();
-        if (inst.vector_op0_src0 == VectorInstructions::from_accumulation) {
-          op0_src0 = temp;
-        } else if (inst.vector_op0_src1 ==
-                   VectorInstructions::from_accumulation) {
-          op0_src1 = temp;
-        } else {
-          op2_src1 = temp;
+        if (inst.vector_op0_src0 == VectorInstructions::from_accumulation ||
+            inst.vector_op0_src1 == VectorInstructions::from_accumulation ||
+            inst.vector_op2_src1 == VectorInstructions::from_accumulation) {
+          Pack1D<VectorType, Width> temp = accumulator_output.Pop();
+          if (inst.vector_op0_src0 == VectorInstructions::from_accumulation) {
+            op0_src0 = temp;
+          } else if (inst.vector_op0_src1 ==
+                     VectorInstructions::from_accumulation) {
+            op0_src1 = temp;
+          } else {
+            op2_src1 = temp;
+          }
         }
-      }
 
-      if (inst.vector_op0_src0 == VectorInstructions::from_reduction_0 ||
-          inst.vector_op0_src1 == VectorInstructions::from_reduction_0 ||
-          inst.vector_op2_src1 == VectorInstructions::from_reduction_0) {
-        Pack1D<VectorType, Width> temp = reducer_output_0.Pop();
-        if (inst.vector_op0_src0 == VectorInstructions::from_reduction_0) {
-          op0_src0 = temp;
-        } else if (inst.vector_op0_src1 ==
-                   VectorInstructions::from_reduction_0) {
-          op0_src1 = temp;
-        } else {
-          op2_src1 = temp;
+        if (inst.vector_op0_src0 == VectorInstructions::from_reduction_0 ||
+            inst.vector_op0_src1 == VectorInstructions::from_reduction_0 ||
+            inst.vector_op2_src1 == VectorInstructions::from_reduction_0) {
+          Pack1D<VectorType, Width> temp = reducer_output_0.Pop();
+          if (inst.vector_op0_src0 == VectorInstructions::from_reduction_0) {
+            op0_src0 = temp;
+          } else if (inst.vector_op0_src1 ==
+                     VectorInstructions::from_reduction_0) {
+            op0_src1 = temp;
+          } else {
+            op2_src1 = temp;
+          }
         }
-      }
 
-      if (inst.vector_op2_src1 == VectorInstructions::from_reduction_1) {
-        op2_src1 = reducer_output_1.Pop();
-      }
+        if (inst.vector_op2_src1 == VectorInstructions::from_reduction_1) {
+          op2_src1 = reducer_output_1.Pop();
+        }
 
-      if (inst.vector_op0_src0 == VectorInstructions::from_immediate_0 ||
-          inst.vector_op0_src1 == VectorInstructions::from_immediate_0) {
-        Pack1D<VectorType, Width> temp;
+        if (inst.vector_op0_src0 == VectorInstructions::from_immediate_0 ||
+            inst.vector_op0_src1 == VectorInstructions::from_immediate_0) {
+          Pack1D<VectorType, Width> temp;
 #pragma hls_unroll yes
-        for (int i = 0; i < Width; i++) {
-          temp[i].set_bits(inst.immediate0);
+          for (int i = 0; i < Width; i++) {
+            temp[i].set_bits(inst.immediate0);
+          }
+
+          if (inst.vector_op0_src0 == VectorInstructions::from_immediate_0) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
+          }
         }
 
-        if (inst.vector_op0_src0 == VectorInstructions::from_immediate_0) {
-          op0_src0 = temp;
-        } else {
-          op0_src1 = temp;
-        }
-      }
-
-      if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1) {
+        if (inst.vector_op2_src1 == VectorInstructions::from_immediate_1) {
 #pragma hls_unroll yes
-        for (int i = 0; i < Width; i++) {
-          op2_src1[i].set_bits(inst.immediate1);
+          for (int i = 0; i < Width; i++) {
+            op2_src1[i].set_bits(inst.immediate1);
+          }
         }
-      }
 
-      if (inst.vector_op3_src1 == VectorInstructions::from_immediate_2) {
+        if (inst.vector_op3_src1 == VectorInstructions::from_immediate_2) {
 #pragma hls_unroll yes
-        for (int i = 0; i < Width; i++) {
-          op3_src1[i].set_bits(inst.immediate2);
+          for (int i = 0; i < Width; i++) {
+            op3_src1[i].set_bits(inst.immediate2);
+          }
         }
+
+        // HACK: We are storing op0_src1 in the second transaction
+        Pack1D<StageInput, 4> transactions;
+        transactions[0] = {inst.vector_op0, inst.immediate0, op0_src0};
+        transactions[1] = {inst.vector_op1, inst.immediate0, op0_src1};
+        transactions[2] = {inst.vector_op2, inst.vdest, op2_src1};
+        transactions[3] = {inst.vector_op3, inst.immediate2, op3_src1};
+
+        stage0_input.Push(transactions);
       }
-
-      // HACK: We are storing op0_src1 in the second transaction
-      Pack1D<StageInput, 4> transactions;
-      transactions[0] = {inst.vector_op0, inst.immediate0, op0_src0};
-      transactions[1] = {inst.vector_op1, inst.immediate0, op0_src1};
-      transactions[2] = {inst.vector_op2, inst.vdest, op2_src1};
-      transactions[3] = {inst.vector_op3, inst.immediate2, op3_src1};
-
-      stage0_input.Push(transactions);
     }
   }
 

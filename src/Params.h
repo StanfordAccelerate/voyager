@@ -382,6 +382,7 @@ struct VectorInstructions {
 #ifndef __SYNTHESIS__
   VectorInstructions() {
     op_type = 0;
+    inst_count = 1;
     vector_op0_src0 = 0;
     vector_op0_src1 = 0;
     vector_op2_src1 = 0;
@@ -409,6 +410,8 @@ struct VectorInstructions {
   static const unsigned int vector = 0;
   static const unsigned int reduction = 1;
   static const unsigned int accumulation = 2;
+
+  ac_int<16, false> inst_count;
 
   ac_int<4, false> vector_op0_src0;
   ac_int<4, false> vector_op0_src1;
@@ -480,12 +483,13 @@ struct VectorInstructions {
   ac_int<16, false> immediate2;
   ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 177;
+  static const unsigned int width = 193;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & op_type;
+    m & inst_count;
     m & vector_op0_src0;
     m & vector_op0_src1;
     m & vector_op2_src1;
@@ -520,6 +524,7 @@ struct VectorInstructions {
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorInstructions& params) {
     os << "op_type: " << params.op_type << std::endl;
+    os << "inst_count: " << params.inst_count << std::endl;
     os << "vector_op0_src0: " << params.vector_op0_src0 << std::endl;
     os << "vector_op0_src1: " << params.vector_op0_src1 << std::endl;
     os << "vector_op2_src1: " << params.vector_op2_src1 << std::endl;
@@ -547,7 +552,7 @@ struct VectorInstructions {
 
   inline friend bool operator==(const VectorInstructions& lhs,
                                 const VectorInstructions& rhs) {
-    return lhs.op_type == rhs.op_type &&
+    return lhs.op_type == rhs.op_type && lhs.inst_count == rhs.inst_count &&
            lhs.vector_op0_src0 == rhs.vector_op0_src0 &&
            lhs.vector_op0_src1 == rhs.vector_op0_src1 &&
            lhs.vector_op2_src1 == rhs.vector_op2_src1 &&
@@ -1160,6 +1165,9 @@ struct VectorInstructionConfig : BaseParams {
   void Marshall(Marshaller<Size>& m) {
     for (int j = 0; j < 8; j++) {
       m& inst[j].op_type;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].inst_count;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vector_op0_src0;
