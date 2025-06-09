@@ -25,7 +25,7 @@ SC_MODULE(VectorAccumulator) {
 #endif
   static constexpr int sum_n = (clock_period < 1)   ? 5
                                : (clock_period < 5) ? 4
-                                                    : 1;
+                                                    : 2;
   static constexpr int sum_last = sum_n - 1;
   static constexpr int max_n = (clock_period < 5) ? 2 : 1;
   static constexpr int max_last = max_n - 1;
