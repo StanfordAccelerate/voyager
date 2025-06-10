@@ -320,16 +320,25 @@ SC_MODULE(VectorUnit) {
     while (1) {
       VectorInstructionConfig vector_inst_config = router_instruction.Pop();
 
+      ac_int<32, false> loop_bounds[8];
+      for (int i = 0; i < 8; i++) {
+        loop_bounds[i] = vector_inst_config.instCount[i] *
+                             vector_inst_config.inst[i].inst_count -
+                         1;
+        if (i == vector_inst_config.instLen - 1) {
+          break;
+        }
+      }
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (decltype(vector_inst_config.instLoopCount) loop = 0;; loop++) {
         for (decltype(vector_inst_config.instLen) i = 0;; i++) {
           VectorInstructions inst = vector_inst_config.inst[i];
+          ac_int<32, false> loop_bound = loop_bounds[i];
 
           if (inst.vdest == VectorInstructions::to_output ||
               inst.rdest == VectorInstructions::to_memory) {
-            ac_int<32, false> loop_bound =
-                vector_inst_config.instCount[i] * inst.inst_count - 1;
             for (ac_int<32, false> count = 0;; count++) {
               Pack1D<VectorType, Width> outputs;
               if (inst.op_type == VectorInstructions::vector) {
