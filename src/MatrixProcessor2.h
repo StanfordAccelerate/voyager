@@ -499,18 +499,19 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
               accumulation_buffer_read_data[accumulation_buffer_bank].Pop();
         }
 
-        Pack1D<Buffer, NCols> scaled_outputs;
-
+#if SUPPORT_MX
 #pragma hls_unroll yes
         for (int i = 0; i < NCols; i++) {
-#if SUPPORT_MX
-          scaled_outputs[i] = dequantize_mx_op<Psum, Scale, Buffer>(
-              outputs[i], input_scale, weight_scales[i]);
-#else
-          scaled_outputs[i] = outputs[i];
-#endif
-          previous_accumulation[i] += scaled_outputs[i];
+          previous_accumulation[i] =
+              dequantize_mx_op(outputs[i], input_scale, weight_scales[i],
+                               previous_accumulation[i]);
         }
+#else
+#pragma hls_unroll yes
+        for (int i = 0; i < NCols; i++) {
+          previous_accumulation[i] += static_cast<Buffer>(outputs[i]);
+        }
+#endif
 
         accumulation_enq.Push(previous_accumulation);
 

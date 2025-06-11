@@ -317,7 +317,7 @@ template <typename T1, typename T2>
 T2 cast_output(T1 input, bool is_codebook_quant) {
   T2 output;
   if (is_codebook_quant) {
-    output.set_bits(input.template to_ac_int<T2::width, true>());
+    output.set_bits(input.bits_rep());
   } else {
     output = input;
   }
@@ -340,6 +340,11 @@ bool send_output_data(
 
 #pragma hls_unroll yes
   for (unsigned i = 0; i < N; i++) {
+    // if (is_codebook_quant) {
+    //   outputs[i].set_bits(inputs[i].bits_rep());
+    // } else {
+    //   outputs[i] = inputs[i];
+    // }
     outputs[i] = cast_output<VectorType, T>(inputs[i], is_codebook_quant);
   }
 

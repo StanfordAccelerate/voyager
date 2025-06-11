@@ -85,5 +85,5 @@ bool decode_type(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
 template <typename Psum, typename Scale, typename Buffer>
 Buffer dequantize_mx_op(const Psum psum, const Scale input_scale,
                         const Scale weight_scale, const Buffer prev_accum) {
-  return prev_accum + (Buffer)psum * (Buffer)input_scale * (Buffer)weight_scale;
+  return prev_accum + (Buffer)input_scale * (Buffer)weight_scale * (Buffer)psum;
 }

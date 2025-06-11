@@ -96,13 +96,12 @@ SC_MODULE(OutputController) {
             }
           }
 
-          Pack1D<VectorType, Width> float_indices;
+          Pack1D<VectorType, Width> quantized_outputs;
 #pragma hls_unroll yes
           for (int i = 0; i < Width; i++) {
-            float_indices[i] = ac_float_t(indices[i]);
+            quantized_outputs[i].set_bits(indices[i]);
           }
-
-          quantized_data.Push(float_indices);
+          quantized_data.Push(quantized_outputs);
         }
       } else
 #endif

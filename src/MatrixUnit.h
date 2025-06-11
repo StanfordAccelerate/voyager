@@ -7,7 +7,7 @@
 #include "DualPortBuffer.h"
 #include "InputController.h"
 #include "InputScaleController.h"
-#include "MatrixProcessor.h"
+#include "MatrixProcessor2.h"
 #include "WeightController.h"
 #include "WeightScaleController.h"
 #include "mc_scverify.h"

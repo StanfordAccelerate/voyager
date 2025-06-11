@@ -82,6 +82,7 @@ void MapLayerNorm(const codegen::Operation &param,
   instr0_0.reduce_op = VectorInstructions::radd;
   instr0_0.rduplicate = 1;
   instr0_0.rbroadcast = 1;
+  instr0_0.rdest = VectorInstructions::to_op0;
   instr0_0.immediate0 = outer_dim / OC_DIMENSION;
   vinstr_config->inst[0] = instr0_0;
   vinstr_config->instCount[0] = 1;
@@ -160,6 +161,7 @@ void MapLayerNorm(const codegen::Operation &param,
   instr1_0.rreciprocal = 1;
   instr1_0.rduplicate = 1;
   instr1_0.rbroadcast = 1;
+  instr1_0.rdest = VectorInstructions::to_op0;
   instr1_0.immediate0 = outer_dim / OC_DIMENSION;
   vinstr_config->inst[0] = instr1_0;
   vinstr_config->instCount[0] = 1;
