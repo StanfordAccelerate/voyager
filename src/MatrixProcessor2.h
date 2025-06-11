@@ -20,6 +20,15 @@ template <typename... InputTypes, typename... WeightTypes, typename Input,
 struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                        Input, Weight, Psum, Buffer, Scale, NRows, NCols,
                        BufferSize> : public sc_module {
+  static constexpr int LOOP_WIDTH = 10;
+  static constexpr int FIFO_DEPTH = SUPPORT_MX ? 16 : 1;
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+  static constexpr int ACCUM_BUFFER_BANKS = 2;
+#else
+  static constexpr int ACCUM_BUFFER_BANKS = 1;
+#endif
+
  private:
   InputSerializedSkewer<Input, NRows> CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<PEInput<Input>, NRows>> CCS_INIT_S1(
@@ -35,19 +44,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   SystolicArray<Input, Weight, Psum, NRows, NCols> CCS_INIT_S1(systolicArray);
 
-  Connections::Fifo<Pack1D<Buffer, NCols>, 16> CCS_INIT_S1(accumulation_fifo);
-
-  static constexpr int int_log2(unsigned int n) {
-    return (n <= 1) ? 0 : 1 + int_log2(n / 2);
-  }
-
-  static constexpr int LOOP_WIDTH = 10;
-
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-  static constexpr int ACCUM_BUFFER_BANKS = 2;
-#else
-  static constexpr int ACCUM_BUFFER_BANKS = 1;
-#endif
+  Connections::Fifo<Pack1D<Buffer, NCols>, FIFO_DEPTH> CCS_INIT_S1(
+      accumulation_fifo);
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
