@@ -15,7 +15,7 @@ class Checker {
 
   void add_reference(T value) { reference->push_back(value); }
 
-  void check_reference(T value) {
+  void check_reference(int pe_num, T value) {
     if (reference->size() == 0) {
       // if weight is 0, then we don't need to check (happens during
       // replication)
@@ -31,11 +31,20 @@ class Checker {
       if (static_cast<float>(std::get<1>(value)) == 0) {
         return;
       }
-      std::cout << "Reference: " << std::get<0>(ref) << " " << std::get<1>(ref)
-                << " " << std::get<2>(ref) << std::endl;
-      std::cout << "Value: " << std::get<0>(value) << " " << std::get<1>(value)
-                << " " << std::get<2>(value) << std::endl;
-      throw std::runtime_error("Value mismatch");
+      std::cerr << "ERROR: PE " << pe_num << " input mismatch detected!"
+                << std::endl;
+
+      std::cerr << "  Expected inputs: "
+                << "input=" << std::get<0>(ref) << ", "
+                << "weight=" << std::get<1>(ref) << ", "
+                << "psum=" << std::get<2>(ref) << std::endl;
+
+      std::cerr << "  Actual inputs:   "
+                << "input=" << std::get<0>(value) << ", "
+                << "weight=" << std::get<1>(value) << ", "
+                << "psum=" << std::get<2>(value) << std::endl;
+
+      throw std::runtime_error("PE input mismatch detected");
     }
     reference->pop_front();
   }
@@ -64,7 +73,8 @@ class PEChecker {
   }
 
   void check_reference(int pe_num, Input input, Weight weight, Psum accum) {
-    checkers[pe_num]->check_reference(std::make_tuple(input, weight, accum));
+    checkers[pe_num]->check_reference(pe_num,
+                                      std::make_tuple(input, weight, accum));
   }
 
  private:
