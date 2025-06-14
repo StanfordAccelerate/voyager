@@ -361,7 +361,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                     for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
                       for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
                         for (loop_counters[1][5] = 0;; loop_counters[1][5]++) {
-                          for (int pf = 0;; pf++) {
+                          for (ac_int<4, false> pf = 0;; pf++) {
                             ac_int<LOOP_WIDTH, true> y1 =
                                 loop_counters[0][params.inputYLoopIndex[0]];
                             ac_int<LOOP_WIDTH, true> x1 =

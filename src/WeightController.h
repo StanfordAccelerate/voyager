@@ -264,7 +264,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                   for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
                     for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
                       for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
-                        for (int pf = 0;; pf++) {
+                        for (ac_int<4, false> pf = 0;; pf++) {
                           ac_int<LOOP_WIDTH, false> k2 = loop_counters
                               [0][params.weightAddressGenWeightLoopIndex[0]];
                           ac_int<LOOP_WIDTH, false> c1 = loop_counters
