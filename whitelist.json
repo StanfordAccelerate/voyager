@@ -1,0 +1,43 @@
+[
+    {
+        "datatype": "MXNF4",
+        "model": [
+            "llama_prefill",
+            "llama_prefill_mp",
+            "llama_decode"
+        ],
+        "sim_type": [
+            "systemc",
+            "fast-systemc",
+            "rtl"
+        ],
+        "block_size": [
+            16,
+            32
+        ],
+        "layers": [
+            "linear_mx_default_7"
+        ]
+    },
+    {
+        "datatype": "MXNF4",
+        "model": [
+            "llama_prefill",
+            "llama_prefill_mp",
+            "llama_decode"
+        ],
+        "sim_type": [
+            "systemc",
+            "fast-systemc",
+            "rtl"
+        ],
+        "block_size": 64,
+        "layers": [
+            "submodule_3",
+            "submodule_4",
+            "submodule_5",
+            "submodule_6",
+            "linear_mx_default_7"
+        ]
+    }
+]
