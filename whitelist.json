@@ -32,6 +32,8 @@
         "block_size": 64,
         "layers": [
             "linear_mx_default_7",
+            "slice_1",
+            "slice_3",
             "submodule_3",
             "submodule_4",
             "submodule_5",
@@ -40,7 +42,10 @@
     },
     {
         "datatype": "MXNF4",
-        "model": "llama_decode",
+        "model": [
+            "llama_decode",
+            "llama_decode_mp"
+        ],
         "sim_type": [
             "systemc",
             "fast-systemc",
@@ -58,7 +63,10 @@
     },
     {
         "datatype": "MXNF4",
-        "model": "llama_decode",
+        "model": [
+            "llama_decode",
+            "llama_decode_mp"
+        ],
         "sim_type": [
             "systemc",
             "fast-systemc",

@@ -577,7 +577,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
-      loop_t c_bound = (C2 * C1 + W - 1) / W - 1;
+      ac_int<32, false> C = C2 * C1;
+      loop_t c_bound = (C + W - 1) / W - 1;
       ac_int<32, false> k_bound = K2 * K1 - 1;
 
       Pack1D<Scale, W / BS> input_scales;
@@ -607,10 +608,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
           Pack1D<Psum, W> psums;
 #pragma hls_unroll yes
-          for (int c = 0; c < W; c++) {
-            psums[c] = (Psum)inputs[c] * (Psum)weights[c];
-            if (c >= C2 * C1) {
-              psums[c] = Psum::zero();  // Zero out unused elements
+          for (int i = 0; i < W; i++) {
+            psums[i] = (Psum)inputs[i] * (Psum)weights[i];
+            if (c * W + i >= C) {
+              psums[i] = Psum::zero();  // Zero out elements out of bounds
             }
           }
 
