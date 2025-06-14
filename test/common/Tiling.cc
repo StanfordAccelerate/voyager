@@ -40,7 +40,7 @@ Tiling get_tiling(const Operation& operation) {
   bool manual_tiling = env_var ? std::stoi(env_var) : false;
 
   Tiling tiling;
-  if (manual_tiling) {
+  if (manual_tiling || !operation.has_valid_tiling) {
     spdlog::info("Using manual tiling for operation {} with target {}\n",
                  operation.name, first_op.target());
     if (first_op.target() == "conv2d" || first_op.target() == "conv2d_mx") {

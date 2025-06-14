@@ -208,9 +208,10 @@ void MapMatrixOperation(const Operation &operation,
   if (matrix_params->is_fc) {
     bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
 
-    int C1 = is_mx_op ? matrix_op.kwargs().at("block_size").int_value() : 1;
-    int C2 = (is_matmul ? weight.shape(0) : weight.shape(1)) / C1;
     int K = is_matmul ? weight.shape(1) : weight.shape(0);
+    int C = is_matmul ? weight.shape(0) : weight.shape(1);
+    int C1 = is_mx_op ? matrix_op.kwargs().at("block_size").int_value() : 1;
+    int C2 = C / C1;
 
     auto k_loops = split_loops({K}, pow(2, 16) - 1);
     k_loops = adjust_loop_indices(k_loops, OC_DIMENSION);
