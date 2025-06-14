@@ -1286,7 +1286,7 @@ struct VectorInstructionConfig : BaseParams {
 
   inline friend std::ostream& operator<<(
       ostream& os, const VectorInstructionConfig& params) {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < params.instLen; i++) {
       os << "instIndex: " << i << std::endl;
       os << "instCount: " << params.instCount[i] << std::endl;
       os << params.inst[i] << std::endl;

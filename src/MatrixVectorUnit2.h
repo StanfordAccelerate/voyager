@@ -207,7 +207,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
-      ac_int<32, false> c_bound = C2 * C1 / W - 1;
+      ac_int<32, false> c_bound = (C2 * C1 + W - 1) / W - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -254,7 +254,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
-      ac_int<32, false> c_bound = C2 * C1 / W - 1;
+      ac_int<32, false> c_bound = (C2 * C1 + W - 1) / W - 1;
 
       constexpr int buffer_width = Input::width * W;
 
@@ -323,7 +323,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
-      ac_int<32, false> c_bound = C2 * C1 / W - 1;
+      ac_int<32, false> c_bound = (C2 * C1 + W - 1) / W - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -370,8 +370,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
       ac_int<32, false> C = C2 * C1;
+      ac_int<32, false> c_bound = (C + W - 1) / W - 1;
       ac_int<32, false> k_bound = K2 * K1 - 1;
-      ac_int<32, false> c_bound = C / W - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -417,7 +417,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
-      ac_int<32, false> c_bound = C2 * C1 / W - 1;
+      ac_int<32, false> c_bound = (C2 * C1 + W - 1) / W - 1;
 
       constexpr int buffer_width = Weight::width * W;
 
@@ -486,7 +486,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
-      ac_int<32, false> loop_bound = K2 * K1 * C2 * C1 / W - 1;
+      ac_int<32, false> loop_bound = K2 * K1 * (C2 * C1 + W - 1) / W - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -577,7 +577,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
-      loop_t c_bound = C2 * C1 / W - 1;
+      loop_t c_bound = (C2 * C1 + W - 1) / W - 1;
       ac_int<32, false> k_bound = K2 * K1 - 1;
 
       Pack1D<Scale, W / BS> input_scales;
@@ -609,6 +609,9 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_unroll yes
           for (int c = 0; c < W; c++) {
             psums[c] = (Psum)inputs[c] * (Psum)weights[c];
+            if (c >= C2 * C1) {
+              psums[c] = Psum::zero();  // Zero out unused elements
+            }
           }
 
           Pack1D<Output, W / BS> outputs;
