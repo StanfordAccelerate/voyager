@@ -55,7 +55,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   Connections::Combinational<MatrixParams> CCS_INIT_S1(reader_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(winder_buffer_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposer_params);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(unpacker_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(input_unpacker_params);
 
   Connections::Combinational<ac_int<MAX_FETCH_WIDTH, false>> transpose_out;
   Connections::Combinational<ac_int<BufferWidth, false>> unpacked_data;
@@ -85,7 +85,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(data_unpacker);
+    SC_THREAD(input_unpacker);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -890,7 +890,6 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     while (true) {
       const MatrixParams params = transposer_params.Pop();
 
-      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
@@ -973,17 +972,16 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     }
   }
 
-  void data_unpacker() {
-    unpacker_params.ResetRead();
+  void input_unpacker() {
+    input_unpacker_params.ResetRead();
     transpose_out.ResetRead();
     unpacked_data.ResetWrite();
 
     wait();
 
     while (true) {
-      const MatrixParams params = unpacker_params.Pop();
+      const MatrixParams params = input_unpacker_params.Pop();
 
-      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
@@ -1058,7 +1056,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     reader_params.ResetWrite();
     winder_buffer_params.ResetWrite();
     transposer_params.ResetWrite();
-    unpacker_params.ResetWrite();
+    input_unpacker_params.ResetWrite();
 
     wait();
 
@@ -1070,7 +1068,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       reader_params.Push(params);
       winder_buffer_params.Push(params);
       transposer_params.Push(params);
-      unpacker_params.Push(params);
+      input_unpacker_params.Push(params);
     }
   }
 };
