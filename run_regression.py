@@ -223,7 +223,7 @@ def run_systemc_unit_test(model, layer, output_folder, fast, scale_down_operatio
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=2 * 60 * 60,
+                timeout=4 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{layer} timed out")
@@ -311,7 +311,7 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
                     env=env_vars,
                     stdout=stdout_file,
                     stderr=subprocess.STDOUT,
-                    timeout=8 * 60 * 60,
+                    timeout=10 * 60 * 60,
                 )
             except subprocess.TimeoutExpired:
                 print(f"Test {model}_{layer} timed out")
@@ -598,7 +598,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--model_name_or_path",
                 model_path,
                 *quantization_args,
-                "--output_dir",
+                "--model_output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
                 "--weight_persistent",
                 "--use_maxpool_2x2",

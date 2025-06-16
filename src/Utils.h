@@ -69,7 +69,7 @@ void send_packed_request(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
 // Unpack bits into outputs for a specific type
 template <typename T, size_t N, int buf_width, int bits_width, typename... Ts>
 bool unpack_bits(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
-                 const ac_int<bits_width, false>& bits,
+                 const ac_int<bits_width, false> bits,
                  ac_int<buf_width, false>& outputs,
                  ac_int<4, false> packing_index) {
   if (get_type_index<T, Ts...>() != dtype) {
