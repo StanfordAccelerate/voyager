@@ -1017,7 +1017,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
         }
 
       } else {  // unpack bits into outputs based on dtype
-        ac_int<4, false> pf_bound = 1 << params.input_packing_shift - 1;
+        ac_int<4, false> pf_bound = (1 << params.input_packing_shift) - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush

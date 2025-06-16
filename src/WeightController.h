@@ -71,11 +71,11 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(biasFetcher);
+    SC_THREAD(bias_fetcher);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(biasCombiner);
+    SC_THREAD(bias_feeder);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -212,7 +212,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
   void writer() {
     writer_params.ResetRead();
-    transpose_out.ResetRead();
+    unpacked_weights.ResetRead();
     write_request[0].Reset();
     write_request[1].Reset();
 
@@ -286,7 +286,8 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                           ac_int<LOOP_WIDTH, false> k1 = loop_counters
                               [1][params.weightAddressGenWeightLoopIndex[1]];
 
-                          ac_int<BufferWidth, false> data = transpose_out.Pop();
+                          ac_int<BufferWidth, false> data =
+                              unpacked_weights.Pop();
 
                           ac_int<16, false> c = c1 * C0 + c0;
                           ac_int<16, false> address =
@@ -671,7 +672,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                        loop_bounds[0][2] * loop_bounds[0][3] *
                                        loop_bounds[1][0] * loop_bounds[1][1] *
                                        loop_bounds[1][2] * loop_bounds[1][3];
-      ac_int<32, false> counter = 0;
+      ac_int<32, false> count = 0;
 
       // don't support transpose when systolic array is larger
       // than 32x32, as it will require a very large buffer
@@ -689,7 +690,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        while (counter++ < total_values) {
+        while (count++ < total_values) {
           // Fill up transpose_buffer
           for (int c0 = 0; c0 < NCols; c0++) {
             ac_int<BufferWidth, false> bits = 0;
@@ -725,6 +726,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
             transpose_out.Push(transposed);
           }
         }
+
       } else {  // passthrough
         total_values *= loop_bounds[1][4];
         total_values >>= params.weight_packing_shift;
@@ -732,7 +734,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < total_values; i++) {
+        while (count++ < total_values) {
           // process_packed_response<NCols, PortWidth, BufferWidth,
           //                         WeightTypes...>(
           //     params.weight_dtype, params.weight_num_fetches, packing_factor,
@@ -763,22 +765,17 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     while (true) {
       const MatrixParams params = weight_unpacker_params.Pop();
 
-      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
-        for (int j = 0; j < 6; j++) {
-          loop_bounds[i][j] = params.loops[i][j];
+        for (int j = 0; j < 5; j++) {
+          loop_bounds[i][j] = params.weightAddressGenLoops[i][j];
         }
       }
 
-      // set irrelevant loop bounds to 1
-      loop_bounds[1][params.weightLoopIndex[1]] = 1;
-      loop_bounds[1][params.fxIndex] = 1;
-      loop_bounds[1][params.fyIndex] = 1;
-
-      ac_int<32, false> total_count =
+      ac_int<32, false> total_values =
           loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
           loop_bounds[0][3] * loop_bounds[1][0] * loop_bounds[1][1] *
           loop_bounds[1][2] * loop_bounds[1][3] * loop_bounds[1][4];
@@ -790,17 +787,18 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        while (count++ < total_count) {
+        while (count++ < total_values) {
           ac_int<BufferWidth, false> bits = transpose_out.Pop();
           unpacked_weights.Push(bits);
         }
 
       } else {  // unpack bits into outputs based on dtype
-        ac_int<4, false> pf_bound = 1 << params.weight_packing_shift - 1;
+        total_values >>= params.weight_packing_shift;
+        ac_int<4, false> pf_bound = (1 << params.weight_packing_shift) - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        while (count++ < total_count) {
+        while (count++ < total_values) {
           ac_int<MAX_FETCH_WIDTH, false> bits = transpose_out.Pop();
 
           // Unpack bits into outputs based on dtype
@@ -828,7 +826,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     }
   }
 
-  void biasFetcher() {
+  void bias_fetcher() {
     bias_fetcher_params.ResetRead();
     bias_req.Reset();
 
@@ -922,7 +920,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     }
   }
 
-  void biasCombiner() {
+  void bias_feeder() {
     bias_feeder_params.ResetRead();
     bias_resp.Reset();
     bias_data.Reset();
@@ -1016,6 +1014,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     writer_params.ResetWrite();
     reader_params.ResetWrite();
     transposer_params.ResetWrite();
+    weight_unpacker_params.ResetWrite();
     bias_fetcher_params.ResetWrite();
     bias_feeder_params.ResetWrite();
 
@@ -1028,6 +1027,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       writer_params.Push(params);
       reader_params.Push(params);
       transposer_params.Push(params);
+      weight_unpacker_params.Push(params);
 
       if (params.has_bias) {
         bias_fetcher_params.Push(params);
