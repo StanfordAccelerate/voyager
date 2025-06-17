@@ -474,6 +474,13 @@ ACCURACY_RESULTS = {
         "MXINT8": 93.1,
         "P8_1": 92.8,
     },
+    "vit": {
+        "E4M3": 83.8,
+        "CFLOAT": 84.1,
+        "INT8": 75.4,
+        "MXINT8": 84.0,
+        "P8_1": 84.0,
+    },
 }
 
 
@@ -613,7 +620,6 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--dump_dataset",
                 "--dataset_output_dir",
                 output_data_dir,
-                "--evaluate",
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
@@ -624,6 +630,15 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "mkdir",
             "-p",
             f"{env_vars['CODEGEN_DIR']}/networks/{model}/{env_vars['DATATYPE']}/{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}",
+        ]
+    )
+
+    subprocess.run(
+        [
+            "protoc",
+            "--proto_path=test/compiler/proto/",
+            "--python_out=test/compiler/proto/",
+            f"test/compiler/proto/tiling.proto",
         ]
     )
 
@@ -666,7 +681,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=5 * 60 * 60 if model == "bert" else 3 * 60 * 60,
+                timeout=10 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{dataset} timed out")
