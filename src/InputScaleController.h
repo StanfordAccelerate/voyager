@@ -183,7 +183,7 @@ SC_MODULE(InputScaleController) {
                               ac_int<8, false> head_size =
                                   params.head_size_power_of_two;
                               ac_int<16, false> mask = (1 << head_size) - 1;
-                              address = (((c >> head_size) * X) << head_size) +
+                              address = ((c >> head_size) * (X << head_size)) +
                                         (x << head_size) + (c & mask);
                             }
 

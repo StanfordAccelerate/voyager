@@ -15,6 +15,11 @@ template <typename... WeightTypes, typename Bias, int NRows, int NCols,
           int PortWidth, int BufferWidth>
 struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                         PortWidth, BufferWidth> : public sc_module {
+  static constexpr int LOOP_WIDTH = 10;
+  static constexpr int DATA_WIDTH = BufferWidth / NCols;
+  static constexpr int MAX_FETCH_WIDTH = std::max(
+      {dtype_fetch_config<WeightTypes, NCols, PortWidth>::max_fetch_width...});
+
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
@@ -34,13 +39,12 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
   Connections::Combinational<MatrixParams> CCS_INIT_S1(writer_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(reader_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(transposer_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(weight_unpacker_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(bias_fetcher_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(bias_feeder_params);
 
-  Connections::Combinational<ac_int<BufferWidth, false>> transpose_out;
-
-  static constexpr int LOOP_WIDTH = 10;
-  static constexpr int DATA_WIDTH = BufferWidth / NCols;
+  Connections::Combinational<ac_int<MAX_FETCH_WIDTH, false>> transpose_out;
+  Connections::Combinational<ac_int<BufferWidth, false>> unpacked_weights;
 
   SC_CTOR(WeightController) {
     SC_THREAD(read_params);
@@ -63,11 +67,15 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(biasFetcher);
+    SC_THREAD(weight_unpacker);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(biasCombiner);
+    SC_THREAD(bias_fetcher);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(bias_feeder);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -114,7 +122,12 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
               .weightAddressGenLoops[1]
                                     [params.weightAddressGenWeightLoopIndex[1]];
 
-      ac_int<24, false> c_stride = K2 * K1 * NCols;
+      // reduce the number of iterations by packing factor
+      K1 = K1 >> params.weight_packing_shift;
+      loop_bounds[1][params.weightAddressGenWeightLoopIndex[1]] = K1 - 1;
+
+      ac_int<16, false> k_stride = NCols << params.weight_packing_shift;
+      ac_int<24, false> c_stride = K2 * K1 * k_stride;
       ac_int<24, false> fx_stride = C2 * C1 * C0 * c_stride;
       ac_int<24, false> fy_stride = FX * fx_stride;
 
@@ -145,7 +158,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                         ac_int<LOOP_WIDTH, false> k1 = loop_counters
                             [1][params.weightAddressGenWeightLoopIndex[1]];
 
-                        ac_int<16, false> k = (k2 * K1 + k1) * NCols;
+                        ac_int<16, false> k = (k2 * K1 + k1) * k_stride;
                         ac_int<16, false> c = (c2 * C1 + c1) * C0 + c0;
                         ac_int<32, false> address =
                             fy * fy_stride + fx * fx_stride + c * c_stride + k;
@@ -154,10 +167,9 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                           address = ((k + c0) * C2 * C1 + c2 * C1 + c1) * NCols;
                         }
 
-                        (fetch_matrix_input<WeightTypes, NCols, WeightTypes...>(
-                             params.weight_dtype, params.WEIGHT_OFFSET, address,
-                             weight_req),
-                         ...);
+                        send_packed_request<WeightTypes...>(
+                            params.weight_dtype, params.WEIGHT_OFFSET, address,
+                            params.weight_fetch_width, weight_req);
 
                         if (loop_counters[1][4] == loop_bounds[1][4]) {
                           break;
@@ -200,7 +212,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
   void writer() {
     writer_params.ResetRead();
-    transpose_out.ResetRead();
+    unpacked_weights.ResetRead();
     write_request[0].Reset();
     write_request[1].Reset();
 
@@ -241,6 +253,11 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
               .weightAddressGenLoops[1]
                                     [params.weightAddressGenWeightLoopIndex[1]];
 
+      // reduce the number of iterations by packing factor
+      K1 = K1 >> params.weight_packing_shift;
+      loop_bounds[1][params.weightAddressGenWeightLoopIndex[1]] = K1 - 1;
+      ac_int<4, false> pf_bound = (1 << params.weight_packing_shift) - 1;
+
       ac_int<24, false> fx_stride = C1 * C0 * K1;
       ac_int<24, false> fy_stride = FX * fx_stride;
 
@@ -255,36 +272,44 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                   for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
                     for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
                       for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
-                        ac_int<LOOP_WIDTH, false> k2 = loop_counters
-                            [0][params.weightAddressGenWeightLoopIndex[0]];
-                        ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                            [1][params.weightAddressGenReductionLoopIndex[1]];
-                        ac_int<LOOP_WIDTH, false> c0 = loop_counters
-                            [1][params.weightAddressGenReductionLoopIndex[2]];
-                        ac_int<LOOP_WIDTH, false> fx =
-                            loop_counters[1][params.weightAddressGenFxIndex];
-                        ac_int<LOOP_WIDTH, false> fy =
-                            loop_counters[1][params.weightAddressGenFyIndex];
-                        ac_int<LOOP_WIDTH, false> k1 = loop_counters
-                            [1][params.weightAddressGenWeightLoopIndex[1]];
+                        for (ac_int<4, false> pf = 0;; pf++) {
+                          ac_int<LOOP_WIDTH, false> k2 = loop_counters
+                              [0][params.weightAddressGenWeightLoopIndex[0]];
+                          ac_int<LOOP_WIDTH, false> c1 = loop_counters
+                              [1][params.weightAddressGenReductionLoopIndex[1]];
+                          ac_int<LOOP_WIDTH, false> c0 = loop_counters
+                              [1][params.weightAddressGenReductionLoopIndex[2]];
+                          ac_int<LOOP_WIDTH, false> fx =
+                              loop_counters[1][params.weightAddressGenFxIndex];
+                          ac_int<LOOP_WIDTH, false> fy =
+                              loop_counters[1][params.weightAddressGenFyIndex];
+                          ac_int<LOOP_WIDTH, false> k1 = loop_counters
+                              [1][params.weightAddressGenWeightLoopIndex[1]];
 
-                        ac_int<BufferWidth, false> data = transpose_out.Pop();
+                          ac_int<BufferWidth, false> data =
+                              unpacked_weights.Pop();
 
-                        ac_int<16, false> k = (k2 * K1 + k1) * NCols;
-                        ac_int<16, false> c = c1 * C0 + c0;
-                        ac_int<16, false> address =
-                            fy * fy_stride + fx * fx_stride + c * K1 + k1;
+                          ac_int<16, false> c = c1 * C0 + c0;
+                          ac_int<16, false> address =
+                              fy * fy_stride + fx * fx_stride + c * K1 + k1;
+                          address =
+                              (address << params.weight_packing_shift) + pf;
 
-                        BufferWriteRequest<ac_int<BufferWidth, false>> req;
-                        req.address = address;
-                        req.data = data;
-                        req.last = loop_counters[1][4] == loop_bounds[1][4] &&
-                                   loop_counters[1][3] == loop_bounds[1][3] &&
-                                   loop_counters[1][2] == loop_bounds[1][2] &&
-                                   loop_counters[1][1] == loop_bounds[1][1] &&
-                                   loop_counters[1][0] == loop_bounds[1][0];
-                        write_request[bankSel].Push(req);
+                          BufferWriteRequest<ac_int<BufferWidth, false>> req;
+                          req.address = address;
+                          req.data = data;
+                          req.last = loop_counters[1][4] == loop_bounds[1][4] &&
+                                     loop_counters[1][3] == loop_bounds[1][3] &&
+                                     loop_counters[1][2] == loop_bounds[1][2] &&
+                                     loop_counters[1][1] == loop_bounds[1][1] &&
+                                     loop_counters[1][0] == loop_bounds[1][0] &&
+                                     pf == pf_bound;
+                          write_request[bankSel].Push(req);
 
+                          if (pf == pf_bound) {
+                            break;
+                          }
+                        }
                         if (loop_counters[1][4] == loop_bounds[1][4]) {
                           break;
                         }
@@ -647,7 +672,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                        loop_bounds[0][2] * loop_bounds[0][3] *
                                        loop_bounds[1][0] * loop_bounds[1][1] *
                                        loop_bounds[1][2] * loop_bounds[1][3];
-      ac_int<32, false> counter = 0;
+      ac_int<32, false> count = 0;
 
       // don't support transpose when systolic array is larger
       // than 32x32, as it will require a very large buffer
@@ -665,7 +690,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        while (counter++ < total_values) {
+        while (count++ < total_values) {
           // Fill up transpose_buffer
           for (int c0 = 0; c0 < NCols; c0++) {
             ac_int<BufferWidth, false> bits = 0;
@@ -701,25 +726,28 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
             transpose_out.Push(transposed);
           }
         }
+
       } else {  // passthrough
         total_values *= loop_bounds[1][4];
+        total_values >>= params.weight_packing_shift;
+        // ac_int<4, false> packing_factor = 1 << params.weight_packing_shift;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (int i = 0; i < total_values; i++) {
-          ac_int<BufferWidth, false> bits = 0;
+        while (count++ < total_values) {
+          // process_packed_response<NCols, PortWidth, BufferWidth,
+          //                         WeightTypes...>(
+          //     params.weight_dtype, params.weight_num_fetches, packing_factor,
+          //     weight_resp, transpose_out);
 
-          bool success = (process_matrix_input<WeightTypes, NCols, PortWidth,
-                                               BufferWidth, WeightTypes...>(
-                              params.weight_dtype, weight_resp, bits) ||
-                          ...);
+          ac_int<MAX_FETCH_WIDTH, false> bits;
 
-#ifndef __SYNTHESIS__
-          if (!success) {
-            std::cerr << "Error: matrix weight dtype '" << params.weight_dtype
-                      << "' is not valid" << std::endl;
+          for (ac_int<4, false> i = 0;; i++) {
+            bits.set_slc(i * PortWidth, weight_resp.Pop());
+            if (i == params.weight_num_fetches - 1) {
+              break;
+            }
           }
-#endif
 
           transpose_out.Push(bits);
         }
@@ -727,7 +755,78 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     }
   }
 
-  void biasFetcher() {
+  void weight_unpacker() {
+    weight_unpacker_params.ResetRead();
+    transpose_out.ResetRead();
+    unpacked_weights.ResetWrite();
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = weight_unpacker_params.Pop();
+
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][5];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
+        for (int j = 0; j < 5; j++) {
+          loop_bounds[i][j] = params.weightAddressGenLoops[i][j];
+        }
+      }
+
+      ac_int<32, false> total_values =
+          loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
+          loop_bounds[0][3] * loop_bounds[1][0] * loop_bounds[1][1] *
+          loop_bounds[1][2] * loop_bounds[1][3] * loop_bounds[1][4];
+      ac_int<32, false> count = 0;
+
+      // passthrough
+      if (params.has_weight_transpose && NRows < 64 && NCols < 64) {
+        ac_int<DATA_WIDTH> transpose_buffer[NRows][NRows];
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (count++ < total_values) {
+          ac_int<BufferWidth, false> bits = transpose_out.Pop();
+          unpacked_weights.Push(bits);
+        }
+
+      } else {  // unpack bits into outputs based on dtype
+        total_values >>= params.weight_packing_shift;
+        ac_int<4, false> pf_bound = (1 << params.weight_packing_shift) - 1;
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (count++ < total_values) {
+          ac_int<MAX_FETCH_WIDTH, false> bits = transpose_out.Pop();
+
+          // Unpack bits into outputs based on dtype
+          for (ac_int<4, false> i = 0;; i++) {
+            ac_int<BufferWidth, false> outputs = 0;
+            bool handled = (unpack_bits<WeightTypes, NCols, BufferWidth,
+                                        MAX_FETCH_WIDTH, WeightTypes...>(
+                                params.weight_dtype, bits, outputs, i) ||
+                            ...);
+
+#ifndef __SYNTHESIS__
+            if (!handled) {
+              throw std::runtime_error("Unsupported dtype for matrix weight: " +
+                                       std::to_string(params.weight_dtype));
+            }
+#endif
+            unpacked_weights.Push(outputs);
+
+            if (i == pf_bound) {
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void bias_fetcher() {
     bias_fetcher_params.ResetRead();
     bias_req.Reset();
 
@@ -821,7 +920,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     }
   }
 
-  void biasCombiner() {
+  void bias_feeder() {
     bias_feeder_params.ResetRead();
     bias_resp.Reset();
     bias_data.Reset();
@@ -915,6 +1014,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     writer_params.ResetWrite();
     reader_params.ResetWrite();
     transposer_params.ResetWrite();
+    weight_unpacker_params.ResetWrite();
     bias_fetcher_params.ResetWrite();
     bias_feeder_params.ResetWrite();
 
@@ -927,6 +1027,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       writer_params.Push(params);
       reader_params.Push(params);
       transposer_params.Push(params);
+      weight_unpacker_params.Push(params);
 
       if (params.has_bias) {
         bias_fetcher_params.Push(params);

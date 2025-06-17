@@ -298,3 +298,47 @@ bool is_fc(const codegen::OpOverload &op) {
 
   return dim == 1;
 }
+
+template <typename T, size_t N, int PortWidth, typename... Ts>
+bool try_fetch_params_for_type(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
+                               int loop_bound, int &out_pf, int &out_fw) {
+  if (get_type_index<T, Ts...>() != dtype) {
+    return false;
+  }
+
+  using cfg = dtype_fetch_config<T, N, PortWidth>;
+  constexpr int pf = cfg::packing_factor;
+
+  // decide if we can do a full pack
+  out_pf = (loop_bound % pf == 0 ? pf : 1);
+
+  // Only allow powers of two packing factors
+  if (out_pf <= 0 || (out_pf & (out_pf - 1)) != 0) {
+    out_pf = 1;
+  }
+
+  // choose the matching width
+  out_fw = (out_pf > 1 ? cfg::packed_fetch_width : cfg::fetch_width);
+
+  return true;
+}
+
+template <size_t N, int PortWidth, typename... Ts>
+int get_packing_factor(ac_int<DTYPE_INDEX_WIDTH, false> dtype, int loop_bound,
+                       int &effective_fetch_width) {
+  int pf = 1;
+
+  // fold: try each Ts in turn. ||-fold stops updating pf once one returns true.
+  bool found = (try_fetch_params_for_type<Ts, N, PortWidth, Ts...>(
+                    dtype, loop_bound, pf, effective_fetch_width) ||
+                ...);
+
+#ifndef __SYNTHESIS__
+  if (!found) {
+    throw std::runtime_error("Unsupported dtype for packing‐factor: " +
+                             std::to_string(dtype));
+  }
+#endif
+
+  return pf;
+}

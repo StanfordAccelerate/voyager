@@ -14,61 +14,61 @@ EXTRA_COMPILER_FLAGS ?=
 ################################################################################
 $(CODEGEN_DIR)/networks/resnet18/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py resnet18 $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py resnet18 $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/resnet50/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py resnet50 $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py resnet50 $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/mobilebert/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --weight_persistent > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --weight_persistent > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/mobilebert_encoder/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/bert/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py bert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py bert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_prefill/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)networks/vit/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py vit $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py vit $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/segformer/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python -u quantized-training/test/test_codegen.py segformer $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python -u quantized-training/test/test_codegen.py segformer $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
 ################################################################################
 # Gesture
 ################################################################################
 $(CODEGEN_DIR)/networks/gesture/CFLOAT/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py gesture --model_name_or_path models/gesture/model.pth --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py gesture --model_name_or_path models/gesture/model.pth --model_output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 ################################################################################
 # Layer Tests
 ################################################################################
 test/compiler/networks/layertest/CFLOAT/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py layertest --output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
+	python quantized-training/test/test_codegen.py layertest --model_output_dir $(dir $@) > $(dir $@)/codegen.log 2>&1
 
 ################################################################################
 # Tilings

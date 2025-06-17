@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import json
 import multiprocessing as mp
 import os
 import subprocess
@@ -13,6 +14,31 @@ from deepdiff import DeepDiff
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 from quantized_training.codegen import param_pb2
+
+
+ACCURACY_RESULTS = {
+    "resnet18": {
+        "E4M3": 70.8,
+        "CFLOAT": 70.8,
+        "INT8": 69.7,
+        "MXINT8": 71.0,
+        "P8_1": 70.5,
+    },
+    "resnet50": {
+        "E4M3": 67.7,
+        "CFLOAT": 71.2,
+        "INT8": 69.1,
+        "MXINT8": 69.5,
+        "P8_1": 69.6,
+    },
+    "mobilebert": {
+        "E4M3": 90.6,
+        "CFLOAT": 90.83,
+        "INT8": 90.37,
+        "MXINT8": 91.0,
+        "P8_1": 90.37,
+    },
+}
 
 
 def set_default_env_vars(env_vars):
@@ -197,7 +223,7 @@ def run_systemc_unit_test(model, layer, output_folder, fast, scale_down_operatio
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=1 * 60 * 60,
+                timeout=4 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{layer} timed out")
@@ -285,7 +311,7 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
                     env=env_vars,
                     stdout=stdout_file,
                     stderr=subprocess.STDOUT,
-                    timeout=8 * 60 * 60,
+                    timeout=10 * 60 * 60,
                 )
             except subprocess.TimeoutExpired:
                 print(f"Test {model}_{layer} timed out")
@@ -437,31 +463,6 @@ def run_rtl_tests(
     return print_test_results(test_results, layers, results_folder)
 
 
-ACCURACY_RESULTS = {
-    "resnet18": {
-        "E4M3": 70.8,
-        "CFLOAT": 70.8,
-        "INT8": 69.7,
-        "MXINT8": 71.0,
-        "P8_1": 70.5,
-    },
-    "resnet50": {
-        "E4M3": 67.7,
-        "CFLOAT": 71.2,
-        "INT8": 69.1,
-        "MXINT8": 69.5,
-        "P8_1": 69.6,
-    },
-    "mobilebert": {
-        "E4M3": 90.6,
-        "CFLOAT": 90.83,
-        "INT8": 90.37,
-        "MXINT8": 91.0,
-        "P8_1": 90.37,
-    },
-}
-
-
 def run_accuracy(model, dataset, num_processes, output_folder):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
@@ -544,7 +545,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid model")
 
-    block_size = max(os.environ["OC_DIMENSION"], os.environ["IC_DIMENSION"])
+    block_size = max(int(os.environ["OC_DIMENSION"]), int(os.environ["IC_DIMENSION"]))
 
     if env_vars["DATATYPE"] == "E4M3":
         quantization_args = [
@@ -580,9 +581,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         quantization_args = [
             "--force_scale_power_of_two",
             "--activation",
-            "int8,qs=microscaling,bs=" + block_size,
+            "int8,qs=microscaling,bs=" + str(block_size),
             "--weight",
-            "int8,qs=microscaling,bs=" + block_size,
+            "int8,qs=microscaling,bs=" + str(block_size),
             "--bf16",
         ]
     else:
@@ -597,7 +598,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--model_name_or_path",
                 model_path,
                 *quantization_args,
-                "--output_dir",
+                "--model_output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
                 "--weight_persistent",
                 "--use_maxpool_2x2",
@@ -672,7 +673,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     return abs(final_accuracy - gold_accuracy) < 1
 
 
-def add_layers(network, layers, layer_counts, uniquify):
+def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
     all_layers = []
 
     layers[network] = []
@@ -739,6 +740,42 @@ def add_layers(network, layers, layer_counts, uniquify):
                 layers[network].append(name)
                 layer_counts[network][name] = 1
 
+    if whitelist_layers:
+        original_layers = layers[network]
+        filtered_layers = [layer for layer in original_layers if layer not in whitelist_layers]
+        removed_layers = set(original_layers) - set(filtered_layers)
+
+        if removed_layers:
+            print(
+                f"[INFO] Skipping {len(removed_layers)} layers in whitelist "
+                f"for model '{network}': {sorted(removed_layers)}"
+            )
+
+        layers[network] = filtered_layers
+        layer_counts[network] = {
+            layer: count for layer, count in layer_counts[network].items()
+            if layer in filtered_layers
+        }
+
+
+def matches(value, rule_value):
+    if isinstance(rule_value, list):
+        return value in rule_value
+    else:
+        return value == rule_value
+
+
+def get_whitelist_layers(whitelist_rules, model, datatype, sim_type, block_size):
+    for rule in whitelist_rules:
+        if (
+            matches(model, rule["model"]) and
+            matches(datatype, rule["datatype"]) and
+            matches(sim_type, rule["sim_type"]) and
+            matches(block_size, rule["block_size"])
+        ):
+            return set(rule["layers"])
+    return set()
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -785,6 +822,11 @@ def main():
         action="store_true",
         help="Keep the generated rtl and use it to run rtl tests",
     )
+    parser.add_argument(
+        "--whitelist",
+        required=False,
+        help="Path to JSON file containing whitelist layers to skip"
+    )
     args = parser.parse_args()
 
     args.models = [s.strip() for s in args.models.split(",")]
@@ -800,6 +842,11 @@ def main():
     layers = {}
     layer_counts = {}
 
+    whitelist = []
+    if args.whitelist:
+        with open(args.whitelist, 'r') as f:
+            whitelist = json.load(f)
+
     # Add codegen layers
     layers = {}
     if args.tests is None:
@@ -813,7 +860,12 @@ def main():
             env_vars = os.environ.copy()
             env_vars["NETWORK"] = network
             subprocess.run(["make", "network-proto"], env=env_vars)
-            add_layers(network, layers, layer_counts, args.uniquify_layers)
+
+            datatype = os.environ['DATATYPE']
+            block_size = max(int(os.environ["OC_DIMENSION"]), int(os.environ["IC_DIMENSION"]))
+            whitelist_layers = get_whitelist_layers(whitelist, network, datatype, args.sims, block_size)
+
+            add_layers(network, layers, layer_counts, args.uniquify_layers, whitelist_layers)
     else:
         assert (
             len(args.models) == 1

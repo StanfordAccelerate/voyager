@@ -447,7 +447,7 @@ inline Output *simd_matrix_vector_multiply(
 
   int C = get_size(input);
   int K = get_size(output);
-  int num_tiles = C / N;
+  int num_tiles = (C + N - 1) / N;
   int num_blocks = N / block_size;
 
   Input *inputs = std::any_cast<Input *>(input_ptr);
@@ -466,7 +466,11 @@ inline Output *simd_matrix_vector_multiply(
       Psum product[N];
       for (int i = 0; i < N; i++) {
         int index = c * N + i;
-        product[i] = (Psum)inputs[index] * (Psum)weights[k * C + index];
+        if (index < C) {
+          product[i] = (Psum)inputs[index] * (Psum)weights[k * C + index];
+        } else {
+          product[i] = Psum::zero();
+        }
       }
 
       Output output_block[num_blocks];

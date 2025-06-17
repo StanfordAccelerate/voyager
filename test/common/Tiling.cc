@@ -41,6 +41,8 @@ Tiling get_tiling(const Operation& operation) {
 
   Tiling tiling;
   if (manual_tiling || !operation.has_valid_tiling) {
+    spdlog::info("Using manual tiling for operation {} with target {}\n",
+                 operation.name, first_op.target());
     if (first_op.target() == "conv2d" || first_op.target() == "conv2d_mx") {
       tiling = get_conv2d_tiling(first_op);
     } else {
@@ -230,14 +232,11 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
   std::vector<int> output_shape = {input_shape[0], weight_shape[0],
                                    output_height, output_width};
 
-  const int oc_unroll = OC_DIMENSION;
-  const int ic_unroll = IC_DIMENSION;
-
   int x1 = 1, y1 = 1, k1 = 1;
   int x0 = output_shape[2];
   int y0 = output_shape[3];
-  int k0 = weight_shape[0] / oc_unroll;
-  int c0 = weight_shape[1] / ic_unroll;
+  int k0 = weight_shape[0] / OC_DIMENSION;
+  int c0 = weight_shape[1] / IC_DIMENSION;
   int fx = weight_shape[2];
   int fy = weight_shape[3];
   int stride = strides[0];
@@ -302,7 +301,7 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
   }
 
   // Reduce OC0 to meet weight buffer constraint
-  while (fx * fy * k0 * ic_unroll > WEIGHT_BUFFER_SIZE) {
+  while (fx * fy * k0 * IC_DIMENSION > WEIGHT_BUFFER_SIZE) {
     if (k0 % 2 == 0) {
       k0 /= 2;
       k1 *= 2;
@@ -313,7 +312,7 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
   }
 
   // Reduce OC0 to meet weight buffer constraint
-  while (fx * fy * k0 * ic_unroll > WEIGHT_BUFFER_SIZE) {
+  while (fx * fy * k0 * IC_DIMENSION > WEIGHT_BUFFER_SIZE) {
     if (k0 % 2 == 0) {
       k0 /= 2;
       k1 *= 2;
@@ -387,21 +386,33 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
   std::string weight_key = is_matmul ? "other" : "weight";
   const auto weight_shape = get_shape(kwargs.at(weight_key).tensor());
 
-  // Generate tiling using unroll factor of 16
-  const int oc_unroll = OC_DIMENSION;
-  const int ic_unroll = IC_DIMENSION;
-
   int x1 = 1, k1 = 1, c1 = 1;
   int x0 = get_size(input_shape) / input_shape.back();
-  int k0 = weight_shape[0] / oc_unroll;
-  int c0 = weight_shape[1] / ic_unroll;
+  int k0 = weight_shape[0] / OC_DIMENSION;
+  int c0 = weight_shape[1] / IC_DIMENSION;
+
+  // Manual tiling
+  if (x0 == 128 && weight_shape[0] == 512 && weight_shape[1] == 2048) {
+    return {
+        .loops = {{1, k0 / 2, 4, c0 / 2, 1, 1}, {2, 1, 2, 1, 1, 32}},
+        .x_loop_index = {2, 5},
+        .y_loop_index = {0, 1},
+        .reduction_loop_index = {3, 0},
+        .weight_loop_index = {1, 2},
+        .fx_index = 4,
+        .fy_index = 3,
+        .weight_reuse_index = {5, 5},
+        .stride = 1,
+        .replication = false,
+    };
+  }
 
   // torch.matmul weight is also an activation, thus does not need to be
   // transposed
   if (op.target() == "matmul" || op.target() == "matmul_mx") {
     int size = weight_shape.size();
-    c0 = weight_shape[size - 2] / ic_unroll;
-    k0 = weight_shape[size - 1] / oc_unroll;
+    c0 = weight_shape[size - 2] / IC_DIMENSION;
+    k0 = weight_shape[size - 1] / OC_DIMENSION;
   }
 
   // Loop indices cannot exceed 1024 (10-bit)
@@ -418,7 +429,7 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
     }
   }
 
-  while (k0 * c0 * ic_unroll > WEIGHT_BUFFER_SIZE) {
+  while (k0 * c0 * IC_DIMENSION > WEIGHT_BUFFER_SIZE) {
     if (k0 % 2 == 0) {
       k0 /= 2;
       k1 *= 2;

@@ -53,10 +53,16 @@ struct MatrixParams : BaseParams {
     weightAddressGenFyIndex = 0;
 
     input_dtype = 0;
-    weight_dtype = 0;
-
     use_input_codebook = false;
+    input_num_fetches = 1;
+    input_packing_shift = 0;
+    input_fetch_width = 0;
+
+    weight_dtype = 0;
     use_weight_codebook = false;
+    weight_num_fetches = 1;
+    weight_packing_shift = 0;
+    weight_fetch_width = 0;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       input_code[i] = 0;
@@ -106,10 +112,16 @@ struct MatrixParams : BaseParams {
   ac_int<3, false> weightAddressGenFyIndex;
 
   ac_int<DTYPE_INDEX_WIDTH, false> input_dtype;
-  ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
-
   bool use_input_codebook;
+  ac_int<4, false> input_num_fetches;
+  ac_int<4, false> input_packing_shift;
+  ac_int<10, false> input_fetch_width;
+
+  ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
   bool use_weight_codebook;
+  ac_int<4, false> weight_num_fetches;
+  ac_int<4, false> weight_packing_shift;
+  ac_int<10, false> weight_fetch_width;
 
   ac_int<DECODED_INPUT_DTYPE_WIDTH, false> input_code[NUM_CODEBOOK_ENTRIES];
   ac_int<DECODED_WEIGHT_DTYPE_WIDTH, false> weight_code[NUM_CODEBOOK_ENTRIES];
@@ -131,7 +143,8 @@ struct MatrixParams : BaseParams {
       10 * 1 /* Bools */;
 
   static const unsigned int extra_width =
-      2 * DTYPE_INDEX_WIDTH + NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
+      2 * DTYPE_INDEX_WIDTH + 36 +
+      NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
       NUM_CODEBOOK_ENTRIES * DECODED_WEIGHT_DTYPE_WIDTH;
 
   static const unsigned int width = base_width + extra_width;
@@ -184,10 +197,16 @@ struct MatrixParams : BaseParams {
     m & weightAddressGenFyIndex;
 
     m & input_dtype;
-    m & weight_dtype;
-
     m & use_input_codebook;
+    m & input_num_fetches;
+    m & input_packing_shift;
+    m & input_fetch_width;
+
+    m & weight_dtype;
     m & use_weight_codebook;
+    m & weight_num_fetches;
+    m & weight_packing_shift;
+    m & weight_fetch_width;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       m& input_code[i];
@@ -273,10 +292,16 @@ struct MatrixParams : BaseParams {
        << std::endl;
 
     os << "input_dtype: " << params.input_dtype << std::endl;
-    os << "weight_dtype: " << params.weight_dtype << std::endl;
-
     os << "use_input_codebook: " << params.use_input_codebook << std::endl;
+    os << "input_num_fetches: " << params.input_num_fetches << std::endl;
+    os << "input_packing_shift: " << params.input_packing_shift << std::endl;
+    os << "input_fetch_width: " << params.input_fetch_width << std::endl;
+
+    os << "weight_dtype: " << params.weight_dtype << std::endl;
     os << "use_weight_codebook: " << params.use_weight_codebook << std::endl;
+    os << "weight_num_fetches: " << params.weight_num_fetches << std::endl;
+    os << "weight_packing_shift: " << params.weight_packing_shift << std::endl;
+    os << "weight_fetch_width: " << params.weight_fetch_width << std::endl;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       os << "input_code[" << i << "]: " << params.input_code[i] << std::endl;
@@ -344,7 +369,16 @@ struct MatrixParams : BaseParams {
     if (lhs.stride != rhs.stride) return false;
 
     if (lhs.input_dtype != rhs.input_dtype) return false;
+    if (lhs.use_input_codebook != rhs.use_input_codebook) return false;
+    if (lhs.input_num_fetches != rhs.input_num_fetches) return false;
+    if (lhs.input_packing_shift != rhs.input_packing_shift) return false;
+    if (lhs.input_fetch_width != rhs.input_fetch_width) return false;
+
     if (lhs.weight_dtype != rhs.weight_dtype) return false;
+    if (lhs.use_weight_codebook != rhs.use_weight_codebook) return false;
+    if (lhs.weight_num_fetches != rhs.weight_num_fetches) return false;
+    if (lhs.weight_packing_shift != rhs.weight_packing_shift) return false;
+    if (lhs.weight_fetch_width != rhs.weight_fetch_width) return false;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       if (lhs.input_code[i] != rhs.input_code[i]) return false;
@@ -1252,7 +1286,7 @@ struct VectorInstructionConfig : BaseParams {
 
   inline friend std::ostream& operator<<(
       ostream& os, const VectorInstructionConfig& params) {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < params.instLen; i++) {
       os << "instIndex: " << i << std::endl;
       os << "instCount: " << params.instCount[i] << std::endl;
       os << params.inst[i] << std::endl;
