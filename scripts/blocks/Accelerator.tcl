@@ -62,7 +62,9 @@ proc pre_assembly {} {
 }
 
 proc pre_architect {} {
-  global TECHNOLOGY OC_DIMENSION INPUT_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_SIZE WEIGHT_BUFFER_WIDTH ACCUM_BUFFER_DATATYPE ACCUM_BUFFER_SIZE ACCUM_DATATYPE_WIDTH ACC_BUF_C_DATA_REP_NAME SUPPORT_MX DOUBLE_BUFFERED_ACCUM_BUFFER
+  global TECHNOLOGY IC_DIMENSION OC_DIMENSION INPUT_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_SIZE WEIGHT_BUFFER_WIDTH ACCUM_BUFFER_DATATYPE ACCUM_BUFFER_SIZE ACCUM_DATATYPE_WIDTH ACC_BUF_C_DATA_REP_NAME SUPPORT_MX DOUBLE_BUFFERED_ACCUM_BUFFER
+
+  directive set MEM_MAP_THRESHOLD 128
 
   # Input double buffer
   set double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$INPUT_BUFFER_WIDTH>"
@@ -97,11 +99,12 @@ proc pre_architect {} {
       directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
     }
 
-    set scale_width [expr $SCALE_DATATYPE_WIDTH*$OC_DIMENSION]
+    set weight_scale_buffer_size [expr {$WEIGHT_BUFFER_SIZE / $IC_DIMENSION}]
+    set weight_scale_buffer_width [expr $SCALE_DATATYPE_WIDTH * $OC_DIMENSION]
 
-    set weight_scale_double_buffer "DoubleBuffer<$WEIGHT_BUFFER_SIZE,$scale_width>"
-    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem0Run/mem0Run/mem0 -WORD_WIDTH $scale_width
-    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1Run/mem1Run/mem1 -WORD_WIDTH $scale_width
+    set weight_scale_double_buffer "DoubleBuffer<$weight_scale_buffer_size,$weight_scale_buffer_width>"
+    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem0Run/mem0Run/mem0 -WORD_WIDTH $weight_scale_buffer_width
+    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1Run/mem1Run/mem1 -WORD_WIDTH $weight_scale_buffer_width
   }
 
   set accumulation_buffer "DualPortBuffer<Pack1D<$ACCUM_BUFFER_DATATYPE,${OC_DIMENSION}UL>,$ACCUM_BUFFER_SIZE>"

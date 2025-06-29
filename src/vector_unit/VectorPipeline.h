@@ -336,8 +336,8 @@ SC_MODULE(VectorPipeline) {
         res1 = vabs<VectorType, Width>(op1_src0);
       } else if (op1 == VectorInstructions::vrelu) {
         res1 = vrelu<VectorType, Width>(op1_src0);
-      } else if (op1 == VectorInstructions::vgelu) {
-        res1 = vgelu<VectorType, Width>(op1_src0);
+        // } else if (op1 == VectorInstructions::vgelu) {
+        //   res1 = vgelu<VectorType, Width>(op1_src0);
       } else if (op1 == VectorInstructions::vsilu) {
         res1 = vsilu<VectorType, Width>(op1_src0);
         // } else if (op1 == VectorInstructions::vmap) {
