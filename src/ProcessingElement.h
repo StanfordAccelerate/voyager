@@ -6,6 +6,8 @@
 #include "AccelTypes.h"
 
 #ifdef CHECK_PE
+#include <regex>
+
 #include "test/checker/PEChecker.h"
 #endif
 
@@ -113,8 +115,18 @@ SC_MODULE(ProcessingElement) {
   Psum pe_fma(Input input, Weight weight, Psum psum) {
 #ifdef CHECK_PE
     std::string inst_name = name();
-    int pe_num = std::stoi(inst_name.substr(inst_name.find_last_of('_') + 1));
-    pe_checker.check_reference(pe_num, input, weight, psum);
+    std::regex pattern(R"(row_(\d+)\.pe_(\d+))");
+    std::smatch matches;
+
+    if (std::regex_search(inst_name, matches, pattern)) {
+      int row_index = std::stoi(matches[1].str());
+      int pe_index = std::stoi(matches[2].str());
+      int pe_num = row_index * OC_DIMENSION + pe_index;
+      pe_checker.check_reference(pe_num, input, weight, psum);
+    } else {
+      std::cerr << "Error: Unable to parse PE instance name: " << inst_name
+                << std::endl;
+    }
 #endif
     return input.fma(weight, psum);
   }

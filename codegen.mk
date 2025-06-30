@@ -42,11 +42,11 @@ $(CODEGEN_DIR)/networks/llama_decode/%/model.txt: quantized-training/test/test_c
 
 $(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --remove_duplicate --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) --context_length 128 $(COMMON_FLAGS) --remove_duplicate --mixed_precision --block_size $(BLOCK_SIZE) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/vit/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "datatypes/DataTypes.h"
+
 template <typename T, size_t N>
 bool send_input_request(ac_int<ADDRESS_WIDTH, false> offset,
                         ac_int<32, false> address,
@@ -53,6 +55,77 @@ bool process_matrix_input(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
   return true;
 }
 
+template <typename... Ts>
+void send_packed_request(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
+                         ac_int<ADDRESS_WIDTH, false> offset,
+                         ac_int<32, false> address,
+                         ac_int<32, false> fetch_width,
+                         Connections::Out<MemoryRequest>& channel) {
+  ac_int<5, false> width = get_type_width<Ts...>(dtype);
+  MemoryRequest request = {offset + address * width / 8, fetch_width};
+  channel.Push(request);
+}
+
+// Unpack bits into outputs for a specific type
+template <typename T, size_t N, int buf_width, int bits_width, typename... Ts>
+bool unpack_bits(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
+                 const ac_int<bits_width, false> bits,
+                 ac_int<buf_width, false>& outputs,
+                 ac_int<4, false> packing_index) {
+  if (get_type_index<T, Ts...>() != dtype) {
+    return false;
+  }
+
+  constexpr int data_width = buf_width / N;
+  ac_int<10, false> offset = packing_index * T::width * N;
+
+#pragma hls_unroll yes
+  for (int i = 0; i < N; i++) {
+    outputs.set_slc(i * data_width,
+                    bits.template slc<T::width>(offset + i * T::width));
+  }
+
+  return true;
+}
+
+template <size_t N, int port_width, int buf_width, typename... Ts>
+void process_packed_response(
+    ac_int<DTYPE_INDEX_WIDTH, false> dtype, ac_int<4, false> num_fetches,
+    ac_int<4, false> packing_factor,
+    Connections::In<ac_int<port_width, false>>& response,
+    Connections::Combinational<ac_int<buf_width, false>>& output) {
+  constexpr int max_fetch_width =
+      std::max({dtype_fetch_config<Ts, N, port_width>::max_fetch_width...});
+  ac_int<max_fetch_width, false> bits;
+
+  for (ac_int<4, false> i = 0;; i++) {
+    bits.set_slc(i * port_width, response.Pop());
+    if (i == num_fetches - 1) {
+      break;
+    }
+  }
+
+  // Unpack bits into outputs based on dtype
+  for (ac_int<4, false> i = 0;; i++) {
+    ac_int<buf_width, false> outputs = 0;
+    bool handled = (unpack_bits<Ts, N, buf_width, max_fetch_width, Ts...>(
+                        dtype, bits, outputs, i) ||
+                    ...);
+
+#ifndef __SYNTHESIS__
+    if (!handled) {
+      throw std::runtime_error("Unsupported dtype for matrix input: " +
+                               std::to_string(dtype));
+    }
+#endif
+    output.Push(outputs);
+
+    if (i == packing_factor - 1) {
+      break;
+    }
+  }
+}
+
 template <typename T, size_t N, int width, typename... Ts>
 bool set_zero(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
               ac_int<width, false>& outputs) {
@@ -79,4 +152,11 @@ bool decode_type(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
   output = typename T1::decoded(temp);
 
   return true;
+}
+
+#pragma hls_design ccore
+template <typename Psum, typename Scale, typename Buffer>
+Buffer dequantize_mx_op(const Psum psum, const Scale input_scale,
+                        const Scale weight_scale, const Buffer prev_accum) {
+  return prev_accum + (Buffer)input_scale * (Buffer)weight_scale * (Buffer)psum;
 }

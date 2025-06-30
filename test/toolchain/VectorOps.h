@@ -424,20 +424,17 @@ void MapVectorOperations(const codegen::Operation &param,
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
   if (output.has_reshape()) {
-    vector_params->has_attn_head_permute = true;
-    // vector_params->has_attn_head_permute = output.shape(1) < output.shape(2);
-    // vector_params->has_output_permute = output.shape(1) > output.shape(2);
-
     // if we have permutation, we need to configure the address generators
     // accordingly we need to make sure the output is split into 32x32 blocks
+    vector_params->has_attn_head_permute = true;
     vector_params->output_loops[1][1] = output.shape(1);
     vector_params->output_loops[1][2] =
         output.shape(2) * output.shape(3) / OC_DIMENSION;
   }
 
   VectorInstructions inst;
-  memset(&inst, 0, sizeof(inst));
   inst.op_type = VectorInstructions::vector;
+  inst.inst_count = get_size(output) / OC_DIMENSION;
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
@@ -600,7 +597,7 @@ void MapVectorOperations(const codegen::Operation &param,
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
   vector_instruction_config->inst[0] = inst;
-  vector_instruction_config->instCount[0] = get_size(output) / OC_DIMENSION;
+  vector_instruction_config->instCount[0] = 1;
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;
 

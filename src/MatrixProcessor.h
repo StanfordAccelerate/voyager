@@ -7,6 +7,7 @@
 #include "ParamsDeserializer.h"
 #include "Skewer.h"
 #include "SystolicArray.h"
+#include "Utils.h"
 
 template <typename InputTypeTuple, typename WeightTypeTuple, typename Input,
           typename Weight, typename Psum, typename Buffer, typename Scale,
@@ -19,6 +20,15 @@ template <typename... InputTypes, typename... WeightTypes, typename Input,
 struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                        Input, Weight, Psum, Buffer, Scale, NRows, NCols,
                        BufferSize> : public sc_module {
+  static constexpr int LOOP_WIDTH = 10;
+  static constexpr int FIFO_DEPTH = SUPPORT_MX ? 16 : 1;
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+  static constexpr int ACCUM_BUFFER_BANKS = 2;
+#else
+  static constexpr int ACCUM_BUFFER_BANKS = 1;
+#endif
+
  private:
   InputSerializedSkewer<Input, NRows> CCS_INIT_S1(inputSkewer);
   Connections::Combinational<Pack1D<PEInput<Input>, NRows>> CCS_INIT_S1(
@@ -34,17 +44,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   SystolicArray<Input, Weight, Psum, NRows, NCols> CCS_INIT_S1(systolicArray);
 
-  static constexpr int int_log2(unsigned int n) {
-    return (n <= 1) ? 0 : 1 + int_log2(n / 2);
-  }
-
-  static constexpr int LOOP_WIDTH = 10;
-
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-  static constexpr int ACCUM_BUFFER_BANKS = 2;
-#else
-  static constexpr int ACCUM_BUFFER_BANKS = 1;
-#endif
+  Connections::Fifo<Pack1D<Buffer, NCols>, FIFO_DEPTH> CCS_INIT_S1(
+      accumulation_fifo);
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
@@ -71,12 +72,16 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(push_weights_params);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(
-      accumulation_buffer_params);
+      process_accumulation_param);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(write_back_params);
 
   Connections::Combinational<PEInput<Input>> inputsToSystolicArray[NRows];
   Connections::Combinational<PEWeight<Weight>> weightsToSystolicArray[NCols];
   Connections::Combinational<Psum> psumsToSystolicArray[NCols];
   Connections::Combinational<Psum> outputsFromSystolicArray[NCols];
+
+  Connections::Combinational<Pack1D<Buffer, NCols>> accumulation_enq;
+  Connections::Combinational<Pack1D<Buffer, NCols>> accumulation_deq;
 
 #if SUPPORT_MX
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(inputScaleChannel);
@@ -121,6 +126,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       systolicArray.weights[i](weightsToSystolicArray[i]);
     }
 
+    accumulation_fifo.clk(clk);
+    accumulation_fifo.rst(rstn);
+    accumulation_fifo.enq(accumulation_enq);
+    accumulation_fifo.deq(accumulation_deq);
+
     SC_THREAD(push_weights);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -130,6 +140,10 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(process_accumulation);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(write_back);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
   }
@@ -193,9 +207,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           loop_bounds[1][1] * loop_bounds[1][2] * loop_bounds[1][3] *
           loop_bounds[1][4] * loop_bounds[1][5] * buffer_reuse * rep_bound;
 
+      ac_int<32, false> step = 0;
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (int i = 0; i < total_loops; i++) {
+      while (step++ < total_loops) {
         for (int weight_count = 0; weight_count < NRows; weight_count++) {
           Pack1D<PEWeight<Weight>, NCols> weights;
           auto bits = weightsChannel.Pop();
@@ -239,7 +255,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     inputsChannel.Reset();
     psumOutSkewerDout.ResetRead();
     push_weights_params.ResetWrite();
-    accumulation_buffer_params.ResetWrite();
+    process_accumulation_param.ResetWrite();
+    write_back_params.ResetWrite();
     inputSkewerDin.ResetWrite();
 
     startSignal.Reset();
@@ -249,7 +266,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = paramsIn.Pop();
       push_weights_params.Push(params);
-      accumulation_buffer_params.Push(params);
+      process_accumulation_param.Push(params);
+      write_back_params.Push(params);
 
       startSignal.SyncPush();
 
@@ -292,8 +310,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
 #pragma hls_unroll yes
         for (int i = 0; i < NRows; i++) {
-          inputs[i].swapWeights =
-              (swap_weights || step == 0) && step < total_ops - 1;
+          inputs[i].swapWeights = swap_weights || step == 0;
         }
 
         auto bits = inputsChannel.Pop();
@@ -348,36 +365,27 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   }
 
   void process_accumulation() {
-    biasChannel.Reset();
-    accumulation_buffer_params.ResetRead();
+    process_accumulation_param.ResetRead();
     psumOutSkewerDout.ResetRead();
-    matrixUnitOutputChannel.Reset();
-
 #if SUPPORT_MX
     inputScaleChannel.Reset();
     weightScaleChannel.Reset();
 #endif
-
+    biasChannel.Reset();
     accumulation_buffer_read_data[0].Reset();
     accumulation_buffer_read_address[0].Reset();
-    accumulation_buffer_write_request[0].Reset();
-
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     accumulation_buffer_read_data[1].Reset();
     accumulation_buffer_read_address[1].Reset();
-    accumulation_buffer_write_request[1].Reset();
-
-    accumulation_buffer_done[0].Reset();
-    accumulation_buffer_done[1].Reset();
 #endif
-    doneSignal.Reset();
+    accumulation_enq.ResetWrite();
 
     bool accumulation_buffer_bank = 0;
 
     wait();
 
     while (true) {
-      const MatrixParams params = accumulation_buffer_params.Pop();
+      const MatrixParams params = process_accumulation_param.Pop();
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -395,11 +403,33 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       ac_int<32, false> step = 0;
 
-      Pack1D<Buffer, NCols> bias;
+      ac_int<LOOP_WIDTH, false> c2_bound =
+          params.loops[0][params.reductionLoopIndex[0]] - 1;
+      ac_int<LOOP_WIDTH, false> c1_bound =
+          params.loops[1][params.reductionLoopIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> k1_bound =
+          params.loops[1][params.weightLoopIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> fx_bound = params.loops[1][params.fxIndex] - 1;
+      ac_int<LOOP_WIDTH, false> fy0_bound =
+          params.loops[0][params.fyIndex[0]] - 1;
+      ac_int<LOOP_WIDTH, false> fy1_bound =
+          params.loops[1][params.fyIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> y0_bound =
+          params.loops[1][params.inputYLoopIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> x0_bound =
+          params.loops[1][params.inputXLoopIndex[1]] - 1;
 
-#if SUPPORT_MX
+      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<16, false> Y0_X0 = Y0 * X0;
+
+      Pack1D<Buffer, NCols> bias;
       Pack1D<Scale, NCols> weight_scales;
-#endif
+
+#pragma hls_unroll yes
+      for (int i = 0; i < NCols; i++) {
+        weight_scales[i] = Scale::one();
+      }
 
       // loop indices that are used to determine when to read in a new bias
       int bias_reuse_indices[4] = {5, 5, 5, 5};
@@ -410,6 +440,28 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       while (step < total_ops) {
+        Pack1D<Psum, NCols> outputs = psumOutSkewerDout.Pop();
+
+#if SUPPORT_MX
+        Scale input_scale = Scale::one();
+        if (params.is_mx_op) {
+          input_scale.set_bits(inputScaleChannel.Pop());
+        }
+
+        bool swap_weights;
+        if (params.weightReuseIndex[0] != params.weightReuseIndex[1]) {
+          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0) &&
+                         (loop_counters[1][params.weightReuseIndex[0]] == 0);
+        } else {
+          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0);
+        }
+
+        if (params.is_mx_op && (swap_weights || step == 0)) {
+          auto bits = weightScaleChannel.Pop();
+          weight_scales = BitsToType<Pack1D<Scale, NCols>>(TypeToBits(bits));
+        }
+#endif
+
         bool is_non_accumulating_tile =
             loop_counters[0][params.reductionLoopIndex[0]] == 0 &&
             loop_counters[1][params.reductionLoopIndex[1]] == 0 &&
@@ -421,7 +473,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
 #pragma hls_unroll yes
         for (int i = 0; i < NCols; i++) {
-          previous_accumulation.value[i] = Buffer::zero();
+          previous_accumulation[i] = Buffer::zero();
         }
 
         if (is_non_accumulating_tile) {
@@ -438,73 +490,138 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             previous_accumulation = bias;
           }
         } else {
-          ac_int<int_log2(BufferSize), false> readAddress =
-              loop_counters[1][params.weightLoopIndex[1]] *
-                  params.loops[1][params.inputXLoopIndex[1]] *
-                  params.loops[1][params.inputYLoopIndex[1]] +
-              loop_counters[1][params.inputYLoopIndex[1]] *
-                  params.loops[1][params.inputXLoopIndex[1]] +
+          ac_int<16, false> address =
+              loop_counters[1][params.weightLoopIndex[1]] * Y0_X0 +
+              loop_counters[1][params.inputYLoopIndex[1]] * X0 +
               loop_counters[1][params.inputXLoopIndex[1]];
 
           accumulation_buffer_read_address[accumulation_buffer_bank].Push(
-              readAddress);
-
+              address);
           previous_accumulation =
               accumulation_buffer_read_data[accumulation_buffer_bank].Pop();
         }
 
-        Pack1D<Psum, NCols> outputs = psumOutSkewerDout.Pop();
-
 #if SUPPORT_MX
-        Scale input_scale;
-        if (params.is_mx_op) {
-          input_scale.set_bits(inputScaleChannel.Pop());
-        }
-
-        bool swap_weights;
-        if (params.weightReuseIndex[0] != params.weightReuseIndex[1]) {
-          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0) &&
-                         (loop_counters[1][params.weightReuseIndex[0]] == 0);
-        } else {
-          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0);
-        }
-
-        swap_weights = swap_weights || step == 0;
-
-        if (swap_weights && params.is_mx_op) {
-          auto bits = weightScaleChannel.Pop();
-          weight_scales = BitsToType<Pack1D<Scale, NCols>>(TypeToBits(bits));
-        }
-#endif
-
-        Pack1D<Buffer, NCols> scaled_outputs;
-
 #pragma hls_unroll yes
         for (int i = 0; i < NCols; i++) {
-#if SUPPORT_MX
-          Buffer scale = static_cast<Buffer>(input_scale) *
-                         static_cast<Buffer>(weight_scales[i]);
-          scaled_outputs[i] = static_cast<Buffer>(outputs[i]);
-          if (params.is_mx_op) {
-            scaled_outputs[i] = scaled_outputs[i] * scale;
-          }
-#else
-          scaled_outputs[i] = outputs[i];
-#endif
-          previous_accumulation.value[i] += scaled_outputs[i];
+          previous_accumulation[i] =
+              dequantize_mx_op(outputs[i], input_scale, weight_scales[i],
+                               previous_accumulation[i]);
         }
+#else
+#pragma hls_unroll yes
+        for (int i = 0; i < NCols; i++) {
+          previous_accumulation[i] += static_cast<Buffer>(outputs[i]);
+        }
+#endif
+
+        accumulation_enq.Push(previous_accumulation);
+
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+        if (params.write_output_to_accum_buffer) {
+          bool output_tile_completed =
+              (loop_counters[0][params.reductionLoopIndex[0]] == c2_bound) &&
+              (loop_counters[1][params.reductionLoopIndex[1]] == c1_bound) &&
+              (loop_counters[1][params.weightLoopIndex[1]] == k1_bound) &&
+              (loop_counters[1][params.fxIndex] == fx_bound) &&
+              (loop_counters[0][params.fyIndex[0]] == fy0_bound) &&
+              (loop_counters[1][params.fyIndex[1]] == fy1_bound) &&
+              (loop_counters[1][params.inputXLoopIndex[1]] == x0_bound) &&
+              (loop_counters[1][params.inputYLoopIndex[1]] == y0_bound);
+
+          if (output_tile_completed) {
+            accumulation_buffer_bank = !accumulation_buffer_bank;
+          }
+        }
+#endif
+        step++;
+        loop_counters[1][5]++;
+#pragma hls_unroll yes
+        for (int i = 1; i >= 0; i--) {
+#pragma hls_unroll yes
+          for (int j = 5; j >= 0; j--) {
+            if (loop_counters[i][j] == params.loops[i][j]) {
+              loop_counters[i][j] = 0;
+              if (j > 0) {
+                loop_counters[i][j - 1]++;
+              } else {
+                if (i > 0) {
+                  loop_counters[i - 1][5]++;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  void write_back() {
+    write_back_params.ResetRead();
+    accumulation_deq.ResetRead();
+    accumulation_buffer_write_request[0].Reset();
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+    accumulation_buffer_write_request[1].Reset();
+    accumulation_buffer_done[0].Reset();
+    accumulation_buffer_done[1].Reset();
+#endif
+    matrixUnitOutputChannel.Reset();
+    doneSignal.Reset();
+
+    bool accumulation_buffer_bank = 0;
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = write_back_params.Pop();
+      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
+        for (int j = 0; j < 6; j++) {
+          loop_counters[i][j] = 0;
+        }
+      }
+
+      ac_int<32, false> total_ops =
+          params.loops[0][0] * params.loops[0][1] * params.loops[0][2] *
+          params.loops[0][3] * params.loops[0][4] * params.loops[1][0] *
+          params.loops[1][1] * params.loops[1][2] * params.loops[1][3] *
+          params.loops[1][4] * params.loops[1][5];
+
+      ac_int<32, false> step = 0;
+
+      ac_int<LOOP_WIDTH, false> c2_bound =
+          params.loops[0][params.reductionLoopIndex[0]] - 1;
+      ac_int<LOOP_WIDTH, false> c1_bound =
+          params.loops[1][params.reductionLoopIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> k1_bound =
+          params.loops[1][params.weightLoopIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> fx_bound = params.loops[1][params.fxIndex] - 1;
+      ac_int<LOOP_WIDTH, false> fy0_bound =
+          params.loops[0][params.fyIndex[0]] - 1;
+      ac_int<LOOP_WIDTH, false> fy1_bound =
+          params.loops[1][params.fyIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> y0_bound =
+          params.loops[1][params.inputYLoopIndex[1]] - 1;
+      ac_int<LOOP_WIDTH, false> x0_bound =
+          params.loops[1][params.inputXLoopIndex[1]] - 1;
+
+      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<16, false> Y0_X0 = Y0 * X0;
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      while (step < total_ops) {
+        Pack1D<Buffer, NCols> previous_accumulation = accumulation_deq.Pop();
 
         bool accumulation_finished =
-            (loop_counters[0][params.reductionLoopIndex[0]] ==
-             params.loops[0][params.reductionLoopIndex[0]] - 1) &&
-            (loop_counters[1][params.reductionLoopIndex[1]] ==
-             params.loops[1][params.reductionLoopIndex[1]] - 1) &&
-            (loop_counters[1][params.fxIndex] ==
-             params.loops[1][params.fxIndex] - 1) &&
-            (loop_counters[0][params.fyIndex[0]] ==
-             params.loops[0][params.fyIndex[0]] - 1) &&
-            (loop_counters[1][params.fyIndex[1]] ==
-             params.loops[1][params.fyIndex[1]] - 1);
+            (loop_counters[0][params.reductionLoopIndex[0]] == c2_bound) &&
+            (loop_counters[1][params.reductionLoopIndex[1]] == c1_bound) &&
+            (loop_counters[1][params.fxIndex] == fx_bound) &&
+            (loop_counters[0][params.fyIndex[0]] == fy0_bound) &&
+            (loop_counters[1][params.fyIndex[1]] == fy1_bound);
 
         if ((accumulation_finished && !DOUBLE_BUFFERED_ACCUM_BUFFER) ||
             (accumulation_finished && DOUBLE_BUFFERED_ACCUM_BUFFER &&
@@ -512,17 +629,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           // write out to vector unit directly
           matrixUnitOutputChannel.Push(previous_accumulation);
         } else {
-          int write_address = static_cast<ac_int<10, false>>(
-                                  loop_counters[1][params.weightLoopIndex[1]] *
-                                  params.loops[1][params.inputXLoopIndex[1]] *
-                                  params.loops[1][params.inputYLoopIndex[1]]) +
-                              static_cast<ac_int<10, false>>(
-                                  loop_counters[1][params.inputYLoopIndex[1]] *
-                                  params.loops[1][params.inputXLoopIndex[1]]) +
-                              loop_counters[1][params.inputXLoopIndex[1]];
+          ac_int<16, false> address =
+              loop_counters[1][params.weightLoopIndex[1]] * Y0_X0 +
+              loop_counters[1][params.inputYLoopIndex[1]] * X0 +
+              loop_counters[1][params.inputXLoopIndex[1]];
 
           BufferWriteRequest<Pack1D<Buffer, NCols>> req;
-          req.address = write_address;
+          req.address = address;
           req.data = previous_accumulation;
           accumulation_buffer_write_request[accumulation_buffer_bank].Push(req);
         }
@@ -530,22 +643,14 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
         if (params.write_output_to_accum_buffer) {
           bool output_tile_completed =
-              (loop_counters[0][params.reductionLoopIndex[0]] ==
-               params.loops[0][params.reductionLoopIndex[0]] - 1) &&
-              (loop_counters[1][params.reductionLoopIndex[1]] ==
-               params.loops[1][params.reductionLoopIndex[1]] - 1) &&
-              (loop_counters[1][params.weightLoopIndex[1]] ==
-               params.loops[1][params.weightLoopIndex[1]] - 1) &&
-              (loop_counters[1][params.fxIndex] ==
-               params.loops[1][params.fxIndex] - 1) &&
-              (loop_counters[0][params.fyIndex[0]] ==
-               params.loops[0][params.fyIndex[0]] - 1) &&
-              (loop_counters[1][params.fyIndex[1]] ==
-               params.loops[1][params.fyIndex[1]] - 1) &&
-              (loop_counters[1][params.inputXLoopIndex[1]] ==
-               params.loops[1][params.inputXLoopIndex[1]] - 1) &&
-              (loop_counters[1][params.inputYLoopIndex[1]] ==
-               params.loops[1][params.inputYLoopIndex[1]] - 1);
+              (loop_counters[0][params.reductionLoopIndex[0]] == c2_bound) &&
+              (loop_counters[1][params.reductionLoopIndex[1]] == c1_bound) &&
+              (loop_counters[1][params.weightLoopIndex[1]] == k1_bound) &&
+              (loop_counters[1][params.fxIndex] == fx_bound) &&
+              (loop_counters[0][params.fyIndex[0]] == fy0_bound) &&
+              (loop_counters[1][params.fyIndex[1]] == fy1_bound) &&
+              (loop_counters[1][params.inputXLoopIndex[1]] == x0_bound) &&
+              (loop_counters[1][params.inputYLoopIndex[1]] == y0_bound);
 
           if (output_tile_completed) {
             accumulation_buffer_done[accumulation_buffer_bank].SyncPush();

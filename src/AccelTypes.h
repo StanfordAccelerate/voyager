@@ -710,6 +710,85 @@ class Pack1D<UFloat<W, E>, Width> {
   }
 };
 
+template <typename T, size_t Width>
+class Transaction {
+ public:
+  ac_int<3, false> op;
+  ac_int<16, false> immediate;
+  Pack1D<T, Width> payload;
+
+  static const unsigned int width = 3 + 16 + Pack1D<T, Width>::width;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    m &this->op;
+    m &this->immediate;
+    for (unsigned i = 0; i < Width; i++) {
+      m &this->payload[i].float_val.d;
+    }
+  }
+
+  inline friend void sc_trace(sc_trace_file *tf, const Transaction &params,
+                              const std::string &name) {
+    sc_trace(tf, params.op, name + ".op");
+  }
+
+  inline friend std::ostream &operator<<(std::ostream &os,
+                                         const Transaction &route) {
+    os << "op: " << route.op << std::endl;
+    return os;
+  }
+
+  inline friend bool operator==(const Transaction &lhs,
+                                const Transaction &rhs) {
+    return (lhs.op == rhs.op && lhs.immediate == rhs.immediate &&
+            lhs.payload == rhs.payload);
+  }
+};
+
+template <size_t Width, int mantissa, int exp, size_t W>
+class Pack1D<Transaction<StdFloat<mantissa, exp>, W>, Width> {
+ public:
+  Transaction<StdFloat<mantissa, exp>, W> value[Width];
+  static const unsigned int width =
+      Transaction<StdFloat<mantissa, exp>, W>::width * Width;
+
+  Pack1D() {}
+  Pack1D(const int a) {}
+
+  Transaction<StdFloat<mantissa, exp>, W> &operator[](size_t i) {
+    return value[i];
+  }
+  const Transaction<StdFloat<mantissa, exp>, W> &operator[](size_t i) const {
+    return value[i];
+  }
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size> &m) {
+    for (unsigned i = 0; i < Width; i++) {
+      m &value[i].op;
+    }
+    for (unsigned i = 0; i < Width; i++) {
+      m &value[i].immediate;
+    }
+    for (unsigned i = 0; i < Width; i++) {
+      for (unsigned j = 0; j < W; j++) {
+        m &value[i].payload[j].float_val.d;
+      }
+    }
+  }
+
+  inline friend bool operator==(const Pack1D &lhs, const Pack1D &rhs) {
+    for (unsigned i = 0; i < Width; i++) {
+      if (!(lhs.value[i] == rhs.value[i])) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+};
+
 template <typename T>
 struct BufferWriteRequest {
   ac_int<16, false> address;

@@ -1,14 +1,14 @@
 module passthrough #(
-  parameter WIDTH = 64
+    parameter WIDTH = 64
 )(
-  input logic clk,
-  input logic rstn,
-  input logic [WIDTH-1:0] bitsIn_dat,
-  output logic bitsIn_rdy,
-  input logic bitsIn_vld,
-  output logic [WIDTH-1:0] typeOut_dat,
-  input logic typeOut_rdy,
-  output logic typeOut_vld
+    input clk,
+    input rstn,
+    input [WIDTH-1:0] bitsIn_dat,
+    output bitsIn_rdy,
+    input bitsIn_vld,
+    output [WIDTH-1:0] typeOut_dat,
+    input typeOut_rdy,
+    output typeOut_vld
 );
 
 assign typeOut_vld = bitsIn_vld;

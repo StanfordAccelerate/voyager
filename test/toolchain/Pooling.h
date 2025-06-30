@@ -68,8 +68,12 @@ void MapPoolingOperation(const codegen::Operation &param,
   vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
-  const int inst_count = tiling.loops[1][tiling.y_loop_index[1]] *
-                         tiling.loops[1][tiling.x_loop_index[1]];
+  const int reduce_count = tiling.loops[1][tiling.y_loop_index[1]] *
+                           tiling.loops[1][tiling.x_loop_index[1]];
+
+  const int inst_count = tiling.loops[0][tiling.y_loop_index[0]] *
+                         tiling.loops[0][tiling.x_loop_index[0]] *
+                         (output_dim / OC_DIMENSION);
 
   bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
   vector_params->is_maxpool = is_max_pool;
@@ -77,41 +81,34 @@ void MapPoolingOperation(const codegen::Operation &param,
   // perform max/sum accumulation
   VectorInstructions vinst0;
   vinst0.op_type = VectorInstructions::accumulation;
+  vinst0.inst_count = inst_count;
+  vinst0.reduce_count = reduce_count;
   vinst0.reduce_op =
       is_max_pool ? VectorInstructions::rmax : VectorInstructions::radd;
-  vinst0.reduce_count = inst_count;
+  vinst0.rdest = VectorInstructions::to_memory;
   vector_instruction_config->inst[0] = vinst0;
   vector_instruction_config->instCount[0] = 1;
 
   // feed accumulator
   VectorInstructions vinst1;
   vinst1.op_type = VectorInstructions::vector;
+  vinst1.inst_count = inst_count * reduce_count;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vdest = VectorInstructions::to_accumulate;
-  vector_instruction_config->inst[1] = vinst1;
-  vector_instruction_config->instCount[1] = inst_count;
-
-  // read out from the accumulator and write out
-  VectorInstructions vinst2;
-  vinst2.op_type = VectorInstructions::vector;
-  vinst2.vector_op0_src0 = VectorInstructions::from_accumulation;
-  vinst2.vdest = VectorInstructions::to_output;
 
   if (!is_max_pool) {
-    vinst2.vector_op2 = VectorInstructions::vmult;
-    vinst2.vector_op2_src1 = VectorInstructions::from_immediate_1;
+    vinst1.vector_op2 = VectorInstructions::vmult;
+    vinst1.vector_op2_src1 = VectorInstructions::from_immediate_1;
     int kernel_size = tiling.loops[1][tiling.x_loop_index[1]];
     VECTOR_DATATYPE scale = 1.0 / (kernel_size * kernel_size);
-    vinst2.immediate1 = scale.bits_rep();
+    vinst1.immediate1 = scale.bits_rep();
   }
 
-  vector_instruction_config->inst[2] = vinst2;
-  vector_instruction_config->instCount[2] = 1;
+  vector_instruction_config->inst[1] = vinst1;
+  vector_instruction_config->instCount[1] = 1;
 
-  vector_instruction_config->instLen = 3;
-  vector_instruction_config->instLoopCount =
-      tiling.loops[0][tiling.y_loop_index[0]] *
-      tiling.loops[0][tiling.x_loop_index[0]] * (output_dim / OC_DIMENSION);
+  vector_instruction_config->instLen = 2;
+  vector_instruction_config->instLoopCount = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vector_instruction_config);

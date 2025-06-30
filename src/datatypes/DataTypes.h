@@ -6,6 +6,7 @@
 
 #include <ac_std_float.h>
 
+#include <numeric>
 #include <string>
 
 // IWYU pragma: begin_exports
@@ -39,7 +40,6 @@ typedef CFloat float32;
 #else
 typedef StdFloat<23, 8, false, true, AC_RND_CONV> float32;
 #endif
-
 
 typedef Posit<8, 1> posit8;
 
@@ -182,15 +182,10 @@ constexpr int get_type_index() {
  * \return The width of the type.
  */
 template <typename... Ts>
-size_t get_width_from_type_index(size_t index) {
-  size_t width = ~0;
-  ((index == get_type_index<Ts, Ts...>()
-        ? (width = Ts::width)
-        : ~0),
-   ...);
-  assert(width != ~0 && "Invalid type index");
-  assert(width != 0 && "Type has zero width");
-  return width;
+size_t get_type_width(size_t index) {
+  constexpr size_t widths[] = {Ts::width...};
+  assert(index < sizeof...(Ts) && "Invalid type index");
+  return widths[index];
 }
 
 template <typename... Ts>
@@ -202,6 +197,22 @@ int get_index_from_type_name(const std::string& dtype) {
    ...);
   return index;
 }
+
+template <typename T, size_t N, int port_width>
+struct dtype_fetch_config {
+  static constexpr int total_data_bits = T::width * N;
+  static constexpr int fetch_count =
+      (total_data_bits + port_width - 1) / port_width;
+  static constexpr int fetch_width = fetch_count * port_width;
+
+  static constexpr int packed_fetches =
+      total_data_bits / std::gcd(total_data_bits, port_width);
+  static constexpr int packed_fetch_width = packed_fetches * port_width;
+  static constexpr int packing_factor = packed_fetch_width / total_data_bits;
+
+  static constexpr int max_fetch_width =
+      packed_fetch_width > fetch_width ? packed_fetch_width : fetch_width;
+};
 
 // ================================================================
 // Datatype Concatenation

@@ -35,23 +35,22 @@ proc pre_assembly {} {
 
   set InputControllerBlock "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>"
   set InputControllerBlock_stripped [string map {" " ""} $InputControllerBlock]
+  directive set /Accelerator/$InputControllerBlock_stripped -MAP_TO_MODULE {[Block] InputController.v1}
 
   set WeightControllerBlock "WeightController<WeightTypeList, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $OC_PORT_WIDTH, $WEIGHT_BUFFER_WIDTH>"
   set WeightControllerBlock_stripped [string map {" " ""} $WeightControllerBlock]
+  directive set /Accelerator/$WeightControllerBlock_stripped -MAP_TO_MODULE {[Block] WeightController.v1}
 
   set MatrixProcessorBlock "MatrixProcessor<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>"
   set MatrixProcessorBlock_stripped [string map {" " ""} $MatrixProcessorBlock]
+  directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
 
   set VectorUnitBlock "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>"
   set VectorUnitBlock_stripped [string map {" " ""} $VectorUnitBlock]
+  directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
 
   set MatrixParamsDeserializerBlock "MatrixParamsDeserializer<[expr {$SUPPORT_MX ? 5 : 3}]>"
   set MatrixParamsDeserializerBlock_stripped [string map {" " ""} $MatrixParamsDeserializerBlock]
-
-  directive set /Accelerator/$InputControllerBlock_stripped -MAP_TO_MODULE {[Block] InputController.v1}
-  directive set /Accelerator/$WeightControllerBlock_stripped -MAP_TO_MODULE {[Block] WeightController.v1}
-  directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
-  directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
   directive set /Accelerator/$MatrixParamsDeserializerBlock_stripped -MAP_TO_MODULE {[Block] MatrixParamsDeserializer.v1}
 
   if {$SUPPORT_MVM == true} {
@@ -81,16 +80,22 @@ proc pre_architect {} {
   set double_buffer "DoubleBuffer<$WEIGHT_BUFFER_SIZE,$WEIGHT_BUFFER_WIDTH>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
 
-    if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
-      directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
-      directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
-    }
+  if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
+  }
 
   if {$SUPPORT_MX == true} {
     global SCALE_DATATYPE SCALE_DATATYPE_WIDTH
+
+    if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
+      set input_scale_double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$SCALE_DATATYPE_WIDTH>"
+      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+    }
 
     set scale_width [expr $SCALE_DATATYPE_WIDTH*$OC_DIMENSION]
 

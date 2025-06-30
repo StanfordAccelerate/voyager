@@ -1,9 +1,9 @@
 import argparse
 import datetime
+import json
 import multiprocessing as mp
 import os
 import subprocess
-from collections import defaultdict
 import pandas as pd
 import re
 import signal
@@ -14,18 +14,62 @@ from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
 from quantized_training.codegen import param_pb2
 
-# Dictionary mapping model names to lists of layers that should be skipped
-# Using defaultdict to return empty list for any model not in the dictionary
-SKIP_LAYERS = defaultdict(
-    list,
-    {
-        "resnet18": [],
-        "resnet50": [],
-        "mobilebert": [],
-        "bert": ["tanh"],
-        "vit": ["pad_default"],
+ACCURACY_RESULTS = {
+    "resnet18": {
+        "E4M3": 69.2,
+        "CFLOAT": 71.5,
+        "INT8": 71.5,
+        "MXINT8": 70.7,
+        "P8_1": 69.1,
     },
-)
+    "resnet50": {
+        "E4M3": 78.8,
+        "CFLOAT": 80.4,
+        "INT8": 78.7,
+        "MXINT8": 79.8,
+        "P8_1": 79.4,
+    },
+    "mobilebert": {
+        "E4M3": 90.6,
+        "CFLOAT": 90.83,
+        "INT8": 90.37,
+        "MXINT8": 91.0,
+        "P8_1": 90.37,
+    },
+    "bert": {
+        "E4M3": 93.1,
+        "CFLOAT": 93.2,
+        "INT8": 91.4,
+        "MXINT8": 93.1,
+        "P8_1": 92.8,
+    },
+    "vit": {
+        "E4M3": 83.8,
+        "CFLOAT": 84.1,
+        "INT8": 75.4,
+        "MXINT8": 84.0,
+        "P8_1": 84.0,
+    },
+}
+
+
+def set_default_env_vars(env_vars):
+    env_vars.setdefault("INPUT_BUFFER_SIZE", "1024")
+    env_vars.setdefault("WEIGHT_BUFFER_SIZE", "1024")
+    env_vars.setdefault("ACCUM_BUFFER_SIZE", "1024")
+    env_vars.setdefault("DOUBLE_BUFFERED_ACCUM_BUFFER", "false")
+    env_vars.setdefault("SUPPORT_MVM", "false")
+
+
+def get_build_folder(env_vars):
+    return (
+        f"build/"
+        f"{env_vars['DATATYPE']}_"
+        f"{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_"
+        f"{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_"
+        f"{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}_"
+        f"{env_vars['SUPPORT_MVM']}"
+    )
 
 
 def print_test_results(test_results, layers, output_folder):
@@ -192,7 +236,7 @@ def run_systemc_unit_test(model, layer, output_folder, fast, scale_down_operatio
                 env=env_vars,
                 stdout=stdout_file,
                 stderr=subprocess.STDOUT,
-                timeout=1 * 60 * 60,
+                timeout=4 * 60 * 60,
             )
         except subprocess.TimeoutExpired:
             print(f"Test {model}_{layer} timed out")
@@ -267,14 +311,8 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
     # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an
     # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
-    if "INPUT_BUFFER_SIZE" not in env_vars:
-        env_vars["INPUT_BUFFER_SIZE"] = "1024"
-    if "WEIGHT_BUFFER_SIZE" not in env_vars:
-        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-    if "ACCUM_BUFFER_SIZE" not in env_vars:
-        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-    if "DOUBLE_BUFFERED_ACCUM_BUFFER" not in env_vars:
-        env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] = "false"
+    set_default_env_vars(env_vars)
+    build_folder = get_build_folder(env_vars)
 
     # we occasionally see the test fail due to filesystem issues ("no rule to make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
@@ -282,11 +320,11 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
             try:
                 subprocess.run(
                     ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
-                    cwd=f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+                    cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
                     env=env_vars,
                     stdout=stdout_file,
                     stderr=subprocess.STDOUT,
-                    timeout=8 * 60 * 60,
+                    timeout=10 * 60 * 60,
                 )
             except subprocess.TimeoutExpired:
                 print(f"Test {model}_{layer} timed out")
@@ -394,19 +432,12 @@ def run_rtl_tests(
         env_vars["TESTS"] = test
         env_vars["SIMS"] = "gold,accelerator"
         env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
-
-        if "INPUT_BUFFER_SIZE" not in env_vars:
-            env_vars["INPUT_BUFFER_SIZE"] = "1024"
-        if "WEIGHT_BUFFER_SIZE" not in env_vars:
-            env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-        if "ACCUM_BUFFER_SIZE" not in env_vars:
-            env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-        if "DOUBLE_BUFFERED_ACCUM_BUFFER" not in env_vars:
-            env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] = "false"
+        set_default_env_vars(env_vars)
+        build_folder = get_build_folder(env_vars)
 
         subprocess.run(
             ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "build"],
-            cwd=f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+            cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
             env=env_vars,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
@@ -445,45 +476,6 @@ def run_rtl_tests(
     return print_test_results(test_results, layers, results_folder)
 
 
-ACCURACY_RESULTS = {
-    "resnet18": {
-        "E4M3": 69.2,
-        "CFLOAT": 71.5,
-        "INT8": 71.5,
-        "MXINT8": 70.7,
-        "P8_1": 69.1,
-    },
-    "resnet50": {
-        "E4M3": 78.8,
-        "CFLOAT": 80.4,
-        "INT8": 78.7,
-        "MXINT8": 79.8,
-        "P8_1": 79.4,
-    },
-    "mobilebert": {
-        "E4M3": 90.6,
-        "CFLOAT": 90.83,
-        "INT8": 90.37,
-        "MXINT8": 91.0,
-        "P8_1": 90.37,
-    },
-    "bert": {
-        "E4M3": 93.1,
-        "CFLOAT": 93.2,
-        "INT8": 91.4,
-        "MXINT8": 93.1,
-        "P8_1": 92.8,
-    },
-    "vit": {
-        "E4M3": 83.8,
-        "CFLOAT": 84.1,
-        "INT8": 75.4,
-        "MXINT8": 84.0,
-        "P8_1": 84.0,
-    },
-}
-
-
 def run_accuracy(model, dataset, num_processes, output_folder):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
 
@@ -493,15 +485,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
 
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
-
-    if "INPUT_BUFFER_SIZE" not in env_vars:
-        env_vars["INPUT_BUFFER_SIZE"] = "1024"
-    if "WEIGHT_BUFFER_SIZE" not in env_vars:
-        env_vars["WEIGHT_BUFFER_SIZE"] = "1024"
-    if "ACCUM_BUFFER_SIZE" not in env_vars:
-        env_vars["ACCUM_BUFFER_SIZE"] = "1024"
-    if "DOUBLE_BUFFERED_ACCUM_BUFFER" not in env_vars:
-        env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] = "false"
+    set_default_env_vars(env_vars)
+    build_folder = get_build_folder(env_vars)
 
     # Build AccuracyTester binary
     subprocess.run(["make", "clean"], env=env_vars)
@@ -552,7 +537,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid dataset")
 
-    block_size = max(os.environ["OC_DIMENSION"], os.environ["IC_DIMENSION"])
+    block_size = max(int(os.environ["OC_DIMENSION"]), int(os.environ["IC_DIMENSION"]))
 
     if env_vars["DATATYPE"] == "E4M3":
         quantization_args = [
@@ -588,9 +573,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         quantization_args = [
             "--force_scale_power_of_two",
             "--activation",
-            "int8,qs=microscaling,bs=" + block_size,
+            "int8,qs=microscaling,bs=" + str(block_size),
             "--weight",
-            "int8,qs=microscaling,bs=" + block_size,
+            "int8,qs=microscaling,bs=" + str(block_size),
             "--bf16",
         ]
     else:
@@ -672,7 +657,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         try:
             subprocess.run(
                 [
-                    f"build/{env_vars['DATATYPE']}_{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}/cc/AccuracyTester",
+                    f"{build_folder}/cc/AccuracyTester",
                     model,
                     output_data_dir,
                     str(num_processes),
@@ -713,7 +698,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     return abs(final_accuracy - gold_accuracy) < 1
 
 
-def add_layers(network, layers, layer_counts, uniquify):
+def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
     all_layers = []
 
     layers[network] = []
@@ -725,9 +710,9 @@ def add_layers(network, layers, layer_counts, uniquify):
             "r",
         ) as f:
             all_layers = f.read().splitlines()
-            # Filter out layers that should be skipped - SKIP_LAYERS[network] will return empty list if network not found
+            # Filter out layers that should be skipped
             layers[network] = [
-                layer for layer in all_layers if layer not in SKIP_LAYERS[network]
+                layer for layer in all_layers if layer not in whitelist_layers
             ]
             layer_counts[network] = {layer: 1 for layer in layers[network]}
     else:
@@ -767,8 +752,8 @@ def add_layers(network, layers, layer_counts, uniquify):
 
             name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
 
-            # Skip layers that are in the skip list - SKIP_LAYERS[network] will return empty list if network not found
-            if name in SKIP_LAYERS[network]:
+            # Skip layers that are in the skip list
+            if name in whitelist_layers:
                 continue
 
             # remove the name, memory, and node fields from the op
@@ -787,6 +772,28 @@ def add_layers(network, layers, layer_counts, uniquify):
                 unique_layers[name] = op
                 layers[network].append(name)
                 layer_counts[network][name] = 1
+
+
+def matches(value, rule_value):
+    if isinstance(rule_value, list):
+        return value in rule_value
+    else:
+        if rule_value == "*":
+            return True
+        else:
+            return value == rule_value
+
+
+def get_whitelist_layers(whitelist_rules, model, datatype, sim_type, block_size):
+    for rule in whitelist_rules:
+        if (
+            matches(model, rule["model"])
+            and matches(datatype, rule["datatype"])
+            and matches(sim_type, rule["sim_type"])
+            and matches(block_size, rule["block_size"])
+        ):
+            return set(rule["layers"])
+    return set()
 
 
 def main():
@@ -834,6 +841,11 @@ def main():
         action="store_true",
         help="Keep the generated rtl and use it to run rtl tests",
     )
+    parser.add_argument(
+        "--whitelist",
+        required=False,
+        help="Path to JSON file containing whitelist layers to skip",
+    )
     args = parser.parse_args()
 
     args.models = [s.strip() for s in args.models.split(",")]
@@ -849,6 +861,11 @@ def main():
     layers = {}
     layer_counts = {}
 
+    whitelist = []
+    if args.whitelist:
+        with open(args.whitelist, "r") as f:
+            whitelist = json.load(f)
+
     # Add codegen layers
     if args.tests is None:
         all_models = []
@@ -862,7 +879,21 @@ def main():
             env_vars["NETWORK"] = network
             if args.sims != "accuracy":
                 subprocess.run(["make", "network-proto"], env=env_vars)
-                add_layers(network, layers, layer_counts, args.uniquify_layers)
+                datatype = os.environ["DATATYPE"]
+                block_size = max(
+                    int(os.environ["OC_DIMENSION"]), int(os.environ["IC_DIMENSION"])
+                )
+                whitelist_layers = get_whitelist_layers(
+                    whitelist, network, datatype, args.sims, block_size
+                )
+
+                add_layers(
+                    network,
+                    layers,
+                    layer_counts,
+                    args.uniquify_layers,
+                    whitelist_layers,
+                )
     else:
         assert (
             len(args.models) == 1

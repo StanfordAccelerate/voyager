@@ -14,30 +14,51 @@ struct InputController;
 template <typename... InputTypes, int NRows, int PortWidth, int BufferWidth>
 struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     : public sc_module {
+  static constexpr int LOOP_WIDTH = 10;
+  static constexpr int DATA_WIDTH = BufferWidth / NRows;
+  static constexpr int MAX_FETCH_WIDTH = std::max(
+      {dtype_fetch_config<InputTypes, NRows, PortWidth>::max_fetch_width...});
+
+  // num x values packed in a word for replication
+  static constexpr int packing_factor = (NRows == 4)    ? 1
+                                        : (NRows == 8)  ? 2
+                                        : (NRows == 16) ? 4
+                                        : (NRows == 32) ? 8
+                                                        : 0;
+
+  // num words needed to store the boundary pixels. essentially
+  // ceil(3/packing_factor)
+  static constexpr int boundary_words = (NRows == 4)    ? 3
+                                        : (NRows == 8)  ? 2
+                                        : (NRows == 16) ? 1
+                                        : (NRows == 32) ? 1
+                                                        : 0;
+
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(addressRequest);
-  Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(dataResponse);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(input_req);
+  Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(input_resp);
+  sc_fifo<bool> fetcher_done;
+  sc_fifo<bool> fetcher_done_2;
 
   Connections::Out<BufferWriteRequest<ac_int<BufferWidth, false>>>
-      writeRequest[2];
-  Connections::Out<BufferReadRequest> readAddress[2];
+      input_write_request[2];
+  Connections::Out<BufferReadRequest> input_read_address[2];
 
-  Connections::In<ac_int<BufferWidth, false>> CCS_INIT_S1(windowBufferIn);
-  Connections::Out<ac_int<BufferWidth, false>> CCS_INIT_S1(windowBufferOut);
+  Connections::In<ac_int<BufferWidth, false>> CCS_INIT_S1(window_buffer_in);
+  Connections::Out<ac_int<BufferWidth, false>> CCS_INIT_S1(window_buffer_out);
 
-  Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcherParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(writerParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(readerParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(windowBufferParams);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(transposerParams);
+  Connections::In<MatrixParams> CCS_INIT_S1(params_in);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcher_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(writer_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(reader_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(winder_buffer_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(transposer_params);
+  Connections::Combinational<MatrixParams> CCS_INIT_S1(input_unpacker_params);
 
-  Connections::Combinational<ac_int<BufferWidth, false>> transposeOut;
-
-  static constexpr int LOOP_WIDTH = 10;
-  static constexpr int DATA_WIDTH = BufferWidth / NRows;
+  Connections::Combinational<ac_int<MAX_FETCH_WIDTH, false>> transpose_out;
+  Connections::Combinational<ac_int<BufferWidth, false>> unpacked_data;
 
   SC_CTOR(InputController) {
     SC_THREAD(read_params);
@@ -56,58 +77,27 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(windowBuffer);
+    SC_THREAD(window_buffer);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
     SC_THREAD(transposer);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+
+    SC_THREAD(input_unpacker);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
   }
 
   void fetcher() {
-    addressRequest.Reset();
-    fetcherParams.ResetRead();
+    fetcher_params.ResetRead();
+    input_req.Reset();
 
     wait();
 
     while (true) {
-      const MatrixParams params = fetcherParams.Pop();
-
-      ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_resnet_replication) {
-        FX = 7;
-      }
-      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
-      ac_int<5, false> STRIDE = params.stride;
-
-      ac_int<LOOP_WIDTH, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
-      ac_int<16, false> X0 =
-          STRIDE * params.loops[1][params.inputXLoopIndex[1]];
-      ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
-      ac_int<16, false> Y0 =
-          STRIDE * params.loops[1][params.inputYLoopIndex[1]];
-      ac_int<LOOP_WIDTH, false> C2 =
-          params.loops[0][params.reductionLoopIndex[0]];
-      ac_int<LOOP_WIDTH, false> C1 =
-          params.loops[1][params.reductionLoopIndex[1]];
-
-      int packingFactor;  // num x values packed in a word
-      int boundaryWords;  // num words needed to store the boundary pixels.
-                          // essentially ceil(3/packingFactor)
-      if (NRows == 4) {
-        packingFactor = 1;
-        boundaryWords = 3;
-      } else if (NRows == 8) {
-        packingFactor = 2;
-        boundaryWords = 2;
-      } else if (NRows == 16) {
-        packingFactor = 4;
-        boundaryWords = 1;
-      } else if (NRows == 32) {
-        packingFactor = 8;
-        boundaryWords = 1;
-      }
+      const MatrixParams params = fetcher_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
@@ -125,134 +115,83 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex[1]] = 1;
 
+      ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> C2 =
+          params.loops[0][params.reductionLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> C1 =
+          params.loops[1][params.reductionLoopIndex[1]];
+      ac_int<16, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<16, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
+      ac_int<5, false> STRIDE = params.stride;
+
+      if (params.is_resnet_replication) {
+        FX = 7;
+      }
+
+      ac_int<4, false> x_padding = params.padding;
+      ac_int<4, false> y_padding = params.padding;
+
+      ac_int<16, false> IX0 = X0 * STRIDE;
+      ac_int<16, false> IY0 = Y0 * STRIDE;
+
+      ac_int<16, false> x_bound = FX == 1 ? X0 : IX0;
+      ac_int<16, false> y_bound = FY0 == 1 ? Y0 : IY0;
+
+      if (params.is_resnet_replication) {
+        x_bound /= packing_factor;
+      }
+
+      loop_bounds[1][params.inputXLoopIndex[1]] = x_bound;
+      if (params.is_resnet_replication) {
+        loop_bounds[1][params.inputXLoopIndex[1]] += 2 * boundary_words;
+      } else if (params.is_generic_replication) {
+        loop_bounds[1][params.inputXLoopIndex[1]] >>= params.fx_unrolling_lg2;
+      } else {
+        loop_bounds[1][params.inputXLoopIndex[1]] += 2 * params.padding;
+      }
+
+      loop_bounds[1][params.inputYLoopIndex[1]] = y_bound + 2 * params.padding;
+
+      // reduce the number of iterations by packing factor
+      C1 = C1 >> params.input_packing_shift;
+      loop_bounds[1][params.reductionLoopIndex[1]] = C1;
+
+      ac_int<16, false> Y = Y1 * IY0;
+      ac_int<16, false> X = X1 * IX0;
+      ac_int<16, false> c_stride = NRows << params.input_packing_shift;
+      ac_int<16, false> C = C2 * C1 * c_stride;
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-           loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-             loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
-               loop_counters[0][2]++) {
-            for (loop_counters[0][3] = 0;
-                 loop_counters[0][3] < loop_bounds[0][3];
-                 loop_counters[0][3]++) {
-              for (loop_counters[0][4] = 0;
-                   loop_counters[0][4] < loop_bounds[0][4];
-                   loop_counters[0][4]++) {
-                // fetching border pixels is a little tricky
-                // for the outer tiles, we don't fetch borders (they are known
-                // to be 0)
-
-                if (params.is_resnet_replication) {
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      params.loops[1][params.inputXLoopIndex[1]] * STRIDE /
-                      packingFactor;
-                  loop_bounds[1][params.inputYLoopIndex[1]] =
-                      params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                } else if (params.is_generic_replication) {
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      static_cast<ac_int<16, false>>(
-                          (params.loops[1][params.inputXLoopIndex[1]]) *
-                          STRIDE) >>
-                      params.fx_unrolling_lg2;
-                  if (FY0 == 1) {
-                    loop_bounds[1][params.inputYLoopIndex[1]] =
-                        params.loops[1][params.inputYLoopIndex[1]];
-                  } else {
-                    loop_bounds[1][params.inputYLoopIndex[1]] =
-                        params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                  }
-                } else {
-                  if (FX == 1) {
-                    loop_bounds[1][params.inputXLoopIndex[1]] =
-                        params.loops[1][params.inputXLoopIndex[1]];
-                  } else {
-                    loop_bounds[1][params.inputXLoopIndex[1]] =
-                        params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
-                  }
-                  if (FY0 == 1) {
-                    loop_bounds[1][params.inputYLoopIndex[1]] =
-                        params.loops[1][params.inputYLoopIndex[1]];
-                  } else {
-                    loop_bounds[1][params.inputYLoopIndex[1]] =
-                        params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                  }
-                }
-
-                ac_int<4, false> x_min_offset = 0;
-                ac_int<4, false> x_max_offset = 0;
-                ac_int<4, false> y_min_offset = 0;
-                ac_int<4, false> y_max_offset = 0;
-
-                if (params.is_resnet_replication) {
-                  if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                    x_min_offset = (FX - 1) / 2;
-                    loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
-                  }
-                  if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                      loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                    x_max_offset = (FX - 1) / 2;
-                    loop_bounds[1][params.inputXLoopIndex[1]] += boundaryWords;
-                  }
-                } else {
-                  if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                    x_min_offset = params.padding;
-                    loop_bounds[1][params.inputXLoopIndex[1]] += params.padding;
-                  }
-
-                  if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                      loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                    x_max_offset = params.padding;
-                    loop_bounds[1][params.inputXLoopIndex[1]] += params.padding;
-                  }
-                }
-
-                if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
-                  y_min_offset = params.padding;
-                  loop_bounds[1][params.inputYLoopIndex[1]] += params.padding;
-                }
-
-                if (loop_counters[0][params.inputYLoopIndex[0]] !=
-                    loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
-                  y_max_offset = params.padding;
-                  loop_bounds[1][params.inputYLoopIndex[1]] += params.padding;
-                }
-
-                for (loop_counters[1][0] = 0;
-                     loop_counters[1][0] < loop_bounds[1][0];
-                     loop_counters[1][0]++) {
-                  for (loop_counters[1][1] = 0;
-                       loop_counters[1][1] < loop_bounds[1][1];
-                       loop_counters[1][1]++) {
-                    for (loop_counters[1][2] = 0;
-                         loop_counters[1][2] < loop_bounds[1][2];
-                         loop_counters[1][2]++) {
-                      for (loop_counters[1][3] = 0;
-                           loop_counters[1][3] < loop_bounds[1][3];
-                           loop_counters[1][3]++) {
-                        for (loop_counters[1][4] = 0;
-                             loop_counters[1][4] < loop_bounds[1][4];
-                             loop_counters[1][4]++) {
-                          for (loop_counters[1][5] = 0;
-                               loop_counters[1][5] < loop_bounds[1][5];
+      for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
+            for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
+              for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
+                for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
+                          for (loop_counters[1][5] = 0;;
                                loop_counters[1][5]++) {
-                            ac_int<LOOP_WIDTH, false> x1 =
-                                loop_counters[0][params.inputXLoopIndex[0]];
-                            ac_int<LOOP_WIDTH, false> x0 =
-                                loop_counters[1][params.inputXLoopIndex[1]];
                             ac_int<LOOP_WIDTH, false> y1 =
                                 loop_counters[0][params.inputYLoopIndex[0]];
-                            ac_int<LOOP_WIDTH, false> y0 =
-                                loop_counters[1][params.inputYLoopIndex[1]];
+                            ac_int<LOOP_WIDTH, false> x1 =
+                                loop_counters[0][params.inputXLoopIndex[0]];
                             ac_int<LOOP_WIDTH, false> c2 =
                                 loop_counters[0][params.reductionLoopIndex[0]];
+                            ac_int<LOOP_WIDTH, false> y0 =
+                                loop_counters[1][params.inputYLoopIndex[1]];
+                            ac_int<LOOP_WIDTH, false> x0 =
+                                loop_counters[1][params.inputXLoopIndex[1]];
                             ac_int<LOOP_WIDTH, false> c1 =
                                 loop_counters[1][params.reductionLoopIndex[1]];
                             ac_int<LOOP_WIDTH, false> fy1 =
                                 loop_counters[0][params.fyIndex[0]];
-
-                            ac_int<16, false> c = c2 * C1 * NRows + c1 * NRows;
-                            ac_int<16, false> C = C2 * C1 * NRows;
 
                             // adjust address for stride
                             if (FX == 1) {
@@ -263,51 +202,53 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                             }
 
                             if (params.is_resnet_replication) {
-                              if (x0 != 0 && x_min_offset == 3) {
-                                x0 = x_min_offset +
-                                     (x0 - boundaryWords) * packingFactor;
+                              if (x0 != 0 && x1 != 0) {
+                                x0 = (x0 - boundary_words) * packing_factor +
+                                     x_padding;
                               } else {
-                                x0 = x0 * packingFactor;
+                                x0 = x0 * packing_factor;
                               }
                             } else if (params.is_generic_replication) {
                               x0 = x0 << params.fx_unrolling_lg2;
                             }
 
-                            ac_int<16, false> x = (x0 - x_min_offset) + x1 * X0;
-                            ac_int<16, false> X = X0 * X1;
+                            ac_int<16, true> y = y1 * IY0 + y0 - y_padding;
+                            ac_int<16, true> x = x1 * IX0 + x0 - x_padding;
+                            ac_int<16, false> c = (c2 * C1 + c1) * c_stride;
 
-                            ac_int<16, false> y = (y0 - y_min_offset) + y1 * Y0;
-                            ac_int<16, false> Y = Y0 * Y1;
+                            if ((x >= 0) && (y >= 0) && (x < X) && (y < Y)) {
+                              ac_int<32, false> address = y * X * C + x * C + c;
 
-                            ac_int<32, false> address = y * X * C + x * C + c;
+                              if (params.is_resnet_replication) {
+                                address = y * (X / packing_factor) * NRows +
+                                          (x / packing_factor) * NRows + c;
+                              } else if (params.is_generic_replication) {
+                                address =
+                                    y * (X >> params.fx_unrolling_lg2) * NRows +
+                                    (x >> params.fx_unrolling_lg2) * NRows + c;
+                              }
 
-                            if (params.is_resnet_replication) {
-                              address = y * (X / packingFactor) * NRows +
-                                        (x / packingFactor) * NRows + c;
-                            } else if (params.is_generic_replication) {
-                              address =
-                                  y * (X >> params.fx_unrolling_lg2) * NRows +
-                                  (x >> params.fx_unrolling_lg2) * NRows + c;
+                              if (params.has_attn_output_permute) {
+                                ac_int<8, false> head_size =
+                                    params.head_size_power_of_two;
+                                ac_int<16, false> mask = (1 << head_size) - 1;
+                                address =
+                                    ((c >> head_size) * (X << head_size)) +
+                                    (x << head_size) + (c & mask);
+                              }
+
+                              if (params.has_input_transpose) {
+                                address =
+                                    (c + (x % NRows)) * X + (x / NRows) * NRows;
+                              } else {
+                                fetcher_done.write(false);
+                                fetcher_done_2.write(false);
+                              }
+
+                              send_packed_request<InputTypes...>(
+                                  params.input_dtype, params.INPUT_OFFSET,
+                                  address, params.input_fetch_width, input_req);
                             }
-
-                            if (params.has_attn_output_permute) {
-                              ac_int<8, false> head_size =
-                                  params.head_size_power_of_two;
-                              ac_int<16, false> mask = (1 << head_size) - 1;
-                              address = (((c >> head_size) * X) << head_size) +
-                                        (x << head_size) + (c & mask);
-                            }
-
-                            if (params.has_input_transpose) {
-                              address =
-                                  (c + (x % NRows)) * X + (x / NRows) * NRows;
-                            }
-
-                            (fetch_matrix_input<InputTypes, NRows,
-                                                InputTypes...>(
-                                 params.input_dtype, params.INPUT_OFFSET,
-                                 address, addressRequest),
-                             ...);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
@@ -353,52 +294,24 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
           break;
         }
       }
+
+      fetcher_done.write(true);
+      fetcher_done_2.write(true);
     }
   }
 
   void writer() {
-    writerParams.ResetRead();
-    transposeOut.ResetRead();
-
-    writeRequest[0].Reset();
-    writeRequest[1].Reset();
+    writer_params.ResetRead();
+    unpacked_data.ResetRead();
+    input_write_request[0].Reset();
+    input_write_request[1].Reset();
 
     bool bankSel = 0;
 
     wait();
 
     while (true) {
-      const MatrixParams params = writerParams.Pop();
-
-      ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_resnet_replication) {
-        FX = 7;
-      }
-
-      // replication packing factor
-      int packingFactor;
-      int boundaryWords;
-      if (NRows == 4) {
-        packingFactor = 1;
-        boundaryWords = 3;
-      } else if (NRows == 8) {
-        packingFactor = 2;
-        boundaryWords = 2;
-      } else if (NRows == 16) {
-        packingFactor = 4;
-        boundaryWords = 1;
-      } else if (NRows == 32) {
-        packingFactor = 8;
-        boundaryWords = 1;
-      }
-
-      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
-      ac_int<5, false> STRIDE = params.stride;
-
-      bool isDownsample = FX == 1 && FY0 == 1;
-
-      ac_int<4, false> fx_bound = params.padding;
-      ac_int<4, false> fy_bound = params.padding;
+      const MatrixParams params = writer_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
@@ -416,173 +329,139 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.fxIndex] = 1;
       loop_bounds[1][params.fyIndex[1]] = 1;
 
-      ac_int<LOOP_WIDTH, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
-      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
-
-      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
       ac_int<LOOP_WIDTH, false> Y1 = params.loops[0][params.inputYLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> X1 = params.loops[0][params.inputXLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> C1 =
+          params.loops[1][params.reductionLoopIndex[1]];
+      ac_int<16, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<16, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
+      ac_int<5, false> STRIDE = params.stride;
+
+      if (params.is_resnet_replication) {
+        FX = 7;
+      }
+
+      ac_int<4, false> x_padding = params.padding;
+      ac_int<4, false> y_padding = params.padding;
+
+      ac_int<16, false> IX0 = X0;
+      ac_int<16, false> IY0 = Y0;
+
+      if (FX != 1) {
+        IX0 = X0 * STRIDE;
+      }
+
+      if (FY0 != 1) {
+        IY0 = Y0 * STRIDE;
+      }
+
+      ac_int<16, false> x_bound = IX0;
+
+      if (params.is_resnet_replication) {
+        x_bound /= packing_factor;
+      }
+
+      ac_int<4, false> x_boundary = params.is_resnet_replication
+                                        ? ac_int<4, false>(2 * boundary_words)
+                                        : ac_int<4, false>(params.padding * 2);
+      if (params.is_generic_replication) {
+        loop_bounds[1][params.inputXLoopIndex[1]] =
+            x_bound >> params.fx_unrolling_lg2;
+      } else {
+        loop_bounds[1][params.inputXLoopIndex[1]] = x_bound + x_boundary;
+      }
+      loop_bounds[1][params.inputYLoopIndex[1]] = IY0 + params.padding * 2;
+
+      // reduce the number of iterations by packing factor
+      C1 = C1 >> params.input_packing_shift;
+      loop_bounds[1][params.reductionLoopIndex[1]] = C1;
+      ac_int<4, false> pf_bound = (1 << params.input_packing_shift) - 1;
+
+      ac_int<16, false> X = X1 * IX0;
+      ac_int<16, false> Y = Y1 * IY0;
+      ac_int<16, false> y_stride =
+          loop_bounds[1][params.inputXLoopIndex[1]] * C1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-           loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-             loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
-               loop_counters[0][2]++) {
-            for (loop_counters[0][3] = 0;
-                 loop_counters[0][3] < loop_bounds[0][3];
-                 loop_counters[0][3]++) {
-              for (loop_counters[0][4] = 0;
-                   loop_counters[0][4] < loop_bounds[0][4];
-                   loop_counters[0][4]++) {
-                if (isDownsample) {
-                  // don't include STRIDE for downsample
-                  STRIDE = 1;
-                }
-
-                ac_int<4, false> x_min_offset = fx_bound;
-                ac_int<4, false> y_min_offset = fy_bound;
-
-                // reset loop bounds
-                if (FX == 1) {
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      params.loops[1][params.inputXLoopIndex[1]];
-                } else {
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
-                }
-
-                if (FY0 == 1) {
-                  loop_bounds[1][params.inputYLoopIndex[1]] =
-                      params.loops[1][params.inputYLoopIndex[1]];
-                } else {
-                  loop_bounds[1][params.inputYLoopIndex[1]] =
-                      params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                }
-
-                if (params.is_resnet_replication) {
-                  // make sure to grab border pixels
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      STRIDE * X0 / packingFactor + 2 * boundaryWords;
-                  loop_bounds[1][params.inputYLoopIndex[1]] =
-                      params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                  loop_bounds[1][params.inputYLoopIndex[1]] += FY0 - 1;
-                } else if (params.is_generic_replication) {
-                  loop_bounds[1][params.inputXLoopIndex[1]] =
-                      loop_bounds[1][params.inputXLoopIndex[1]] >>
-                      params.fx_unrolling_lg2;
-                } else {
-                  loop_bounds[1][params.inputXLoopIndex[1]] +=
-                      params.padding * 2;
-                  loop_bounds[1][params.inputYLoopIndex[1]] +=
-                      params.padding * 2;
-                }
-
-                for (loop_counters[1][0] = 0;
-                     loop_counters[1][0] < loop_bounds[1][0];
-                     loop_counters[1][0]++) {
-                  for (loop_counters[1][1] = 0;
-                       loop_counters[1][1] < loop_bounds[1][1];
-                       loop_counters[1][1]++) {
-                    for (loop_counters[1][2] = 0;
-                         loop_counters[1][2] < loop_bounds[1][2];
-                         loop_counters[1][2]++) {
-                      for (loop_counters[1][3] = 0;
-                           loop_counters[1][3] < loop_bounds[1][3];
-                           loop_counters[1][3]++) {
-                        for (loop_counters[1][4] = 0;
-                             loop_counters[1][4] < loop_bounds[1][4];
-                             loop_counters[1][4]++) {
-                          for (loop_counters[1][5] = 0;
-                               loop_counters[1][5] < loop_bounds[1][5];
+      for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
+            for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
+              for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
+                for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
+                          for (loop_counters[1][5] = 0;;
                                loop_counters[1][5]++) {
-                            ac_int<LOOP_WIDTH, true> x0 =
-                                loop_counters[1][params.inputXLoopIndex[1]];
-                            ac_int<LOOP_WIDTH, true> x1 =
-                                loop_counters[0][params.inputXLoopIndex[0]];
+                            for (ac_int<4, false> pf = 0;; pf++) {
+                              ac_int<LOOP_WIDTH, true> y1 =
+                                  loop_counters[0][params.inputYLoopIndex[0]];
+                              ac_int<LOOP_WIDTH, true> x1 =
+                                  loop_counters[0][params.inputXLoopIndex[0]];
+                              ac_int<LOOP_WIDTH, true> y0 =
+                                  loop_counters[1][params.inputYLoopIndex[1]];
+                              ac_int<LOOP_WIDTH, true> x0 =
+                                  loop_counters[1][params.inputXLoopIndex[1]];
+                              ac_int<LOOP_WIDTH, true> c1 =
+                                  loop_counters[1]
+                                               [params.reductionLoopIndex[1]];
 
-                            ac_int<LOOP_WIDTH, true> y0 =
-                                loop_counters[1][params.inputYLoopIndex[1]];
-                            ac_int<LOOP_WIDTH, true> y1 =
-                                loop_counters[0][params.inputYLoopIndex[0]];
-
-                            ac_int<LOOP_WIDTH, true> c1 =
-                                loop_counters[1][params.reductionLoopIndex[1]];
-                            ac_int<LOOP_WIDTH, true> C1 =
-                                loop_bounds[1][params.reductionLoopIndex[1]];
-
-                            if (params.is_resnet_replication) {
-                              if (x0 != 0) {
-                                x0 = x_min_offset +
-                                     (x0 - boundaryWords) * packingFactor;
+                              if (params.is_resnet_replication && x0 != 0) {
+                                x0 = (x0 - boundary_words) * packing_factor +
+                                     x_padding;
                               }
-                            }
 
-                            ac_int<16, true> full_x, full_y;
-                            if (isDownsample) {
-                              full_x = (x0 - x_min_offset) + x1 * X0;
-                              full_y = (y0 - y_min_offset) + y1 * Y0;
-                            } else {
-                              full_x = (x0 - x_min_offset) + x1 * STRIDE * X0;
-                              full_y = (y0 - y_min_offset) + y1 * STRIDE * Y0;
-                            }
+                              ac_int<16, true> x = x1 * IX0 + x0 - x_padding;
+                              ac_int<16, true> y = y1 * IY0 + y0 - y_padding;
 
-                            ac_int<BufferWidth, false> data;
+                              ac_int<BufferWidth, false> data;
 
-                            if ((full_x < 0) || (full_y < 0) ||
-                                (full_x >= STRIDE * X0 * X1) ||
-                                (full_y >= STRIDE * Y0 * Y1)) {
-                              bool success =
-                                  (set_zero<InputTypes, NRows, BufferWidth,
-                                            InputTypes...>(params.input_dtype,
-                                                           data) ||
-                                   ...);
-
-#ifndef __SYNTHESIS__
-                              if (!success) {
-                                std::cerr << "Error: matrix input dtype '"
-                                          << params.input_dtype
-                                          << "' is not valid" << std::endl;
+                              if ((x < 0) || (y < 0) || (x >= X) || (y >= Y)) {
+                                (set_zero<InputTypes, NRows, BufferWidth,
+                                          InputTypes...>(params.input_dtype,
+                                                         data),
+                                 ...);
+                              } else {
+                                data = unpacked_data.Pop();
                               }
-#endif
-                            } else {
-                              data = transposeOut.Pop();
-                            }
 
-                            ac_int<32, false> address =
-                                y0 * (X0 * STRIDE + (params.padding * 2)) * C1 +
-                                x0 * C1 + c1;
-
-                            if (params.is_resnet_replication) {
+                              ac_int<LOOP_WIDTH> orig_x0 =
+                                  loop_counters[1][params.inputXLoopIndex[1]];
+                              ac_int<16, false> address =
+                                  y0 * y_stride + orig_x0 * C1 + c1;
                               address =
-                                  y0 *
-                                      (X0 * STRIDE / packingFactor +
-                                       2 * boundaryWords) *
-                                      C1 +
-                                  loop_counters[1][params.inputXLoopIndex[1]] *
-                                      C1 +
-                                  c1;
-                            } else if (params.is_generic_replication) {
-                              address = y0 *
-                                            ((X0 * STRIDE) >>
-                                             params.fx_unrolling_lg2) *
-                                            C1 +
-                                        x0 * C1 + c1;
+                                  (address << params.input_packing_shift) + pf;
+
+                              bool is_last = loop_counters[1][5] ==
+                                                 loop_bounds[1][5] - 1 &&
+                                             loop_counters[1][4] ==
+                                                 loop_bounds[1][4] - 1 &&
+                                             loop_counters[1][3] ==
+                                                 loop_bounds[1][3] - 1 &&
+                                             loop_counters[1][2] ==
+                                                 loop_bounds[1][2] - 1 &&
+                                             loop_counters[1][1] ==
+                                                 loop_bounds[1][1] - 1 &&
+                                             loop_counters[1][0] ==
+                                                 loop_bounds[1][0] - 1 &&
+                                             pf == pf_bound;
+
+                              BufferWriteRequest<ac_int<BufferWidth, false>>
+                                  req;
+                              req.address = address;
+                              req.data = data;
+                              req.last = is_last;
+                              input_write_request[bankSel].Push(req);
+
+                              if (pf == pf_bound) {
+                                break;
+                              }
                             }
-
-                            BufferWriteRequest<ac_int<BufferWidth, false>> req;
-                            req.address = address;
-                            req.data = data;
-                            req.last =
-                                loop_counters[1][5] == loop_bounds[1][5] - 1 &&
-                                loop_counters[1][4] == loop_bounds[1][4] - 1 &&
-                                loop_counters[1][3] == loop_bounds[1][3] - 1 &&
-                                loop_counters[1][2] == loop_bounds[1][2] - 1 &&
-                                loop_counters[1][1] == loop_bounds[1][1] - 1 &&
-                                loop_counters[1][0] == loop_bounds[1][0] - 1;
-                            writeRequest[bankSel].Push(req);
-
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
                             }
@@ -632,44 +511,20 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   }
 
   void reader() {
-    readerParams.ResetRead();
+    reader_params.ResetRead();
 
-    readAddress[0].Reset();
-    readAddress[1].Reset();
+    input_read_address[0].Reset();
+    input_read_address[1].Reset();
 
     bool bankSel = 0;
 
     wait();
 
     while (true) {
-      const MatrixParams params = readerParams.Pop();
-
-      // replication packing factor
-      int packingFactor;
-      int boundaryWords;
-      if (NRows == 4) {
-        packingFactor = 1;
-        boundaryWords = 3;
-      } else if (NRows == 8) {
-        packingFactor = 2;
-        boundaryWords = 2;
-      } else if (NRows == 16) {
-        packingFactor = 4;
-        boundaryWords = 1;
-      } else if (NRows == 32) {
-        packingFactor = 8;
-        boundaryWords = 1;
-      }
-
-      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
-
-      ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
-      bool isDownsample = FX == 1 && FY0 == 1;
+      const MatrixParams params = reader_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
-      ac_int<5, false> STRIDE = params.stride;
 
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -681,99 +536,85 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
       if (params.is_resnet_replication && NRows >= 16) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
-            (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
-             packingFactor) +
+            (loop_bounds[1][params.inputXLoopIndex[1]] * params.stride /
+             packing_factor) +
             2;
       } else if (params.is_resnet_replication && NRows == 8) {
         loop_bounds[1][params.inputXLoopIndex[1]] =
-            (loop_bounds[1][params.inputXLoopIndex[1]] * STRIDE /
-             packingFactor) +
+            (loop_bounds[1][params.inputXLoopIndex[1]] * params.stride /
+             packing_factor) +
             1;
+      }
+
+      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> C1 =
+          params.loops[1][params.reductionLoopIndex[1]];
+      ac_int<4, false> FX = params.loops[1][params.fxIndex];
+      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
+      ac_int<5, false> STRIDE = params.stride;
+
+      bool is_downsample = FX == 1 && FY0 == 1;
+
+      if (is_downsample) {
+        STRIDE = 1;
+      }
+
+      ac_int<16, false> IX0 = X0 * STRIDE;
+      ac_int<16, false> y_stride = C1;
+      if (params.is_resnet_replication) {
+        y_stride *= IX0 / packing_factor + 2 * boundary_words;
+      } else {
+        y_stride *= IX0 + FX - 1;
       }
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-           loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-             loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0; loop_counters[0][2] < loop_bounds[0][2];
-               loop_counters[0][2]++) {
-            for (loop_counters[0][3] = 0;
-                 loop_counters[0][3] < loop_bounds[0][3];
-                 loop_counters[0][3]++) {
-              for (loop_counters[0][4] = 0;
-                   loop_counters[0][4] < loop_bounds[0][4];
-                   loop_counters[0][4]++) {
-                for (loop_counters[1][0] = 0;
-                     loop_counters[1][0] < loop_bounds[1][0];
-                     loop_counters[1][0]++) {
-                  for (loop_counters[1][1] = 0;
-                       loop_counters[1][1] < loop_bounds[1][1];
-                       loop_counters[1][1]++) {
-                    for (loop_counters[1][2] = 0;
-                         loop_counters[1][2] < loop_bounds[1][2];
-                         loop_counters[1][2]++) {
-                      for (loop_counters[1][3] = 0;
-                           loop_counters[1][3] < loop_bounds[1][3];
-                           loop_counters[1][3]++) {
-                        for (loop_counters[1][4] = 0;
-                             loop_counters[1][4] < loop_bounds[1][4];
-                             loop_counters[1][4]++) {
-                          for (loop_counters[1][5] = 0;
-                               loop_counters[1][5] < loop_bounds[1][5];
+      for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
+        for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
+          for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
+            for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
+              for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
+                for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
+                          for (loop_counters[1][5] = 0;;
                                loop_counters[1][5]++) {
                             ac_int<LOOP_WIDTH, false> x0 =
                                 loop_counters[1][params.inputXLoopIndex[1]];
-                            ac_int<LOOP_WIDTH, false> X0 =
-                                params.loops[1][params.inputXLoopIndex[1]];
                             ac_int<LOOP_WIDTH, false> y0 =
                                 loop_counters[1][params.inputYLoopIndex[1]];
-                            ac_int<LOOP_WIDTH, false> Y0 =
-                                params.loops[1][params.inputYLoopIndex[1]];
                             ac_int<LOOP_WIDTH, false> fx =
                                 loop_counters[1][params.fxIndex];
                             ac_int<LOOP_WIDTH, false> fy0 =
                                 loop_counters[1][params.fyIndex[1]];
                             ac_int<LOOP_WIDTH, false> c1 =
                                 loop_counters[1][params.reductionLoopIndex[1]];
-                            ac_int<LOOP_WIDTH, false> C1 =
-                                loop_bounds[1][params.reductionLoopIndex[1]];
 
                             ac_int<16, false> x = STRIDE * x0 + fx;
                             ac_int<16, false> y = STRIDE * y0 + fy0;
-
                             ac_int<16, false> address;
                             if (params.is_resnet_replication && NRows >= 8) {
-                              address = y *
-                                            (((STRIDE * X0) / packingFactor) +
-                                             2 * boundaryWords) *
-                                            C1 +
-                                        (x0 + fx) * C1 + c1;
+                              address = y * y_stride + (x0 + fx) * C1 + c1;
+                            } else if (is_downsample) {
+                              address = y0 * X0 * C1 + x0 * C1 + c1;
+                            } else if (params.is_generic_replication) {
+                              address =
+                                  (y0 + fy0) *
+                                      ((STRIDE * X0) >>
+                                       params.fx_unrolling_lg2) *
+                                      C1 +
+                                  (((STRIDE * x0) >> params.fx_unrolling_lg2) +
+                                   fx) *
+                                      C1 +
+                                  c1;
                             } else {
-                              if (FX == 1 && FY0 == 1) {
-                                address = y0 * X0 * C1 + x0 * C1 + c1;
-                              } else if (params.is_generic_replication) {
-                                address = (y0 + fy0) *
-                                              ((STRIDE * X0) >>
-                                               params.fx_unrolling_lg2) *
-                                              C1 +
-                                          (((STRIDE * x0) >>
-                                            params.fx_unrolling_lg2) +
-                                           fx) *
-                                              C1 +
-                                          c1;
-                              } else {
-                                address =
-                                    y * (STRIDE * X0 + (params.padding * 2)) *
-                                        C1 +
-                                    x * C1 + c1;
-                              }
+                              address = y * y_stride + x * C1 + c1;
                             }
 
-                            BufferReadRequest req;
-                            req.address = address;
-                            req.last =
+                            bool is_last =
                                 loop_counters[1][5] == loop_bounds[1][5] - 1 &&
                                 loop_counters[1][4] == loop_bounds[1][4] - 1 &&
                                 loop_counters[1][3] == loop_bounds[1][3] - 1 &&
@@ -781,7 +622,11 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                 loop_counters[1][1] == loop_bounds[1][1] - 1 &&
                                 loop_counters[1][0] == loop_bounds[1][0] - 1;
 
-                            readAddress[bankSel].Push(req);
+                            BufferReadRequest req = {
+                                .address = address,
+                                .last = is_last,
+                            };
+                            input_read_address[bankSel].Push(req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
@@ -835,15 +680,15 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
    * Used for FX replication with stride=2
    * Window buffer cuts down on memory accesses
    */
-  void windowBuffer() {
-    windowBufferParams.ResetRead();
-    windowBufferIn.Reset();
-    windowBufferOut.Reset();
+  void window_buffer() {
+    winder_buffer_params.ResetRead();
+    window_buffer_in.Reset();
+    window_buffer_out.Reset();
 
     wait();
 
     while (true) {
-      const MatrixParams params = windowBufferParams.Pop();
+      const MatrixParams params = winder_buffer_params.Pop();
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
@@ -855,31 +700,30 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
         }
       }
 
-      int packingFactor;    // num x values packed in a word in the buffer
-      int unrollingFactor;  // num x values packed in a word sent to the
+      int unrollingFactor;  // num x values packed in a word
+                            // sent to the
       // systolic array
-      int additionalUnrollingFactor;  // additional x values packed in a word
-                                      // sent to the systolic array, but are
-                                      // unused by the systolic array
+      int additionalUnrollingFactor;  // additional x values
+                                      // packed in a word
+                                      // sent to the
+                                      // systolic array, but
+                                      // are unused by the
+                                      // systolic array
       constexpr int initialReuseFactor = (NRows == 8) ? 1 : 3;
       int shiftFactor;
 
       if (NRows == 4) {
-        packingFactor = 1;
         unrollingFactor = 1;
         additionalUnrollingFactor = 0;
       } else if (NRows == 8) {
-        packingFactor = 2;
         unrollingFactor = 2;
         additionalUnrollingFactor = 0;
         shiftFactor = 1;
       } else if (NRows == 16) {
-        packingFactor = 4;
         unrollingFactor = 4;
         additionalUnrollingFactor = 1;
         shiftFactor = 2;
       } else if (NRows == 32) {
-        packingFactor = 8;
         unrollingFactor = 7;
         additionalUnrollingFactor = 0;
         shiftFactor = 2;
@@ -917,13 +761,13 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                           ac_int<BufferWidth, false> data;
 
                           ac_int<BufferWidth, false> buffer =
-                              windowBufferIn.Pop();
+                              window_buffer_in.Pop();
 #pragma hls_unroll yes
                           for (int x = 0; x < 3; x++) {
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
                               int dst_idx = x * 3 + dim;
-                              int src_idx = (packingFactor - 3 + x) * 3 + dim;
+                              int src_idx = (packing_factor - 3 + x) * 3 + dim;
 
                               auto temp = buffer.template slc<DATA_WIDTH>(
                                   src_idx * DATA_WIDTH);
@@ -931,7 +775,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                             }
                           }
 
-                          buffer = windowBufferIn.Pop();
+                          buffer = window_buffer_in.Pop();
 #pragma hls_unroll yes
                           for (int x = 3;
                                x < unrollingFactor + additionalUnrollingFactor;
@@ -947,7 +791,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                             }
                           }
 
-                          windowBufferOut.Push(data);
+                          window_buffer_out.Push(data);
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -958,11 +802,12 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 #pragma hls_unroll yes
                             for (int x = 0;
                                  x <
-                                 packingFactor + additionalUnrollingFactor - 2;
+                                 packing_factor + additionalUnrollingFactor - 2;
                                  x++) {
 #pragma hls_unroll yes
                               for (int dim = 0; dim < 3; dim++) {
-                                // data[x * 3 + dim] = data[(x + 2) * 3 + dim];
+                                // data[x * 3 + dim] =
+                                // data[(x + 2) * 3 + dim];
 
                                 int dst_idx = x * 3 + dim;
                                 int src_idx = (x + 2) * 3 + dim;
@@ -977,7 +822,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                             int bufferPosition =
                                 (loop_counters[1][5] + unrollingFactor +
                                  additionalUnrollingFactor - 3) %
-                                packingFactor;
+                                packing_factor;
 #pragma hls_unroll yes
                             for (int x = unrollingFactor +
                                          additionalUnrollingFactor - 2;
@@ -1000,10 +845,10 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                               }
                             }
 
-                            windowBufferOut.Push(data);
+                            window_buffer_out.Push(data);
 
-                            if (bufferPosition == packingFactor - 2) {
-                              buffer = windowBufferIn.Pop();
+                            if (bufferPosition == packing_factor - 2) {
+                              buffer = window_buffer_in.Pop();
                             }
                           }
                         }
@@ -1016,7 +861,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
           }
         }
       } else if (params.is_resnet_replication && NRows == 8) {
-        // no window buffer reuse, but need to combine multiple words together
+        // no window buffer reuse, but need to combine
+        // multiple words together
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
              loop_counters[0][0]++) {
           for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
@@ -1044,7 +890,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                              loop_counters[1][4] < loop_bounds[1][4];
                              loop_counters[1][4]++) {
                           ac_int<BufferWidth, false> buffer =
-                              windowBufferIn.Pop();
+                              window_buffer_in.Pop();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -1059,7 +905,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                               data.set_slc(dim * DATA_WIDTH, temp);
                             }
 
-                            buffer = windowBufferIn.Pop();
+                            buffer = window_buffer_in.Pop();
 
 #pragma hls_unroll yes
                             for (int dim = 0; dim < 3; dim++) {
@@ -1067,7 +913,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                   dim * DATA_WIDTH);
                               data.set_slc((3 + dim) * DATA_WIDTH, temp);
                             }
-                            windowBufferOut.Push(data);
+                            window_buffer_out.Push(data);
                           }
                         }
                       }
@@ -1088,51 +934,22 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (int i = 0; i < total_count; i++) {
-          windowBufferOut.Push(windowBufferIn.Pop());
+          window_buffer_out.Push(window_buffer_in.Pop());
         }
       }
     }
   }
 
   void transposer() {
-    transposerParams.ResetRead();
-    dataResponse.Reset();
-    transposeOut.ResetWrite();
+    transposer_params.ResetRead();
+    input_resp.Reset();
+    transpose_out.ResetWrite();
 
     wait();
 
     while (true) {
-      const MatrixParams params = transposerParams.Pop();
+      const MatrixParams params = transposer_params.Pop();
 
-      ac_int<4, false> FX = params.loops[1][params.fxIndex];
-      if (params.is_resnet_replication) {
-        FX = 7;
-      }
-
-      int packingFactor;  // num x values packed in a word
-      int boundaryWords;  // num words needed to store the boundary pixels.
-                          // essentially ceil(3/packingFactor)
-      if (NRows == 4) {
-        packingFactor = 1;
-        boundaryWords = 3;
-      } else if (NRows == 8) {
-        packingFactor = 2;
-        boundaryWords = 2;
-      } else if (NRows == 16) {
-        packingFactor = 4;
-        boundaryWords = 1;
-      } else if (NRows == 32) {
-        packingFactor = 8;
-        boundaryWords = 1;
-      }
-
-      ac_int<4, false> FY0 = params.loops[1][params.fyIndex[1]];
-
-      bool isDownsample = FX == 1 && FY0 == 1;
-
-      ac_int<5, false> STRIDE = params.stride;
-
-      ac_int<LOOP_WIDTH, false> loop_counters[2][6];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
 
 #pragma hls_unroll yes
@@ -1149,258 +966,146 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.fyIndex[1]] = 1;
 
       if (params.has_input_transpose && NRows <= 32) {
-        ac_int<DATA_WIDTH> transposeBuffer[NRows][NRows];
+        ac_int<DATA_WIDTH> transpose_buffer[NRows][NRows];
+
+        ac_int<32, false> total_count =
+            loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
+            loop_bounds[0][3] * loop_bounds[1][0] * loop_bounds[1][1] *
+            loop_bounds[1][2] * loop_bounds[1][3] * loop_bounds[1][4] *
+            loop_bounds[1][5] / NRows;
+
+        ac_int<32, false> count = 0;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              for (loop_counters[0][3] = 0;
-                   loop_counters[0][3] < loop_bounds[0][3];
-                   loop_counters[0][3]++) {
-                for (loop_counters[0][4] = 0;
-                     loop_counters[0][4] < loop_bounds[0][4];
-                     loop_counters[0][4]++) {
-                  // inner memory
-                  for (loop_counters[1][0] = 0;
-                       loop_counters[1][0] < loop_bounds[1][0];
-                       loop_counters[1][0]++) {
-                    for (loop_counters[1][1] = 0;
-                         loop_counters[1][1] < loop_bounds[1][1];
-                         loop_counters[1][1]++) {
-                      for (loop_counters[1][2] = 0;
-                           loop_counters[1][2] < loop_bounds[1][2];
-                           loop_counters[1][2]++) {
-                        for (loop_counters[1][3] = 0;
-                             loop_counters[1][3] < loop_bounds[1][3];
-                             loop_counters[1][3]++) {
-                          for (loop_counters[1][4] = 0;
-                               loop_counters[1][4] < loop_bounds[1][4];
-                               loop_counters[1][4]++) {
-                            // innermost loop must be X0, and must be a multiple
-                            // of NRows
-                            for (loop_counters[1][5] = 0;
-                                 loop_counters[1][5] <
-                                 loop_bounds[1][5] / NRows;
-                                 loop_counters[1][5]++) {
-                              for (int c0 = 0; c0 < NRows; c0++) {
-                                ac_int<BufferWidth, false> bits = 0;
+        while (count++ < total_count) {
+          for (int c0 = 0; c0 < NRows; c0++) {
+            ac_int<BufferWidth, false> bits = 0;
 
-                                bool success =
-                                    (process_matrix_input<
-                                         InputTypes, NRows, PortWidth,
-                                         BufferWidth, InputTypes...>(
-                                         params.input_dtype, dataResponse,
-                                         bits) ||
-                                     ...);
+            bool success = (process_matrix_input<InputTypes, NRows, PortWidth,
+                                                 BufferWidth, InputTypes...>(
+                                params.input_dtype, input_resp, bits) ||
+                            ...);
 
 #ifndef __SYNTHESIS__
-                                if (!success) {
-                                  std::cerr << "Error: matrix input dtype '"
-                                            << params.input_dtype
-                                            << "' is not valid" << std::endl;
-                                }
+            if (!success) {
+              std::cerr << "Error: matrix input dtype '" << params.input_dtype
+                        << "' is not valid" << std::endl;
+            }
 #endif
 
 #pragma hls_unroll yes
-                                for (int dim = 0; dim < NRows; dim++) {
-                                  transposeBuffer[dim][c0] =
-                                      bits.template slc<DATA_WIDTH>(dim *
-                                                                    DATA_WIDTH);
-                                }
+            for (int dim = 0; dim < NRows; dim++) {
+              transpose_buffer[dim][c0] =
+                  bits.template slc<DATA_WIDTH>(dim * DATA_WIDTH);
+            }
+          }
 
-                                // Write out from tranposeBuffer
-                                for (int c0 = 0; c0 < NRows; c0++) {
-                                  ac_int<BufferWidth, false> transposed;
+          // Write out from tranpose buffer
+          for (int c0 = 0; c0 < NRows; c0++) {
+            ac_int<BufferWidth, false> transposed;
 
 #pragma hls_unroll yes
-                                  for (int dim = 0; dim < NRows; dim++) {
-                                    transposed.set_slc(
-                                        dim * DATA_WIDTH,
-                                        transposeBuffer[c0][dim]);
-                                  }
-                                  transposeOut.Push(transposed);
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+            for (int dim = 0; dim < NRows; dim++) {
+              transposed.set_slc(dim * DATA_WIDTH, transpose_buffer[c0][dim]);
             }
+            transpose_out.Push(transposed);
           }
         }
       } else {  // passthrough
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];
-             loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0; loop_counters[0][1] < loop_bounds[0][1];
-               loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;
-                 loop_counters[0][2] < loop_bounds[0][2];
-                 loop_counters[0][2]++) {
-              for (loop_counters[0][3] = 0;
-                   loop_counters[0][3] < loop_bounds[0][3];
-                   loop_counters[0][3]++) {
-                for (loop_counters[0][4] = 0;
-                     loop_counters[0][4] < loop_bounds[0][4];
-                     loop_counters[0][4]++) {
-                  // fetching border pixels is a little tricky
-                  // for the outer tiles, we don't fetch borders (they are
-                  // known to be 0)
+        while (!fetcher_done.read()) {
+          ac_int<MAX_FETCH_WIDTH, false> bits;
 
-                  if (params.is_resnet_replication) {
-                    loop_bounds[1][params.inputXLoopIndex[1]] =
-                        params.loops[1][params.inputXLoopIndex[1]] * STRIDE /
-                        packingFactor;
-                    loop_bounds[1][params.inputYLoopIndex[1]] =
-                        params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                  } else if (params.is_generic_replication) {
-                    loop_bounds[1][params.inputXLoopIndex[1]] =
-                        static_cast<ac_int<16, false>>(
-                            (params.loops[1][params.inputXLoopIndex[1]]) *
-                            params.stride) >>
-                        params.fx_unrolling_lg2;
-                    loop_bounds[1][params.inputYLoopIndex[1]] =
-                        params.loops[1][params.inputYLoopIndex[1]] *
-                        params.stride;
-                  } else {
-                    if (FX == 1) {
-                      loop_bounds[1][params.inputXLoopIndex[1]] =
-                          params.loops[1][params.inputXLoopIndex[1]];
-                    } else {
-                      loop_bounds[1][params.inputXLoopIndex[1]] =
-                          params.loops[1][params.inputXLoopIndex[1]] * STRIDE;
-                    }
-                    if (FY0 == 1) {
-                      loop_bounds[1][params.inputYLoopIndex[1]] =
-                          params.loops[1][params.inputYLoopIndex[1]];
-                    } else {
-                      loop_bounds[1][params.inputYLoopIndex[1]] =
-                          params.loops[1][params.inputYLoopIndex[1]] * STRIDE;
-                    }
-                  }
-
-                  if (params.is_resnet_replication) {
-                    if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                      loop_bounds[1][params.inputXLoopIndex[1]] +=
-                          boundaryWords;
-                    }
-                    if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                        loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                      loop_bounds[1][params.inputXLoopIndex[1]] +=
-                          boundaryWords;
-                    }
-                  } else {
-                    if (loop_counters[0][params.inputXLoopIndex[0]] != 0) {
-                      loop_bounds[1][params.inputXLoopIndex[1]] +=
-                          params.padding;
-                    }
-
-                    if (loop_counters[0][params.inputXLoopIndex[0]] !=
-                        loop_bounds[0][params.inputXLoopIndex[0]] - 1) {
-                      loop_bounds[1][params.inputXLoopIndex[1]] +=
-                          params.padding;
-                    }
-                  }
-
-                  if (loop_counters[0][params.inputYLoopIndex[0]] != 0) {
-                    loop_bounds[1][params.inputYLoopIndex[1]] += params.padding;
-                  }
-
-                  if (loop_counters[0][params.inputYLoopIndex[0]] !=
-                      loop_bounds[0][params.inputYLoopIndex[0]] - 1) {
-                    loop_bounds[1][params.inputYLoopIndex[1]] += params.padding;
-                  }
-
-                  for (loop_counters[1][0] = 0;
-                       loop_counters[1][0] < loop_bounds[1][0];
-                       loop_counters[1][0]++) {
-                    for (loop_counters[1][1] = 0;
-                         loop_counters[1][1] < loop_bounds[1][1];
-                         loop_counters[1][1]++) {
-                      for (loop_counters[1][2] = 0;
-                           loop_counters[1][2] < loop_bounds[1][2];
-                           loop_counters[1][2]++) {
-                        for (loop_counters[1][3] = 0;
-                             loop_counters[1][3] < loop_bounds[1][3];
-                             loop_counters[1][3]++) {
-                          for (loop_counters[1][4] = 0;
-                               loop_counters[1][4] < loop_bounds[1][4];
-                               loop_counters[1][4]++) {
-                            for (loop_counters[1][5] = 0;
-                                 loop_counters[1][5] < loop_bounds[1][5];
-                                 loop_counters[1][5]++) {
-                              ac_int<BufferWidth, false> bits = 0;
-
-                              bool success =
-                                  (process_matrix_input<InputTypes, NRows,
-                                                        PortWidth, BufferWidth,
-                                                        InputTypes...>(
-                                       params.input_dtype, dataResponse,
-                                       bits) ||
-                                   ...);
-#ifndef __SYNTHESIS__
-                              if (!success) {
-                                std::cerr << "Error: matrix input dtype '"
-                                          << params.input_dtype
-                                          << "' is not valid" << std::endl;
-                              }
-#endif
-                              transposeOut.Push(bits);
-
-                              if (loop_counters[1][5] >=
-                                  loop_bounds[1][5] - 1) {
-                                break;
-                              }
-                            }
-                            if (loop_counters[1][4] >= loop_bounds[1][4] - 1) {
-                              break;
-                            }
-                          }
-                          if (loop_counters[1][3] >= loop_bounds[1][3] - 1) {
-                            break;
-                          }
-                        }
-                        if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
-                          break;
-                        }
-                      }
-                      if (loop_counters[1][1] >= loop_bounds[1][1] - 1) {
-                        break;
-                      }
-                    }
-                    if (loop_counters[1][0] >= loop_bounds[1][0] - 1) {
-                      break;
-                    }
-                  }
-                  if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
-                    break;
-                  }
-                }
-                if (loop_counters[0][3] >= loop_bounds[0][3] - 1) {
-                  break;
-                }
-              }
-              if (loop_counters[0][2] >= loop_bounds[0][2] - 1) {
-                break;
-              }
-            }
-            if (loop_counters[0][1] >= loop_bounds[0][1] - 1) {
+          for (ac_int<4, false> i = 0;; i++) {
+            bits.set_slc(i * PortWidth, input_resp.Pop());
+            if (i == params.input_num_fetches - 1) {
               break;
             }
           }
-          if (loop_counters[0][0] >= loop_bounds[0][0] - 1) {
-            break;
+
+          transpose_out.Push(bits);
+        }
+      }
+    }
+  }
+
+  void input_unpacker() {
+    input_unpacker_params.ResetRead();
+    transpose_out.ResetRead();
+    unpacked_data.ResetWrite();
+
+    wait();
+
+    while (true) {
+      const MatrixParams params = input_unpacker_params.Pop();
+
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][6];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
+        for (int j = 0; j < 6; j++) {
+          loop_bounds[i][j] = params.loops[i][j];
+        }
+      }
+
+      // set irrelevant loop bounds to 1
+      loop_bounds[1][params.weightLoopIndex[1]] = 1;
+      loop_bounds[1][params.fxIndex] = 1;
+      loop_bounds[1][params.fyIndex[1]] = 1;
+
+      // passthrough
+      if (params.has_input_transpose && NRows <= 32) {
+        ac_int<DATA_WIDTH> transpose_buffer[NRows][NRows];
+
+        ac_int<32, false> total_count = loop_bounds[0][0] * loop_bounds[0][1] *
+                                        loop_bounds[0][2] * loop_bounds[0][3] *
+                                        loop_bounds[1][0] * loop_bounds[1][1] *
+                                        loop_bounds[1][2] * loop_bounds[1][3] *
+                                        loop_bounds[1][4] * loop_bounds[1][5];
+
+        ac_int<32, false> count = 0;
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (count++ < total_count) {
+          ac_int<BufferWidth, false> bits = transpose_out.Pop();
+          unpacked_data.Push(bits);
+        }
+
+      } else {  // unpack bits into outputs
+                // based on dtype
+        ac_int<4, false> pf_bound = (1 << params.input_packing_shift) - 1;
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (!fetcher_done_2.read()) {
+          ac_int<MAX_FETCH_WIDTH, false> bits = transpose_out.Pop();
+
+          // Unpack bits into outputs based on
+          // dtype
+          for (ac_int<4, false> i = 0;; i++) {
+            ac_int<BufferWidth, false> outputs = 0;
+            bool handled = (unpack_bits<InputTypes, NRows, BufferWidth,
+                                        MAX_FETCH_WIDTH, InputTypes...>(
+                                params.input_dtype, bits, outputs, i) ||
+                            ...);
+
+#ifndef __SYNTHESIS__
+            if (!handled) {
+              throw std::runtime_error(
+                  "Unsupported dtype for "
+                  "matrix input: " +
+                  std::to_string(params.input_dtype));
+            }
+#endif
+            unpacked_data.Push(outputs);
+
+            if (i == pf_bound) {
+              break;
+            }
           }
         }
       }
@@ -1408,23 +1113,25 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   }
 
   void read_params() {
-    paramsIn.Reset();
-    fetcherParams.ResetWrite();
-    writerParams.ResetWrite();
-    readerParams.ResetWrite();
-    windowBufferParams.ResetWrite();
-    transposerParams.ResetWrite();
+    params_in.Reset();
+    fetcher_params.ResetWrite();
+    writer_params.ResetWrite();
+    reader_params.ResetWrite();
+    winder_buffer_params.ResetWrite();
+    transposer_params.ResetWrite();
+    input_unpacker_params.ResetWrite();
 
     wait();
 
     while (true) {
-      const MatrixParams params = paramsIn.Pop();
+      const MatrixParams params = params_in.Pop();
 
-      fetcherParams.Push(params);
-      writerParams.Push(params);
-      readerParams.Push(params);
-      windowBufferParams.Push(params);
-      transposerParams.Push(params);
+      fetcher_params.Push(params);
+      writer_params.Push(params);
+      reader_params.Push(params);
+      winder_buffer_params.Push(params);
+      transposer_params.Push(params);
+      input_unpacker_params.Push(params);
     }
   }
 };

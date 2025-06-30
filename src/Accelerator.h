@@ -6,9 +6,9 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 #include "MatrixUnit.h"
-#include "MatrixVectorUnit.h"
-#include "VectorUnit.h"
+#include "MatrixVectorUnit2.h"
 #include "mc_scverify.h"
+#include "vector_unit/main.h"
 
 SC_MODULE(Accelerator) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -74,8 +74,9 @@ SC_MODULE(Accelerator) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_input_scale_req);
   Connections::Out<MemoryRequest> CCS_INIT_S1(matrix_vector_weight_scale_req);
 
-  Connections::In<ac_int<8, false>> CCS_INIT_S1(matrix_vector_input_scale_resp);
-  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+  Connections::In<ac_int<MVU_SCALE_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_vector_input_scale_resp);
+  Connections::In<ac_int<MVU_SCALE_PORT_WIDTH, false>> CCS_INIT_S1(
       matrix_vector_weight_scale_resp);
 #endif
 
@@ -189,7 +190,7 @@ SC_MODULE(Accelerator) {
     vector_unit.scale_address_out(scalar_output_address);
     vector_unit.start(vectorUnitStartSignal);
     vector_unit.done(vectorUnitDoneSignal);
-    vector_unit.matrixUnitOutput(matrixUnitOutput);
+    vector_unit.matrix_unit_output(matrixUnitOutput);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     for (int i = 0; i < 2; i++) {

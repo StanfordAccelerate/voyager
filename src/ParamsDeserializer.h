@@ -158,6 +158,8 @@ SC_MODULE(VectorParamsDeserializer) {
 
   void run() {
     serialParamsIn.Reset();
+    vectorInstructionsOut.Reset();
+    vectorParamsOut.Reset();
     vectorParamsBits.ResetWrite();
     vectorInstructionsBits.ResetWrite();
     convertedVectorParams.ResetRead();

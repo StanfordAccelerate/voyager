@@ -161,21 +161,21 @@ static bool should_use_direct_path(const VectorParams *vector_params) {
   //
   // Remember, we need `OC_DIMENSION` elements per cycle on each (active) port
   // to keep up with the matrix unit.
-  const size_t addr_gen1_bw = (vector_params->addr_gen1_mode == 0)
-                                  ? 0
-                                  : get_width_from_type_index<VU_INPUT_TYPES>(
-                                        vector_params->addr_gen1_dtype) *
-                                        OC_DIMENSION;
-  const size_t addr_gen2_bw = (vector_params->addr_gen2_mode == 0)
-                                  ? 0
-                                  : get_width_from_type_index<VU_INPUT_TYPES>(
-                                        vector_params->addr_gen2_dtype) *
-                                        OC_DIMENSION;
-  const size_t output_bw = (vector_params->output_mode == 0)
-                               ? 0
-                               : get_width_from_type_index<OUTPUT_DATATYPES>(
-                                     vector_params->output_dtype) *
-                                     OC_DIMENSION;
+  const size_t addr_gen1_bw =
+      (vector_params->addr_gen1_mode == 0)
+          ? 0
+          : get_type_width<VU_INPUT_TYPES>(vector_params->addr_gen1_dtype) *
+                OC_DIMENSION;
+  const size_t addr_gen2_bw =
+      (vector_params->addr_gen2_mode == 0)
+          ? 0
+          : get_type_width<VU_INPUT_TYPES>(vector_params->addr_gen2_dtype) *
+                OC_DIMENSION;
+  const size_t output_bw =
+      (vector_params->output_mode == 0)
+          ? 0
+          : get_type_width<OUTPUT_DATATYPES>(vector_params->output_dtype) *
+                OC_DIMENSION;
 
   bool should_use_direct_path = true;
   should_use_direct_path &= addr_gen1_bw <= available_bandwidth;
@@ -208,9 +208,10 @@ void MapMatrixOperation(const Operation &operation,
   if (matrix_params->is_fc) {
     bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
 
-    int C1 = is_mx_op ? matrix_op.kwargs().at("block_size").int_value() : 1;
-    int C2 = (is_matmul ? weight.shape(0) : weight.shape(1)) / C1;
     int K = is_matmul ? weight.shape(1) : weight.shape(0);
+    int C = is_matmul ? weight.shape(0) : weight.shape(1);
+    int C1 = is_mx_op ? matrix_op.kwargs().at("block_size").int_value() : 1;
+    int C2 = C / C1;
 
     auto k_loops = split_loops({K}, pow(2, 16) - 1);
     k_loops = adjust_loop_indices(k_loops, OC_DIMENSION);
@@ -371,9 +372,8 @@ void MapMatrixOperation(const Operation &operation,
       }
     }
     matrix_params->weightAddressGenReductionLoopIndex[1] = 0;
-  } else {
-    // if not transpose, then we have freedom to pick any loop order
 
+  } else {  // if not transpose, then we have freedom to pick any loop order
     // K1 loop
     matrix_params->weightAddressGenLoops[1][4] =
         tiling.loops[1][tiling.weight_loop_index[1]];
@@ -459,6 +459,29 @@ void MapMatrixOperation(const Operation &operation,
       matrix_params->head_size_power_of_two = result;
     }
   }
+
+  int c_bound =
+      tiling.resnet_replication ? 1 : tiling.loops[1][tiling.reduction_loop_index[1]];
+  int input_effective_fw;
+  int input_pf =
+      get_packing_factor<IC_DIMENSION, IC_PORT_WIDTH, INPUT_DATATYPE>(
+          matrix_params->input_dtype, c_bound, input_effective_fw);
+
+  matrix_params->input_fetch_width = input_effective_fw / 8;
+  matrix_params->input_num_fetches = input_effective_fw / IC_PORT_WIDTH;
+  matrix_params->input_packing_shift = std::log2(input_pf);
+
+  int k_bound = matrix_params->has_weight_transpose
+                    ? 1
+                    : tiling.loops[1][tiling.weight_loop_index[1]];
+  int weight_effective_fw;
+  int weight_pf =
+      get_packing_factor<OC_DIMENSION, OC_PORT_WIDTH, WEIGHT_DATATYPE>(
+          matrix_params->weight_dtype, k_bound, weight_effective_fw);
+
+  matrix_params->weight_fetch_width = weight_effective_fw / 8;
+  matrix_params->weight_num_fetches = weight_effective_fw / OC_PORT_WIDTH;
+  matrix_params->weight_packing_shift = std::log2(weight_pf);
 
   // bias
   if (matrix_op.kwargs().contains("bias")) {
@@ -570,8 +593,13 @@ void MapMatrixOperation(const Operation &operation,
   }
 
   VectorInstructions inst;
-  memset(&inst, 0, sizeof(inst));
   inst.op_type = VectorInstructions::vector;
+  inst.inst_count = tiling.loops[0][tiling.x_loop_index[0]] *
+                    tiling.loops[1][tiling.x_loop_index[1]] *
+                    tiling.loops[0][tiling.y_loop_index[0]] *
+                    tiling.loops[1][tiling.y_loop_index[1]] *
+                    tiling.loops[0][tiling.weight_loop_index[0]] *
+                    tiling.loops[1][tiling.weight_loop_index[1]];
 
   if (matrix_params->is_fc) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_vector_unit;
@@ -729,13 +757,7 @@ void MapMatrixOperation(const Operation &operation,
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
   vector_instruction_config->inst[0] = inst;
-  vector_instruction_config->instCount[0] =
-      tiling.loops[0][tiling.x_loop_index[0]] *
-      tiling.loops[1][tiling.x_loop_index[1]] *
-      tiling.loops[0][tiling.y_loop_index[0]] *
-      tiling.loops[1][tiling.y_loop_index[1]] *
-      tiling.loops[0][tiling.weight_loop_index[0]] *
-      tiling.loops[1][tiling.weight_loop_index[1]];
+  vector_instruction_config->instCount[0] = 1;
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;
 

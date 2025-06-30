@@ -56,10 +56,16 @@ struct MatrixParams : BaseParams {
     weightAddressGenFxIndex = 0;
 
     input_dtype = 0;
-    weight_dtype = 0;
-
     use_input_codebook = false;
+    input_num_fetches = 1;
+    input_packing_shift = 0;
+    input_fetch_width = 0;
+
+    weight_dtype = 0;
     use_weight_codebook = false;
+    weight_num_fetches = 1;
+    weight_packing_shift = 0;
+    weight_fetch_width = 0;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       input_code[i] = 0;
@@ -115,10 +121,16 @@ struct MatrixParams : BaseParams {
   ac_int<3, false> weightAddressGenFxIndex;
 
   ac_int<DTYPE_INDEX_WIDTH, false> input_dtype;
-  ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
-
   bool use_input_codebook;
+  ac_int<4, false> input_num_fetches;
+  ac_int<4, false> input_packing_shift;
+  ac_int<10, false> input_fetch_width;
+
+  ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
   bool use_weight_codebook;
+  ac_int<4, false> weight_num_fetches;
+  ac_int<4, false> weight_packing_shift;
+  ac_int<10, false> weight_fetch_width;
 
   ac_int<DECODED_INPUT_DTYPE_WIDTH, false> input_code[NUM_CODEBOOK_ENTRIES];
   ac_int<DECODED_WEIGHT_DTYPE_WIDTH, false> weight_code[NUM_CODEBOOK_ENTRIES];
@@ -146,7 +158,8 @@ struct MatrixParams : BaseParams {
       11 * 1 /* Bools */;
 
   static const unsigned int extra_width =
-      2 * DTYPE_INDEX_WIDTH + NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
+      2 * DTYPE_INDEX_WIDTH + 36 +
+      NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
       NUM_CODEBOOK_ENTRIES * DECODED_WEIGHT_DTYPE_WIDTH;
 
   static const unsigned int width = base_width + extra_width;
@@ -204,10 +217,16 @@ struct MatrixParams : BaseParams {
     m & weightAddressGenFxIndex;
 
     m & input_dtype;
-    m & weight_dtype;
-
     m & use_input_codebook;
+    m & input_num_fetches;
+    m & input_packing_shift;
+    m & input_fetch_width;
+
+    m & weight_dtype;
     m & use_weight_codebook;
+    m & weight_num_fetches;
+    m & weight_packing_shift;
+    m & weight_fetch_width;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       m& input_code[i];
@@ -300,10 +319,16 @@ struct MatrixParams : BaseParams {
        << std::endl;
 
     os << "input_dtype: " << params.input_dtype << std::endl;
-    os << "weight_dtype: " << params.weight_dtype << std::endl;
-
     os << "use_input_codebook: " << params.use_input_codebook << std::endl;
+    os << "input_num_fetches: " << params.input_num_fetches << std::endl;
+    os << "input_packing_shift: " << params.input_packing_shift << std::endl;
+    os << "input_fetch_width: " << params.input_fetch_width << std::endl;
+
+    os << "weight_dtype: " << params.weight_dtype << std::endl;
     os << "use_weight_codebook: " << params.use_weight_codebook << std::endl;
+    os << "weight_num_fetches: " << params.weight_num_fetches << std::endl;
+    os << "weight_packing_shift: " << params.weight_packing_shift << std::endl;
+    os << "weight_fetch_width: " << params.weight_fetch_width << std::endl;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       os << "input_code[" << i << "]: " << params.input_code[i] << std::endl;
@@ -379,7 +404,16 @@ struct MatrixParams : BaseParams {
     if (lhs.padding != rhs.padding) return false;
 
     if (lhs.input_dtype != rhs.input_dtype) return false;
+    if (lhs.use_input_codebook != rhs.use_input_codebook) return false;
+    if (lhs.input_num_fetches != rhs.input_num_fetches) return false;
+    if (lhs.input_packing_shift != rhs.input_packing_shift) return false;
+    if (lhs.input_fetch_width != rhs.input_fetch_width) return false;
+
     if (lhs.weight_dtype != rhs.weight_dtype) return false;
+    if (lhs.use_weight_codebook != rhs.use_weight_codebook) return false;
+    if (lhs.weight_num_fetches != rhs.weight_num_fetches) return false;
+    if (lhs.weight_packing_shift != rhs.weight_packing_shift) return false;
+    if (lhs.weight_fetch_width != rhs.weight_fetch_width) return false;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       if (lhs.input_code[i] != rhs.input_code[i]) return false;
@@ -417,6 +451,7 @@ struct VectorInstructions {
 #ifndef __SYNTHESIS__
   VectorInstructions() {
     op_type = 0;
+    inst_count = 1;
     vector_op0_src0 = 0;
     vector_op0_src1 = 0;
     vector_op2_src1 = 0;
@@ -444,6 +479,8 @@ struct VectorInstructions {
   static const unsigned int vector = 0;
   static const unsigned int reduction = 1;
   static const unsigned int accumulation = 2;
+
+  ac_int<24, false> inst_count;
 
   ac_int<4, false> vector_op0_src0;
   ac_int<4, false> vector_op0_src1;
@@ -500,9 +537,10 @@ struct VectorInstructions {
   ac_int<1, false> rduplicate;
   ac_int<1, false> rbroadcast;  // broadcast by immediate0
 
-  ac_int<1, false> rdest;
-  static const unsigned int to_op0 = 0;
-  static const unsigned int to_op2 = 1;
+  ac_int<2, false> rdest;
+  static const unsigned int to_op0 = 1;
+  static const unsigned int to_op2 = 2;
+  static const unsigned int to_memory = 3;
 
   ac_int<2, false> vdest;
   static const unsigned int to_output = 1;
@@ -514,12 +552,13 @@ struct VectorInstructions {
   ac_int<16, false> immediate2;
   ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 176;
+  static const unsigned int width = 201;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & op_type;
+    m & inst_count;
     m & vector_op0_src0;
     m & vector_op0_src1;
     m & vector_op2_src1;
@@ -554,6 +593,7 @@ struct VectorInstructions {
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorInstructions& params) {
     os << "op_type: " << params.op_type << std::endl;
+    os << "inst_count: " << params.inst_count << std::endl;
     os << "vector_op0_src0: " << params.vector_op0_src0 << std::endl;
     os << "vector_op0_src1: " << params.vector_op0_src1 << std::endl;
     os << "vector_op2_src1: " << params.vector_op2_src1 << std::endl;
@@ -581,7 +621,7 @@ struct VectorInstructions {
 
   inline friend bool operator==(const VectorInstructions& lhs,
                                 const VectorInstructions& rhs) {
-    return lhs.op_type == rhs.op_type &&
+    return lhs.op_type == rhs.op_type && lhs.inst_count == rhs.inst_count &&
            lhs.vector_op0_src0 == rhs.vector_op0_src0 &&
            lhs.vector_op0_src1 == rhs.vector_op0_src1 &&
            lhs.vector_op2_src1 == rhs.vector_op2_src1 &&
@@ -700,7 +740,6 @@ struct VectorParams : BaseParams {
 
     head_size_power_of_two = 32;
     has_attn_head_permute = false;
-    has_output_permute = false;
 
     quantize_output_mx = false;
     SCALE_OFFSET = 0;
@@ -781,7 +820,6 @@ struct VectorParams : BaseParams {
   // Transformer head permutation
   ac_int<4, false> head_size_power_of_two;
   bool has_attn_head_permute;
-  bool has_output_permute;
 
   bool quantize_output_mx;
   ac_int<ADDRESS_WIDTH, false> SCALE_OFFSET;
@@ -800,11 +838,11 @@ struct VectorParams : BaseParams {
       1 + (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
 
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
-  // slicing params + 32-bit pooling param + 18-bit reshape params + 19-bit
-  // padded transpose params + 4-bit head size + 7 boolean flags + 64-bit scale
+  // slicing params + 32-bit pooling param + 18-bit reshape params + 17-bit
+  // padded transpose params + 4-bit head size + 8 boolean flags + 64-bit scale
   // offset
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
-                                    19 + 4 + 7 + ADDRESS_WIDTH - 16 +
+                                    17 + 4 + 8 + ADDRESS_WIDTH - 16 +
                                     codebook_params_width;
 
 #ifndef NO_SYSC
@@ -924,7 +962,6 @@ struct VectorParams : BaseParams {
     // Transformer head permutation flags
     m & head_size_power_of_two;
     m & has_attn_head_permute;
-    m & has_output_permute;
 
     m & quantize_output_mx;
     m & SCALE_OFFSET;
@@ -1073,7 +1110,6 @@ struct VectorParams : BaseParams {
        << std::endl;
     os << "has_attn_head_permute: " << params.has_attn_head_permute
        << std::endl;
-    os << "has_output_permute: " << params.has_output_permute << std::endl;
 
     os << "quantize_output_mx: " << params.quantize_output_mx << std::endl;
     os << "SCALE_OFFSET: " << params.SCALE_OFFSET << std::endl;
@@ -1199,7 +1235,6 @@ struct VectorParams : BaseParams {
 
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
     if (lhs.has_attn_head_permute != rhs.has_attn_head_permute) return false;
-    if (lhs.has_output_permute != rhs.has_output_permute) return false;
 
     if (lhs.quantize_output_mx != rhs.quantize_output_mx) return false;
     if (lhs.SCALE_OFFSET != rhs.SCALE_OFFSET) return false;
@@ -1237,6 +1272,9 @@ struct VectorInstructionConfig : BaseParams {
   void Marshall(Marshaller<Size>& m) {
     for (int j = 0; j < 8; j++) {
       m& inst[j].op_type;
+    }
+    for (int j = 0; j < 8; j++) {
+      m& inst[j].inst_count;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vector_op0_src0;
@@ -1321,7 +1359,7 @@ struct VectorInstructionConfig : BaseParams {
 
   inline friend std::ostream& operator<<(
       ostream& os, const VectorInstructionConfig& params) {
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < params.instLen; i++) {
       os << "instIndex: " << i << std::endl;
       os << "instCount: " << params.instCount[i] << std::endl;
       os << params.inst[i] << std::endl;

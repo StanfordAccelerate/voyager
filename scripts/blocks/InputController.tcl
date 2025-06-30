@@ -1,6 +1,5 @@
 set block "InputController"
 set full_block_name "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>"
-set clock_multiplier 1.2
 
 proc pre_architect {} {
   global full_block_name
@@ -8,6 +7,6 @@ proc pre_architect {} {
 
   global IC_DIMENSION
   if {$IC_DIMENSION <= 32} {
-    directive set /$input_controller_stripped/$input_controller_stripped:transposer/transposer/while:if#2:transposeBuffer:rsc -MAP_TO_MODULE {[Register]}
+    directive set /$input_controller_stripped/$input_controller_stripped:transposer/transposer/while:if:transpose_buffer:rsc -MAP_TO_MODULE {[Register]}
   }
 }
