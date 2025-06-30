@@ -91,7 +91,7 @@ proc pre_architect {} {
   }
 
   if {$SUPPORT_MX == true} {
-    global SCALE_DATATYPE SCALE_DATATYPE_WIDTH
+    global SCALE_DATATYPE_WIDTH
 
     if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
       set input_scale_double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$SCALE_DATATYPE_WIDTH>"
@@ -101,18 +101,27 @@ proc pre_architect {} {
 
     set weight_scale_buffer_size [expr {$WEIGHT_BUFFER_SIZE / $IC_DIMENSION}]
     set weight_scale_buffer_width [expr $SCALE_DATATYPE_WIDTH * $OC_DIMENSION]
-
     set weight_scale_double_buffer "DoubleBuffer<$weight_scale_buffer_size,$weight_scale_buffer_width>"
+
     directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem0Run/mem0Run/mem0 -WORD_WIDTH $weight_scale_buffer_width
     directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1Run/mem1Run/mem1 -WORD_WIDTH $weight_scale_buffer_width
   }
 
+  # Accumulation buffer
   set accumulation_buffer "DualPortBuffer<Pack1D<$ACCUM_BUFFER_DATATYPE,${OC_DIMENSION}UL>,$ACCUM_BUFFER_SIZE>"
   set accumulation_buffer_stripped [string map {" " ""} $accumulation_buffer]
-  set memory_width [expr $OC_DIMENSION*$ACCUM_DATATYPE_WIDTH]
-  directive set /Accelerator/$accumulation_buffer_stripped/bank0_run/bank0.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $memory_width
+  set accumulation_buffer_width [expr $OC_DIMENSION*$ACCUM_DATATYPE_WIDTH]
+
+  directive set /Accelerator/$accumulation_buffer_stripped/bank0_run/bank0.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $accumulation_buffer_width
   if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
-    directive set /Accelerator/$accumulation_buffer_stripped/bank1_run/bank1.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $memory_width
+    directive set /Accelerator/$accumulation_buffer_stripped/bank1_run/bank1.value.$ACC_BUF_C_DATA_REP_NAME -WORD_WIDTH $accumulation_buffer_width
+  }
+
+  if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
+    directive set /Accelerator/$accumulation_buffer_stripped/bank0_run/bank0.value.$ACC_BUF_C_DATA_REP_NAME:rsc -MAP_TO_MODULE [get_memory_name 0 $ACCUM_BUFFER_SIZE $accumulation_buffer_width]
+    if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
+      directive set /Accelerator/$accumulation_buffer_stripped/bank1_run/bank1.value.$ACC_BUF_C_DATA_REP_NAME:rsc -MAP_TO_MODULE [get_memory_name 0 $ACCUM_BUFFER_SIZE $accumulation_buffer_width]
+    }
   }
 }
 
