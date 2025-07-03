@@ -45,7 +45,7 @@
             32
         ],
         "layers": [
-            "linear_mx_default_7"
+            "lm_head"
         ]
     },
     {
@@ -61,12 +61,12 @@
         ],
         "block_size": 64,
         "layers": [
-            "linear_mx_default_7",
+            "lm_head",
             "slice_1",
             "slice_3",
-            "submodule_3",
-            "submodule_4",
-            "submodule_5",
+            "permute_default_fused",
+            "slice_4_fused",
+            "permute_default_1_fused",
             "submodule_6"
         ]
     },
@@ -106,11 +106,11 @@
         "layers": [
             "calculate_mx_qparam_default",
             "calculate_mx_qparam_default_1",
-            "index_copy_",
+            "index_copy__1",
             "slice_1",
             "slice_3",
             "submodule_2",
-            "submodule_3",
+            "permute_default_fused",
             "submodule_4",
             "submodule_5"
         ]
