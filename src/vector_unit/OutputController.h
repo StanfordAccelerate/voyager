@@ -19,7 +19,10 @@ SC_MODULE(OutputController) {
   Connections::In<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_in);
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
       quantized_data);
+
+  Connections::Fifo<ScaleType, 16> CCS_INIT_S1(scale_fifo);
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
+  Connections::Combinational<ScaleType> CCS_INIT_S1(scale_deq);
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
@@ -32,6 +35,11 @@ SC_MODULE(OutputController) {
   static constexpr int LOOP_WIDTH = 16;
 
   SC_CTOR(OutputController) {
+    scale_fifo.clk(clk);
+    scale_fifo.rst(rstn);
+    scale_fifo.enq(scale_in);
+    scale_fifo.deq(scale_deq);
+
     SC_THREAD(send_address);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -119,9 +127,9 @@ SC_MODULE(OutputController) {
 
   void send_data() {
     send_data_params.ResetRead();
-    quantized_data.ResetRead();
-    scale_in.Reset();
+    scale_deq.ResetRead();
     scale_out.Reset();
+    quantized_data.ResetRead();
     vector_out.Reset();
     done.Reset();
 
@@ -142,7 +150,7 @@ SC_MODULE(OutputController) {
       while (counter++ < num_outputs) {
 #if SUPPORT_MX
         if (params.quantize_output_mx) {
-          ScaleType scale = scale_in.Pop();
+          ScaleType scale = scale_deq.Pop();
           scale_out.Push(scale.bits_rep());
         }
 #endif
