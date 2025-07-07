@@ -65,6 +65,7 @@
             "slice_1",
             "slice_3",
             "permute_default_fused",
+            "slice_2_fused",
             "slice_4_fused",
             "permute_default_1_fused",
             "submodule_6"
@@ -88,7 +89,8 @@
         "layers": [
             "calculate_mx_qparam_default",
             "calculate_mx_qparam_default_1",
-            "index_copy_"
+            "index_copy_",
+            "index_copy__1"
         ]
     },
     {
@@ -106,11 +108,15 @@
         "layers": [
             "calculate_mx_qparam_default",
             "calculate_mx_qparam_default_1",
+            "index_copy_",
             "index_copy__1",
             "slice_1",
             "slice_3",
             "submodule_2",
             "permute_default_fused",
+            "permute_default_1_fused",
+            "slice_2_fused",
+            "slice_4_fused",
             "submodule_4",
             "submodule_5"
         ]
