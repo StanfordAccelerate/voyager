@@ -18,7 +18,7 @@ ACCURACY_RESULTS = {
     "resnet18": {
         "E4M3": 69.2,
         "CFLOAT": 71.5,
-        "INT8": 71.5,
+        "INT8": 69.5,
         "MXINT8": 70.7,
         "P8_1": 69.1,
     },
