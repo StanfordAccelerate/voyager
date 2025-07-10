@@ -1,4 +1,4 @@
-name: accelerator-env-1
+name: accelerator-env
 channels:
   - conda-forge
 dependencies:
