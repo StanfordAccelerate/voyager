@@ -37,7 +37,7 @@ void MapMicroscaling(const codegen::Operation &param,
 
   const auto input_memory = input.memory();
   memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
+  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
   vector_params->addr_gen0_mode = 1;
   vector_params->addr_gen0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
@@ -59,7 +59,7 @@ void MapMicroscaling(const codegen::Operation &param,
 
   const auto output_memory = output.memory();
   memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
   vector_params->output_mode = 1;
 
   vector_params->output_loops[0][0] = input_shape[0];

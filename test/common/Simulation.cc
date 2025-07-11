@@ -131,10 +131,19 @@ void Simulation::print_ideal_runtime(const Operation operation) {
 
     // the total number of operations is X * Y * C * FX * FY * K.
     long num_macs = get_size(output) * get_size(weight) / K;
-    cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
 
-    if (operation.has_shrunk_tiling) {
-      cycles *= operation.shrink_factor;
+    if (is_fc(first_op)) {
+#if SUPPORT_MVM
+      cycles = num_macs / MV_UNIT_WIDTH;
+#else
+      cycles = num_macs / OC_DIMENSION;
+#endif
+    } else {
+      cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
+
+      if (operation.has_shrunk_tiling) {
+        cycles *= operation.shrink_factor;
+      }
     }
 
     spdlog::info("{}, matrix unit ideal runtime: {} ns\n", get_op_name(param),

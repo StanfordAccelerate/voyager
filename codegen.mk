@@ -9,12 +9,12 @@ BLOCK_SIZE := $(shell [ $(IC_DIMENSION) -gt $(OC_DIMENSION) ] && echo $(IC_DIMEN
 MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE) --weight int8,qs=microscaling,bs=$(BLOCK_SIZE) --force_scale_power_of_two --bf16
 MXNF4_FLAGS := --activation nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16
 COMMON_FLAGS := --transpose_weight
-LLM_FLAGS := --context_length 128
+LLM_FLAGS := --context_length 512 --remove_duplicate
 EXTRA_COMPILER_FLAGS ?=
 
 # Set default values if not already defined in the environment
-CACHE_SIZE ?= 8388608
-NUM_BANKS  ?= 32
+CACHE_SIZE ?= 4194304
+NUM_BANKS  ?= 8
 
 ifeq ($(SOC_SIM),1)
 COMMON_FLAGS += --perform_tiling --cache_size $(CACHE_SIZE) --num_banks $(NUM_BANKS)

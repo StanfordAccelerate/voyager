@@ -78,10 +78,6 @@ else
 	override BASE_FLAGS += -DSUPPORT_MVM=$(SUPPORT_MVM)
 endif
 
-ifdef LLM_DECODE
-	override BASE_FLAGS += -DLLM_DECODE=$(LLM_DECODE)
-endif
-
 ifdef CLOCK_PERIOD
 	override BASE_FLAGS += -DCLOCK_PERIOD=$(CLOCK_PERIOD)
 endif

@@ -17,7 +17,7 @@
 #include "test/compiler/proto/param.pb.h"
 // IWYU pragma: end_exports
 
-#define DRAM_SIZE_MB (512 * 1024LL * 1024LL)
+#define DRAM_SIZE_MB (1024 * 1024LL * 1024LL)
 #define SRAM_SIZE_MB (8 * 1024LL * 1024LL)
 #define REFERENCE_MEMORY_SIZE (1024 * 1024 * 8)
 
@@ -108,6 +108,17 @@ inline std::vector<codegen::Tensor> get_op_outputs(
   return outputs;
 }
 
+inline bool is_fc(const codegen::OpOverload& op) {
+  const auto input = op.kwargs().at("input").tensor();
+
+  int dim = 1;
+  for (int i = 0; i < input.shape_size() - 1; i++) {
+    dim *= input.shape(i);
+  }
+
+  return dim == 1;
+}
+
 inline float* read_constant_param(const codegen::Tensor& tensor) {
   const char* env_var = std::getenv("NETWORK");
   std::string model_name(env_var);
@@ -139,7 +150,8 @@ inline bool is_soc_sim() {
 
 inline uint64_t get_address(const codegen::Tensor& tensor) {
   if (is_soc_sim() && tensor.has_scratchpad()) {
-    return tensor.scratchpad().offset();
+    std::string offset = getenv("SOC_MEM_OFFSET", "0");
+    return tensor.scratchpad().offset() + std::stoi(offset);
   } else {
     return tensor.memory().address();
   }

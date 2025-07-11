@@ -91,8 +91,7 @@
             "permute_default_fused",
             "slice_2_fused",
             "slice_4_fused",
-            "permute_default_1_fused",
-            "submodule_6"
+            "permute_default_1_fused"
         ]
     },
     {

@@ -288,17 +288,6 @@ void set_quantize_params(const codegen::Operation &param,
   }
 }
 
-bool is_fc(const codegen::OpOverload &op) {
-  const auto input = op.kwargs().at("input").tensor();
-
-  int dim = 1;
-  for (int i = 0; i < input.shape_size() - 1; i++) {
-    dim *= input.shape(i);
-  }
-
-  return dim == 1;
-}
-
 template <typename T, size_t N, int PortWidth, typename... Ts>
 bool try_fetch_params_for_type(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
                                int loop_bound, int &out_pf, int &out_fw) {
