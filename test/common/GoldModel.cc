@@ -212,7 +212,9 @@ std::vector<std::any> run_operation(const Operation &operation,
 
   if (first_op.target() == "transpose") {
     const auto input = first_op.kwargs().at("input").tensor();
-    output_ptr = transpose<Vector>(kwargs[input.node()], first_op);
+    std::any input_ptr = kwargs[input.node()];
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    output_ptr = transpose<Vector>(input_ptr, first_op);
   }
 
   if (first_op.target() == "permute") {
