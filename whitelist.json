@@ -55,6 +55,19 @@
     },
     {
         "datatype": "MXNF4",
+        "model": "llama_prefill_mp",
+        "sim_type": [
+            "systemc",
+            "fast-systemc",
+            "rtl"
+        ],
+        "block_size": 32,
+        "layers": [
+            "model_layers_0_mlp_down_proj_fused"
+        ]
+    },
+    {
+        "datatype": "MXNF4",
         "model": "llama_prefill",
         "sim_type": [
             "systemc",
@@ -101,11 +114,9 @@
             "fast-systemc",
             "rtl"
         ],
-        "block_size": [
-            16,
-            32
-        ],
+        "block_size": 32,
         "layers": [
+            "calculate_mx_qparam_default",
             "calculate_mx_qparam_default_1",
             "index_copy_",
             "index_copy__1",
