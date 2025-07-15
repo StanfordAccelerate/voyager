@@ -8,6 +8,7 @@
 #include "src/ArchitectureParams.h"
 #include "test/common/ArrayMemory.h"
 #include "test/common/MemoryInterface.h"
+#include "test/common/Network.h"
 #include "test/common/VerificationTypes.h"
 #include "test/compiler/proto/param.pb.h"
 
@@ -15,13 +16,10 @@ class DataLoader {
  public:
   DataLoader(MemoryInterface*, bool);
 
-  void load_inputs(const codegen::Operation param, std::string data_dir,
-                   bool random_data = false);
-  void load_outputs(const codegen::Operation param, std::string data_dir);
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
                    bool transpose = false, bool replication = false);
-  void load_parameters(const codegen::Operation param, std::string data_dir,
-                       bool random_data = false);
+  void load_inputs(const std::vector<Operation>, std::string data_dir);
+  void load_outputs(const codegen::Operation param, std::string data_dir);
 
   float* read_tensor_from_file(const std::string& filename, int size);
 

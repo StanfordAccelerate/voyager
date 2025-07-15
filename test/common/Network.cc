@@ -251,11 +251,11 @@ Network::Network(std::string& model_name) {
              "/networks/" + model_name + "/" + datatype + "/" +
              std::string(getenv("IC_DIMENSION")) + "x" +
              std::string(getenv("OC_DIMENSION")) + "_" +
-             std::string(getenv("INPUT_BUFFER_SIZE")) + "x" +
-             std::string(getenv("WEIGHT_BUFFER_SIZE")) + "x" +
-             std::string(getenv("ACCUM_BUFFER_SIZE")) + "_" +
-             std::string(getenv("DOUBLE_BUFFERED_ACCUM_BUFFER")) + "/" +
-             "tilings.txtpb";
+             std::string(getenv("INPUT_BUFFER_SIZE", "1024")) + "x" +
+             std::string(getenv("WEIGHT_BUFFER_SIZE", "1024")) + "x" +
+             std::string(getenv("ACCUM_BUFFER_SIZE", "1024")) + "_" +
+             std::string(getenv("DOUBLE_BUFFERED_ACCUM_BUFFER", "false")) +
+             "/tilings.txtpb";
 
   bool tilings_exist = std::filesystem::exists(filename);
   if (tilings_exist) {

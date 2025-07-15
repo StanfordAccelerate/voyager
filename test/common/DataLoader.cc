@@ -15,6 +15,7 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
                              bool replication) {
   const auto shape = get_shape(tensor, false);
   const int size = get_size(shape);
+  const uint64_t offset = get_address(tensor);
 
   if (size == 1 && !tensor.has_memory()) {
     return;
@@ -27,7 +28,7 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   }
   spdlog::debug("\n");
   spdlog::debug("Datatype: {}\n", tensor.dtype());
-  spdlog::debug("Address: {}\n", tensor.memory().address());
+  spdlog::debug("Address: {}\n", offset);
   spdlog::debug("Transposed: {}\n", transpose);
   spdlog::debug("Replication: {}\n", replication);
 
@@ -63,38 +64,61 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   delete[] array_ptr;
 }
 
-void DataLoader::load_inputs(const codegen::Operation param,
-                             std::string data_dir, bool random_data) {
-  // convolution layer inputs/outputs need to be permuted. If the matrix
-  // operation is a convolution, the following fused vector operations will
-  // need to be permuted as well. This logic should be refined in the future.
-  const auto op_list = get_op_list(param);
+void DataLoader::load_inputs(const std::vector<Operation> operations,
+                             std::string data_dir) {
+  std::vector<codegen::Tensor> inputs;
+  std::vector<codegen::Tensor> inputs_with_replication;
+  std::vector<codegen::Tensor> outputs;
 
-  for (const auto& op : op_list) {
-    for (const auto [key, value] : op.kwargs()) {
-      const auto& tensor = value.tensor();
-      if (value.has_tensor() && tensor.has_memory() &&
-          tensor.node().find("constant") == std::string::npos) {
-        bool is_conv2d = op.target().find("conv2d") != std::string::npos;
-        bool is_replication =
-            is_conv2d && tensor.shape(tensor.shape().size() - 1) == 3 && is_dut;
-        load_tensor(value.tensor(), data_dir, false, is_replication);
+  for (const auto op : operations) {
+    const auto op_list = get_op_list(op.param);
+    for (const auto op : op_list) {
+      for (const auto [key, value] : op.kwargs()) {
+        const auto& tensor = value.tensor();
+        if (value.has_tensor() &&
+            (value.tensor().has_memory() || get_size(value.tensor()) == 1)) {
+          bool is_conv2d = op.target().find("conv2d") != std::string::npos;
+          if (is_dut && is_conv2d && tensor.shape_size() == 4 &&
+              tensor.shape(3) == 3) {
+            inputs_with_replication.push_back(value.tensor());
+          } else {
+            inputs.push_back(value.tensor());
+          }
+        }
       }
     }
+
+    const auto tensors = get_op_outputs(op.param);
+    for (const auto& tensor : tensors) {
+      outputs.push_back(tensor);
+    }
   }
-}
 
-void DataLoader::load_parameters(const codegen::Operation param,
-                                 std::string data_dir, bool random_data) {
-  const auto op_list = get_op_list(param);
-
-  for (const auto& op : op_list) {
-    for (const auto [key, value] : op.kwargs()) {
-      const auto& tensor = value.tensor();
-      if (value.has_tensor() && tensor.has_memory() &&
-          tensor.node().find("_param_constant") != std::string::npos) {
-        load_tensor(value.tensor(), data_dir, false);
+  for (const auto& tensor : inputs) {
+    bool found = false;
+    for (const auto& output : outputs) {
+      if (tensor.node() == output.node()) {
+        found = true;
+        break;
       }
+    }
+
+    if (!found) {
+      load_tensor(tensor, data_dir, false, false);
+    }
+  }
+
+  for (const auto& tensor : inputs_with_replication) {
+    bool found = false;
+    for (const auto& output : outputs) {
+      if (tensor.node() == output.node()) {
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      load_tensor(tensor, data_dir, false, true);
     }
   }
 }
@@ -113,9 +137,14 @@ void DataLoader::load_outputs(const codegen::Operation param,
     output_tensor.CopyFrom(tensor);
     // Store output in the last memory partition
     output_tensor.mutable_memory()->set_partition(-1);
-    output_tensor.mutable_memory()->set_address(address);
 
-    load_tensor(output_tensor, data_dir, false);
+    if (is_soc_sim()) {
+      output_tensor.mutable_scratchpad()->set_offset(address);
+    } else {
+      output_tensor.mutable_memory()->set_address(address);
+    }
+
+    load_tensor(output_tensor, data_dir);
     address += get_size(tensor);
   }
 }

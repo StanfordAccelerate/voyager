@@ -269,7 +269,7 @@ void set_quantize_params(const codegen::Operation &param,
     }
 
     vector_params->quantize_output_mx = true;
-    vector_params->SCALE_OFFSET = param.outputs().tensors(0).memory().address();
+    vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
 
     if (last_op.kwargs().contains("quant_code")) {
       const auto code = last_op.kwargs().at("quant_code").tensor();
@@ -286,17 +286,6 @@ void set_quantize_params(const codegen::Operation &param,
       vector_params->use_output_codebook = true;
     }
   }
-}
-
-bool is_fc(const codegen::OpOverload &op) {
-  const auto input = op.kwargs().at("input").tensor();
-
-  int dim = 1;
-  for (int i = 0; i < input.shape_size() - 1; i++) {
-    dim *= input.shape(i);
-  }
-
-  return dim == 1;
 }
 
 template <typename T, size_t N, int PortWidth, typename... Ts>

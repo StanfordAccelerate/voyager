@@ -27,7 +27,7 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   // input is a vector of size reduction_dim
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
+  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
   vector_params->addr_gen0_mode = 2;
   vector_params->addr_gen0_broadcast = 0b010000;
   vector_params->addr_gen0_dtype =
@@ -43,7 +43,7 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   // weight is a matrix of output_dim x reduction_dim
   const auto weight_memory = weight.memory();
   accelerator_memory_map["vector1"] = get_partition(weight_memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = weight_memory.address();
+  vector_params->ADDRESS_GEN1_OFFSET = get_address(weight);
   vector_params->addr_gen1_mode = true;
   vector_params->addr_gen1_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(weight.dtype());
@@ -66,7 +66,7 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
     const auto bias = matrix_op.kwargs().at("bias").tensor();
     const auto bias_memory = bias.memory();
     accelerator_memory_map["vector2"] = get_partition(bias_memory.partition());
-    vector_params->ADDRESS_GEN2_OFFSET = bias_memory.address();
+    vector_params->ADDRESS_GEN2_OFFSET = get_address(bias);
     vector_params->addr_gen2_mode = true;
     vector_params->addr_gen2_broadcast = 0b011;
     vector_params->addr_gen2_dtype =
@@ -89,7 +89,7 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   // output
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
   vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 

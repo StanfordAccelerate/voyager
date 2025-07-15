@@ -21,7 +21,7 @@ void set_addr_gen1(const codegen::Tensor &tensor, const Tiling &tiling,
 
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = memory.address();
+  vector_params->ADDRESS_GEN1_OFFSET = get_address(tensor);
   vector_params->addr_gen1_mode = true;
   vector_params->addr_gen1_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
   vector_params->addr_gen1_dtype =
@@ -68,7 +68,7 @@ void set_addr_gen2(const codegen::Tensor &tensor, const Tiling &tiling,
 
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN2_OFFSET = memory.address();
+  vector_params->ADDRESS_GEN2_OFFSET = get_address(tensor);
   vector_params->addr_gen2_mode = true;
   vector_params->addr_gen2_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
 
@@ -240,7 +240,7 @@ void MapMatrixOperation(const Operation &operation,
 
   const auto input_memory = input.memory();
   accelerator_memory_map["inputs"] = get_partition(input_memory.partition());
-  matrix_params->INPUT_OFFSET = input_memory.address();
+  matrix_params->INPUT_OFFSET = get_address(input);
   matrix_params->input_dtype =
       get_index_from_type_name<INPUT_DATATYPE>(input.dtype());
   matrix_params->use_input_codebook = matrix_op.kwargs().contains("input_code");
@@ -260,7 +260,7 @@ void MapMatrixOperation(const Operation &operation,
 
   const auto weight_memory = weight.memory();
   accelerator_memory_map["weights"] = get_partition(weight_memory.partition());
-  matrix_params->WEIGHT_OFFSET = weight_memory.address();
+  matrix_params->WEIGHT_OFFSET = get_address(weight);
   matrix_params->weight_dtype =
       get_index_from_type_name<WEIGHT_DATATYPE>(weight.dtype());
   matrix_params->use_weight_codebook =
@@ -286,10 +286,10 @@ void MapMatrixOperation(const Operation &operation,
     assert(block_size == std::max(IC_DIMENSION, OC_DIMENSION));
 
     const auto input_scale = matrix_op.kwargs().at("input_scale").tensor();
-    matrix_params->INPUT_SCALE_OFFSET = input_scale.memory().address();
+    matrix_params->INPUT_SCALE_OFFSET = get_address(input_scale);
 
     const auto weight_scale = matrix_op.kwargs().at("weight_scale").tensor();
-    matrix_params->WEIGHT_SCALE_OFFSET = weight_scale.memory().address();
+    matrix_params->WEIGHT_SCALE_OFFSET = get_address(weight_scale);
   }
 
   for (int i = 0; i < 2; i++) {
@@ -460,8 +460,9 @@ void MapMatrixOperation(const Operation &operation,
     }
   }
 
-  int c_bound =
-      tiling.resnet_replication ? 1 : tiling.loops[1][tiling.reduction_loop_index[1]];
+  int c_bound = tiling.resnet_replication
+                    ? 1
+                    : tiling.loops[1][tiling.reduction_loop_index[1]];
   int input_effective_fw;
   int input_pf =
       get_packing_factor<IC_DIMENSION, IC_PORT_WIDTH, INPUT_DATATYPE>(
@@ -488,7 +489,7 @@ void MapMatrixOperation(const Operation &operation,
     const auto bias = matrix_op.kwargs().at("bias").tensor();
     const auto bias_memory = bias.memory();
     matrix_params->has_bias = true;
-    matrix_params->BIAS_OFFSET = bias_memory.address();
+    matrix_params->BIAS_OFFSET = get_address(bias);
     accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
   }
 
@@ -547,7 +548,7 @@ void MapMatrixOperation(const Operation &operation,
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
 
   // Set outer loops
   for (int i = 0; i < 3; i++) {
@@ -674,7 +675,7 @@ void MapMatrixOperation(const Operation &operation,
 
     if (opcode == "vmap") {
       const auto other = op.kwargs().at("code").tensor();
-      inst.VMAP_OFFSET = other.memory().address();
+      inst.VMAP_OFFSET = get_address(other);
     } else if (opcode == "quantize_mx") {
       float quant_max = op.kwargs().at("quant_max").float_value();
       bool force_scale_power_of_two =
@@ -688,8 +689,7 @@ void MapMatrixOperation(const Operation &operation,
       }
 
       vector_params->quantize_output_mx = true;
-      vector_params->SCALE_OFFSET =
-          param.outputs().tensors(0).memory().address();
+      vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
 
       if (op.kwargs().contains("quant_code")) {
         const auto code = op.kwargs().at("quant_code").tensor();

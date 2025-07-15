@@ -45,32 +45,6 @@ char* ArrayMemory::get_memory(int partition) {
   return memories[partition];
 }
 
-/**
- * Retrieves the reference output tensor from the given accelerator parameter.
- * The reference output tensor is stored at the last partition at address of
- * 0.
- */
-std::vector<std::any> ArrayMemory::get_reference_outputs(
-    const codegen::Operation& param) {
-  const auto tensors = get_op_outputs(param);
-  std::vector<std::any> outputs;
-
-  uint64_t address = 0;
-
-  for (const auto& tensor : tensors) {
-    codegen::Tensor tensor_copy;
-    tensor_copy.CopyFrom(tensor);
-    auto memory = tensor_copy.mutable_memory();
-    memory->set_partition(-1);
-    memory->set_address(address);
-
-    outputs.push_back(read_tensor(tensor_copy));
-    address += get_size(tensor);
-  }
-
-  return outputs;
-}
-
 void ArrayMemory::read_bytes_from_memory(const long long address,
                                          const int partition,
                                          const int num_bytes, char* bytes) {

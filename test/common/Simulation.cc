@@ -67,7 +67,8 @@ Simulation::Simulation() {
   for (const std::string& s : sims) spdlog::info("{} ", s);
   spdlog::info("\n> Tolerance: {}", tolerance);
   spdlog::info("\n> Output dir: {}", out_dir);
-  spdlog::info("\n> SRAM: {} KB\n", SRAM_MEMORY_SIZE / 1024);
+  spdlog::info("\n> DRAM: {} KB", DRAM_SIZE_MB / 1024);
+  spdlog::info("\n> SRAM: {} KB\n", SRAM_SIZE_MB / 1024);
 }
 
 Simulation::~Simulation() {
@@ -80,15 +81,8 @@ Simulation::~Simulation() {
 }
 
 void Simulation::load_data() {
-  std::vector<uint64_t> memory_sizes{SRAM_MEMORY_SIZE, REFERENCE_MEMORY_SIZE};
-
-  bool is_cnn = model == "resnet18" || model == "resnet50";
-  int num_classes;
-  if (model == "mobilebert" || model == "bert") {
-    num_classes = 2;
-  } else if (model == "resnet18" || model == "resnet50") {
-    num_classes = 1000;
-  }
+  const int sim_memory_size = is_soc_sim() ? SRAM_SIZE_MB : DRAM_SIZE_MB;
+  std::vector<uint64_t> memory_sizes{sim_memory_size, REFERENCE_MEMORY_SIZE};
 
   if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
     memories["gold"] = new ArrayMemory(memory_sizes);
@@ -108,17 +102,7 @@ void Simulation::load_data() {
   const auto operations = network->get_operations(tests, false);
 
   for (const auto& [key, dataloader] : dataLoaders) {
-    // Load the inputs to the entire model first, e.g. attention mask
-    for (const auto& tensor : network->model.inputs()) {
-      dataloader->load_tensor(tensor, data_dir);
-    }
-
-    for (const auto& operation : operations) {
-      dataloader->load_parameters(operation.param, data_dir);
-    }
-
-    // Load the layer's input and output last
-    dataloader->load_inputs(operations.front().param, data_dir);
+    dataloader->load_inputs(operations, data_dir);
     dataloader->load_outputs(operations.back().param, data_dir);
   }
 
@@ -147,10 +131,19 @@ void Simulation::print_ideal_runtime(const Operation operation) {
 
     // the total number of operations is X * Y * C * FX * FY * K.
     long num_macs = get_size(output) * get_size(weight) / K;
-    cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
 
-    if (operation.has_shrunk_tiling) {
-      cycles *= operation.shrink_factor;
+    if (is_fc(first_op)) {
+#if SUPPORT_MVM
+      cycles = num_macs / MV_UNIT_WIDTH;
+#else
+      cycles = num_macs / OC_DIMENSION;
+#endif
+    } else {
+      cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
+
+      if (operation.has_shrunk_tiling) {
+        cycles *= operation.shrink_factor;
+      }
     }
 
     spdlog::info("{}, matrix unit ideal runtime: {} ns\n", get_op_name(param),

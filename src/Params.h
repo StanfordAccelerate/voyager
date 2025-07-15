@@ -983,6 +983,7 @@ struct VectorParams : BaseParams {
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorParams& params) {
     os << "addr_gen0_mode: " << params.addr_gen0_mode << std::endl;
+    os << "addr_gen0_broadcast: " << params.addr_gen0_broadcast << std::endl;
     os << "ADDRESS_GEN0_OFFSET: " << params.ADDRESS_GEN0_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -1006,6 +1007,7 @@ struct VectorParams : BaseParams {
     os << "addr_gen0_dtype: " << params.addr_gen0_dtype << std::endl;
 
     os << "addr_gen1_mode: " << params.addr_gen1_mode << std::endl;
+    os << "addr_gen1_broadcast: " << params.addr_gen1_broadcast << std::endl;
     os << "ADDRESS_GEN1_OFFSET: " << params.ADDRESS_GEN1_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -1029,6 +1031,7 @@ struct VectorParams : BaseParams {
     os << "addr_gen1_dtype: " << params.addr_gen1_dtype << std::endl;
 
     os << "addr_gen2_mode: " << params.addr_gen2_mode << std::endl;
+    os << "addr_gen2_broadcast: " << params.addr_gen2_broadcast << std::endl;
     os << "ADDRESS_GEN2_OFFSET: " << params.ADDRESS_GEN2_OFFSET << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
@@ -1079,10 +1082,6 @@ struct VectorParams : BaseParams {
       os << "output_pad_dim_idx[" << i << "]: " << params.output_pad_dim_idx[i]
          << std::endl;
     }
-
-    os << "addr_gen0_broadcast: " << params.addr_gen0_broadcast << std::endl;
-    os << "addr_gen1_broadcast: " << params.addr_gen1_broadcast << std::endl;
-    os << "addr_gen2_broadcast: " << params.addr_gen2_broadcast << std::endl;
 
     os << "has_slicing: " << params.has_slicing << std::endl;
     os << "addr_gen0_dim: " << params.addr_gen0_dim << std::endl;

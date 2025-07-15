@@ -22,7 +22,7 @@
 /* Run inference on a single sample and return correct classification. */
 bool run_sample(std::string model_name, std::string data_dir,
                 std::string sample, Network network) {
-  std::vector<uint64_t> memory_sizes{SRAM_MEMORY_SIZE};
+  std::vector<uint64_t> memory_sizes{DRAM_SIZE_MB};
   auto memory = std::make_unique<ArrayMemory>(memory_sizes);
 
   const auto model = network.model;

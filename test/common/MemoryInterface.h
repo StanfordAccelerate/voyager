@@ -30,9 +30,8 @@ class MemoryInterface {
       return false;
     }
 
-    const auto& memory = tensor.memory();
-    const uint64_t address = memory.address();
-    const int partition = memory.partition();
+    const uint64_t address = get_address(tensor);
+    const int partition = tensor.memory().partition();
     const int size = get_size(tensor, false);
 
     int num_bytes = (size * T::width + 7) / 8;
@@ -119,9 +118,8 @@ class MemoryInterface {
       return false;
     }
 
-    const auto& memory = tensor.memory();
-    const uint64_t address = memory.address();
-    const int partition = memory.partition();
+    const uint64_t address = get_address(tensor);
+    const int partition = tensor.memory().partition();
     const int size = get_size(tensor, false);
     T* casted = std::any_cast<T*>(data);
 
@@ -177,9 +175,8 @@ class MemoryInterface {
       return false;
     }
 
-    const auto& memory = tensor.memory();
-    const uint64_t address = memory.address();
-    const int partition = memory.partition();
+    const uint64_t address = get_address(tensor);
+    const int partition = tensor.memory().partition();
 
     int start = index * T::width / 8;
     int end = (index + 1) * T::width / 8;
@@ -254,8 +251,30 @@ class MemoryInterface {
     return outputs;
   }
 
-  virtual std::vector<std::any> get_reference_outputs(
-      const codegen::Operation& param) = 0;
+  std::vector<std::any> get_reference_outputs(const codegen::Operation& param) {
+    const auto tensors = get_op_outputs(param);
+    std::vector<std::any> outputs;
+
+    uint64_t address = 0;
+
+    for (const auto& tensor : tensors) {
+      codegen::Tensor tensor_copy;
+      tensor_copy.CopyFrom(tensor);
+      auto memory = tensor_copy.mutable_memory();
+      memory->set_partition(-1);
+
+      if (is_soc_sim()) {
+        tensor_copy.mutable_scratchpad()->set_offset(address);
+      } else {
+        tensor_copy.mutable_memory()->set_address(address);
+      }
+
+      outputs.push_back(read_tensor(tensor_copy));
+      address += get_size(tensor);
+    }
+
+    return outputs;
+  }
 
   virtual void write_bytes_to_memory(const long long address,
                                      const int partition, const int num_bytes,

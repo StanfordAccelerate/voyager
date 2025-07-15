@@ -28,6 +28,9 @@ std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   os << "Stride: " << tiling.stride << std::endl;
   os << "Padding: " << tiling.padding << std::endl;
   os << "Resnet Replication: " << tiling.resnet_replication << std::endl;
+  os << "Generic Replication: " << tiling.generic_replication << std::endl;
+  os << "Num Channels: " << tiling.num_channels << std::endl;
+  os << "FX Unrolling: " << tiling.fx_unrolling << std::endl;
   return os;
 }
 

@@ -46,7 +46,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   const auto input_memory = input.memory();
   memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
+  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
   vector_params->addr_gen0_mode = 2;
   vector_params->addr_gen0_broadcast = 0b010000;
   vector_params->addr_gen0_dtype =
@@ -62,7 +62,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   // Overwrite inputs
   memory_map["outputs"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = input_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(input);
   vector_params->output_mode = 2;
 
   vector_params->output_loops[0][0] = 1;
@@ -123,7 +123,7 @@ void MapLayerNorm(const codegen::Operation &param,
   vinstr_config = new VectorInstructionConfig;
 
   memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
+  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
   vector_params->addr_gen0_mode = 2;
   vector_params->addr_gen0_broadcast = 0b010000;
   vector_params->addr_gen0_dtype =
@@ -139,7 +139,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   // Overwrite inputs
   memory_map["outputs"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = input_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(input);
   vector_params->output_mode = 2;
 
   vector_params->output_loops[0][0] = 1;
@@ -204,7 +204,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   // Fetch inputs
   memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
+  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
   vector_params->addr_gen0_mode = 2;
   vector_params->addr_gen0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
@@ -219,7 +219,7 @@ void MapLayerNorm(const codegen::Operation &param,
   // Fetch weights
   const auto weight_memory = weight.memory();
   memory_map["vector1"] = get_partition(weight_memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = weight_memory.address();
+  vector_params->ADDRESS_GEN1_OFFSET = get_address(weight);
   vector_params->addr_gen1_mode = true;
   vector_params->addr_gen1_broadcast = 0b011;
   vector_params->addr_gen1_dtype =
@@ -247,7 +247,7 @@ void MapLayerNorm(const codegen::Operation &param,
     const auto bias = layer_norm_op.kwargs().at("bias").tensor();
     const auto bias_memory = bias.memory();
     memory_map["vector2"] = get_partition(bias_memory.partition());
-    vector_params->ADDRESS_GEN2_OFFSET = bias_memory.address();
+    vector_params->ADDRESS_GEN2_OFFSET = get_address(bias);
     vector_params->addr_gen2_mode = true;
     vector_params->addr_gen2_broadcast = 0b011;
     vector_params->addr_gen2_dtype =
@@ -269,7 +269,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   const auto output_memory = output.memory();
   memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
   vector_params->output_mode = 2;
 
   vector_params->output_loops[0][0] = 1;

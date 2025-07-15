@@ -71,17 +71,32 @@ inline T* permute(std::any input_ptr, const std::vector<int>& shape,
 
 template <typename T>
 inline T* permute(std::any input_ptr, const codegen::OpOverload op) {
-  if (op.target() != "permute") {
-    return std::any_cast<T*>(input_ptr);
+  if (op.target() == "permute") {
+    const auto input = op.kwargs().at("input").tensor();
+    const auto input_shape = get_shape(input);
+
+    const auto dims = op.kwargs().at("dims").int_list().values();
+    std::vector<int> dims_vector(dims.begin(), dims.end());
+
+    return permute<T>(input_ptr, input_shape, dims_vector);
+  } else if (op.target() == "transpose") {
+    const auto input = op.kwargs().at("input").tensor();
+    const auto input_shape = get_shape(input);
+
+    const int dim0 = op.kwargs().at("dim0").int_value();
+    const int dim1 = op.kwargs().at("dim1").int_value();
+
+    std::vector<int> dims_vector;
+    for (int i = 0; i < input_shape.size(); ++i) {
+      dims_vector.push_back(i);
+    }
+
+    std::swap(dims_vector[dim0], dims_vector[dim1]);
+
+    return permute<T>(input_ptr, input_shape, dims_vector);
   }
 
-  const auto input = op.kwargs().at("input").tensor();
-  const auto input_shape = get_shape(input);
-
-  const auto dims = op.kwargs().at("dims").int_list().values();
-  std::vector<int> dims_vector(dims.begin(), dims.end());
-
-  return permute<T>(input_ptr, input_shape, dims_vector);
+  return std::any_cast<T*>(input_ptr);
 }
 
 template <typename T>

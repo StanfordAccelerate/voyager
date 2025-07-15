@@ -54,7 +54,7 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
                           VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = memory.address();
+  vector_params->ADDRESS_GEN1_OFFSET = get_address(tensor);
   vector_params->addr_gen1_mode = true;
 
   auto input_shape = get_shape(tensor);
@@ -94,7 +94,7 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
                           VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN2_OFFSET = memory.address();
+  vector_params->ADDRESS_GEN2_OFFSET = get_address(tensor);
   vector_params->addr_gen2_mode = true;
 
   auto input_shape = get_shape(tensor);
@@ -158,7 +158,7 @@ void MapVectorOperations(const codegen::Operation &param,
   const auto input = op_list[0].kwargs().at("input").tensor();
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
+  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
   vector_params->addr_gen0_mode = 2;
   vector_params->addr_gen0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
@@ -261,6 +261,11 @@ void MapVectorOperations(const codegen::Operation &param,
   }
 
   if (vector_params->has_permute) {
+    if (input_shape[input_shape.size() - 1] % OC_DIMENSION != 0) {
+      throw std::invalid_argument(
+          "Last dimension of input shape must be a multiple of OC_DIMENSION!");
+    }
+
     std::vector<int> dims;
     if (reshape_kwargs.contains("dims")) {
       auto int_list = reshape_op.kwargs().at("dims").int_list().values();
@@ -361,7 +366,7 @@ void MapVectorOperations(const codegen::Operation &param,
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
   vector_params->output_mode = 2;
 
   auto output_shape = get_shape(output);
@@ -497,7 +502,7 @@ void MapVectorOperations(const codegen::Operation &param,
 
     if (opcode == "vmap") {
       const auto other = op.kwargs().at("other").tensor();
-      inst.VMAP_OFFSET = other.memory().address();
+      inst.VMAP_OFFSET = get_address(other);
     } else if (opcode == "neg") {
       const auto self = op.kwargs().at("input").tensor();
       const auto output_shape = squeeze_shape(get_shape(self));
@@ -522,8 +527,7 @@ void MapVectorOperations(const codegen::Operation &param,
       }
 
       vector_params->quantize_output_mx = true;
-      vector_params->SCALE_OFFSET =
-          param.outputs().tensors(0).memory().address();
+      vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
     } else if (op.kwargs().contains("other") || opcode == "quantize") {
       std::string other_key = opcode == "quantize" ? "scale" : "other";
       const auto other = op.kwargs().at(other_key);
