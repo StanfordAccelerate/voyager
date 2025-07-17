@@ -593,6 +593,9 @@ void MapMatrixOperation(const Operation &operation,
     vector_params->head_size_power_of_two = result;
   }
 
+  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
+  tiling.loops[1][tiling.weight_loop_index[1]] *= packing_factor;
+
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;
   inst.inst_count = tiling.loops[0][tiling.x_loop_index[0]] *
@@ -600,7 +603,8 @@ void MapMatrixOperation(const Operation &operation,
                     tiling.loops[0][tiling.y_loop_index[0]] *
                     tiling.loops[1][tiling.y_loop_index[1]] *
                     tiling.loops[0][tiling.weight_loop_index[0]] *
-                    tiling.loops[1][tiling.weight_loop_index[1]];
+                    tiling.loops[1][tiling.weight_loop_index[1]] *
+                    packing_factor;
 
   if (matrix_params->is_fc) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_vector_unit;

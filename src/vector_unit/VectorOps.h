@@ -12,7 +12,6 @@ T add(T op0, T op1) {
   return op0 + op1;
 }
 
-// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vadd(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   Pack1D<T, Width> res;
@@ -29,7 +28,6 @@ T mul(T op0, T op1) {
   return op0 * op1;
 }
 
-// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vmul(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   Pack1D<T, Width> res;
@@ -50,7 +48,6 @@ T div(T op0, T op1) {
   return op0 / op1;
 }
 
-// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vdiv(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   Pack1D<T, Width> res;
@@ -61,7 +58,6 @@ Pack1D<T, Width> vdiv(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
   return res;
 }
 
-// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vexp(const Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -72,7 +68,6 @@ Pack1D<T, Width> vexp(const Pack1D<T, Width> op0) {
   return res;
 }
 
-#pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vabs(Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -83,7 +78,6 @@ Pack1D<T, Width> vabs(Pack1D<T, Width> op0) {
   return res;
 }
 
-#pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vrelu(Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -94,7 +88,6 @@ Pack1D<T, Width> vrelu(Pack1D<T, Width> op0) {
   return res;
 }
 
-// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vgelu(Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -105,7 +98,6 @@ Pack1D<T, Width> vgelu(Pack1D<T, Width> op0) {
   return res;
 }
 
-// #pragma hls_design ccore
 template <typename T, size_t Width>
 Pack1D<T, Width> vsilu(Pack1D<T, Width> op0) {
   Pack1D<T, Width> res;
@@ -226,6 +218,30 @@ void vdequantize(const Pack1D<Input, Width>& op0, Pack1D<Output, Width>& res,
 }
 
 template <typename VectorType, typename ScaleType, int Width>
+ScaleType compute_scale(const VectorType amax, ac_int<16> qparam) {
+  ScaleType scale;
+
+  if constexpr (ScaleType::width == ScaleType::e_width) {
+    auto max_exp = amax.unbiased_exponent();
+
+    ac_int<VectorType::e_width, true> scaled_exp;
+    if (max_exp == 0) {
+      scaled_exp = 127;
+    } else {
+      scaled_exp = max_exp - qparam;
+    }
+
+    scale.set_bits(scaled_exp);
+  } else {
+    VectorType quant_max;
+    quant_max.set_bits(qparam);
+    scale = amax / quant_max;
+  }
+
+  return scale.is_zero() ? ScaleType::one() : scale;
+}
+
+template <typename VectorType, typename ScaleType, int Width>
 ScaleType calculate_mx_scale(const Pack1D<VectorType, Width>& op0,
                              ac_int<16> qparam) {
   ScaleType scale;
@@ -340,11 +356,6 @@ bool send_output_data(
 
 #pragma hls_unroll yes
   for (unsigned i = 0; i < N; i++) {
-    // if (is_codebook_quant) {
-    //   outputs[i].set_bits(inputs[i].bits_rep());
-    // } else {
-    //   outputs[i] = inputs[i];
-    // }
     outputs[i] = cast_output<VectorType, T>(inputs[i], is_codebook_quant);
   }
 

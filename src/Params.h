@@ -730,7 +730,6 @@ struct VectorParams : BaseParams {
     }
 
     has_transpose = false;
-    has_transpose_with_padded_dimension = false;
 
     is_maxpool = false;
     for (int i = 0; i < 2; i++) {
@@ -813,7 +812,6 @@ struct VectorParams : BaseParams {
   ac_int<3, false> addr_gen0_dims[6];
 
   bool has_transpose;
-  bool has_transpose_with_padded_dimension;
 
   bool is_maxpool;
   ac_int<8, false> stride[2];
@@ -841,10 +839,10 @@ struct VectorParams : BaseParams {
 
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
   // slicing params + 32-bit pooling param + 18-bit reshape params + 17-bit
-  // padded transpose params + 4-bit head size + 8 boolean flags + 64-bit scale
+  // padded transpose params + 4-bit head size + 7 boolean flags + 64-bit scale
   // offset
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
-                                    17 + 4 + 8 + ADDRESS_WIDTH - 16 +
+                                    17 + 4 + 7 + ADDRESS_WIDTH - 16 +
                                     codebook_params_width;
 
 #ifndef NO_SYSC
@@ -951,7 +949,6 @@ struct VectorParams : BaseParams {
     }
 
     m & has_transpose;
-    m & has_transpose_with_padded_dimension;
 
     m & is_maxpool;
     for (int i = 0; i < 2; i++) {
@@ -1096,8 +1093,6 @@ struct VectorParams : BaseParams {
     }
 
     os << "has_transpose: " << params.has_transpose << std::endl;
-    os << "has_transpose_with_padded_dimension: "
-       << params.has_transpose_with_padded_dimension << std::endl;
 
     os << "is_maxpool: " << params.is_maxpool << std::endl;
     for (int i = 0; i < 2; i++) {
@@ -1222,9 +1217,6 @@ struct VectorParams : BaseParams {
     }
 
     if (lhs.has_transpose != rhs.has_transpose) return false;
-    if (lhs.has_transpose_with_padded_dimension !=
-        rhs.has_transpose_with_padded_dimension)
-      return false;
 
     if (lhs.is_maxpool != rhs.is_maxpool) return false;
     for (int i = 0; i < 2; i++) {

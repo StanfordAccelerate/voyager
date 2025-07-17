@@ -37,6 +37,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   const int output_size = get_size(output);
   const int reduced_size = get_size(non_reduction_loops);
+  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   const auto output_memory = output.memory();
 
@@ -59,7 +60,8 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->addr_gen0_loops[1][0] = non_reduction_loops[0];
   vector_params->addr_gen0_loops[1][1] = non_reduction_loops[1];
-  vector_params->addr_gen0_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      reduction_dim / OC_DIMENSION * packing_factor;
 
   // Output: Scratch memory for max.
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -70,7 +72,7 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->output_loops[1][0] = 1;
   vector_params->output_loops[1][1] = 1;
-  vector_params->output_loops[1][2] = reduced_size;
+  vector_params->output_loops[1][2] = reduced_size / packing_factor;
   vector_params->output_dtype =
       get_type_index<VECTOR_DATATYPE, OUTPUT_DATATYPES>();
 
@@ -78,7 +80,7 @@ void MapSoftmax(const codegen::Operation &param,
   VectorInstructions vinst0;
   vinst0.op_type = VectorInstructions::reduction;
   vinst0.inst_count = reduced_size;
-  vinst0.reduce_count = reduction_dim / OC_DIMENSION;
+  vinst0.reduce_count = reduction_dim / OC_DIMENSION * packing_factor;
   vinst0.reduce_op = VectorInstructions::rmax;
   vinst0.rduplicate = 1;
   vinst0.rdest = VectorInstructions::to_memory;
@@ -88,7 +90,7 @@ void MapSoftmax(const codegen::Operation &param,
   // Instruction 1 - send to reduction engine to calculate max
   VectorInstructions vinst1;
   vinst1.op_type = VectorInstructions::vector;
-  vinst1.inst_count = input_size / OC_DIMENSION;
+  vinst1.inst_count = input_size / OC_DIMENSION * packing_factor;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst1;
@@ -119,7 +121,8 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->addr_gen0_loops[1][0] = non_reduction_loops[0];
   vector_params->addr_gen0_loops[1][1] = non_reduction_loops[1];
-  vector_params->addr_gen0_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      reduction_dim / OC_DIMENSION * packing_factor;
 
   // Address generator 1: Scratch max.
   vector_params->ADDRESS_GEN1_OFFSET = max_scratch_memory;
@@ -132,7 +135,8 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->addr_gen1_loops[1][0] = non_reduction_loops[0];
   vector_params->addr_gen1_loops[1][1] = non_reduction_loops[1];
-  vector_params->addr_gen1_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->addr_gen1_loops[1][2] =
+      reduction_dim / OC_DIMENSION * packing_factor;
 
   // Output: Scratch memory for sum.
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -145,13 +149,13 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->output_loops[1][0] = 1;
   vector_params->output_loops[1][1] = 1;
-  vector_params->output_loops[1][2] = reduced_size;
+  vector_params->output_loops[1][2] = reduced_size / packing_factor;
 
   // Instruction 2 - start reduction engine to calculate sum
   VectorInstructions vinst2;
   vinst2.op_type = VectorInstructions::reduction;
   vinst2.inst_count = reduced_size;
-  vinst2.reduce_count = reduction_dim / OC_DIMENSION;
+  vinst2.reduce_count = reduction_dim / OC_DIMENSION * packing_factor;
   vinst2.reduce_op = VectorInstructions::radd;
   vinst2.rreciprocal = 1;
   vinst2.rduplicate = 1;
@@ -162,7 +166,7 @@ void MapSoftmax(const codegen::Operation &param,
   // Instruction 3 - subtract max and exp, and reduce sum
   VectorInstructions vinst3;
   vinst3.op_type = VectorInstructions::vector;
-  vinst3.inst_count = input_size / OC_DIMENSION;
+  vinst3.inst_count = input_size / OC_DIMENSION * packing_factor;
   vinst3.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst3.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   vinst3.vector_op0 = VectorInstructions::vsub;
@@ -196,7 +200,8 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->addr_gen0_loops[1][0] = non_reduction_loops[0];
   vector_params->addr_gen0_loops[1][1] = non_reduction_loops[1];
-  vector_params->addr_gen0_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      reduction_dim / OC_DIMENSION * packing_factor;
 
   // Address generator 1: Scratch max.
   vector_params->ADDRESS_GEN1_OFFSET = max_scratch_memory;
@@ -209,7 +214,8 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->addr_gen1_loops[1][0] = non_reduction_loops[0];
   vector_params->addr_gen1_loops[1][1] = non_reduction_loops[1];
-  vector_params->addr_gen1_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->addr_gen1_loops[1][2] =
+      reduction_dim / OC_DIMENSION * packing_factor;
 
   // Address generator 2: Scratch max.
   vector_params->ADDRESS_GEN2_OFFSET = sum_scratch_memory;
@@ -222,7 +228,8 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->addr_gen2_loops[1][0] = non_reduction_loops[0];
   vector_params->addr_gen2_loops[1][1] = non_reduction_loops[1];
-  vector_params->addr_gen2_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->addr_gen2_loops[1][2] =
+      reduction_dim / OC_DIMENSION * packing_factor;
 
   // Output
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -240,7 +247,7 @@ void MapSoftmax(const codegen::Operation &param,
   // Instruction 4 - subtract max and exp, and divide by reduced value
   VectorInstructions inst4;
   inst4.op_type = VectorInstructions::vector;
-  inst4.inst_count = input_size / OC_DIMENSION;
+  inst4.inst_count = input_size / OC_DIMENSION * packing_factor;
   inst4.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst4.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   inst4.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;

@@ -10,15 +10,15 @@
 
 template <typename InputTypeTuple, typename WeightTypeTuple, typename Input,
           typename Weight, typename Psum, typename Output, typename Scale,
-          int PortWidth, int W, int BS>
+          int PortWidth, int W, int BS, int VectorUnitWidth>
 struct MatrixVectorUnit;
 
 template <typename... InputTypes, typename... WeightTypes, typename Input,
           typename Weight, typename Psum, typename Output, typename Scale,
-          int PortWidth, int W, int BS>
+          int PortWidth, int W, int BS, int VectorUnitWidth>
 struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
-                        Input, Weight, Psum, Output, Scale, PortWidth, W, BS>
-    : public sc_module {
+                        Input, Weight, Psum, Output, Scale, PortWidth, W, BS,
+                        VectorUnitWidth> : public sc_module {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
@@ -121,7 +121,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(bias_req);
   Connections::In<ac_int<PortWidth, false>> CCS_INIT_S1(bias_resp);
-  Connections::Combinational<Pack1D<Output, BS>> CCS_INIT_S1(bias_data);
+  Connections::Combinational<Pack1D<Output, VectorUnitWidth>> CCS_INIT_S1(
+      bias_data);
 
 #if SUPPORT_MX
   Connections::Out<MemoryRequest> CCS_INIT_S1(input_scale_req);
@@ -138,7 +139,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #endif
 
   Connections::Combinational<Output> CCS_INIT_S1(accumulation_out);
-  Connections::Out<Pack1D<Output, BS>> CCS_INIT_S1(matrix_out);
+  Connections::Out<Pack1D<Output, VectorUnitWidth>> CCS_INIT_S1(matrix_out);
 
   Connections::SyncOut CCS_INIT_S1(start_signal);
   Connections::SyncOut CCS_INIT_S1(done_signal);
@@ -524,20 +525,22 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
       loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      ac_int<32, false> k_bound = (K2 * K1 + BS - 1) / BS - 1;
+      ac_int<32, false> k_bound =
+          (K2 * K1 + VectorUnitWidth - 1) / VectorUnitWidth - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (ac_int<32, false> k = 0;; k++) {
-        send_input_request<Output, BS>(params.BIAS_OFFSET, k * W, bias_req);
+        send_input_request<Output, VectorUnitWidth>(
+            params.BIAS_OFFSET, k * VectorUnitWidth, bias_req);
 
-        ac_int<Output::width * BS, false> bits = 0;
-        process_matrix_input<Output, BS, PortWidth, Output::width * BS>(
-            bias_resp, bits);
+        ac_int<Output::width * VectorUnitWidth, false> bits = 0;
+        process_matrix_input<Output, VectorUnitWidth, PortWidth,
+                             Output::width * VectorUnitWidth>(bias_resp, bits);
 
-        Pack1D<Output, BS> biases;
+        Pack1D<Output, VectorUnitWidth> biases;
 #pragma hls_unroll yes
-        for (int i = 0; i < BS; i++) {
+        for (int i = 0; i < VectorUnitWidth; i++) {
           auto data = bits.template slc<Output::width>(i * Output::width);
           biases[i].set_bits(data);
         }
@@ -674,23 +677,24 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
       loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      ac_int<32, false> k_bound = (K2 * K1 + BS - 1) / BS - 1;
+      ac_int<32, false> k_bound =
+          (K2 * K1 + VectorUnitWidth - 1) / VectorUnitWidth - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (ac_int<32, false> k = 0;; k++) {
-        Pack1D<Output, BS> biases;
+        Pack1D<Output, VectorUnitWidth> biases;
         if (params.has_bias) {
           biases = bias_data.Pop();
         } else {
 #pragma hls_unroll yes
-          for (int i = 0; i < BS; i++) {
+          for (int i = 0; i < VectorUnitWidth; i++) {
             biases[i] = Output::zero();
           }
         }
 
-        Pack1D<Output, BS> outputs;
-        for (int i = 0; i < BS; i++) {
+        Pack1D<Output, VectorUnitWidth> outputs;
+        for (int i = 0; i < VectorUnitWidth; i++) {
           auto acc = accumulation_out.Pop();
           outputs[i] = acc + biases[i];
         }

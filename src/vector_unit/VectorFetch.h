@@ -6,7 +6,7 @@
 #include "../ArchitectureParams.h"
 #include "VectorOps.h"
 
-template <typename VectorType, typename BufferType, int Width,
+template <typename VectorType, typename BufferType, int Width, int OcDimension,
           typename... InputTypes>
 SC_MODULE(VectorFetchUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -23,8 +23,9 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<Pack1D<VectorType, Width>> CCS_INIT_S1(vector_fetch_0_data);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
-  Connections::In<Pack1D<BufferType, Width>> accumulation_buffer_read_data[2];
-  Connections::Out<BufferWriteRequest<Pack1D<BufferType, Width>>>
+  Connections::In<Pack1D<BufferType, OcDimension>>
+      accumulation_buffer_read_data[2];
+  Connections::Out<BufferWriteRequest<Pack1D<BufferType, OcDimension>>>
       accumulation_buffer_write_request[2];
   Connections::Out<Pack1D<BufferType, Width>> CCS_INIT_S1(
       accumulation_buffer_output);
@@ -49,8 +50,9 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(data_resp_1_params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(data_resp_2_params);
 
-  static constexpr int LOOP_WIDTH = 16;
-  static constexpr int BUFSIZE = 1024 / Width < Width ? 1024 / Width : Width;
+  static constexpr int LOOP_WIDTH = 11;
+  static constexpr int BUFSIZE =
+      1024 / OcDimension < OcDimension ? 1024 / OcDimension : OcDimension;
 
   SC_CTOR(VectorFetchUnit) {
     SC_THREAD(read_params);
@@ -112,17 +114,18 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<LOOP_WIDTH, false> K1 =
           params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]];
 
-      if (params.has_transpose && BUFSIZE != Width) {
-        X1 = X1 * BUFSIZE / Width;
+      ac_int<LOOP_WIDTH, false> stride_y = Y0;
+      ac_int<LOOP_WIDTH, false> stride_x = X0;
+      ac_int<16, false> stride_k = K1 * Width;
+
+      if (params.has_transpose) {
+        X1 = X1 * BUFSIZE / OcDimension;
+        stride_k = stride_k / Width * OcDimension;
       }
 
       ac_int<16, false> Y = Y1 * Y0;
       ac_int<16, false> X = X1 * X0;
-      ac_int<16, false> K = K2 * K1 * Width;
-
-      ac_int<LOOP_WIDTH, false> stride_y = Y0;
-      ac_int<LOOP_WIDTH, false> stride_x = X0;
-      ac_int<16, false> stride_k = K1 * Width;
+      ac_int<16, false> K = K2 * stride_k;
 
       ac_int<4, false> padding_y = params.padding[0];
       ac_int<4, false> padding_x = params.padding[1];
@@ -146,34 +149,33 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<LOOP_WIDTH, false> loop_ends[2][3];
       ac_int<LOOP_WIDTH, false> loop_steps[2][3];
 
+      ac_int<LOOP_WIDTH, false> loop_starts_flat[6] = {
+          0, 0, 0, 0, 0, 0,
+      };
+      ac_int<LOOP_WIDTH, false> loop_steps_flat[6] = {
+          1, 1, 1, 1, 1, 1,
+      };
+      ac_int<LOOP_WIDTH, false> loop_ends_flat[6] = {
+          params.addr_gen0_loops[0][0], params.addr_gen0_loops[0][1],
+          params.addr_gen0_loops[0][2], params.addr_gen0_loops[1][0],
+          params.addr_gen0_loops[1][1], params.addr_gen0_loops[1][2],
+      };
       ac_int<LOOP_WIDTH, false> loop_bounds[6] = {
           params.addr_gen0_loops[0][0], params.addr_gen0_loops[0][1],
           params.addr_gen0_loops[0][2], params.addr_gen0_loops[1][0],
           params.addr_gen0_loops[1][1], params.addr_gen0_loops[1][2],
       };
 
-      ac_int<LOOP_WIDTH, false> loop_starts_1d[6] = {
-          0, 0, 0, 0, 0, 0,
-      };
-      ac_int<LOOP_WIDTH, false> loop_ends_1d[6] = {
-          params.addr_gen0_loops[0][0], params.addr_gen0_loops[0][1],
-          params.addr_gen0_loops[0][2], params.addr_gen0_loops[1][0],
-          params.addr_gen0_loops[1][1], params.addr_gen0_loops[1][2],
-      };
-      ac_int<LOOP_WIDTH, false> loop_steps_1d[6] = {
-          1, 1, 1, 1, 1, 1,
-      };
-
       if (params.has_slicing) {
-        loop_starts_1d[params.addr_gen0_dim] = params.addr_gen0_start;
-        loop_ends_1d[params.addr_gen0_dim] = params.addr_gen0_end;
-        loop_steps_1d[params.addr_gen0_dim] = params.addr_gen0_step;
+        loop_starts_flat[params.addr_gen0_dim] = params.addr_gen0_start;
+        loop_ends_flat[params.addr_gen0_dim] = params.addr_gen0_end;
+        loop_steps_flat[params.addr_gen0_dim] = params.addr_gen0_step;
       }
 
       if (params.has_permute) {
 #pragma hls_unroll yes
         for (int dim = 0; dim < 6; dim++) {
-          loop_ends_1d[dim] = loop_bounds[params.addr_gen0_dims[dim]];
+          loop_ends_flat[dim] = loop_bounds[params.addr_gen0_dims[dim]];
         }
       }
 
@@ -182,9 +184,9 @@ SC_MODULE(VectorFetchUnit) {
 #pragma hls_unroll yes
         for (int j = 0; j < 3; j++) {
           int index = i * 3 + j;
-          loop_starts[i][j] = loop_starts_1d[index];
-          loop_ends[i][j] = loop_ends_1d[index] - loop_steps_1d[index];
-          loop_steps[i][j] = loop_steps_1d[index];
+          loop_starts[i][j] = loop_starts_flat[index];
+          loop_ends[i][j] = loop_ends_flat[index] - loop_steps_flat[index];
+          loop_steps[i][j] = loop_steps_flat[index];
         }
       }
 
@@ -201,8 +203,6 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<16, false> loop_bound_2 = loop_bounds[3] * loop_bound_3;
       ac_int<16, false> loop_bound_1 = loop_bounds[2] * loop_bound_2;
       ac_int<16, false> loop_bound_0 = loop_bounds[1] * loop_bound_1;
-
-      ac_int<16, false> X_K = X * K;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -248,9 +248,9 @@ SC_MODULE(VectorFetchUnit) {
 
                   ADDRESS_GEN0_MODE_1:
                     if (params.has_transpose) {
-                      address = y * X_K + (k + x0) * X + x1 * BUFSIZE;
+                      address = y * X * K + (k + x0) * X + x1 * BUFSIZE;
                     } else {
-                      address = y * X_K + x * K + k;
+                      address = y * X * K + x * K + k;
                     }
 
                     in_bound = x >= 0 && x < X && y >= 0 && y < Y;
@@ -297,7 +297,6 @@ SC_MODULE(VectorFetchUnit) {
                   if (params.addr_gen0_mode == 1 ||
                       params.addr_gen0_mode == 2) {
                     if (params.has_transpose || in_bound) {
-                    FETCH_ADDRESS_0:
                       bool found =
                           (fetch_vector_input<InputTypes, Width, InputTypes...>(
                                params.addr_gen0_dtype, address,
@@ -398,10 +397,10 @@ SC_MODULE(VectorFetchUnit) {
           params.addr_gen0_loops[1][params.addr_gen0_k_loop_idx[1]] - 1;
 
       if (params.has_transpose) {
-        VectorType buffer[BUFSIZE][Width];
+        VectorType buffer[BUFSIZE][OcDimension];
 
 #ifndef __SYNTHESIS__
-        assert(params.addr_gen0_loops[1][2] == Width);
+        assert(params.addr_gen0_loops[1][2] == OcDimension);
 #endif
 
         ac_int<32, false> total_values =
@@ -441,20 +440,34 @@ SC_MODULE(VectorFetchUnit) {
               buffer[row][col] = dequantized[row];
             }
 
-            if (col == Width - 1) {
+            if (col == OcDimension - 1) {
               break;
             }
           }
 
         TRANSPOSE_WRITE:
           for (ac_int<10, false> row = 0;; row++) {
-            Pack1D<VectorType, Width> transposed;
+            Pack1D<VectorType, OcDimension> transposed;
 #pragma hls_unroll yes
-            for (int col = 0; col < Width; col++) {
+            for (int col = 0; col < OcDimension; col++) {
               transposed[col] = buffer[row][col];
             }
 
-            vector_fetch_0_data.Push(transposed);
+            if constexpr (OcDimension == Width) {
+              vector_fetch_0_data.Push(transposed);
+            } else {
+              for (ac_int<4, false> pack = 0;; pack++) {
+                Pack1D<VectorType, Width> unpacked;
+#pragma hls_unroll yes
+                for (int i = 0; i < Width; i++) {
+                  unpacked[i] = transposed[pack * Width + i];
+                }
+                vector_fetch_0_data.Push(unpacked);
+                if (pack == OcDimension / Width - 1) {
+                  break;
+                }
+              }
+            }
 
             if (row == BUFSIZE - 1) {
               break;
@@ -472,10 +485,17 @@ SC_MODULE(VectorFetchUnit) {
               for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
                 for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
                   for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
-                    Pack1D<BufferType, Width> read_data =
+                    auto read_data =
                         accumulation_buffer_read_data[accumulation_buffer_bank]
                             .Pop();
-                    accumulation_buffer_output.Push(read_data);
+                    for (int i = 0; i < OcDimension / Width; i++) {
+                      Pack1D<BufferType, Width> output_data;
+#pragma hls_unroll yes
+                      for (int j = 0; j < Width; j++) {
+                        output_data[j] = read_data[i * Width + j];
+                      }
+                      accumulation_buffer_output.Push(output_data);
+                    }
 
                     ac_int<LOOP_WIDTH, false> x0 =
                         loop_counters[1][params.addr_gen0_x_loop_idx[1]];

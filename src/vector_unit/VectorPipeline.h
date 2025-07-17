@@ -9,7 +9,7 @@
 #include "VectorOps.h"
 
 template <typename VectorType, typename BufferType, typename ScaleType,
-          int Width>
+          int Width, int OcDimension>
 SC_MODULE(VectorPipeline) {
   sc_in<bool> clk;
   sc_in<bool> rstn;
@@ -49,6 +49,14 @@ SC_MODULE(VectorPipeline) {
   Connections::Combinational<Pack1D<StageInput, 3>> stage1_input;
   Connections::Combinational<Pack1D<StageInput, 3>> stage2_input;
   Connections::Combinational<Pack1D<StageInput, 2>> stage3_input;
+#if SUPPORT_MX
+  Connections::Fifo<Pack1D<StageInput, 2>, OcDimension / Width>
+      stage3_input_fifo;
+  Connections::Combinational<Pack1D<StageInput, 2>> stage3_input_in;
+  Connections::Combinational<Pack1D<StageInput, 2>> stage3_input_out;
+
+  Connections::Combinational<ScaleType> stage3_scale;
+#endif
 
   SC_CTOR(VectorPipeline) {
     SC_THREAD(router);
@@ -70,6 +78,16 @@ SC_MODULE(VectorPipeline) {
     SC_THREAD(stage3);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+#if SUPPORT_MX
+    SC_THREAD(compute_mx_qparams);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    stage3_input_fifo.clk(clk);
+    stage3_input_fifo.rst(rstn);
+    stage3_input_fifo.enq(stage3_input_in);
+    stage3_input_fifo.deq(stage3_input_out);
+#endif
   }
 
   void router() {
@@ -336,10 +354,10 @@ SC_MODULE(VectorPipeline) {
         res1 = vabs<VectorType, Width>(op1_src0);
       } else if (op1 == VectorInstructions::vrelu) {
         res1 = vrelu<VectorType, Width>(op1_src0);
-        // } else if (op1 == VectorInstructions::vgelu) {
-        //   res1 = vgelu<VectorType, Width>(op1_src0);
       } else if (op1 == VectorInstructions::vsilu) {
         res1 = vsilu<VectorType, Width>(op1_src0);
+        // } else if (op1 == VectorInstructions::vgelu) {
+        //   res1 = vgelu<VectorType, Width>(op1_src0);
         // } else if (op1 == VectorInstructions::vmap) {
         //   for (int i = 0; i < Width; i++) {
         //     DataTypes::bfloat16 value = op1_src0[i];
@@ -404,13 +422,16 @@ SC_MODULE(VectorPipeline) {
       }
     }
   }
-
-  void stage3() {
+#if SUPPORT_MX
+  void compute_mx_qparams() {
     stage3_input.ResetRead();
-    mx_scale.Reset();
-    vector_unit_output.Reset();
+    stage3_input_in.ResetWrite();
+    stage3_scale.ResetWrite();
 
     wait();
+
+    VectorType amax_history;
+    ac_int<4, false> count = 0;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -420,14 +441,68 @@ SC_MODULE(VectorPipeline) {
       decltype(VectorInstructions::immediate2) qparam =
           transactions[1].immediate;
       Pack1D<VectorType, Width> op3_src0 = transactions[0].payload;
+
+      if (op3 == VectorInstructions::vquantize_mx) {
+        Pack1D<VectorType, Width> temp;
+#pragma hls_unroll yes
+        for (int i = 0; i < Width; i++) {
+          temp[i] = op3_src0[i].abs();
+        }
+        VectorType amax = tree_max(temp);
+        amax_history = count == 0 || amax > amax_history ? amax : amax_history;
+        count = count + 1;
+
+        if (count == OcDimension / Width) {
+          ScaleType scale =
+              compute_scale<VectorType, ScaleType, Width>(amax_history, qparam);
+          stage3_scale.Push(scale);
+          count = 0;
+        }
+      }
+
+      stage3_input_in.Push(transactions);
+    }
+  }
+#endif
+  void stage3() {
+#if SUPPORT_MX
+    stage3_input_out.ResetRead();
+    stage3_scale.ResetRead();
+    mx_scale.Reset();
+#else
+    stage3_input.ResetRead();
+#endif
+    vector_unit_output.Reset();
+
+    wait();
+
+    ac_int<4, false> count = 0;
+    ScaleType scale;
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (1) {
+#if SUPPORT_MX
+      Pack1D<StageInput, 2> transactions = stage3_input_out.Pop();
+#else
+      Pack1D<StageInput, 2> transactions = stage3_input.Pop();
+#endif
+      decltype(VectorInstructions::vector_op3) op3 = transactions[1].op;
+      Pack1D<VectorType, Width> op3_src0 = transactions[0].payload;
       Pack1D<VectorType, Width> op3_src1 = transactions[1].payload;
       Pack1D<VectorType, Width> res3;
 
 #if SUPPORT_MX
       if (op3 == VectorInstructions::vquantize_mx) {
-        ScaleType scale =
-            calculate_mx_scale<VectorType, ScaleType, Width>(op3_src0, qparam);
-        mx_scale.Push(scale);
+        if (count == 0) {
+          scale = stage3_scale.Pop();
+          mx_scale.Push(scale);
+        }
+
+        count = count + 1;
+        if (count == OcDimension / Width) {
+          count = 0;
+        }
 
 #pragma hls_unroll yes
         for (int i = 0; i < Width; i++) {

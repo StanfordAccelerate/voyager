@@ -38,6 +38,8 @@ void MapLayerNorm(const codegen::Operation &param,
   non_reduction_loops = split_loops(non_reduction_loops, 1024);
   pad_shape_to_ndim(non_reduction_loops, 4);
 
+  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
+
   // ======================================================================
   // Pass 1: calculate mean and subtract mean from tensor
   // ======================================================================
@@ -58,7 +60,8 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->addr_gen0_loops[0][2] = non_reduction_loops[2];
   vector_params->addr_gen0_loops[1][0] = non_reduction_loops[3];
   vector_params->addr_gen0_loops[1][1] = 2;
-  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      outer_dim / OC_DIMENSION * packing_factor;
 
   // Overwrite inputs
   memory_map["outputs"] = get_partition(input_memory.partition());
@@ -78,12 +81,12 @@ void MapLayerNorm(const codegen::Operation &param,
   // Configure reduction engine
   VectorInstructions instr0_0;
   instr0_0.op_type = VectorInstructions::reduction;
-  instr0_0.reduce_count = outer_dim / OC_DIMENSION;
+  instr0_0.reduce_count = outer_dim / OC_DIMENSION * packing_factor;
   instr0_0.reduce_op = VectorInstructions::radd;
   instr0_0.rduplicate = 1;
   instr0_0.rbroadcast = 1;
   instr0_0.rdest = VectorInstructions::to_op0;
-  instr0_0.immediate0 = outer_dim / OC_DIMENSION;
+  instr0_0.immediate0 = outer_dim / OC_DIMENSION * packing_factor;
   vinstr_config->inst[0] = instr0_0;
   vinstr_config->instCount[0] = 1;
 
@@ -97,7 +100,7 @@ void MapLayerNorm(const codegen::Operation &param,
   instr0_1.immediate0 = immediate.bits_rep();
   instr0_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = instr0_1;
-  vinstr_config->instCount[1] = outer_dim / OC_DIMENSION;
+  vinstr_config->instCount[1] = outer_dim / OC_DIMENSION * packing_factor;
 
   // Subtract mean from tensor
   VectorInstructions instr0_2;
@@ -107,7 +110,7 @@ void MapLayerNorm(const codegen::Operation &param,
   instr0_2.vector_op0 = VectorInstructions::vsub;
   instr0_2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[2] = instr0_2;
-  vinstr_config->instCount[2] = outer_dim / OC_DIMENSION;
+  vinstr_config->instCount[2] = outer_dim / OC_DIMENSION * packing_factor;
 
   vinstr_config->instLen = 3;
   vinstr_config->instLoopCount = inner_dim;
@@ -135,7 +138,8 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->addr_gen0_loops[0][2] = non_reduction_loops[2];
   vector_params->addr_gen0_loops[1][0] = non_reduction_loops[3];
   vector_params->addr_gen0_loops[1][1] = 2;
-  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      outer_dim / OC_DIMENSION * packing_factor;
 
   // Overwrite inputs
   memory_map["outputs"] = get_partition(input_memory.partition());
@@ -155,14 +159,14 @@ void MapLayerNorm(const codegen::Operation &param,
   // Configure reduction unit
   VectorInstructions instr1_0;
   instr1_0.op_type = VectorInstructions::reduction;
-  instr1_0.reduce_count = outer_dim / OC_DIMENSION;
+  instr1_0.reduce_count = outer_dim / OC_DIMENSION * packing_factor;
   instr1_0.reduce_op = VectorInstructions::radd;
   instr1_0.rsqrt = 1;
   instr1_0.rreciprocal = 1;
   instr1_0.rduplicate = 1;
   instr1_0.rbroadcast = 1;
   instr1_0.rdest = VectorInstructions::to_op0;
-  instr1_0.immediate0 = outer_dim / OC_DIMENSION;
+  instr1_0.immediate0 = outer_dim / OC_DIMENSION * packing_factor;
   vinstr_config->inst[0] = instr1_0;
   vinstr_config->instCount[0] = 1;
 
@@ -173,7 +177,7 @@ void MapLayerNorm(const codegen::Operation &param,
   instr1_1.vector_op2 = VectorInstructions::vsquare;
   instr1_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = instr1_1;
-  vinstr_config->instCount[1] = outer_dim / OC_DIMENSION;
+  vinstr_config->instCount[1] = outer_dim / OC_DIMENSION * packing_factor;
 
   // Multiply inputs with the inverse sqrt of the variance
   VectorInstructions instr1_2;
@@ -187,7 +191,7 @@ void MapLayerNorm(const codegen::Operation &param,
   instr1_2.vector_op2 = VectorInstructions::vmult;
   instr1_2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[2] = instr1_2;
-  vinstr_config->instCount[2] = outer_dim / OC_DIMENSION;
+  vinstr_config->instCount[2] = outer_dim / OC_DIMENSION * packing_factor;
 
   vinstr_config->instLen = 3;
   vinstr_config->instLoopCount = inner_dim;
@@ -214,7 +218,8 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->addr_gen0_loops[0][2] = non_reduction_loops[1];
   vector_params->addr_gen0_loops[1][0] = non_reduction_loops[2];
   vector_params->addr_gen0_loops[1][1] = non_reduction_loops[3];
-  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      outer_dim / OC_DIMENSION * packing_factor;
 
   // Fetch weights
   const auto weight_memory = weight.memory();
@@ -239,7 +244,8 @@ void MapLayerNorm(const codegen::Operation &param,
   }
   vector_params->addr_gen1_loops[1][0] = param_loops[0];
   vector_params->addr_gen1_loops[1][1] = param_loops[1];
-  vector_params->addr_gen1_loops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->addr_gen1_loops[1][2] =
+      outer_dim / OC_DIMENSION * packing_factor;
 
   // Fetch bias
   const bool has_bias = layer_norm_op.kwargs().contains("bias");
@@ -264,7 +270,8 @@ void MapLayerNorm(const codegen::Operation &param,
     }
     vector_params->addr_gen2_loops[1][0] = param_loops[0];
     vector_params->addr_gen2_loops[1][1] = param_loops[1];
-    vector_params->addr_gen2_loops[1][2] = outer_dim / OC_DIMENSION;
+    vector_params->addr_gen2_loops[1][2] =
+        outer_dim / OC_DIMENSION * packing_factor;
   }
 
   const auto output_memory = output.memory();
@@ -297,7 +304,8 @@ void MapLayerNorm(const codegen::Operation &param,
   set_quantize_params(param, vector_params, inst2);
 
   vinstr_config->inst[0] = inst2;
-  vinstr_config->instCount[0] = inner_dim * outer_dim / OC_DIMENSION;
+  vinstr_config->instCount[0] =
+      inner_dim * outer_dim / OC_DIMENSION * packing_factor;
 
   vinstr_config->instLen = 1;
   vinstr_config->instLoopCount = 1;

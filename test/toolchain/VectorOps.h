@@ -76,7 +76,8 @@ void set_vector_addr_gen1(const codegen::Tensor &tensor,
   pad_shape_to_ndim(output_shape, 3);
   vector_params->addr_gen1_loops[1][0] = output_shape[0];
   vector_params->addr_gen1_loops[1][1] = output_shape[1];
-  vector_params->addr_gen1_loops[1][2] = output_shape.back() / OC_DIMENSION;
+  vector_params->addr_gen1_loops[1][2] =
+      output_shape.back() / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 2; i++) {
     vector_params->addr_gen1_y_loop_idx[i] = 0;
@@ -115,7 +116,8 @@ void set_vector_addr_gen2(const codegen::Tensor &tensor,
   pad_shape_to_ndim(output_shape, 3);
   vector_params->addr_gen2_loops[1][0] = output_shape[0];
   vector_params->addr_gen2_loops[1][1] = output_shape[1];
-  vector_params->addr_gen2_loops[1][2] = output_shape.back() / OC_DIMENSION;
+  vector_params->addr_gen2_loops[1][2] =
+      output_shape.back() / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 2; i++) {
     vector_params->addr_gen2_y_loop_idx[i] = 0;
@@ -183,12 +185,15 @@ void MapVectorOperations(const codegen::Operation &param,
   // Pad the shape to 6 dimensions with 1s
   int padded_dims = pad_shape_to_ndim(input_shape, 6);
 
+  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
+
   vector_params->addr_gen0_loops[0][0] = input_shape[0];
   vector_params->addr_gen0_loops[0][1] = input_shape[1];
   vector_params->addr_gen0_loops[0][2] = input_shape[2];
   vector_params->addr_gen0_loops[1][0] = input_shape[3];
   vector_params->addr_gen0_loops[1][1] = input_shape[4];
-  vector_params->addr_gen0_loops[1][2] = input_shape[5] / OC_DIMENSION;
+  vector_params->addr_gen0_loops[1][2] =
+      input_shape[5] / OC_DIMENSION * packing_factor;
 
   codegen::OpOverload reshape_op;
   if (input.has_reshape()) {
@@ -225,8 +230,8 @@ void MapVectorOperations(const codegen::Operation &param,
             "Slice start and end must be multiples of OC_DIMENSION!");
       }
 
-      vector_params->addr_gen0_start /= OC_DIMENSION;
-      vector_params->addr_gen0_end /= OC_DIMENSION;
+      vector_params->addr_gen0_start = start / OC_DIMENSION * packing_factor;
+      vector_params->addr_gen0_end = end / OC_DIMENSION * packing_factor;
     }
   } else if (reshape_op.target() == "permute") {
     const auto int_list = reshape_kwargs.at("dims").int_list().values();
@@ -287,7 +292,6 @@ void MapVectorOperations(const codegen::Operation &param,
 
   // TODO: use tiling to set address generator
   Tiling tiling;
-
   if (vector_params->has_transpose) {
     // Support a maximum buffer size of 1024
     const int BUFSIZE = std::min(1024 / OC_DIMENSION, OC_DIMENSION);
@@ -295,14 +299,6 @@ void MapVectorOperations(const codegen::Operation &param,
     std::vector<int> input_shape(input.shape().begin(), input.shape().end());
     input_shape = squeeze_shape(input_shape);
     int padded_dims = pad_shape_to_ndim(input_shape, 3);
-
-    if (input_shape.back() % OC_DIMENSION != 0) {
-      spdlog::debug("Input last dimension is not a multiple of OC_DIMENSION: ");
-      print_shape(input_shape);
-
-      vector_params->has_transpose_with_padded_dimension = true;
-      vector_params->addr_gen0_end = input_shape.back();
-    }
 
     // Transpose the input shape
     std::swap(input_shape[1], input_shape[2]);
@@ -353,11 +349,6 @@ void MapVectorOperations(const codegen::Operation &param,
 
     // Adjust for output loops
     tiling.loops[1][5] = BUFSIZE;
-
-    if (vector_params->has_transpose_with_padded_dimension) {
-      vector_params->output_pad_dimension = true;
-      vector_params->output_pad_dim_size = input_shape[1] % OC_DIMENSION;
-    }
   }
 
   VECTOR_DATATYPE scale = 1.0;
@@ -416,13 +407,6 @@ void MapVectorOperations(const codegen::Operation &param,
         vector_params->output_k_loop_idx[1] = loop_index++;
       }
     }
-
-    if (vector_params->has_transpose_with_padded_dimension) {
-      vector_params->output_pad_dim_idx[0] =
-          vector_params->output_x_loop_idx[0];
-      vector_params->output_pad_dim_idx[1] =
-          vector_params->output_x_loop_idx[1];
-    }
   }
 
   vector_params->output_dtype =
@@ -439,7 +423,7 @@ void MapVectorOperations(const codegen::Operation &param,
 
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;
-  inst.inst_count = get_size(output) / OC_DIMENSION;
+  inst.inst_count = get_size(output) / OC_DIMENSION * packing_factor;
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
