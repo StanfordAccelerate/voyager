@@ -294,7 +294,8 @@ void MapVectorOperations(const codegen::Operation &param,
   Tiling tiling;
   if (vector_params->has_transpose) {
     // Support a maximum buffer size of 1024
-    const int BUFSIZE = std::min(1024 / OC_DIMENSION, OC_DIMENSION);
+    const int BUFSIZE =
+        std::min({1024 / OC_DIMENSION, OC_DIMENSION, VECTOR_UNIT_WIDTH});
 
     std::vector<int> input_shape(input.shape().begin(), input.shape().end());
     input_shape = squeeze_shape(input_shape);

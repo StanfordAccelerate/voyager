@@ -51,8 +51,9 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(data_resp_2_params);
 
   static constexpr int LOOP_WIDTH = 11;
-  static constexpr int BUFSIZE =
+  static constexpr int MAX_BUFSIZE =
       1024 / OcDimension < OcDimension ? 1024 / OcDimension : OcDimension;
+  static constexpr int BUFSIZE = Width < MAX_BUFSIZE ? Width : MAX_BUFSIZE;
 
   SC_CTOR(VectorFetchUnit) {
     SC_THREAD(read_params);
