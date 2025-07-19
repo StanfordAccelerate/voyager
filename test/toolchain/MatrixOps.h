@@ -379,35 +379,35 @@ void MapMatrixOperation(const Operation &operation,
         tiling.loops[1][tiling.weight_loop_index[1]];
     matrix_params->weightAddressGenWeightLoopIndex[1] = 4;
 
-    // FY loop
-    matrix_params->weightAddressGenLoops[1][3] =
-        tiling.loops[1][tiling.fy_index[1]];
-    matrix_params->weightAddressGenFyIndex[1] = 3;
-
-    // FX loop
-    matrix_params->weightAddressGenLoops[1][2] =
-        tiling.loops[1][tiling.fx_index];
-    if (tiling.resnet_replication) {
-      matrix_params->weightAddressGenLoops[1][2] = 7;
-    } else if (tiling.generic_replication) {
-      matrix_params->weightAddressGenLoops[1][2] *= tiling.fx_unrolling;
-    }
-    matrix_params->weightAddressGenFxIndex = 2;
-
     // C0 loop
     if (tiling.resnet_replication) {
-      matrix_params->weightAddressGenLoops[1][1] = 3;
+      matrix_params->weightAddressGenLoops[1][3] = 3;
     } else if (tiling.generic_replication) {
-      matrix_params->weightAddressGenLoops[1][1] = tiling.num_channels;
+      matrix_params->weightAddressGenLoops[1][3] = tiling.num_channels;
     } else {
-      matrix_params->weightAddressGenLoops[1][1] = IC_DIMENSION;
+      matrix_params->weightAddressGenLoops[1][3] = IC_DIMENSION;
     }
-    matrix_params->weightAddressGenReductionLoopIndex[2] = 1;
+    matrix_params->weightAddressGenReductionLoopIndex[2] = 3;
 
     // C1 loop
-    matrix_params->weightAddressGenLoops[1][0] =
+    matrix_params->weightAddressGenLoops[1][2] =
         tiling.loops[1][tiling.reduction_loop_index[1]];
-    matrix_params->weightAddressGenReductionLoopIndex[1] = 0;
+    matrix_params->weightAddressGenReductionLoopIndex[1] = 2;
+
+    // FX loop
+    matrix_params->weightAddressGenLoops[1][1] =
+        tiling.loops[1][tiling.fx_index];
+    if (tiling.resnet_replication) {
+      matrix_params->weightAddressGenLoops[1][1] = 7;
+    } else if (tiling.generic_replication) {
+      matrix_params->weightAddressGenLoops[1][1] *= tiling.fx_unrolling;
+    }
+    matrix_params->weightAddressGenFxIndex = 1;
+
+    // FY loop
+    matrix_params->weightAddressGenLoops[1][0] =
+        tiling.loops[1][tiling.fy_index[1]];
+    matrix_params->weightAddressGenFyIndex[1] = 0;
   }
 
   matrix_params->stride = tiling.stride;
