@@ -48,85 +48,97 @@ inline std::vector<int> broadcast_shape(std::vector<int> &shape1,
   return result_shape;
 }
 
-void set_vector_addr_gen1(const codegen::Tensor &tensor,
-                          std::vector<int> output_shape,
-                          AcceleratorMemoryMap &accelerator_memory_map,
-                          VectorParams *vector_params) {
+void set_vector_fetch_1(const codegen::Tensor &tensor,
+                        std::vector<int> output_shape,
+                        AcceleratorMemoryMap &accelerator_memory_map,
+                        VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = get_address(tensor);
-  vector_params->addr_gen1_mode = true;
+  vector_params->vector_fetch_1_offset = get_address(tensor);
+  vector_params->vector_fetch_1_mode = true;
 
   auto input_shape = get_shape(tensor);
   squeeze_front_ones(input_shape);
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_broadcast[i] =
+    vector_params->vector_fetch_1_broadcast[i] =
         input_shape[i] == 1 && output_shape[i] != 1;
   }
 
-  vector_params->addr_gen1_dtype =
+  vector_params->vector_fetch_1_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  int fetch_width = OC_DIMENSION * get_type_width<VU_INPUT_TYPES>(
+                                       vector_params->vector_fetch_1_dtype);
+  vector_params->vector_fetch_1_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_1_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_1_packing_factor =
+      OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_loops[0][i] = 1;
+    vector_params->vector_fetch_1_loops[0][i] = 1;
   }
 
   pad_shape_to_ndim(output_shape, 3);
-  vector_params->addr_gen1_loops[1][0] = output_shape[0];
-  vector_params->addr_gen1_loops[1][1] = output_shape[1];
-  vector_params->addr_gen1_loops[1][2] =
-      output_shape.back() / VECTOR_UNIT_WIDTH;
+  vector_params->vector_fetch_1_loops[1][0] = output_shape[0];
+  vector_params->vector_fetch_1_loops[1][1] = output_shape[1];
+  vector_params->vector_fetch_1_loops[1][2] =
+      output_shape.back() / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addr_gen1_y_loop_idx[i] = 0;
-    vector_params->addr_gen1_x_loop_idx[i] = 1;
-    vector_params->addr_gen1_k_loop_idx[i] = 2;
+    vector_params->vector_fetch_1_y_loop_idx[i] = 0;
+    vector_params->vector_fetch_1_x_loop_idx[i] = 1;
+    vector_params->vector_fetch_1_k_loop_idx[i] = 2;
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->addr_gen1_dq_scale = scale.bits_rep();
+  vector_params->vector_fetch_1_dq_scale = scale.bits_rep();
 }
 
-void set_vector_addr_gen2(const codegen::Tensor &tensor,
-                          std::vector<int> output_shape,
-                          AcceleratorMemoryMap &accelerator_memory_map,
-                          VectorParams *vector_params) {
+void set_vector_fetch_2(const codegen::Tensor &tensor,
+                        std::vector<int> output_shape,
+                        AcceleratorMemoryMap &accelerator_memory_map,
+                        VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN2_OFFSET = get_address(tensor);
-  vector_params->addr_gen2_mode = true;
+  vector_params->vector_fetch_2_offset = get_address(tensor);
+  vector_params->vector_fetch_2_mode = true;
 
   auto input_shape = get_shape(tensor);
   squeeze_front_ones(input_shape);
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen2_broadcast[i] = input_shape[i] == 1;
+    vector_params->vector_fetch_2_broadcast[i] = input_shape[i] == 1;
   }
 
-  vector_params->addr_gen2_dtype =
+  vector_params->vector_fetch_2_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  int fetch_width = OC_DIMENSION * get_type_width<VU_INPUT_TYPES>(
+                                       vector_params->vector_fetch_2_dtype);
+  vector_params->vector_fetch_1_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_1_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_1_packing_factor =
+      OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen2_loops[0][i] = 1;
+    vector_params->vector_fetch_2_loops[0][i] = 1;
   }
 
   pad_shape_to_ndim(output_shape, 3);
-  vector_params->addr_gen2_loops[1][0] = output_shape[0];
-  vector_params->addr_gen2_loops[1][1] = output_shape[1];
-  vector_params->addr_gen2_loops[1][2] =
-      output_shape.back() / VECTOR_UNIT_WIDTH;
+  vector_params->vector_fetch_2_loops[1][0] = output_shape[0];
+  vector_params->vector_fetch_2_loops[1][1] = output_shape[1];
+  vector_params->vector_fetch_2_loops[1][2] =
+      output_shape.back() / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addr_gen2_y_loop_idx[i] = 0;
-    vector_params->addr_gen2_x_loop_idx[i] = 1;
-    vector_params->addr_gen2_k_loop_idx[i] = 2;
+    vector_params->vector_fetch_2_y_loop_idx[i] = 0;
+    vector_params->vector_fetch_2_x_loop_idx[i] = 1;
+    vector_params->vector_fetch_2_k_loop_idx[i] = 2;
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->addr_gen2_dq_scale = scale.bits_rep();
+  vector_params->vector_fetch_2_dq_scale = scale.bits_rep();
 }
 
 void set_vector_immediate(const float scalar, const int stage,
@@ -160,9 +172,9 @@ void MapVectorOperations(const codegen::Operation &param,
   const auto input = op_list[0].kwargs().at("input").tensor();
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
-  vector_params->addr_gen0_mode = 2;
-  vector_params->addr_gen0_dtype =
+  vector_params->vector_fetch_0_offset = get_address(input);
+  vector_params->vector_fetch_0_mode = 2;
+  vector_params->vector_fetch_0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
 
   // Use the original shape without permute/slice
@@ -185,15 +197,12 @@ void MapVectorOperations(const codegen::Operation &param,
   // Pad the shape to 6 dimensions with 1s
   int padded_dims = pad_shape_to_ndim(input_shape, 6);
 
-  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
-
-  vector_params->addr_gen0_loops[0][0] = input_shape[0];
-  vector_params->addr_gen0_loops[0][1] = input_shape[1];
-  vector_params->addr_gen0_loops[0][2] = input_shape[2];
-  vector_params->addr_gen0_loops[1][0] = input_shape[3];
-  vector_params->addr_gen0_loops[1][1] = input_shape[4];
-  vector_params->addr_gen0_loops[1][2] =
-      input_shape[5] / OC_DIMENSION * packing_factor;
+  vector_params->vector_fetch_0_loops[0][0] = input_shape[0];
+  vector_params->vector_fetch_0_loops[0][1] = input_shape[1];
+  vector_params->vector_fetch_0_loops[0][2] = input_shape[2];
+  vector_params->vector_fetch_0_loops[1][0] = input_shape[3];
+  vector_params->vector_fetch_0_loops[1][1] = input_shape[4];
+  vector_params->vector_fetch_0_loops[1][2] = input_shape[5] / OC_DIMENSION;
 
   codegen::OpOverload reshape_op;
   if (input.has_reshape()) {
@@ -218,20 +227,20 @@ void MapVectorOperations(const codegen::Operation &param,
     dim = dim < 0 ? dim + shape.size() : dim;
     end = end > shape[dim] ? shape[dim] : end;
 
-    vector_params->addr_gen0_dim = dim + padded_dims;
-    vector_params->addr_gen0_start = start;
-    vector_params->addr_gen0_end = end;
-    vector_params->addr_gen0_step = step;
+    vector_params->vector_fetch_0_dim = dim + padded_dims;
+    vector_params->vector_fetch_0_start = start;
+    vector_params->vector_fetch_0_end = end;
+    vector_params->vector_fetch_0_step = step;
 
     // Last dimension needs to be scaled by OC_DIMENSION
-    if (vector_params->addr_gen0_dim == 5) {
+    if (vector_params->vector_fetch_0_dim == 5) {
       if (start % OC_DIMENSION != 0 || end % OC_DIMENSION != 0) {
         throw std::invalid_argument(
             "Slice start and end must be multiples of OC_DIMENSION!");
       }
 
-      vector_params->addr_gen0_start = start / OC_DIMENSION * packing_factor;
-      vector_params->addr_gen0_end = end / OC_DIMENSION * packing_factor;
+      vector_params->vector_fetch_0_start = start / OC_DIMENSION;
+      vector_params->vector_fetch_0_end = end / OC_DIMENSION;
     }
   } else if (reshape_op.target() == "permute") {
     const auto int_list = reshape_kwargs.at("dims").int_list().values();
@@ -277,14 +286,15 @@ void MapVectorOperations(const codegen::Operation &param,
       dims = std::vector<int>(int_list.begin(), int_list.end());
 
       for (int i = 0; i < dims.size(); i++) {
-        vector_params->addr_gen0_dims[i + padded_dims] = dims[i] + padded_dims;
+        vector_params->vector_fetch_0_dims[i + padded_dims] =
+            dims[i] + padded_dims;
       }
     } else if (reshape_kwargs.contains("dim0") &&
                reshape_kwargs.contains("dim1")) {
       int dim0 = reshape_kwargs.at("dim0").int_value();
       int dim1 = reshape_kwargs.at("dim1").int_value();
-      std::swap(vector_params->addr_gen0_dims[dim0 + padded_dims],
-                vector_params->addr_gen0_dims[dim1 + padded_dims]);
+      std::swap(vector_params->vector_fetch_0_dims[dim0 + padded_dims],
+                vector_params->vector_fetch_0_dims[dim1 + padded_dims]);
     } else {
       throw std::invalid_argument("Invalid permute arguments!");
     }
@@ -310,7 +320,7 @@ void MapVectorOperations(const codegen::Operation &param,
     }
 
     // Tiled access
-    vector_params->addr_gen0_mode = 1;
+    vector_params->vector_fetch_0_mode = 1;
 
     int Y1 = input_shape[0];
     int K1 = input_shape[2] / OC_DIMENSION;
@@ -325,26 +335,26 @@ void MapVectorOperations(const codegen::Operation &param,
     };
 
     for (int i = 0; i < 3; i++) {
-      vector_params->addr_gen0_loops[0][i] = tiling.loops[0][i];
+      vector_params->vector_fetch_0_loops[0][i] = tiling.loops[0][i];
     }
-    vector_params->addr_gen0_y_loop_idx[0] = tiling.y_loop_index[0];
-    vector_params->addr_gen0_x_loop_idx[0] = tiling.x_loop_index[0];
-    vector_params->addr_gen0_k_loop_idx[0] = tiling.weight_loop_index[0];
+    vector_params->vector_fetch_0_y_loop_idx[0] = tiling.y_loop_index[0];
+    vector_params->vector_fetch_0_x_loop_idx[0] = tiling.x_loop_index[0];
+    vector_params->vector_fetch_0_k_loop_idx[0] = tiling.weight_loop_index[0];
 
     int loop_index = 0;
     for (int i = 0; i < 6; i++) {
       // ignore the loops not present in outputs (reduction, fx, fy)
       if (i == tiling.y_loop_index[1]) {
-        vector_params->addr_gen0_loops[1][loop_index] = tiling.loops[1][i];
-        vector_params->addr_gen0_y_loop_idx[1] = loop_index++;
+        vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
+        vector_params->vector_fetch_0_y_loop_idx[1] = loop_index++;
       }
       if (i == tiling.x_loop_index[1]) {
-        vector_params->addr_gen0_loops[1][loop_index] = tiling.loops[1][i];
-        vector_params->addr_gen0_x_loop_idx[1] = loop_index++;
+        vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
+        vector_params->vector_fetch_0_x_loop_idx[1] = loop_index++;
       }
       if (i == tiling.weight_loop_index[1]) {
-        vector_params->addr_gen0_loops[1][loop_index] = tiling.loops[1][i];
-        vector_params->addr_gen0_k_loop_idx[1] = loop_index++;
+        vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
+        vector_params->vector_fetch_0_k_loop_idx[1] = loop_index++;
       }
     }
 
@@ -352,8 +362,17 @@ void MapVectorOperations(const codegen::Operation &param,
     tiling.loops[1][5] = BUFSIZE;
   }
 
+  int packing_factor =
+      vector_params->has_transpose ? 1 : OC_DIMENSION / VECTOR_UNIT_WIDTH;
+  int fetch_width =
+      packing_factor * VECTOR_UNIT_WIDTH *
+      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_0_dtype);
+  vector_params->vector_fetch_0_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_0_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_0_packing_factor = packing_factor;
+
   VECTOR_DATATYPE scale = 1.0;
-  vector_params->addr_gen0_dq_scale = scale.bits_rep();
+  vector_params->vector_fetch_0_dq_scale = scale.bits_rep();
 
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
@@ -424,7 +443,7 @@ void MapVectorOperations(const codegen::Operation &param,
 
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;
-  inst.inst_count = get_size(output) / OC_DIMENSION * packing_factor;
+  inst.inst_count = get_size(output) / VECTOR_UNIT_WIDTH;
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
@@ -497,8 +516,8 @@ void MapVectorOperations(const codegen::Operation &param,
       inst.vector_op0_src0 = VectorInstructions::from_immediate_0;
       inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_0;
 
-      set_vector_addr_gen1(self, output_shape, accelerator_memory_map,
-                           vector_params);
+      set_vector_fetch_1(self, output_shape, accelerator_memory_map,
+                         vector_params);
     } else if (opcode == "quantize_mx") {
       float quant_max = op.kwargs().at("quant_max").float_value();
       bool force_scale_power_of_two =
@@ -548,18 +567,18 @@ void MapVectorOperations(const codegen::Operation &param,
 
         if (stage == 0) {
           inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
-          set_vector_addr_gen1(tensor_to_load, output_shape,
-                               accelerator_memory_map, vector_params);
+          set_vector_fetch_1(tensor_to_load, output_shape,
+                             accelerator_memory_map, vector_params);
         } else if (stage == 2) {
           inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_addr_gen2(tensor_to_load, output_shape,
-                               accelerator_memory_map, vector_params);
+          set_vector_fetch_2(tensor_to_load, output_shape,
+                             accelerator_memory_map, vector_params);
         } else {
           assert(inst.vector_op2_src1 !=
                  VectorInstructions::from_vector_fetch_2);
           inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_addr_gen2(tensor_to_load, output_shape,
-                               accelerator_memory_map, vector_params);
+          set_vector_fetch_2(tensor_to_load, output_shape,
+                             accelerator_memory_map, vector_params);
         }
       }
     }

@@ -282,91 +282,32 @@ ScaleType calculate_mx_scale(const Pack1D<VectorType, Width>& op0,
   return scale.is_zero() ? ScaleType::one() : scale;
 }
 
-template <size_t Width, typename... Ts>
+template <typename... Ts>
 void fetch_vector_input(ac_int<4, false> dtype,
                         ac_int<ADDRESS_WIDTH, false> offset,
-                        ac_int<32, false> address,
+                        ac_int<32, false> address, ac_int<16, false> burst_size,
                         Connections::Out<MemoryRequest>& channel) {
   ac_int<6, false> width = get_type_width<Ts...>(dtype);
-  MemoryRequest request = {offset + address * width / 8, width * Width / 8};
+  MemoryRequest request = {offset + address * width / 8, burst_size};
   channel.Push(request);
 }
 
-template <typename T, typename VectorType, size_t N, int bits_width,
-          typename... Ts>
-bool unpack_data(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
-                 const ac_int<bits_width, false> bits,
-                 Pack1D<VectorType, N>& outputs) {
+template <typename T, typename VectorType, size_t N, int width, typename... Ts>
+bool unpack_vector_data(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
+                        const ac_int<width, false> bits,
+                        Pack1D<VectorType, N>& outputs,
+                        ac_int<4, false> packing_index) {
   if (get_type_index<T, Ts...>() != dtype) {
     return false;
   }
+
+  ac_int<16, false> offset = packing_index * T::width * N;
 
 #pragma hls_unroll yes
   for (int i = 0; i < N; i++) {
     T data;
-    data.set_bits(bits.template slc<T::width>(i * T::width));
+    data.set_bits(bits.template slc<T::width>(offset + i * T::width));
     outputs[i] = data;
-  }
-
-  return true;
-}
-
-template <typename VectorType, size_t N, int port_width, typename... Ts>
-Pack1D<VectorType, N> process_vector_response(
-    ac_int<4, false> dtype, ac_int<4, false> num_fetches,
-    Connections::In<ac_int<port_width, false>>& response) {
-  constexpr int buffer_width = std::max({Ts::width...}) * N;
-  ac_int<buffer_width, false> bits;
-
-  for (ac_int<4, false> i = 0;; i++) {
-    bits.set_slc(i * port_width, response.Pop());
-    if (i == num_fetches - 1) {
-      break;
-    }
-  }
-
-  // Unpack bits into outputs based on dtype
-  Pack1D<VectorType, N> outputs;
-  bool handled = (unpack_data<Ts, VectorType, N, buffer_width, Ts...>(
-                      dtype, bits, outputs) ||
-                  ...);
-
-#ifndef __SYNTHESIS__
-  if (!handled) {
-    throw std::runtime_error("Unsupported dtype for matrix input: " +
-                             std::to_string(dtype));
-  }
-#endif
-
-  return outputs;
-}
-
-template <typename T, size_t Width, typename VectorType, typename... Ts>
-bool process_vector_input(
-    ac_int<4, false> dtype,
-    Connections::In<ac_int<OC_PORT_WIDTH, false>>& input_channel,
-    Pack1D<VectorType, Width>& outputs) {
-  if (get_type_index<T, Ts...>() != dtype) {
-    return false;
-  }
-
-  constexpr int num_words =
-      (T::width * Width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
-
-  ac_int<num_words * OC_PORT_WIDTH, false> bits;
-
-  for (int i = 0; i < num_words; i++) {
-    bits.set_slc(i * OC_PORT_WIDTH, input_channel.Pop());
-  }
-
-  ac_int<Width * T::width, false> bits_rep =
-      bits.template slc<Width * T::width>(0);
-
-  Pack1D<T, Width> typed = BitsToType<Pack1D<T, Width>>(TypeToBits(bits_rep));
-
-#pragma hls_unroll yes
-  for (int i = 0; i < Width; i++) {
-    outputs[i] = typed[i];
   }
 
   return true;

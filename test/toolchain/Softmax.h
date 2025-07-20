@@ -39,18 +39,18 @@ void MapSoftmax(const codegen::Operation &param,
   // inputs
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
-  vector_params->addr_gen0_mode = 2;
-  vector_params->addr_gen0_broadcast = 0b010000;
-  vector_params->addr_gen0_dtype =
+  vector_params->vector_fetch_0_offset = input_memory.address();
+  vector_params->vector_fetch_0_mode = 2;
+  vector_params->vector_fetch_0_broadcast = 0b010000;
+  vector_params->vector_fetch_0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
 
-  vector_params->addr_gen0_loops[0][0] = non_reduction_loops[0];
-  vector_params->addr_gen0_loops[0][1] = non_reduction_loops[1];
-  vector_params->addr_gen0_loops[0][2] = non_reduction_loops[2];
-  vector_params->addr_gen0_loops[1][0] = non_reduction_loops[3];
-  vector_params->addr_gen0_loops[1][1] = 3;
-  vector_params->addr_gen0_loops[1][2] = outer_dim / OC_DIMENSION;
+  vector_params->vector_fetch_0_loops[0][0] = non_reduction_loops[0];
+  vector_params->vector_fetch_0_loops[0][1] = non_reduction_loops[1];
+  vector_params->vector_fetch_0_loops[0][2] = non_reduction_loops[2];
+  vector_params->vector_fetch_0_loops[1][0] = non_reduction_loops[3];
+  vector_params->vector_fetch_0_loops[1][1] = 3;
+  vector_params->vector_fetch_0_loops[1][2] = outer_dim / OC_DIMENSION;
 
   // output
   const auto output_memory = output.memory();

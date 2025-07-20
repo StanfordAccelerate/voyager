@@ -156,12 +156,12 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.inputYLoopIndex[1]] = y_bound + 2 * params.padding;
 
       // reduce the number of iterations by packing factor
-      C1 = C1 >> params.input_packing_shift;
+      C1 = C1 >> params.input_packing_factor_power;
       loop_bounds[1][params.reductionLoopIndex[1]] = C1;
 
       ac_int<16, false> Y = Y1 * IY0;
       ac_int<16, false> X = X1 * IX0;
-      ac_int<16, false> c_stride = NRows << params.input_packing_shift;
+      ac_int<16, false> c_stride = NRows << params.input_packing_factor_power;
       ac_int<16, false> C = C2 * C1 * c_stride;
 
 #pragma hls_pipeline_init_interval 1
@@ -247,7 +247,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
                               send_packed_request<InputTypes...>(
                                   params.input_dtype, params.INPUT_OFFSET,
-                                  address, params.input_fetch_width, input_req);
+                                  address, params.input_burst_size, input_req);
                             }
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
@@ -375,9 +375,9 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
       loop_bounds[1][params.inputYLoopIndex[1]] = IY0 + params.padding * 2;
 
       // reduce the number of iterations by packing factor
-      C1 = C1 >> params.input_packing_shift;
+      C1 = C1 >> params.input_packing_factor_power;
       loop_bounds[1][params.reductionLoopIndex[1]] = C1;
-      ac_int<4, false> pf_bound = (1 << params.input_packing_shift) - 1;
+      ac_int<4, false> num_packs = (1 << params.input_packing_factor_power) - 1;
 
       ac_int<16, false> X = X1 * IX0;
       ac_int<16, false> Y = Y1 * IY0;
@@ -398,7 +398,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                         for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
                           for (loop_counters[1][5] = 0;;
                                loop_counters[1][5]++) {
-                            for (ac_int<4, false> pf = 0;; pf++) {
+                            for (ac_int<4, false> pack = 0;; pack++) {
                               ac_int<LOOP_WIDTH, true> y1 =
                                   loop_counters[0][params.inputYLoopIndex[0]];
                               ac_int<LOOP_WIDTH, true> x1 =
@@ -434,8 +434,9 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                   loop_counters[1][params.inputXLoopIndex[1]];
                               ac_int<16, false> address =
                                   y0 * y_stride + orig_x0 * C1 + c1;
-                              address =
-                                  (address << params.input_packing_shift) + pf;
+                              address = (address
+                                         << params.input_packing_factor_power) +
+                                        pack;
 
                               bool is_last = loop_counters[1][5] ==
                                                  loop_bounds[1][5] - 1 &&
@@ -449,7 +450,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                                  loop_bounds[1][1] - 1 &&
                                              loop_counters[1][0] ==
                                                  loop_bounds[1][0] - 1 &&
-                                             pf == pf_bound;
+                                             pack == num_packs;
 
                               BufferWriteRequest<ac_int<BufferWidth, false>>
                                   req;
@@ -458,7 +459,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                               req.last = is_last;
                               input_write_request[bankSel].Push(req);
 
-                              if (pf == pf_bound) {
+                              if (pack == num_packs) {
                                 break;
                               }
                             }
@@ -1020,7 +1021,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
           for (ac_int<4, false> i = 0;; i++) {
             bits.set_slc(i * PortWidth, input_resp.Pop());
-            if (i == params.input_num_fetches - 1) {
+            if (i == params.input_num_beats - 1) {
               break;
             }
           }
@@ -1075,9 +1076,9 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
           unpacked_data.Push(bits);
         }
 
-      } else {  // unpack bits into outputs
-                // based on dtype
-        ac_int<4, false> pf_bound = (1 << params.input_packing_shift) - 1;
+      } else {  // unpack bits into outputs based on dtype
+        ac_int<4, false> num_packs =
+            (1 << params.input_packing_factor_power) - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -1100,7 +1101,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 #endif
             unpacked_data.Push(outputs);
 
-            if (i == pf_bound) {
+            if (i == num_packs) {
               break;
             }
           }

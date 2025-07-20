@@ -125,10 +125,10 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                     [params.weightAddressGenWeightLoopIndex[1]];
 
       // reduce the number of iterations by packing factor
-      K1 = K1 >> params.weight_packing_shift;
+      K1 = K1 >> params.weight_packing_factor_power;
       loop_bounds[1][params.weightAddressGenWeightLoopIndex[1]] = K1 - 1;
 
-      ac_int<16, false> k_stride = NCols << params.weight_packing_shift;
+      ac_int<16, false> k_stride = NCols << params.weight_packing_factor_power;
       ac_int<24, false> c_stride = K2 * K1 * k_stride;
       ac_int<24, false> fx_stride = C2 * C1 * C0 * c_stride;
       ac_int<24, false> fy_stride = FX * fx_stride;
@@ -179,7 +179,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
                           send_packed_request<WeightTypes...>(
                               params.weight_dtype, params.WEIGHT_OFFSET,
-                              address, params.weight_fetch_width, weight_req);
+                              address, params.weight_burst_size, weight_req);
 
                           if (loop_counters[1][4] == loop_bounds[1][4]) {
                             break;
@@ -268,9 +268,10 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                     [params.weightAddressGenWeightLoopIndex[1]];
 
       // reduce the number of iterations by packing factor
-      K1 = K1 >> params.weight_packing_shift;
+      K1 = K1 >> params.weight_packing_factor_power;
       loop_bounds[1][params.weightAddressGenWeightLoopIndex[1]] = K1 - 1;
-      ac_int<4, false> pf_bound = (1 << params.weight_packing_shift) - 1;
+      ac_int<4, false> num_packs =
+          (1 << params.weight_packing_factor_power) - 1;
 
       ac_int<24, false> fx_stride = C1 * C0 * K1;
       ac_int<24, false> fy_stride = FX * fx_stride;
@@ -287,7 +288,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                     for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
                       for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
                         for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
-                          for (ac_int<4, false> pf = 0;; pf++) {
+                          for (ac_int<4, false> pack = 0;; pack++) {
                             ac_int<LOOP_WIDTH, false> k2 = loop_counters
                                 [0][params.weightAddressGenWeightLoopIndex[0]];
                             ac_int<LOOP_WIDTH, false> c1 = loop_counters
@@ -310,8 +311,9 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                             ac_int<16, false> c = c1 * C0 + c0;
                             ac_int<16, false> address =
                                 fy0 * fy_stride + fx * fx_stride + c * K1 + k1;
-                            address =
-                                (address << params.weight_packing_shift) + pf;
+                            address = (address
+                                       << params.weight_packing_factor_power) +
+                                      pack;
 
                             BufferWriteRequest<ac_int<BufferWidth, false>> req;
                             req.address = address;
@@ -322,10 +324,10 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                 loop_counters[1][2] == loop_bounds[1][2] &&
                                 loop_counters[1][1] == loop_bounds[1][1] &&
                                 loop_counters[1][0] == loop_bounds[1][0] &&
-                                pf == pf_bound;
+                                pack == num_packs;
                             write_request[bankSel].Push(req);
 
-                            if (pf == pf_bound) {
+                            if (pack == num_packs) {
                               break;
                             }
                           }
@@ -780,22 +782,18 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 
       } else {  // passthrough
         total_values *= loop_bounds[1][4];
-        total_values >>= params.weight_packing_shift;
-        // ac_int<4, false> packing_factor = 1 << params.weight_packing_shift;
+        total_values >>= params.weight_packing_factor_power;
+        // ac_int<4, false> packing_factor = 1 <<
+        // params.weight_packing_factor_power;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         while (count++ < total_values) {
-          // process_packed_response<NCols, PortWidth, BufferWidth,
-          //                         WeightTypes...>(
-          //     params.weight_dtype, params.weight_num_fetches,
-          //     packing_factor, weight_resp, transpose_out);
-
           ac_int<MAX_FETCH_WIDTH, false> bits;
 
           for (ac_int<4, false> i = 0;; i++) {
             bits.set_slc(i * PortWidth, weight_resp.Pop());
-            if (i == params.weight_num_fetches - 1) {
+            if (i == params.weight_num_beats - 1) {
               break;
             }
           }
@@ -826,10 +824,11 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
         }
       }
 
-      ac_int<32, false> total_values =
-          loop_bounds[0][0] * loop_bounds[0][1] * loop_bounds[0][2] *
-          loop_bounds[0][3] * loop_bounds[0][4]* loop_bounds[1][0] * loop_bounds[1][1] *
-          loop_bounds[1][2] * loop_bounds[1][3] * loop_bounds[1][4];
+      ac_int<32, false> total_values = loop_bounds[0][0] * loop_bounds[0][1] *
+                                       loop_bounds[0][2] * loop_bounds[0][3] *
+                                       loop_bounds[0][4] * loop_bounds[1][0] *
+                                       loop_bounds[1][1] * loop_bounds[1][2] *
+                                       loop_bounds[1][3] * loop_bounds[1][4];
       ac_int<32, false> count = 0;
 
       // passthrough
@@ -844,8 +843,9 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
         }
 
       } else {  // unpack bits into outputs based on dtype
-        total_values >>= params.weight_packing_shift;
-        ac_int<4, false> pf_bound = (1 << params.weight_packing_shift) - 1;
+        total_values >>= params.weight_packing_factor_power;
+        ac_int<4, false> num_packs =
+            (1 << params.weight_packing_factor_power) - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -868,7 +868,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
 #endif
             unpacked_weights.Push(outputs);
 
-            if (i == pf_bound) {
+            if (i == num_packs) {
               break;
             }
           }
