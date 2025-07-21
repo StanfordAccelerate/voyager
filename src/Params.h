@@ -90,7 +90,7 @@ struct MatrixParams : BaseParams {
   }
 #endif
 
-  static constexpr int LOOP_WIDTH = 11;
+  static constexpr int LOOP_WIDTH = 16;
 
   ac_int<ADDRESS_WIDTH, false> INPUT_OFFSET;
   ac_int<ADDRESS_WIDTH, false> INPUT_SCALE_OFFSET;
@@ -764,7 +764,7 @@ struct VectorParams : BaseParams {
   }
 #endif
 
-  static constexpr int LOOP_WIDTH = 11;
+  static constexpr int LOOP_WIDTH = 16;
 
   // Address generator 0
   ac_int<2, false> vector_fetch_0_mode;

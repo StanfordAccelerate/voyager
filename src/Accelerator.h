@@ -54,7 +54,7 @@ SC_MODULE(Accelerator) {
 #if SUPPORT_MVM
   MatrixVectorUnit<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
                    ACCUM_DATATYPE, VECTOR_DATATYPE, SCALE_DATATYPE,
-                   OC_PORT_WIDTH, MV_UNIT_WIDTH, OC_DIMENSION,
+                   OC_PORT_WIDTH, MV_UNIT_WIDTH, IC_DIMENSION,
                    VECTOR_UNIT_WIDTH>
       CCS_INIT_S1(matrix_vector_unit);
 

@@ -90,8 +90,8 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
         get_index_from_type_name<VU_INPUT_TYPES>(bias.dtype());
 
     int vector_fetch_2_input_width =
-      OC_DIMENSION *
-      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_2_dtype);
+        OC_DIMENSION *
+        get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_2_dtype);
     vector_params->vector_fetch_2_burst_size = vector_fetch_2_input_width / 8;
     vector_params->vector_fetch_2_num_beats =
         vector_fetch_2_input_width / OC_PORT_WIDTH;

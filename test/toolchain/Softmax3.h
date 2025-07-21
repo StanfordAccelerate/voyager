@@ -27,6 +27,8 @@ void MapSoftmax(const codegen::Operation &param,
   const int input_size = get_size(input);
   const int reduction_dim = input_shape.back();
 
+  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
+
   std::vector<int> non_reduction_loops;
   for (int i = 0; i < input_shape.size() - 1; i++) {
     non_reduction_loops.push_back(input_shape[i]);
@@ -34,10 +36,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   non_reduction_loops = split_loops(non_reduction_loops, 1024);
   pad_shape_to_ndim(non_reduction_loops, 2);
-
-  const int output_size = get_size(output);
   const int reduced_size = get_size(non_reduction_loops);
-  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   const auto output_memory = output.memory();
 
@@ -80,7 +79,7 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->output_loops[1][0] = 1;
   vector_params->output_loops[1][1] = 1;
-  vector_params->output_loops[1][2] = reduced_size / packing_factor;
+  vector_params->output_loops[1][2] = reduced_size;
   vector_params->output_dtype =
       get_type_index<VECTOR_DATATYPE, OUTPUT_DATATYPES>();
 
@@ -144,11 +143,11 @@ void MapSoftmax(const codegen::Operation &param,
 
   int vector_fetch_1_input_width =
       get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_1_dtype) *
-      VECTOR_UNIT_WIDTH;
+      OC_DIMENSION;
   vector_params->vector_fetch_1_burst_size = vector_fetch_1_input_width / 8;
   vector_params->vector_fetch_1_num_beats =
       vector_fetch_1_input_width / OC_PORT_WIDTH;
-  vector_params->vector_fetch_1_packing_factor = 1;
+  vector_params->vector_fetch_1_packing_factor = packing_factor;
 
   vector_params->vector_fetch_1_broadcast = 0b100;
   for (int i = 0; i < 3; i++) {
@@ -156,8 +155,7 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->vector_fetch_1_loops[1][0] = non_reduction_loops[0];
   vector_params->vector_fetch_1_loops[1][1] = non_reduction_loops[1];
-  vector_params->vector_fetch_1_loops[1][2] =
-      reduction_dim / OC_DIMENSION * packing_factor;
+  vector_params->vector_fetch_1_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Output: Scratch memory for sum.
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
@@ -170,7 +168,7 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->output_loops[1][0] = 1;
   vector_params->output_loops[1][1] = 1;
-  vector_params->output_loops[1][2] = reduced_size / packing_factor;
+  vector_params->output_loops[1][2] = reduced_size;
 
   // Instruction 2 - start reduction engine to calculate sum
   VectorInstructions vinst2;
@@ -236,7 +234,7 @@ void MapSoftmax(const codegen::Operation &param,
   vector_params->vector_fetch_1_burst_size = vector_fetch_1_input_width / 8;
   vector_params->vector_fetch_1_num_beats =
       vector_fetch_1_input_width / OC_PORT_WIDTH;
-  vector_params->vector_fetch_1_packing_factor = 1;
+  vector_params->vector_fetch_1_packing_factor = packing_factor;
 
   vector_params->vector_fetch_1_broadcast = 0b100;
   for (int i = 0; i < 3; i++) {
@@ -244,8 +242,7 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->vector_fetch_1_loops[1][0] = non_reduction_loops[0];
   vector_params->vector_fetch_1_loops[1][1] = non_reduction_loops[1];
-  vector_params->vector_fetch_1_loops[1][2] =
-      reduction_dim / OC_DIMENSION * packing_factor;
+  vector_params->vector_fetch_1_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Address generator 2: Scratch max.
   vector_params->vector_fetch_2_offset = sum_scratch_memory;
@@ -255,7 +252,7 @@ void MapSoftmax(const codegen::Operation &param,
   vector_params->vector_fetch_2_burst_size = vector_fetch_1_input_width / 8;
   vector_params->vector_fetch_2_num_beats =
       vector_fetch_1_input_width / OC_PORT_WIDTH;
-  vector_params->vector_fetch_2_packing_factor = 1;
+  vector_params->vector_fetch_2_packing_factor = packing_factor;
 
   vector_params->vector_fetch_2_broadcast = 0b100;
   for (int i = 0; i < 3; i++) {
@@ -263,8 +260,7 @@ void MapSoftmax(const codegen::Operation &param,
   }
   vector_params->vector_fetch_2_loops[1][0] = non_reduction_loops[0];
   vector_params->vector_fetch_2_loops[1][1] = non_reduction_loops[1];
-  vector_params->vector_fetch_2_loops[1][2] =
-      reduction_dim / OC_DIMENSION * packing_factor;
+  vector_params->vector_fetch_2_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Output
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());

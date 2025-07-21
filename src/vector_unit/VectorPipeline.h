@@ -5,7 +5,6 @@
 
 #include "../AccelTypes.h"
 #include "../ArchitectureParams.h"
-#include "Broadcaster.h"
 #include "VectorOps.h"
 
 template <typename VectorType, typename BufferType, typename ScaleType,

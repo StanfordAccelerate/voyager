@@ -116,9 +116,9 @@ void set_vector_fetch_2(const codegen::Tensor &tensor,
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
   int fetch_width = OC_DIMENSION * get_type_width<VU_INPUT_TYPES>(
                                        vector_params->vector_fetch_2_dtype);
-  vector_params->vector_fetch_1_burst_size = fetch_width / 8;
-  vector_params->vector_fetch_1_num_beats = fetch_width / OC_PORT_WIDTH;
-  vector_params->vector_fetch_1_packing_factor =
+  vector_params->vector_fetch_2_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_2_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_2_packing_factor =
       OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 3; i++) {

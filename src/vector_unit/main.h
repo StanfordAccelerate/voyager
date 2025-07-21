@@ -5,9 +5,9 @@
 
 #include "../ParamsDeserializer.h"
 #include "Accumulator.h"
-#include "Broadcaster.h"
 #include "OutputController.h"
 #include "Reducer.h"
+#include "Repeater.h"
 #include "VectorFetch.h"
 #include "VectorOps.h"
 #include "VectorPipeline.h"
@@ -56,6 +56,7 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(vector_fetch_params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       output_controller_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(send_output_params);
 
   // Vector fetch ports
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
@@ -91,10 +92,10 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_1;
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_to_memory;
 
-  Connections::Combinational<ac_int<16, false>> broadcast_count_0;
-  Connections::Combinational<ac_int<16, false>> broadcast_count_1;
-  Connections::Combinational<Pack1D<VectorType, Width>> broadcast_input_0;
-  Connections::Combinational<Pack1D<VectorType, Width>> broadcast_input_1;
+  Connections::Combinational<ac_int<16, false>> repeater_count_0;
+  Connections::Combinational<ac_int<16, false>> repeater_count_1;
+  Connections::Combinational<Pack1D<VectorType, Width>> repeater_input_0;
+  Connections::Combinational<Pack1D<VectorType, Width>> repeater_input_1;
 
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_input;
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_to_pipeline;
@@ -117,8 +118,8 @@ SC_MODULE(VectorUnit) {
   VectorPipeline<VectorType, BufferType, ScaleType, Width, OcDimension>
       CCS_INIT_S1(pipeline);
   VectorReducer<VectorType, Width> CCS_INIT_S1(reducer);
-  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(broadcaster_0);
-  Broadcaster<Pack1D<VectorType, Width>> CCS_INIT_S1(broadcaster_1);
+  Repeater<Pack1D<VectorType, Width>> CCS_INIT_S1(repeater_0);
+  Repeater<Pack1D<VectorType, Width>> CCS_INIT_S1(repeater_1);
   VectorAccumulator<VectorType, Width> CCS_INIT_S1(accumulator);
   OutputController<VectorType, ScaleType, OcDimension, OUTPUT_DATATYPES>
       CCS_INIT_S1(output_controller);
@@ -197,24 +198,23 @@ SC_MODULE(VectorUnit) {
     reducer.rstn(rstn);
     reducer.instr(reducer_instr);
     reducer.input(reducer_input);
-
-    reducer.count_0(broadcast_count_0);
-    reducer.output_0(broadcast_input_0);
-    reducer.count_1(broadcast_count_1);
-    reducer.output_1(broadcast_input_1);
+    reducer.count_0(repeater_count_0);
+    reducer.output_0(repeater_input_0);
+    reducer.count_1(repeater_count_1);
+    reducer.output_1(repeater_input_1);
     reducer.output_to_memory(reducer_to_memory);
 
-    broadcaster_0.clk(clk);
-    broadcaster_0.rstn(rstn);
-    broadcaster_0.dataIn(broadcast_input_0);
-    broadcaster_0.count(broadcast_count_0);
-    broadcaster_0.dataOut(reducer_output_0);
+    repeater_0.clk(clk);
+    repeater_0.rstn(rstn);
+    repeater_0.data_in(repeater_input_0);
+    repeater_0.count(repeater_count_0);
+    repeater_0.data_out(reducer_output_0);
 
-    broadcaster_1.clk(clk);
-    broadcaster_1.rstn(rstn);
-    broadcaster_1.dataIn(broadcast_input_1);
-    broadcaster_1.count(broadcast_count_1);
-    broadcaster_1.dataOut(reducer_output_1);
+    repeater_1.clk(clk);
+    repeater_1.rstn(rstn);
+    repeater_1.data_in(repeater_input_1);
+    repeater_1.count(repeater_count_1);
+    repeater_1.data_out(reducer_output_1);
 
     // Accumulator
     accumulator.clk(clk);
@@ -258,6 +258,7 @@ SC_MODULE(VectorUnit) {
     vector_params.ResetRead();
     vector_fetch_params.ResetWrite();
     output_controller_params.ResetWrite();
+    send_output_params.ResetWrite();
 
     wait();
 
@@ -265,6 +266,7 @@ SC_MODULE(VectorUnit) {
       VectorParams params = vector_params.Pop();
       vector_fetch_params.Push(params);
       output_controller_params.Push(params);
+      send_output_params.Push(params);
     }
   }
 
@@ -340,6 +342,7 @@ SC_MODULE(VectorUnit) {
 
   void send_outputs() {
     output_instruction.ResetRead();
+    send_output_params.ResetRead();
     vector_unit_output.ResetRead();
     reducer_to_memory.ResetRead();
     accumulator_to_memory.ResetRead();
@@ -349,62 +352,53 @@ SC_MODULE(VectorUnit) {
 
     while (1) {
       VectorInstructionConfig vector_inst_config = output_instruction.Pop();
+      VectorParams params = send_output_params.Pop();
 
       constexpr int packing_factor = OcDimension / Width;
 
-      ac_int<32, false> output_counts[8];
-      for (int i = 0; i < 8; i++) {
-        output_counts[i] = vector_inst_config.instCount[i] *
-                               vector_inst_config.inst[i].inst_count /
-                               packing_factor -
-                           1;
-        if (i == vector_inst_config.instLen - 1) {
-          break;
-        }
-      }
+      ac_int<32, false> num_outputs =
+          params.output_loops[0][0] * params.output_loops[0][1] *
+          params.output_loops[0][2] * params.output_loops[1][0] *
+          params.output_loops[1][1] * params.output_loops[1][2];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (decltype(vector_inst_config.instLoopCount) loop = 0;; loop++) {
-        for (decltype(vector_inst_config.instLen) i = 0;; i++) {
-          VectorInstructions inst = vector_inst_config.inst[i];
+      for (decltype(vector_inst_config.instLen) i = 0;; i++) {
+        VectorInstructions inst = vector_inst_config.inst[i];
 
-          if (inst.vdest == VectorInstructions::to_output ||
-              inst.rdest == VectorInstructions::to_memory) {
-            ac_int<32, false> num_outputs = output_counts[i];
-            for (ac_int<32, false> count = 0;; count++) {
-              Pack1D<VectorType, OcDimension> packed_outputs;
-              for (ac_int<4, false> pack = 0;; pack++) {
-                Pack1D<VectorType, Width> outputs;
-                if (inst.op_type == VectorInstructions::vector) {
-                  outputs = vector_unit_output.Pop();
-                } else if (inst.op_type == VectorInstructions::accumulation) {
-                  outputs = accumulator_to_memory.Pop();
-                } else if (inst.op_type == VectorInstructions::reduction) {
-                  outputs = reducer_to_memory.Pop();
-                }
+        if (inst.vdest == VectorInstructions::to_output ||
+            inst.rdest == VectorInstructions::to_memory) {
+          for (ac_int<32, false> count = 0;; count++) {
+            Pack1D<VectorType, OcDimension> packed_outputs;
+
+            for (ac_int<4, false> pack = 0;; pack++) {
+              Pack1D<VectorType, Width> outputs;
+              if (inst.op_type == VectorInstructions::vector) {
+                outputs = vector_unit_output.Pop();
+              } else if (inst.op_type == VectorInstructions::accumulation) {
+                outputs = accumulator_to_memory.Pop();
+              } else if (inst.op_type == VectorInstructions::reduction) {
+                outputs = reducer_to_memory.Pop();
+              }
 
 #pragma hls_unroll yes
-                for (int i = 0; i < Width; i++) {
-                  packed_outputs[pack * Width + i] = outputs[i];
-                }
-
-                if (pack == packing_factor - 1) {
-                  break;
-                }
+              for (int i = 0; i < Width; i++) {
+                packed_outputs[pack * Width + i] = outputs[i];
               }
-              outputs_to_memory.Push(packed_outputs);
 
-              if (count == num_outputs) {
+              if (pack == packing_factor - 1) {
                 break;
               }
             }
+            outputs_to_memory.Push(packed_outputs);
+
+            if (count == num_outputs - 1) {
+              break;
+            }
           }
-          if (i == vector_inst_config.instLen - 1) {
-            break;
-          }
+          break;
         }
-        if (loop == vector_inst_config.instLoopCount - 1) {
+        if (i == vector_inst_config.instLen - 1) {
           break;
         }
       }

@@ -3,6 +3,8 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include "Repeater.h"
+
 template <typename VectorType, int Width>
 SC_MODULE(VectorReducer) {
   sc_in<bool> clk;
@@ -19,12 +21,23 @@ SC_MODULE(VectorReducer) {
   Connections::Out<Pack1D<VectorType, Width>> output_1;
   Connections::Out<Pack1D<VectorType, Width>> output_to_memory;
 
+  Repeater<Pack1D<VectorType, Width>> CCS_INIT_S1(repeater);
+  Connections::Combinational<ac_int<16, false>> repeat_count;
+  Connections::Combinational<Pack1D<VectorType, Width>> repeat_input;
+
   static constexpr int N = 2;
   static constexpr int last = N - 1;
 
   static_assert(N > 0, "Pipeline size N must be greater than 0");
 
   SC_CTOR(VectorReducer) {
+#if VECTOR_UNIT_WIDTH != OC_DIMENSION
+    repeater.clk(clk);
+    repeater.rstn(rstn);
+    repeater.data_in(repeat_input);
+    repeater.count(repeat_count);
+    repeater.data_out(output_to_memory);
+#endif
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -37,7 +50,12 @@ SC_MODULE(VectorReducer) {
     count_1.Reset();
     output_0.Reset();
     output_1.Reset();
+#if VECTOR_UNIT_WIDTH != OC_DIMENSION
+    repeat_count.ResetWrite();
+    repeat_input.ResetWrite();
+#else
     output_to_memory.Reset();
+#endif
 
     wait();
 
@@ -51,7 +69,6 @@ SC_MODULE(VectorReducer) {
       while (counter++ < total_values) {
         Pack1D<VectorType, Width> res;
         for (ac_int<8, false> i = 0;; i++) {
-          VectorType acc;
           Pack1D<VectorType, N> acc_old;
 
 #pragma hls_unroll yes
@@ -66,6 +83,7 @@ SC_MODULE(VectorReducer) {
           for (decltype(inst.reduce_count) j = 0;; j++) {
             Pack1D<VectorType, Width> reduce_input = input.Pop();
 
+            VectorType acc;
             if (inst.reduce_op == VectorInstructions::radd) {
               VectorType sum = tree_sum(reduce_input);
               acc = j < N ? sum : acc_old[last] + sum;
@@ -121,7 +139,12 @@ SC_MODULE(VectorReducer) {
           count_1.Push(inst.immediate0);
           output_1.Push(res);
         } else if (inst.rdest == VectorInstructions::to_memory) {
+#if VECTOR_UNIT_WIDTH == OC_DIMENSION
           output_to_memory.Push(res);
+#else
+          repeat_count.Push(inst.rduplicate ? OC_DIMENSION / Width : 1);
+          repeat_input.Push(res);
+#endif
         }
       }
     }
