@@ -14,7 +14,7 @@ proc pre_compile {} {
   }
   if {$SUPPORT_MVM == true} {
     global MV_UNIT_WIDTH
-    solution design set "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $OC_DIMENSION, $VECTOR_UNIT_WIDTH>" -mapped
+    solution design set "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $IC_DIMENSION, $VECTOR_UNIT_WIDTH>" -mapped
   }
 }
 
@@ -55,7 +55,7 @@ proc pre_assembly {} {
 
   if {$SUPPORT_MVM == true} {
     global MV_UNIT_WIDTH
-    set MatrixVectorUnitBlock "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $OC_DIMENSION, $VECTOR_UNIT_WIDTH>"
+    set MatrixVectorUnitBlock "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $IC_DIMENSION, $VECTOR_UNIT_WIDTH>"
     set MatrixVectorUnitBlock_stripped [string map {" " ""} $MatrixVectorUnitBlock]
     directive set /Accelerator/$MatrixVectorUnitBlock_stripped -MAP_TO_MODULE {[Block] MatrixVectorUnit.v1}
   }
