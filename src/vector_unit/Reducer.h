@@ -21,9 +21,11 @@ SC_MODULE(VectorReducer) {
   Connections::Out<Pack1D<VectorType, Width>> output_1;
   Connections::Out<Pack1D<VectorType, Width>> output_to_memory;
 
+#if VECTOR_UNIT_WIDTH != OC_DIMENSION
   Repeater<Pack1D<VectorType, Width>> CCS_INIT_S1(repeater);
   Connections::Combinational<ac_int<16, false>> repeat_count;
   Connections::Combinational<Pack1D<VectorType, Width>> repeat_input;
+#endif
 
   static constexpr int N = 2;
   static constexpr int last = N - 1;
