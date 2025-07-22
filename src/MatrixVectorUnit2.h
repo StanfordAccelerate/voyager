@@ -686,18 +686,20 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (ac_int<32, false> k = 0;; k++) {
-        Pack1D<Output, VectorUnitWidth> outputs;
-#pragma hls_unroll yes
-        for (int i = 0; i < VectorUnitWidth; i++) {
-          outputs[i] = Output::zero();
-        }
-
+        Pack1D<Output, VectorUnitWidth> biases;
         if (params.has_bias) {
-          outputs = bias_data.Pop();
+          biases = bias_data.Pop();
+        } else {
+#pragma hls_unroll yes
+          for (int i = 0; i < VectorUnitWidth; i++) {
+            biases[i] = Output::zero();
+          }
         }
 
+        Pack1D<Output, VectorUnitWidth> outputs;
         for (int i = 0; i < VectorUnitWidth; i++) {
-          outputs[i] += accumulation_out.Pop();
+          Output acc = accumulation_out.Pop();
+          outputs[i] = acc + biases[i];
         }
 
         matrix_out.Push(outputs);
