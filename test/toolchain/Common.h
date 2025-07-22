@@ -257,7 +257,7 @@ void set_quantize_params(const codegen::Operation &param,
     bool force_scale_power_of_two =
         last_op.kwargs().at("force_scale_power_of_two").int_value();
 
-    assert(block_size == OC_DIMENSION);
+    assert(block_size == IC_DIMENSION);
 
     inst.vector_op3 = VectorInstructions::vquantize_mx;
 

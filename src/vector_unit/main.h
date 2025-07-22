@@ -7,7 +7,6 @@
 #include "Accumulator.h"
 #include "OutputController.h"
 #include "Reducer.h"
-#include "Repeater.h"
 #include "VectorFetch.h"
 #include "VectorOps.h"
 #include "VectorPipeline.h"
@@ -82,24 +81,20 @@ SC_MODULE(VectorUnit) {
   Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
 
   Connections::Combinational<Pack1D<VectorType, Width>> CCS_INIT_S1(
-      vector_unit_output);
+      pipeline_to_memory);
   Connections::Combinational<ScaleType> CCS_INIT_S1(mx_scale);
 
   // Internal connections between submodules
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_input;
-
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_0;
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_output_1;
   Connections::Combinational<Pack1D<VectorType, Width>> reducer_to_memory;
 
-  Connections::Combinational<ac_int<16, false>> repeater_count_0;
-  Connections::Combinational<ac_int<16, false>> repeater_count_1;
-  Connections::Combinational<Pack1D<VectorType, Width>> repeater_input_0;
-  Connections::Combinational<Pack1D<VectorType, Width>> repeater_input_1;
-
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_input;
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_to_pipeline;
   Connections::Combinational<Pack1D<VectorType, Width>> accumulator_to_memory;
+
+  Connections::Combinational<Pack1D<VectorType, OcDimension>> vector_unit_output;
 
   // Output Controller
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
@@ -107,7 +102,6 @@ SC_MODULE(VectorUnit) {
       vector_address_out);
   Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(scale_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(scale_address_out);
-  Connections::Combinational<Pack1D<VectorType, OcDimension>> outputs_to_memory;
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
@@ -118,8 +112,6 @@ SC_MODULE(VectorUnit) {
   VectorPipeline<VectorType, BufferType, ScaleType, Width, OcDimension>
       CCS_INIT_S1(pipeline);
   VectorReducer<VectorType, Width> CCS_INIT_S1(reducer);
-  Repeater<Pack1D<VectorType, Width>> CCS_INIT_S1(repeater_0);
-  Repeater<Pack1D<VectorType, Width>> CCS_INIT_S1(repeater_1);
   VectorAccumulator<VectorType, Width> CCS_INIT_S1(accumulator);
   OutputController<VectorType, ScaleType, OcDimension, OUTPUT_DATATYPES>
       CCS_INIT_S1(output_controller);
@@ -141,7 +133,6 @@ SC_MODULE(VectorUnit) {
     fetcher.clk(clk);
     fetcher.rstn(rstn);
     fetcher.params_in(vector_fetch_params);
-
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     fetcher.accumulation_buffer_read_address[0](
         accumulation_buffer_read_address[0]);
@@ -160,11 +151,9 @@ SC_MODULE(VectorUnit) {
     fetcher.vector_fetch_0_req(vector_fetch_0_req);
     fetcher.vector_fetch_0_resp(vector_fetch_0_resp);
     fetcher.vector_fetch_0_data(vector_fetch_0_data);
-
     fetcher.vector_fetch_1_req(vector_fetch_1_req);
     fetcher.vector_fetch_1_resp(vector_fetch_1_resp);
     fetcher.vector_fetch_1_data(vector_fetch_1_data);
-
     fetcher.vector_fetch_2_req(vector_fetch_2_req);
     fetcher.vector_fetch_2_resp(vector_fetch_2_resp);
     fetcher.vector_fetch_2_data(vector_fetch_2_data);
@@ -189,7 +178,7 @@ SC_MODULE(VectorUnit) {
     pipeline.reducer_output_0(reducer_output_0);
     pipeline.reducer_output_1(reducer_output_1);
     pipeline.mx_scale(mx_scale);
-    pipeline.vector_unit_output(vector_unit_output);
+    pipeline.vector_unit_output(pipeline_to_memory);
     pipeline.reducer_input(reducer_input);
     pipeline.accumulator_input(accumulator_input);
 
@@ -198,23 +187,9 @@ SC_MODULE(VectorUnit) {
     reducer.rstn(rstn);
     reducer.instr(reducer_instr);
     reducer.input(reducer_input);
-    reducer.count_0(repeater_count_0);
-    reducer.output_0(repeater_input_0);
-    reducer.count_1(repeater_count_1);
-    reducer.output_1(repeater_input_1);
+    reducer.output_to_stage0(reducer_output_0);
+    reducer.output_to_stage2(reducer_output_1);
     reducer.output_to_memory(reducer_to_memory);
-
-    repeater_0.clk(clk);
-    repeater_0.rstn(rstn);
-    repeater_0.data_in(repeater_input_0);
-    repeater_0.count(repeater_count_0);
-    repeater_0.data_out(reducer_output_0);
-
-    repeater_1.clk(clk);
-    repeater_1.rstn(rstn);
-    repeater_1.data_in(repeater_input_1);
-    repeater_1.count(repeater_count_1);
-    repeater_1.data_out(reducer_output_1);
 
     // Accumulator
     accumulator.clk(clk);
@@ -228,7 +203,7 @@ SC_MODULE(VectorUnit) {
     output_controller.clk(clk);
     output_controller.rstn(rstn);
     output_controller.params_in(output_controller_params);
-    output_controller.vector_in(outputs_to_memory);
+    output_controller.vector_in(vector_unit_output);
     output_controller.scale_in(mx_scale);
     output_controller.vector_out(vector_out);
     output_controller.vector_address_out(vector_address_out);
@@ -343,10 +318,10 @@ SC_MODULE(VectorUnit) {
   void send_outputs() {
     output_instruction.ResetRead();
     send_output_params.ResetRead();
-    vector_unit_output.ResetRead();
+    pipeline_to_memory.ResetRead();
     reducer_to_memory.ResetRead();
     accumulator_to_memory.ResetRead();
-    outputs_to_memory.ResetWrite();
+    vector_unit_output.ResetWrite();
 
     wait();
 
@@ -374,7 +349,7 @@ SC_MODULE(VectorUnit) {
             for (ac_int<4, false> pack = 0;; pack++) {
               Pack1D<VectorType, Width> outputs;
               if (inst.op_type == VectorInstructions::vector) {
-                outputs = vector_unit_output.Pop();
+                outputs = pipeline_to_memory.Pop();
               } else if (inst.op_type == VectorInstructions::accumulation) {
                 outputs = accumulator_to_memory.Pop();
               } else if (inst.op_type == VectorInstructions::reduction) {
@@ -390,7 +365,7 @@ SC_MODULE(VectorUnit) {
                 break;
               }
             }
-            outputs_to_memory.Push(packed_outputs);
+            vector_unit_output.Push(packed_outputs);
 
             if (count == num_outputs - 1) {
               break;
