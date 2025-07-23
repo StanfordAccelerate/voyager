@@ -297,6 +297,8 @@ SC_MODULE(VectorUnit) {
 
     wait();
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
     while (true) {
       Pack1D<BufferType, OcDimension> full_response = matrix_unit_output.Pop();
 
