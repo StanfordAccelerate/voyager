@@ -2,19 +2,19 @@ set block "Accelerator"
 set full_block_name "Accelerator"
 
 proc pre_compile {} {
-  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION SUPPORT_MX SUPPORT_MVM IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
+  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION VECTOR_UNIT_WIDTH SUPPORT_MX SUPPORT_MVM IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
   foreach mapped_block [list \
     "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>" \
     "WeightController<WeightTypeList, $ACCUM_BUFFER_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $OC_PORT_WIDTH, $WEIGHT_BUFFER_WIDTH>" \
     "MatrixProcessor<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $IC_DIMENSION, $OC_DIMENSION, $ACCUM_BUFFER_SIZE>" \
-    "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>" \
+    "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $VECTOR_UNIT_WIDTH, $OC_DIMENSION>" \
     "MatrixParamsDeserializer<[expr {$SUPPORT_MX ? 5 : 3}]>" \
   ] {
     solution design set $mapped_block -mapped
   }
   if {$SUPPORT_MVM == true} {
     global MV_UNIT_WIDTH
-    solution design set "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $OC_DIMENSION>" -mapped
+    solution design set "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $IC_DIMENSION, $VECTOR_UNIT_WIDTH>" -mapped
   }
 }
 
@@ -31,7 +31,7 @@ proc pre_libraries {} {
 }
 
 proc pre_assembly {} {
-  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION SUPPORT_MX SUPPORT_MVM IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
+  global INPUT_TYPE_LIST WEIGHT_TYPE_LIST SA_INPUT_TYPE SA_WEIGHT_TYPE ACCUM_DATATYPE ACCUM_BUFFER_DATATYPE VECTOR_DATATYPE SCALE_DATATYPE IC_DIMENSION OC_DIMENSION VECTOR_UNIT_WIDTH SUPPORT_MX SUPPORT_MVM IC_PORT_WIDTH OC_PORT_WIDTH ACCUM_BUFFER_SIZE INPUT_BUFFER_WIDTH WEIGHT_BUFFER_WIDTH
 
   set InputControllerBlock "InputController<InputTypeList, $IC_DIMENSION, $IC_PORT_WIDTH, $INPUT_BUFFER_WIDTH>"
   set InputControllerBlock_stripped [string map {" " ""} $InputControllerBlock]
@@ -45,7 +45,7 @@ proc pre_assembly {} {
   set MatrixProcessorBlock_stripped [string map {" " ""} $MatrixProcessorBlock]
   directive set /Accelerator/$MatrixProcessorBlock_stripped -MAP_TO_MODULE {[Block] MatrixProcessor.v1}
 
-  set VectorUnitBlock "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $OC_DIMENSION>"
+  set VectorUnitBlock "VectorUnit<$VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE, $SCALE_DATATYPE, $VECTOR_UNIT_WIDTH, $OC_DIMENSION>"
   set VectorUnitBlock_stripped [string map {" " ""} $VectorUnitBlock]
   directive set /Accelerator/$VectorUnitBlock_stripped -MAP_TO_MODULE {[Block] VectorUnit.v1}
 
@@ -55,7 +55,7 @@ proc pre_assembly {} {
 
   if {$SUPPORT_MVM == true} {
     global MV_UNIT_WIDTH
-    set MatrixVectorUnitBlock "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $OC_DIMENSION>"
+    set MatrixVectorUnitBlock "MatrixVectorUnit<InputTypeList, WeightTypeList, $SA_INPUT_TYPE, $SA_WEIGHT_TYPE, $ACCUM_DATATYPE, $VECTOR_DATATYPE, $SCALE_DATATYPE, $OC_PORT_WIDTH, $MV_UNIT_WIDTH, $IC_DIMENSION, $VECTOR_UNIT_WIDTH>"
     set MatrixVectorUnitBlock_stripped [string map {" " ""} $MatrixVectorUnitBlock]
     directive set /Accelerator/$MatrixVectorUnitBlock_stripped -MAP_TO_MODULE {[Block] MatrixVectorUnit.v1}
   }

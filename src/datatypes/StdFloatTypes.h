@@ -56,7 +56,7 @@ class StdFloat {
     return float_val.template convert_to_ac_int<width, is_signed>();
   }
 
-  ac_int<width, false> bits_rep() { return float_val.d; }
+  ac_int<width, false> bits_rep() const { return float_val.d; }
 
   void set_bits(int i) { float_val.d = i; }
 

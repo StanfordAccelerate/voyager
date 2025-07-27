@@ -61,7 +61,7 @@ void send_packed_request(ac_int<DTYPE_INDEX_WIDTH, false> dtype,
                          ac_int<32, false> address,
                          ac_int<32, false> fetch_width,
                          Connections::Out<MemoryRequest>& channel) {
-  ac_int<5, false> width = get_type_width<Ts...>(dtype);
+  ac_int<6, false> width = get_type_width<Ts...>(dtype);
   MemoryRequest request = {offset + address * width / 8, fetch_width};
   channel.Push(request);
 }

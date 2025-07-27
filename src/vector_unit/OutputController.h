@@ -97,6 +97,7 @@ SC_MODULE(OutputController) {
             indices[i] = 0;
           }
 
+#pragma hls_unroll 4
           for (int j = 0; j < NUM_CODEBOOK_ENTRIES - 1; j++) {
 #pragma hls_unroll yes
             for (int i = 0; i < Width; i++) {

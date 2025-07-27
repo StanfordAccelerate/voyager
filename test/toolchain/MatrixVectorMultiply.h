@@ -27,38 +27,55 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
   // input is a vector of size reduction_dim
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = get_address(input);
-  vector_params->addr_gen0_mode = 2;
-  vector_params->addr_gen0_broadcast = 0b010000;
-  vector_params->addr_gen0_dtype =
+  vector_params->vector_fetch_0_offset = get_address(input);
+  vector_params->vector_fetch_0_mode = 2;
+  vector_params->vector_fetch_0_broadcast = 0b010000;
+  vector_params->vector_fetch_0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
 
+  int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
+  int vector_fetch_0_input_width =
+      OC_DIMENSION *
+      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_0_dtype);
+  vector_params->vector_fetch_0_burst_size = vector_fetch_0_input_width / 8;
+  vector_params->vector_fetch_0_num_beats =
+      vector_fetch_0_input_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_0_packing_factor = packing_factor;
+
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen0_loops[0][i] = 1;
+    vector_params->vector_fetch_0_loops[0][i] = 1;
   }
-  vector_params->addr_gen0_loops[1][0] = 1;
-  vector_params->addr_gen0_loops[1][1] = output_dim;
-  vector_params->addr_gen0_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->vector_fetch_0_loops[1][0] = 1;
+  vector_params->vector_fetch_0_loops[1][1] = output_dim;
+  vector_params->vector_fetch_0_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // weight is a matrix of output_dim x reduction_dim
   const auto weight_memory = weight.memory();
   accelerator_memory_map["vector1"] = get_partition(weight_memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = get_address(weight);
-  vector_params->addr_gen1_mode = true;
-  vector_params->addr_gen1_dtype =
+  vector_params->vector_fetch_1_offset = get_address(weight);
+  vector_params->vector_fetch_1_mode = true;
+  vector_params->vector_fetch_1_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(weight.dtype());
 
+  int vector_fetch_1_input_width =
+      OC_DIMENSION *
+      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_1_dtype);
+  vector_params->vector_fetch_1_burst_size = vector_fetch_1_input_width / 8;
+  vector_params->vector_fetch_1_num_beats =
+      vector_fetch_1_input_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_1_packing_factor = packing_factor;
+
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_loops[0][i] = 1;
+    vector_params->vector_fetch_1_loops[0][i] = 1;
   }
-  vector_params->addr_gen1_loops[1][0] = 1;
-  vector_params->addr_gen1_loops[1][1] = output_dim;
-  vector_params->addr_gen1_loops[1][2] = reduction_dim / OC_DIMENSION;
+  vector_params->vector_fetch_1_loops[1][0] = 1;
+  vector_params->vector_fetch_1_loops[1][1] = output_dim;
+  vector_params->vector_fetch_1_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addr_gen1_y_loop_idx[i] = 0;
-    vector_params->addr_gen1_x_loop_idx[i] = 1;
-    vector_params->addr_gen1_k_loop_idx[i] = 2;
+    vector_params->vector_fetch_1_y_loop_idx[i] = 0;
+    vector_params->vector_fetch_1_x_loop_idx[i] = 1;
+    vector_params->vector_fetch_1_k_loop_idx[i] = 2;
   }
 
   // bias
@@ -66,23 +83,31 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
     const auto bias = matrix_op.kwargs().at("bias").tensor();
     const auto bias_memory = bias.memory();
     accelerator_memory_map["vector2"] = get_partition(bias_memory.partition());
-    vector_params->ADDRESS_GEN2_OFFSET = get_address(bias);
-    vector_params->addr_gen2_mode = true;
-    vector_params->addr_gen2_broadcast = 0b011;
-    vector_params->addr_gen2_dtype =
+    vector_params->vector_fetch_2_offset = get_address(bias);
+    vector_params->vector_fetch_2_mode = true;
+    vector_params->vector_fetch_2_broadcast = 0b011;
+    vector_params->vector_fetch_2_dtype =
         get_index_from_type_name<VU_INPUT_TYPES>(bias.dtype());
 
+    int vector_fetch_2_input_width =
+        OC_DIMENSION *
+        get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_2_dtype);
+    vector_params->vector_fetch_2_burst_size = vector_fetch_2_input_width / 8;
+    vector_params->vector_fetch_2_num_beats =
+        vector_fetch_2_input_width / OC_PORT_WIDTH;
+    vector_params->vector_fetch_2_packing_factor = packing_factor;
+
     for (int i = 0; i < 3; i++) {
-      vector_params->addr_gen2_loops[0][i] = 1;
+      vector_params->vector_fetch_2_loops[0][i] = 1;
     }
-    vector_params->addr_gen2_loops[1][0] = 1;
-    vector_params->addr_gen2_loops[1][1] = 1;
-    vector_params->addr_gen2_loops[1][2] = output_dim / OC_DIMENSION;
+    vector_params->vector_fetch_2_loops[1][0] = 1;
+    vector_params->vector_fetch_2_loops[1][1] = 1;
+    vector_params->vector_fetch_2_loops[1][2] = output_dim / OC_DIMENSION;
 
     for (int i = 0; i < 2; i++) {
-      vector_params->addr_gen2_y_loop_idx[i] = 0;
-      vector_params->addr_gen2_x_loop_idx[i] = 1;
-      vector_params->addr_gen2_k_loop_idx[i] = 2;
+      vector_params->vector_fetch_2_y_loop_idx[i] = 0;
+      vector_params->vector_fetch_2_x_loop_idx[i] = 1;
+      vector_params->vector_fetch_2_k_loop_idx[i] = 2;
     }
   }
 

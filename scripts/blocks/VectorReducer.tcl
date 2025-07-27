@@ -1,5 +1,5 @@
 set block "VectorReducer"
-set full_block_name "VectorReducer<$VECTOR_DATATYPE, $OC_DIMENSION>"
+set full_block_name "VectorReducer<$VECTOR_DATATYPE, $VECTOR_UNIT_WIDTH>"
 
 proc pre_architect {} {
   global full_block_name
