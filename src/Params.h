@@ -471,8 +471,8 @@ struct VectorInstructions {
     reduce_op = 0;
     rsqrt = 0;
     rreciprocal = 0;
+    rscale = 0;
     rduplicate = 0;
-    rbroadcast = 0;
     rdest = 0;
     immediate0 = 0;
     immediate1 = 0;
@@ -540,8 +540,8 @@ struct VectorInstructions {
 
   ac_int<1, false> rsqrt;
   ac_int<1, false> rreciprocal;
+  ac_int<1, false> rscale;
   ac_int<1, false> rduplicate;
-  ac_int<1, false> rbroadcast;  // broadcast by immediate0
 
   ac_int<2, false> rdest;
   static const unsigned int to_op0 = 1;
@@ -579,8 +579,8 @@ struct VectorInstructions {
     m & reduce_op;
     m & rsqrt;
     m & rreciprocal;
+    m & rscale;
     m & rduplicate;
-    m & rbroadcast;
     m & rdest;
     m & vdest;
     m & immediate0;
@@ -614,8 +614,8 @@ struct VectorInstructions {
     os << "reduce_op: " << params.reduce_op << std::endl;
     os << "rsqrt: " << params.rsqrt << std::endl;
     os << "rreciprocal: " << params.rreciprocal << std::endl;
+    os << "rscale: " << params.rscale << std::endl;
     os << "rduplicate: " << params.rduplicate << std::endl;
-    os << "rbroadcast: " << params.rbroadcast << std::endl;
     os << "rdest: " << params.rdest << std::endl;
     os << "vdest: " << params.vdest << std::endl;
     os << "immediate0: " << params.immediate0 << std::endl;
@@ -641,8 +641,8 @@ struct VectorInstructions {
            lhs.reduce_count == rhs.reduce_count &&
            lhs.reduce_op == rhs.reduce_op && lhs.rsqrt == rhs.rsqrt &&
            lhs.rreciprocal == rhs.rreciprocal &&
-           lhs.rduplicate == rhs.rduplicate &&
-           lhs.rbroadcast == rhs.rbroadcast && lhs.rdest == rhs.rdest &&
+           lhs.rscale == rhs.rscale && lhs.rduplicate == rhs.rduplicate &&
+           lhs.rdest == rhs.rdest &&
            lhs.vdest == rhs.vdest && lhs.immediate0 == rhs.immediate0 &&
            lhs.immediate1 == rhs.immediate1 &&
            lhs.immediate2 == rhs.immediate2 &&
@@ -1398,10 +1398,10 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].rreciprocal;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rduplicate;
+      m& inst[j].rscale;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rbroadcast;
+      m& inst[j].rduplicate;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rdest;

@@ -138,6 +138,12 @@ SC_MODULE(VectorReducer) {
             output = output.reciprocal();
           }
 
+          if (inst.rscale) {
+            VectorType scale;
+            scale.set_bits(inst.immediate1);
+            output = output * scale;
+          }
+
           res[i] = output;
           if (inst.rduplicate || i == Width - 1) {
             break;
