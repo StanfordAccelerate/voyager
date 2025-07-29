@@ -135,7 +135,8 @@ SC_MODULE(VectorReducer) {
           }
 
           if (inst.rreciprocal) {
-            output = output.reciprocal();
+            output =
+                output.is_zero() ? VectorType::zero() : output.reciprocal();
           }
 
           if (inst.rscale) {
