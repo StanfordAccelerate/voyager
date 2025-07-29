@@ -352,7 +352,11 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
 
         if success:
             # Sum all Runtime values
-            runtimes = re.findall(r"Runtime:\s+(\d+)\s*ns", content, flags=re.IGNORECASE)
+            runtimes = re.findall(
+                r"^Runtime:\s+(\d+)\s*ns",
+                content,
+                flags=re.IGNORECASE | re.MULTILINE,
+            )
             total_runtime = sum(map(int, runtimes)) if runtimes else 0
 
             # Capture runtime type and ideal runtime
