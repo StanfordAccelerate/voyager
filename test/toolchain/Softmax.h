@@ -41,7 +41,8 @@ void MapSoftmax(const codegen::Operation &param,
   const auto output_memory = output.memory();
 
   const int max_scratch_memory = get_address(input) + 2 * input_size;
-  const int sum_scratch_memory = max_scratch_memory + 2 * input_size;
+  const int sum_scratch_memory =
+      max_scratch_memory + reduced_size * OC_DIMENSION * 2;
 
   // ----------------------------------------------------------------------------
   // Pass 1: Calculate max and subtract max from tensor

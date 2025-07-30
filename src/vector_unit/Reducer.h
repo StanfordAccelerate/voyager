@@ -135,7 +135,14 @@ SC_MODULE(VectorReducer) {
           }
 
           if (inst.rreciprocal) {
-            output = output.reciprocal();
+            output =
+                output.is_zero() ? VectorType::zero() : output.reciprocal();
+          }
+
+          if (inst.rscale) {
+            VectorType scale;
+            scale.set_bits(inst.immediate1);
+            output = output * scale;
           }
 
           res[i] = output;

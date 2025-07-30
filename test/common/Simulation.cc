@@ -129,19 +129,19 @@ void Simulation::print_ideal_runtime(const Operation operation) {
     const auto weight_shape = get_shape(weight);
     const auto output_shape = get_shape(output);
 
-    int K = weight_shape[weight_shape.size() - 1];
-
     // the total number of operations is X * Y * C * FX * FY * K.
-    long num_macs = get_size(output) * get_size(weight) / K;
+    long num_macs = get_size(output) * get_size(weight);
 
     if (is_fc(first_op)) {
+      int K = weight_shape[0];
 #if SUPPORT_MVM
-      cycles = num_macs / MV_UNIT_WIDTH;
+      cycles = num_macs / K / MV_UNIT_WIDTH;
 #else
-      cycles = num_macs / OC_DIMENSION;
+      cycles = num_macs / K / OC_DIMENSION;
 #endif
     } else {
-      cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
+      int K = weight_shape[weight_shape.size() - 1];
+      cycles = num_macs / K / (IC_DIMENSION * OC_DIMENSION);
 
       if (operation.has_shrunk_tiling) {
         cycles *= operation.shrink_factor;

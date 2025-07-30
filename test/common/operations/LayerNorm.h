@@ -69,12 +69,11 @@ inline T *layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
       variance += buffer[0];
     }
 
-    T stddev_inv = variance.inv_sqrt();
     T divisor = sqrt(outer_dim);
+    T stddev_inv = variance.inv_sqrt() * divisor;
 
     if (variance == T::zero()) {
       stddev_inv = 1.0;
-      divisor = 1.0;
     }
 
     // Normalize by variance and perform an affine transformation
@@ -82,7 +81,6 @@ inline T *layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
       T input = inputs[i * outer_dim + j];
       input -= mean;
       input *= stddev_inv;
-      input *= divisor;
 
       // perform affine transformation
       if (weights) input *= weights[j];

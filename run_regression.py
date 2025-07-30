@@ -336,65 +336,40 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
             if "No rule to make target" not in text:
                 break
 
-    # search if the test passed
-    p = subprocess.Popen(
-        ["grep", "Error count: 0", f"{output_folder}/{model}_{layer}.log"],
-        stdout=subprocess.PIPE,
-    )
-    p.communicate()
-    success = p.returncode == 0
+    log_file = f"{output_folder}/{model}_{layer}.log"
 
-    if success:
-        # capture number after "Runtime: " in the log file
-        p = subprocess.Popen(
-            [
-                "grep",
-                "-oP",
-                "(?<=Runtime: ).\d+",
-                f"{output_folder}/{model}_{layer}.log",
-            ],
-            stdout=subprocess.PIPE,
-        )
-        runtime = int(p.communicate()[0].decode("utf-8").strip())
+    success = False
+    total_runtime = 0
+    ideal_runtime = 0
+    runtime_type = ""
 
-        # capture ideal runtime number in the log file
-        # can either be "Matrix unit ideal runtime: " or "Vector unit ideal runtime: "
-        p = subprocess.Popen(
-            [
-                "grep",
-                "-oP",
-                "(?<=matrix unit ideal runtime: ).\d+",
-                f"{output_folder}/{model}_{layer}.log",
-            ],
-            stdout=subprocess.PIPE,
-        )
+    if os.path.exists(log_file):
+        with open(log_file, "r") as file:
+            content = file.read()
 
-        match = p.communicate()[0]
+        # Check if "Error count: 0" exists
+        success = bool(re.search(r"Error\s+count:\s+0", content))
 
-        if match:
-            runtime_type = "matrix"
-        else:
-            p = subprocess.Popen(
-                [
-                    "grep",
-                    "-oP",
-                    "(?<=vector unit ideal runtime: ).\d+",
-                    f"{output_folder}/{model}_{layer}.log",
-                ],
-                stdout=subprocess.PIPE,
+        if success:
+            # Sum all Runtime values
+            runtimes = re.findall(
+                r"^Runtime:\s+(\d+)\s*ns",
+                content,
+                flags=re.IGNORECASE | re.MULTILINE,
             )
-            match, error = p.communicate()
-            assert not error
+            total_runtime = sum(map(int, runtimes)) if runtimes else 0
 
-            runtime_type = "vector"
+            # Capture runtime type and ideal runtime
+            match = re.search(
+                r"(matrix|vector)\s+unit\s+ideal\s+runtime:\s+(\d+)\s*ns",
+                content,
+                flags=re.IGNORECASE,
+            )
 
-        ideal = int(match.decode("utf-8").strip())
-    else:
-        runtime = 0
-        ideal = 0
-        runtime_type = ""
+            runtime_type = match.group(1).lower()
+            ideal_runtime = int(match.group(2))
 
-    return (model, layer, success, runtime, ideal, runtime_type, layer_count)
+    return (model, layer, success, total_runtime, ideal_runtime, runtime_type, layer_count)
 
 
 def run_rtl_tests(
@@ -758,6 +733,7 @@ def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
             # remove the name, memory, and node fields from the op
             delete_nested_keys(op, "name")
             delete_nested_keys(op, "memory")
+            delete_nested_keys(op, "scratchpad")
             delete_nested_keys(op, "node")
 
             is_unique_layer = True
@@ -898,6 +874,7 @@ def main():
             len(args.models) == 1
         ), "Only one model can be specified when using --tests"
         layers[args.models[0]] = args.tests.split(",")
+        layer_counts[args.models[0]] = {test: 1 for test in layers[args.models[0]]}
 
     if args.sims == "systemc" or args.sims == "fast-systemc":
         success = run_systemc_tests(
