@@ -42,8 +42,9 @@ void MapMicroscaling(const codegen::Operation &param,
   vector_params->vector_fetch_0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
 
-  int input_width = VECTOR_UNIT_WIDTH * get_type_width<VU_INPUT_TYPES>(
-                                            vector_params->vector_fetch_0_dtype);
+  int input_width =
+      VECTOR_UNIT_WIDTH *
+      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_0_dtype);
   vector_params->vector_fetch_0_burst_size = input_width / 8;
   vector_params->vector_fetch_0_num_beats = input_width / OC_PORT_WIDTH;
   vector_params->vector_fetch_0_packing_factor = 1;
@@ -54,7 +55,8 @@ void MapMicroscaling(const codegen::Operation &param,
 
   vector_params->vector_fetch_0_loops[0][0] = input_shape[0];
   vector_params->vector_fetch_0_loops[0][1] = input_shape[1] / block_size;
-  vector_params->vector_fetch_0_loops[0][2] = input_shape[2] / VECTOR_UNIT_WIDTH;
+  vector_params->vector_fetch_0_loops[0][2] =
+      input_shape[2] / VECTOR_UNIT_WIDTH;
   vector_params->vector_fetch_0_loops[1][0] = 1;
   vector_params->vector_fetch_0_loops[1][1] = block_size;
   vector_params->vector_fetch_0_loops[1][2] = 1;
@@ -94,7 +96,6 @@ void MapMicroscaling(const codegen::Operation &param,
   vinst0.reduce_count = block_size;
   vinst0.rdest = VectorInstructions::to_memory;
   vector_instruction_config->inst[0] = vinst0;
-  vector_instruction_config->instCount[0] = 1;
 
   // feed accumulator
   VectorInstructions vinst1;
@@ -110,7 +111,6 @@ void MapMicroscaling(const codegen::Operation &param,
   vinst1.vector_op1 = VectorInstructions::vabs;
   vinst1.vdest = VectorInstructions::to_accumulate;
   vector_instruction_config->inst[1] = vinst1;
-  vector_instruction_config->instCount[1] = 1;
 
   vector_instruction_config->instLen = 2;
   vector_instruction_config->instLoopCount = 1;

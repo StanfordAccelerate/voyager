@@ -249,7 +249,19 @@ std::vector<std::any> run_operation(const Operation &operation,
       const auto input_shape = get_shape(input);
 
       Vector *input_ptr = std::any_cast<Vector *>(output_ptr);
-      output_ptr = perform_unary_operation(input_ptr, input_shape, op.target());
+
+      // Grab kwargs that are relevant for some activation functions
+      std::map<std::string, Vector> filtered_kwargs;
+      if (unary_ops_with_kwargs.find(op.target()) !=
+          unary_ops_with_kwargs.end()) {
+        for (const auto &[key, value] : op.kwargs()) {
+          if (key != "input") {
+            filtered_kwargs[key] = Vector(value.float_value());
+          }
+        }
+      }
+      output_ptr = perform_unary_operation(input_ptr, input_shape, op.target(),
+                                           filtered_kwargs);
     } else if (arithmetics.find(op.target()) != arithmetics.end()) {
       Vector *input_ptr = std::any_cast<Vector *>(output_ptr);
 

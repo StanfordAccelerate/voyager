@@ -104,9 +104,6 @@ SC_MODULE(Accelerator) {
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_2_resp);
 
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
-
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_output_address);
@@ -183,8 +180,6 @@ SC_MODULE(Accelerator) {
     vector_unit.vector_fetch_1_resp(vector_fetch_1_resp);
     vector_unit.vector_fetch_2_req(vector_fetch_2_req);
     vector_unit.vector_fetch_2_resp(vector_fetch_2_resp);
-    vector_unit.vector_fetch_3_req(vector_fetch_3_req);
-    vector_unit.vector_fetch_3_resp(vector_fetch_3_resp);
     vector_unit.vector_out(vector_output);
     vector_unit.vector_address_out(vector_output_address);
     vector_unit.scale_out(scalar_output);

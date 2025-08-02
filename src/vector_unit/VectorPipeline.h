@@ -15,6 +15,7 @@ SC_MODULE(VectorPipeline) {
 
   // Inputs
   Connections::In<VectorInstructions> instr;
+  Connections::In<ApproxUnitConfig> approx_unit_config;
   Connections::In<Pack1D<BufferType, Width>> matrix_unit_output;
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
@@ -28,9 +29,6 @@ SC_MODULE(VectorPipeline) {
   Connections::In<Pack1D<VectorType, Width>> vector_fetch_0_data;
   Connections::In<Pack1D<VectorType, Width>> vector_fetch_1_data;
   Connections::In<Pack1D<VectorType, Width>> vector_fetch_2_data;
-
-  Connections::Out<MemoryRequest> vector_fetch_3_req;
-  Connections::In<ac_int<16, false>> vector_fetch_3_resp;
 
   Connections::In<Pack1D<VectorType, Width>> accumulator_output;
   Connections::In<Pack1D<VectorType, Width>> reducer_output_0;
@@ -48,6 +46,8 @@ SC_MODULE(VectorPipeline) {
   Connections::Combinational<Pack1D<StageInput, 3>> stage1_input;
   Connections::Combinational<Pack1D<StageInput, 3>> stage2_input;
   Connections::Combinational<Pack1D<StageInput, 2>> stage3_input;
+
+  Connections::Combinational<VectorInstructions> stage2_inst;
 
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
   Connections::Fifo<Pack1D<StageInput, 2>, OcDimension / Width>
@@ -96,8 +96,6 @@ SC_MODULE(VectorPipeline) {
     vector_fetch_0_data.Reset();
     vector_fetch_1_data.Reset();
     vector_fetch_2_data.Reset();
-    vector_fetch_3_req.Reset();
-    vector_fetch_3_resp.Reset();
     accumulator_output.Reset();
     reducer_output_0.Reset();
     reducer_output_1.Reset();
@@ -108,6 +106,7 @@ SC_MODULE(VectorPipeline) {
     matrix_vector_unit_data.Reset();
 #endif
     stage0_input.ResetWrite();
+    stage2_inst.ResetWrite();
 
     wait();
 
@@ -117,6 +116,8 @@ SC_MODULE(VectorPipeline) {
       VectorInstructions inst = instr.Pop();
       decltype(inst.inst_count) total_values = inst.inst_count;
       decltype(inst.inst_count) counter = 0;
+
+      stage2_inst.Push(inst);
 
       while (counter++ < total_values) {
         // Vector unit inputs
@@ -286,7 +287,6 @@ SC_MODULE(VectorPipeline) {
         transactions[1] = {inst.vector_op1, inst.immediate0, op0_src1};
         transactions[2] = {inst.vector_op2, inst.vdest, op2_src1};
         transactions[3] = {inst.vector_op3, inst.immediate2, op3_src1};
-
         stage0_input.Push(transactions);
       }
     }
@@ -305,7 +305,6 @@ SC_MODULE(VectorPipeline) {
       decltype(VectorInstructions::vector_op0) op0 = transactions[0].op;
       Pack1D<VectorType, Width> op0_src0 = transactions[0].payload;
       Pack1D<VectorType, Width> op0_src1 = transactions[1].payload;
-
       Pack1D<VectorType, Width> res0;
 
       // Stage 0: add, sub, mult
@@ -336,32 +335,40 @@ SC_MODULE(VectorPipeline) {
   void stage1() {
     stage1_input.ResetRead();
     stage2_input.ResetWrite();
+    approx_unit_config.Reset();
+    stage2_inst.ResetRead();
 
     wait();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (1) {
-      Pack1D<StageInput, 3> transactions = stage1_input.Pop();
-      decltype(VectorInstructions::vector_op1) op1 = transactions[0].op;
-      Pack1D<VectorType, Width> op1_src0 = transactions[0].payload;
-      Pack1D<VectorType, Width> res1;
+      ApproxUnitConfig config = approx_unit_config.Pop();
+      VectorInstructions inst = stage2_inst.Pop();
+      decltype(inst.inst_count) total_values = inst.inst_count;
+      decltype(inst.inst_count) counter = 0;
 
-      // Stage 1: exp, abs, activations
-      if (op1 == VectorInstructions::vexp) {
-        res1 = vexp<VectorType, Width>(op1_src0);
-      } else if (op1 == VectorInstructions::vabs) {
-        res1 = vabs<VectorType, Width>(op1_src0);
-      } else if (op1 == VectorInstructions::vrelu) {
-        res1 = vrelu<VectorType, Width>(op1_src0);
-      } else if (op1 == VectorInstructions::vsilu) {
-        res1 = vsilu<VectorType, Width>(op1_src0);
-      } else {
-        res1 = op1_src0;
+      while (counter++ < total_values) {
+        Pack1D<StageInput, 3> transactions = stage1_input.Pop();
+        decltype(VectorInstructions::vector_op1) op1 = transactions[0].op;
+        Pack1D<VectorType, Width> op1_src0 = transactions[0].payload;
+        Pack1D<VectorType, Width> res1;
+
+        // Stage 1: exp, abs, activations
+        if (op1 == VectorInstructions::vpoly) {
+          res1 = vpoly<VectorType, Width>(op1_src0, config.maxes, config.ranges,
+                                          config.clamp_min, config.clamp_max);
+        } else if (op1 == VectorInstructions::vabs) {
+          res1 = vabs<VectorType, Width>(op1_src0);
+        } else if (op1 == VectorInstructions::vrelu) {
+          res1 = vrelu<VectorType, Width>(op1_src0);
+        } else {
+          res1 = op1_src0;
+        }
+
+        transactions[0].payload = res1;
+        stage2_input.Push(transactions);
       }
-
-      transactions[0].payload = res1;
-      stage2_input.Push(transactions);
     }
   }
 

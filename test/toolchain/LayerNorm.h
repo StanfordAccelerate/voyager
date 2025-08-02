@@ -95,7 +95,6 @@ void MapLayerNorm(const codegen::Operation &param,
   inst0_0.rdest = VectorInstructions::to_memory;
   inst0_0.immediate0 = reduction_dim / OC_DIMENSION * packing_factor;
   vinstr_config->inst[0] = inst0_0;
-  vinstr_config->instCount[0] = 1;
 
   // Scale inputs by 1 / norm_size and send to the reduction engine
   VectorInstructions inst0_1;
@@ -108,7 +107,6 @@ void MapLayerNorm(const codegen::Operation &param,
   inst0_1.immediate0 = immediate.bits_rep();
   inst0_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = inst0_1;
-  vinstr_config->instCount[1] = 1;
 
   vinstr_config->instLen = 2;
   vinstr_config->instLoopCount = 1;
@@ -192,7 +190,6 @@ void MapLayerNorm(const codegen::Operation &param,
   inst1_0.rduplicate = 1;
   inst1_0.rdest = VectorInstructions::to_memory;
   vinstr_config->inst[0] = inst1_0;
-  vinstr_config->instCount[0] = 1;
 
   VectorInstructions inst1_1;
   inst1_1.op_type = VectorInstructions::vector;
@@ -203,7 +200,6 @@ void MapLayerNorm(const codegen::Operation &param,
   inst1_1.vector_op2 = VectorInstructions::vsquare;
   inst1_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = inst1_1;
-  vinstr_config->instCount[1] = 1;
 
   vinstr_config->instLen = 2;
   vinstr_config->instLoopCount = 1;
@@ -300,7 +296,6 @@ void MapLayerNorm(const codegen::Operation &param,
   inst2.vector_op2 = VectorInstructions::vmult;
   inst2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[0] = inst2;
-  vinstr_config->instCount[0] = 1;
 
   vinstr_config->instLen = 1;
   vinstr_config->instLoopCount = 1;
@@ -419,7 +414,6 @@ void MapLayerNorm(const codegen::Operation &param,
   set_quantize_params(param, vector_params, inst3);
 
   vinstr_config->inst[0] = inst3;
-  vinstr_config->instCount[0] = 1;
 
   vinstr_config->instLen = 1;
   vinstr_config->instLoopCount = 1;

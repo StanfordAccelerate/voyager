@@ -3,6 +3,7 @@
 #include "../AccelTypes.h"
 #include "../ArchitectureParams.h"
 #include "../TypeToBits.h"
+#include "ApproximationUnit.h"
 
 using namespace ac_math;
 
@@ -115,6 +116,21 @@ Pack1D<T, Width> vmax(const Pack1D<T, Width> op0, const Pack1D<T, Width> op1) {
 #pragma hls_unroll yes
   for (int i = 0; i < Width; i++) {
     res[i] = std::max(op0[i], op1[i]);
+  }
+  return res;
+}
+
+// For approximated functions (e.g. exp, gelu, silu, etc.)
+#pragma hls_design ccore
+template <typename T, size_t Width>
+Pack1D<T, Width> vpoly(const Pack1D<T, Width>& op0, const T maxes[NUM_MAXES],
+                       const T ranges[NUM_RANGES][NUM_COEFFS],
+                       const ac_int<1, false> clamp_min,
+                       const ac_int<1, false> clamp_max) {
+  Pack1D<T, Width> res;
+#pragma hls_unroll yes
+  for (int i = 0; i < Width; i++) {
+    res[i] = vepoly<T>(op0[i], maxes, ranges, clamp_min, clamp_max);
   }
   return res;
 }

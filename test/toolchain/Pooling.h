@@ -96,7 +96,6 @@ void MapPoolingOperation(const codegen::Operation &param,
       is_max_pool ? VectorInstructions::rmax : VectorInstructions::radd;
   vinst0.rdest = VectorInstructions::to_memory;
   vector_instruction_config->inst[0] = vinst0;
-  vector_instruction_config->instCount[0] = 1;
 
   // feed accumulator
   VectorInstructions vinst1;
@@ -114,7 +113,6 @@ void MapPoolingOperation(const codegen::Operation &param,
   }
 
   vector_instruction_config->inst[1] = vinst1;
-  vector_instruction_config->instCount[1] = 1;
 
   vector_instruction_config->instLen = 2;
   vector_instruction_config->instLoopCount = 1;

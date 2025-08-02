@@ -4,6 +4,11 @@
 // IWYU thinks that this header is not used, even though it is.
 #include "datatypes/DataTypes.h"  // IWYU pragma: keep
 
+// Constants for Approximation Unit
+constexpr int NUM_MAXES = 6;
+constexpr int NUM_RANGES = 7;
+constexpr int NUM_COEFFS = 3;
+
 #if defined(P8_1)
 
 #define INPUT_DATATYPE DataTypes::posit8

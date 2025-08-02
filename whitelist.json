@@ -11,46 +11,7 @@
         ],
         "block_size": "*",
         "layers": [
-            "pad_default",
-            "vit_encoder_layer_0_intermediate_dense_fused",
-            "vit_encoder_layer_1_intermediate_dense_fused",
-            "vit_encoder_layer_2_intermediate_dense_fused",
-            "vit_encoder_layer_3_intermediate_dense_fused",
-            "vit_encoder_layer_4_intermediate_dense_fused",
-            "vit_encoder_layer_5_intermediate_dense_fused",
-            "vit_encoder_layer_6_intermediate_dense_fused",
-            "vit_encoder_layer_7_intermediate_dense_fused",
-            "vit_encoder_layer_8_intermediate_dense_fused",
-            "vit_encoder_layer_9_intermediate_dense_fused",
-            "vit_encoder_layer_10_intermediate_dense_fused",
-            "vit_encoder_layer_11_intermediate_dense_fused"
-        ]
-    },
-    {
-        "datatype": "*",
-        "model": [
-            "bert"
-        ],
-        "sim_type": [
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": "*",
-        "layers": [
-            "tanh",
-            "bert_encoder_layer_0_intermediate_dense_fused",
-            "bert_encoder_layer_1_intermediate_dense_fused",
-            "bert_encoder_layer_2_intermediate_dense_fused",
-            "bert_encoder_layer_3_intermediate_dense_fused",
-            "bert_encoder_layer_4_intermediate_dense_fused",
-            "bert_encoder_layer_5_intermediate_dense_fused",
-            "bert_encoder_layer_6_intermediate_dense_fused",
-            "bert_encoder_layer_7_intermediate_dense_fused",
-            "bert_encoder_layer_8_intermediate_dense_fused",
-            "bert_encoder_layer_9_intermediate_dense_fused",
-            "bert_encoder_layer_10_intermediate_dense_fused",
-            "bert_encoder_layer_11_intermediate_dense_fused"
+            "pad_default"
         ]
     },
     {

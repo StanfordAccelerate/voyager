@@ -146,11 +146,6 @@ SC_MODULE(Harness) {
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_2_resp);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
-  sc_fifo<ac_int<16, false>> vectorFetch3DataResponse_fifo;
-  Connections::Combinational<ac_int<16, false>> CCS_INIT_S1(
-      vector_fetch_3_resp);
-
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_output);
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
@@ -233,9 +228,6 @@ SC_MODULE(Harness) {
 
   void readRequestVector2();
   void sendResponseVector2();
-
-  void readRequestVector3();
-  void sendResponseVector3();
 
   void storeVectorOutputs();
   void storeScalarOutputs();
