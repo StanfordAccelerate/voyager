@@ -1,5 +1,6 @@
 import argparse
 import interstellar
+import math
 
 from google.protobuf import text_format
 
@@ -277,8 +278,16 @@ def main():
 
         # FC doesn't need tiling
         input = matrix_op.kwargs["input"].tensor
-        if sum(input.shape[:-1]) == 1:
+        if math.prod(input.shape[:-1]) == 1:
+            print(f"Skipping {param_name} as it is a fully connected layer with no tiling")
             continue
+
+        # Skip first layer of torchvision models
+        if matrix_op.target in ["conv2d", "conv2d_mx"] and input.shape[-1] == 3:
+            print(f"Skipping {param_name} as it is a 3-channel input")
+            continue
+
+        print(f"Processing {param_name} with target {matrix_op.target}")
 
         is_matmul = matrix_op.target in ["matmul", "matmul_mx"]
         weight = matrix_op.kwargs["other" if is_matmul else "weight"].tensor
@@ -288,85 +297,39 @@ def main():
             weights_shape = weight.shape
 
         output = param.output if param.HasField("output") else param.outputs.tensors[1]
-        output_shape = output.shape
+
+        # HACK: for operations with reshape, look at the input shape
+        if output.HasField("reshape"):
+            output_shape = matrix_op.kwargs["input"].tensor.shape
+        else:
+            output_shape = output.shape
+
+        if matrix_op.target in ["conv2d", "conv2d_mx"]:
+            assert len(weights_shape) == 4, "Expected weights shape to be 4D for convolution"
+            kernel_width = weights_shape[0]
+            kernel_height = weights_shape[1]
+            input_channels = weights_shape[2]
+            output_channels = weights_shape[3]
+            height = output_shape[1]
+            width = output_shape[2]
+        else:
+            assert len(weights_shape) == 2, "Expected weights shape to be 2D for linear or matmul"
+            kernel_width = 1
+            kernel_height = 1
+            input_channels = weights_shape[0]
+            output_channels = weights_shape[1]
+            height = 1
+            width = math.prod(output_shape[:-1])
 
         if "stride" in matrix_op.kwargs:
             stride = matrix_op.kwargs["stride"].int_list.values[0]
         else:
             stride = 1
 
-        if len(weights_shape) == 4:
-            # convolution
-            output_channels = weights_shape[3]
-            input_channels = weights_shape[2]
-            kernel_height = weights_shape[1]
-            kernel_width = weights_shape[0]
-        elif len(weights_shape) == 2:
-            # matrix multiplication
-            output_channels = weights_shape[1] if not is_matmul else weights_shape[0]
-            input_channels = weights_shape[0] if not is_matmul else weights_shape[1]
-            kernel_height = 1
-            kernel_width = 1
-        else:
-            print(f"Unsupported weights shape: {weights_shape}, skipping")
-            continue
-
-        if input_channels == 3:
-            print(f"Skipping input with {input_channels} channels")
-            continue
-
-        if len(output_shape) == 4:
-            if output_shape[0] == 1 and output_shape[1] == 1:
-                width = output_shape[2]
-                if output_shape[3] != output_channels:
-                    # the input channels and output channels need to be switched.
-                    # not sure why this the compiler produces this shape.
-                    input_channels = output_channels
-                    output_channels = output_shape[3]
-            else:
-                height = output_shape[1]
-                width = output_shape[2]
-        elif len(output_shape) == 3:
-            assert output_shape[0] == 1
-            width = output_shape[1]
-
-            if output_shape[2] != output_channels:
-                # the input channels and output channels need to be switched.
-                # not sure why this the compiler produces this shape.
-                input_channels = output_channels
-                output_channels = output_shape[2]
-            height = 1
-        elif len(output_shape) == 2:
-            width = output_shape[0]
-
-            if output_shape[1] != output_channels:
-                # the input channels and output channels need to be switched.
-                # not sure why this the compiler produces this shape.
-                input_channels = output_channels
-                output_channels = output_shape[1]
-
-            height = 1
-            if width == 1:
-                print("Fully-connected layer, skipping")
-                continue
-        else:
-            print(f"Unsupported output shape: {output_shape}, skipping")
-            continue
-
-        # for operations with reshape, we can look at the input shape to get height and width
-        if output.HasField("reshape"):
-            input_shape = matrix_op.kwargs["input"].tensor.shape
-            if len(input_shape) != 3 or input_shape[0] != 1:
-                print("Unsupported input shape for reshape, skipping")
-                continue
-
-            width = input_shape[1]
-            height = 1
-
         print(f"Input channels: {input_channels}")
         print(f"Output channels: {output_channels}")
-        print(f"Input height: {height}")
-        print(f"Input width: {width}")
+        print(f"Output height: {height}")
+        print(f"Output width: {width}")
         print(f"Kernel height: {kernel_height}")
         print(f"Kernel width: {kernel_width}")
         print(f"Stride: {stride}")

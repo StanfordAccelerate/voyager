@@ -13,7 +13,7 @@ LLM_FLAGS := --context_length 512 --remove_duplicate
 EXTRA_COMPILER_FLAGS ?=
 
 # Set default values if not already defined in the environment
-CACHE_SIZE ?= 4194304
+CACHE_SIZE ?= 8388608
 NUM_BANKS  ?= 8
 
 ifeq ($(SOC_SIM),1)

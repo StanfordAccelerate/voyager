@@ -18,7 +18,7 @@
 // IWYU pragma: end_exports
 
 #define DRAM_SIZE_MB (1024 * 1024LL * 1024LL)
-#define SRAM_SIZE_MB (8 * 1024LL * 1024LL)
+#define SRAM_SIZE_MB (8 * 1024 * 1024)
 #define REFERENCE_MEMORY_SIZE (8 * 1024 * 1024)
 
 static const std::unordered_set<std::string> GEMM_OPS = {

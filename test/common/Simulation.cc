@@ -81,9 +81,7 @@ Simulation::~Simulation() {
 }
 
 void Simulation::load_data() {
-  const char* env_val = std::getenv("CACHE_SIZE");
-  const int sram_size = env_val ? std::stoi(env_val) : SRAM_SIZE_MB;
-  const int memory_size = is_soc_sim() ? sram_size : DRAM_SIZE_MB;
+  const int memory_size = is_soc_sim() ? SRAM_SIZE_MB : DRAM_SIZE_MB;
   std::vector<uint64_t> memory_sizes{memory_size, REFERENCE_MEMORY_SIZE};
 
   if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
