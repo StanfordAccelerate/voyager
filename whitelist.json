@@ -94,6 +94,7 @@
         ],
         "block_size": 64,
         "layers": [
+            "calculate_mx_qparam_default",
             "calculate_mx_qparam_default_1",
             "index_copy_",
             "index_copy__1",
