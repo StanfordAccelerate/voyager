@@ -1,5 +1,8 @@
 #pragma once
 
+#include "ArchitectureParams.h"
+#include "test/common/Tiling.h"
+#include "test/toolchain/ApproximationConstants.h"
 #include "test/toolchain/Common.h"
 #include "ApproximationConstants.h"
 #include "ArchitectureParams.h"
@@ -50,83 +53,97 @@ inline std::vector<int> broadcast_shape(std::vector<int> &shape1,
   return result_shape;
 }
 
-void set_vector_addr_gen1(const codegen::Tensor &tensor,
-                          std::vector<int> output_shape,
-                          AcceleratorMemoryMap &accelerator_memory_map,
-                          VectorParams *vector_params) {
+void set_vector_fetch_1(const codegen::Tensor &tensor,
+                        std::vector<int> output_shape,
+                        AcceleratorMemoryMap &accelerator_memory_map,
+                        VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector1"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN1_OFFSET = memory.address();
-  vector_params->addr_gen1_mode = true;
+  vector_params->vector_fetch_1_offset = get_address(tensor);
+  vector_params->vector_fetch_1_mode = true;
 
   auto input_shape = get_shape(tensor);
   squeeze_front_ones(input_shape);
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_broadcast[i] =
+    vector_params->vector_fetch_1_broadcast[i] =
         input_shape[i] == 1 && output_shape[i] != 1;
   }
 
-  vector_params->addr_gen1_dtype =
+  vector_params->vector_fetch_1_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  int fetch_width = OC_DIMENSION * get_type_width<VU_INPUT_TYPES>(
+                                       vector_params->vector_fetch_1_dtype);
+  vector_params->vector_fetch_1_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_1_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_1_packing_factor =
+      OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen1_loops[0][i] = 1;
+    vector_params->vector_fetch_1_loops[0][i] = 1;
   }
 
   pad_shape_to_ndim(output_shape, 3);
-  vector_params->addr_gen1_loops[1][0] = output_shape[0];
-  vector_params->addr_gen1_loops[1][1] = output_shape[1];
-  vector_params->addr_gen1_loops[1][2] = output_shape.back() / OC_DIMENSION;
+  vector_params->vector_fetch_1_loops[1][0] = output_shape[0];
+  vector_params->vector_fetch_1_loops[1][1] = output_shape[1];
+  vector_params->vector_fetch_1_loops[1][2] =
+      output_shape.back() / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addr_gen1_y_loop_idx[i] = 0;
-    vector_params->addr_gen1_x_loop_idx[i] = 1;
-    vector_params->addr_gen1_k_loop_idx[i] = 2;
+    vector_params->vector_fetch_1_y_loop_idx[i] = 0;
+    vector_params->vector_fetch_1_x_loop_idx[i] = 1;
+    vector_params->vector_fetch_1_k_loop_idx[i] = 2;
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->addr_gen1_dq_scale = scale.bits_rep();
+  vector_params->vector_fetch_1_dq_scale = scale.bits_rep();
 }
 
-void set_vector_addr_gen2(const codegen::Tensor &tensor,
-                          std::vector<int> output_shape,
-                          AcceleratorMemoryMap &accelerator_memory_map,
-                          VectorParams *vector_params) {
+void set_vector_fetch_2(const codegen::Tensor &tensor,
+                        std::vector<int> output_shape,
+                        AcceleratorMemoryMap &accelerator_memory_map,
+                        VectorParams *vector_params) {
   const auto memory = tensor.memory();
   accelerator_memory_map["vector2"] = get_partition(memory.partition());
-  vector_params->ADDRESS_GEN2_OFFSET = memory.address();
-  vector_params->addr_gen2_mode = true;
+  vector_params->vector_fetch_2_offset = get_address(tensor);
+  vector_params->vector_fetch_2_mode = true;
 
   auto input_shape = get_shape(tensor);
   squeeze_front_ones(input_shape);
   pad_shape_to_ndim(input_shape, 3);
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen2_broadcast[i] = input_shape[i] == 1;
+    vector_params->vector_fetch_2_broadcast[i] = input_shape[i] == 1;
   }
 
-  vector_params->addr_gen2_dtype =
+  vector_params->vector_fetch_2_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  int fetch_width = OC_DIMENSION * get_type_width<VU_INPUT_TYPES>(
+                                       vector_params->vector_fetch_2_dtype);
+  vector_params->vector_fetch_2_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_2_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_2_packing_factor =
+      OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   for (int i = 0; i < 3; i++) {
-    vector_params->addr_gen2_loops[0][i] = 1;
+    vector_params->vector_fetch_2_loops[0][i] = 1;
   }
 
   pad_shape_to_ndim(output_shape, 3);
-  vector_params->addr_gen2_loops[1][0] = output_shape[0];
-  vector_params->addr_gen2_loops[1][1] = output_shape[1];
-  vector_params->addr_gen2_loops[1][2] = output_shape.back() / OC_DIMENSION;
+  vector_params->vector_fetch_2_loops[1][0] = output_shape[0];
+  vector_params->vector_fetch_2_loops[1][1] = output_shape[1];
+  vector_params->vector_fetch_2_loops[1][2] =
+      output_shape.back() / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
-    vector_params->addr_gen2_y_loop_idx[i] = 0;
-    vector_params->addr_gen2_x_loop_idx[i] = 1;
-    vector_params->addr_gen2_k_loop_idx[i] = 2;
+    vector_params->vector_fetch_2_y_loop_idx[i] = 0;
+    vector_params->vector_fetch_2_x_loop_idx[i] = 1;
+    vector_params->vector_fetch_2_k_loop_idx[i] = 2;
   }
 
   DataTypes::bfloat16 scale = tensor.scale() != 0 ? tensor.scale() : 1.0;
-  vector_params->addr_gen2_dq_scale = scale.bits_rep();
+  vector_params->vector_fetch_2_dq_scale = scale.bits_rep();
 }
 
 void set_vector_immediate(const float scalar, const int stage,
@@ -154,16 +171,17 @@ void MapVectorOperations(const codegen::Operation &param,
                          std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
   VectorParams *vector_params = new VectorParams;
   AcceleratorMemoryMap accelerator_memory_map;
-  VectorInstructionConfig *vector_instruction_config = new VectorInstructionConfig;
+  VectorInstructionConfig *vector_instruction_config =
+      new VectorInstructionConfig;
 
   auto op_list = get_op_list(param);
 
   const auto input = op_list[0].kwargs().at("input").tensor();
   const auto input_memory = input.memory();
   accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
-  vector_params->ADDRESS_GEN0_OFFSET = input_memory.address();
-  vector_params->addr_gen0_mode = 2;
-  vector_params->addr_gen0_dtype =
+  vector_params->vector_fetch_0_offset = get_address(input);
+  vector_params->vector_fetch_0_mode = 2;
+  vector_params->vector_fetch_0_dtype =
       get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
 
   // Use the original shape without permute/slice
@@ -186,12 +204,12 @@ void MapVectorOperations(const codegen::Operation &param,
   // Pad the shape to 6 dimensions with 1s
   int padded_dims = pad_shape_to_ndim(input_shape, 6);
 
-  vector_params->addr_gen0_loops[0][0] = input_shape[0];
-  vector_params->addr_gen0_loops[0][1] = input_shape[1];
-  vector_params->addr_gen0_loops[0][2] = input_shape[2];
-  vector_params->addr_gen0_loops[1][0] = input_shape[3];
-  vector_params->addr_gen0_loops[1][1] = input_shape[4];
-  vector_params->addr_gen0_loops[1][2] = input_shape[5] / OC_DIMENSION;
+  vector_params->vector_fetch_0_loops[0][0] = input_shape[0];
+  vector_params->vector_fetch_0_loops[0][1] = input_shape[1];
+  vector_params->vector_fetch_0_loops[0][2] = input_shape[2];
+  vector_params->vector_fetch_0_loops[1][0] = input_shape[3];
+  vector_params->vector_fetch_0_loops[1][1] = input_shape[4];
+  vector_params->vector_fetch_0_loops[1][2] = input_shape[5] / OC_DIMENSION;
 
   codegen::OpOverload reshape_op;
   if (input.has_reshape()) {
@@ -216,20 +234,20 @@ void MapVectorOperations(const codegen::Operation &param,
     dim = dim < 0 ? dim + shape.size() : dim;
     end = end > shape[dim] ? shape[dim] : end;
 
-    vector_params->addr_gen0_dim = dim + padded_dims;
-    vector_params->addr_gen0_start = start;
-    vector_params->addr_gen0_end = end;
-    vector_params->addr_gen0_step = step;
+    vector_params->vector_fetch_0_dim = dim + padded_dims;
+    vector_params->vector_fetch_0_start = start;
+    vector_params->vector_fetch_0_end = end;
+    vector_params->vector_fetch_0_step = step;
 
     // Last dimension needs to be scaled by OC_DIMENSION
-    if (vector_params->addr_gen0_dim == 5) {
+    if (vector_params->vector_fetch_0_dim == 5) {
       if (start % OC_DIMENSION != 0 || end % OC_DIMENSION != 0) {
         throw std::invalid_argument(
             "Slice start and end must be multiples of OC_DIMENSION!");
       }
 
-      vector_params->addr_gen0_start /= OC_DIMENSION;
-      vector_params->addr_gen0_end /= OC_DIMENSION;
+      vector_params->vector_fetch_0_start = start / OC_DIMENSION;
+      vector_params->vector_fetch_0_end = end / OC_DIMENSION;
     }
   } else if (reshape_op.target() == "permute") {
     const auto int_list = reshape_kwargs.at("dims").int_list().values();
@@ -264,20 +282,26 @@ void MapVectorOperations(const codegen::Operation &param,
   }
 
   if (vector_params->has_permute) {
+    if (input_shape[input_shape.size() - 1] % OC_DIMENSION != 0) {
+      throw std::invalid_argument(
+          "Last dimension of input shape must be a multiple of OC_DIMENSION!");
+    }
+
     std::vector<int> dims;
     if (reshape_kwargs.contains("dims")) {
       auto int_list = reshape_op.kwargs().at("dims").int_list().values();
       dims = std::vector<int>(int_list.begin(), int_list.end());
 
       for (int i = 0; i < dims.size(); i++) {
-        vector_params->addr_gen0_dims[i + padded_dims] = dims[i] + padded_dims;
+        vector_params->vector_fetch_0_dims[i + padded_dims] =
+            dims[i] + padded_dims;
       }
     } else if (reshape_kwargs.contains("dim0") &&
                reshape_kwargs.contains("dim1")) {
       int dim0 = reshape_kwargs.at("dim0").int_value();
       int dim1 = reshape_kwargs.at("dim1").int_value();
-      std::swap(vector_params->addr_gen0_dims[dim0 + padded_dims],
-                vector_params->addr_gen0_dims[dim1 + padded_dims]);
+      std::swap(vector_params->vector_fetch_0_dims[dim0 + padded_dims],
+                vector_params->vector_fetch_0_dims[dim1 + padded_dims]);
     } else {
       throw std::invalid_argument("Invalid permute arguments!");
     }
@@ -285,22 +309,14 @@ void MapVectorOperations(const codegen::Operation &param,
 
   // TODO: use tiling to set address generator
   Tiling tiling;
-
   if (vector_params->has_transpose) {
     // Support a maximum buffer size of 1024
-    const int BUFSIZE = std::min(1024 / OC_DIMENSION, OC_DIMENSION);
+    const int BUFSIZE =
+        std::min({1024 / OC_DIMENSION, OC_DIMENSION, VECTOR_UNIT_WIDTH});
 
     std::vector<int> input_shape(input.shape().begin(), input.shape().end());
     input_shape = squeeze_shape(input_shape);
     int padded_dims = pad_shape_to_ndim(input_shape, 3);
-
-    if (input_shape.back() % OC_DIMENSION != 0) {
-      spdlog::debug("Input last dimension is not a multiple of OC_DIMENSION: ");
-      print_shape(input_shape);
-
-      vector_params->has_transpose_with_padded_dimension = true;
-      vector_params->addr_gen0_end = input_shape.back();
-    }
 
     // Transpose the input shape
     std::swap(input_shape[1], input_shape[2]);
@@ -311,7 +327,7 @@ void MapVectorOperations(const codegen::Operation &param,
     }
 
     // Tiled access
-    vector_params->addr_gen0_mode = 1;
+    vector_params->vector_fetch_0_mode = 1;
 
     int Y1 = input_shape[0];
     int K1 = input_shape[2] / OC_DIMENSION;
@@ -326,45 +342,49 @@ void MapVectorOperations(const codegen::Operation &param,
     };
 
     for (int i = 0; i < 3; i++) {
-      vector_params->addr_gen0_loops[0][i] = tiling.loops[0][i];
+      vector_params->vector_fetch_0_loops[0][i] = tiling.loops[0][i];
     }
-    vector_params->addr_gen0_y_loop_idx[0] = tiling.y_loop_index[0];
-    vector_params->addr_gen0_x_loop_idx[0] = tiling.x_loop_index[0];
-    vector_params->addr_gen0_k_loop_idx[0] = tiling.weight_loop_index[0];
+    vector_params->vector_fetch_0_y_loop_idx[0] = tiling.y_loop_index[0];
+    vector_params->vector_fetch_0_x_loop_idx[0] = tiling.x_loop_index[0];
+    vector_params->vector_fetch_0_k_loop_idx[0] = tiling.weight_loop_index[0];
 
     int loop_index = 0;
     for (int i = 0; i < 6; i++) {
       // ignore the loops not present in outputs (reduction, fx, fy)
       if (i == tiling.y_loop_index[1]) {
-        vector_params->addr_gen0_loops[1][loop_index] = tiling.loops[1][i];
-        vector_params->addr_gen0_y_loop_idx[1] = loop_index++;
+        vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
+        vector_params->vector_fetch_0_y_loop_idx[1] = loop_index++;
       }
       if (i == tiling.x_loop_index[1]) {
-        vector_params->addr_gen0_loops[1][loop_index] = tiling.loops[1][i];
-        vector_params->addr_gen0_x_loop_idx[1] = loop_index++;
+        vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
+        vector_params->vector_fetch_0_x_loop_idx[1] = loop_index++;
       }
       if (i == tiling.weight_loop_index[1]) {
-        vector_params->addr_gen0_loops[1][loop_index] = tiling.loops[1][i];
-        vector_params->addr_gen0_k_loop_idx[1] = loop_index++;
+        vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
+        vector_params->vector_fetch_0_k_loop_idx[1] = loop_index++;
       }
     }
 
     // Adjust for output loops
     tiling.loops[1][5] = BUFSIZE;
-
-    if (vector_params->has_transpose_with_padded_dimension) {
-      vector_params->output_pad_dimension = true;
-      vector_params->output_pad_dim_size = input_shape[1] % OC_DIMENSION;
-    }
   }
 
+  int packing_factor =
+      vector_params->has_transpose ? 1 : OC_DIMENSION / VECTOR_UNIT_WIDTH;
+  int fetch_width =
+      packing_factor * VECTOR_UNIT_WIDTH *
+      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_0_dtype);
+  vector_params->vector_fetch_0_burst_size = fetch_width / 8;
+  vector_params->vector_fetch_0_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_0_packing_factor = packing_factor;
+
   VECTOR_DATATYPE scale = 1.0;
-  vector_params->addr_gen0_dq_scale = scale.bits_rep();
+  vector_params->vector_fetch_0_dq_scale = scale.bits_rep();
 
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = output_memory.address();
+  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
   vector_params->output_mode = 2;
 
   auto output_shape = get_shape(output);
@@ -414,13 +434,6 @@ void MapVectorOperations(const codegen::Operation &param,
         vector_params->output_k_loop_idx[1] = loop_index++;
       }
     }
-
-    if (vector_params->has_transpose_with_padded_dimension) {
-      vector_params->output_pad_dim_idx[0] =
-          vector_params->output_x_loop_idx[0];
-      vector_params->output_pad_dim_idx[1] =
-          vector_params->output_x_loop_idx[1];
-    }
   }
 
   vector_params->output_dtype =
@@ -437,7 +450,7 @@ void MapVectorOperations(const codegen::Operation &param,
 
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;
-  inst.inst_count = get_size(output) / OC_DIMENSION;
+  inst.inst_count = get_size(output) / VECTOR_UNIT_WIDTH;
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
@@ -448,6 +461,17 @@ void MapVectorOperations(const codegen::Operation &param,
   for (int i = 0; i < op_list.size(); i++) {
     const auto op = op_list[i];
     const std::string opcode = op.target();
+
+    // Grab kwargs that are relevant for some activation functions
+    std::map<std::string, VECTOR_DATATYPE> activation_kwargs;
+    if (unary_ops_with_kwargs.find(op.target()) !=
+        unary_ops_with_kwargs.end()) {
+      for (const auto &[key, value] : op.kwargs()) {
+        if (key != "input") {
+          activation_kwargs[key] = VECTOR_DATATYPE(value.float_value());
+        }
+      }
+    }
 
     // Dequantization doesn't take a stage in the pipeline
     if (opcode == "dequantize") {
@@ -498,10 +522,7 @@ void MapVectorOperations(const codegen::Operation &param,
       inst.vector_op3 = vop;
     }
 
-    if (opcode == "vmap") {
-      const auto other = op.kwargs().at("other").tensor();
-      inst.VMAP_OFFSET = other.memory().address();
-    } else if (opcode == "neg") {
+    if (opcode == "neg") {
       const auto self = op.kwargs().at("input").tensor();
       const auto output_shape = squeeze_shape(get_shape(self));
 
@@ -510,8 +531,8 @@ void MapVectorOperations(const codegen::Operation &param,
       inst.vector_op0_src0 = VectorInstructions::from_immediate_0;
       inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_0;
 
-      set_vector_addr_gen1(self, output_shape, accelerator_memory_map,
-                           vector_params);
+      set_vector_fetch_1(self, output_shape, accelerator_memory_map,
+                         vector_params);
     } else if (opcode == "quantize_mx") {
       float quant_max = op.kwargs().at("quant_max").float_value();
       bool force_scale_power_of_two =
@@ -525,20 +546,272 @@ void MapVectorOperations(const codegen::Operation &param,
       }
 
       vector_params->quantize_output_mx = true;
-      vector_params->SCALE_OFFSET =
-          param.outputs().tensors(0).memory().address();
-    } else if (opcode == "hardtanh_") {
+      vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
+
       // Copy coefficients from ApproximationConstants.h
+    } else if (opcode == "gelu" || opcode == "gelu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = GELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = GELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = GELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = GELU_CLAMP_MAX;
+    } else if (opcode == "silu" || opcode == "silu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SILU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = SILU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SILU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SILU_CLAMP_MAX;
+    } else if (opcode == "elu" || opcode == "elu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = ELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = ELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = ELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = ELU_CLAMP_MAX;
+    } else if (opcode == "log_sigmoid" || opcode == "log_sigmoid_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = LOGSIGMOID_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              LOGSIGMOID_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = LOGSIGMOID_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = LOGSIGMOID_CLAMP_MAX;
+    } else if (opcode == "tanh" || opcode == "tanh_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = TANH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = TANH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = TANH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = TANH_CLAMP_MAX;
+    } else if (opcode == "tanh_1" || opcode == "tanh_1_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = TANHSHRINK_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              TANHSHRINK_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = TANHSHRINK_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = TANHSHRINK_CLAMP_MAX;
+    } else if (opcode == "softplus" || opcode == "softplus_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SOFTPLUS_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              SOFTPLUS_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SOFTPLUS_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SOFTPLUS_CLAMP_MAX;
+    } else if (opcode == "mish" || opcode == "mish_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = MISH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = MISH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = MISH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = MISH_CLAMP_MAX;
+    } else if (opcode == "sigmoid" || opcode == "sigmoid_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SIGMOID_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = SIGMOID_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SIGMOID_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SIGMOID_CLAMP_MAX;
+    } else if (opcode == "selu" || opcode == "selu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = SELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SELU_CLAMP_MAX;
+    } else if (opcode == "celu" || opcode == "celu_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = CELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = CELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = CELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = CELU_CLAMP_MAX;
+    } else if (opcode == "hardsigmoid" || opcode == "hardsigmoid_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDSIGMOID_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDSIGMOID_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDSIGMOID_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDSIGMOID_CLAMP_MAX;
+    } else if (opcode == "hardswish" || opcode == "hardswish_") {
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDSWISH_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDSWISH_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDSWISH_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDSWISH_CLAMP_MAX;
+
+      // Start of activation functions with kwargs
+    } else if (opcode == "hardshrink" || opcode == "hardshrink_") {
+      const VECTOR_DATATYPE lambda = activation_kwargs.at("lambd");
+      const VECTOR_DATATYPE HARDSHRINK_MAXES[NUM_MAXES] = {
+          -lambda, 0.0, 0.0, 0.0, 0.0, lambda};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = HARDSHRINK_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDSHRINK_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = HARDSHRINK_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = HARDSHRINK_CLAMP_MAX;
+    } else if (opcode == "hardtanh" || opcode == "hardtanh_") {
+      const VECTOR_DATATYPE min_val = activation_kwargs.at("min_val");
+      const VECTOR_DATATYPE max_val = activation_kwargs.at("max_val");
+      const VECTOR_DATATYPE HARDTANH_MAXES[NUM_MAXES] = {
+          min_val, max_val, max_val, max_val, max_val, max_val};
+      const VECTOR_DATATYPE HARDTANH_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {min_val, 0.0, 0.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0},
+          {0.0, 1.0, 0.0},     {0.0, 1.0, 0.0}, {0.0, 1.0, 0.0},
+          {max_val, 0.0, 0.0}};
       for (int i = 0; i < NUM_MAXES; i++) {
         vector_instruction_config->approx.maxes[i] = HARDTANH_MAXES[i];
       }
       for (int i = 0; i < NUM_RANGES; i++) {
         for (int j = 0; j < NUM_COEFFS; j++) {
-          vector_instruction_config->approx.ranges[i][j] = HARDTANH_RANGES[i][j];
+          vector_instruction_config->approx.ranges[i][j] =
+              HARDTANH_RANGES[i][j];
         }
       }
       vector_instruction_config->approx.clamp_min = HARDTANH_CLAMP_MIN;
       vector_instruction_config->approx.clamp_max = HARDTANH_CLAMP_MAX;
+    } else if (opcode == "leaky_relu" || opcode == "leaky_relu_") {
+      const VECTOR_DATATYPE negative_slope =
+          activation_kwargs.at("negative_slope");
+      const VECTOR_DATATYPE LEAKYRELU_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {0.0, negative_slope, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},
+          {0.0, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = LEAKYRELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              LEAKYRELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = LEAKYRELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = LEAKYRELU_CLAMP_MAX;
+    } else if (opcode == "rrelu" || opcode == "rrelu_") {
+      const VECTOR_DATATYPE lower = activation_kwargs.at("lower");
+      const VECTOR_DATATYPE upper = activation_kwargs.at("upper");
+      const VECTOR_DATATYPE alpha = (lower + upper) / VECTOR_DATATYPE(2);
+      const VECTOR_DATATYPE RRELU_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {0.0, alpha, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},   {0.0, 0.0, 0.0}, {0.0, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = RRELU_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] = RRELU_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = RRELU_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = RRELU_CLAMP_MAX;
+    } else if (opcode == "softshrink" || opcode == "softshrink_") {
+      const VECTOR_DATATYPE lambda = activation_kwargs.at("lambd");
+      const VECTOR_DATATYPE SOFTSHRINK_MAXES[NUM_MAXES] = {
+          -lambda, 0.0, 0.0, 0.0, 0.0, lambda};
+      const VECTOR_DATATYPE SOFTSHRINK_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {lambda, 1.0, 0.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+          {0.0, 0.0, 0.0},    {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0},
+          {-lambda, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = SOFTSHRINK_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              SOFTSHRINK_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = SOFTSHRINK_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = SOFTSHRINK_CLAMP_MAX;
+    } else if (opcode == "threshold" || opcode == "threshold_") {
+      const VECTOR_DATATYPE threshold = activation_kwargs.at("threshold");
+      const VECTOR_DATATYPE value = activation_kwargs.at("value");
+      const VECTOR_DATATYPE THRESHOLD_MAXES[NUM_MAXES] = {0.0, 0.0, 0.0,
+                                                          0.0, 0.0, threshold};
+      const VECTOR_DATATYPE THRESHOLD_RANGES[NUM_RANGES][NUM_COEFFS] = {
+          {value, 0.0, 0.0}, {value, 0.0, 0.0}, {value, 0.0, 0.0},
+          {value, 0.0, 0.0}, {value, 0.0, 0.0}, {value, 0.0, 0.0},
+          {0.0, 1.0, 0.0}};
+      for (int i = 0; i < NUM_MAXES; i++) {
+        vector_instruction_config->approx.maxes[i] = THRESHOLD_MAXES[i];
+      }
+      for (int i = 0; i < NUM_RANGES; i++) {
+        for (int j = 0; j < NUM_COEFFS; j++) {
+          vector_instruction_config->approx.ranges[i][j] =
+              THRESHOLD_RANGES[i][j];
+        }
+      }
+      vector_instruction_config->approx.clamp_min = THRESHOLD_CLAMP_MIN;
+      vector_instruction_config->approx.clamp_max = THRESHOLD_CLAMP_MAX;
     } else if (op.kwargs().contains("other") || opcode == "quantize") {
       std::string other_key = opcode == "quantize" ? "scale" : "other";
       const auto other = op.kwargs().at(other_key);
@@ -574,18 +847,18 @@ void MapVectorOperations(const codegen::Operation &param,
 
         if (stage == 0) {
           inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
-          set_vector_addr_gen1(tensor_to_load, output_shape,
-                               accelerator_memory_map, vector_params);
+          set_vector_fetch_1(tensor_to_load, output_shape,
+                             accelerator_memory_map, vector_params);
         } else if (stage == 2) {
           inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_addr_gen2(tensor_to_load, output_shape,
-                               accelerator_memory_map, vector_params);
+          set_vector_fetch_2(tensor_to_load, output_shape,
+                             accelerator_memory_map, vector_params);
         } else {
           assert(inst.vector_op2_src1 !=
                  VectorInstructions::from_vector_fetch_2);
           inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_addr_gen2(tensor_to_load, output_shape,
-                               accelerator_memory_map, vector_params);
+          set_vector_fetch_2(tensor_to_load, output_shape,
+                             accelerator_memory_map, vector_params);
         }
       }
     }
@@ -610,7 +883,6 @@ void MapVectorOperations(const codegen::Operation &param,
 
   // total output count
   vector_instruction_config->inst[0] = inst;
-  vector_instruction_config->instCount[0] = 1;
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;
 

@@ -57,15 +57,15 @@ struct MatrixParams : BaseParams {
 
     input_dtype = 0;
     use_input_codebook = false;
-    input_num_fetches = 1;
-    input_packing_shift = 0;
-    input_fetch_width = 0;
+    input_burst_size = 0;
+    input_num_beats = 1;
+    input_packing_factor_power = 1;
 
     weight_dtype = 0;
     use_weight_codebook = false;
-    weight_num_fetches = 1;
-    weight_packing_shift = 0;
-    weight_fetch_width = 0;
+    weight_burst_size = 0;
+    weight_num_beats = 1;
+    weight_packing_factor_power = 1;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       input_code[i] = 0;
@@ -122,15 +122,15 @@ struct MatrixParams : BaseParams {
 
   ac_int<DTYPE_INDEX_WIDTH, false> input_dtype;
   bool use_input_codebook;
-  ac_int<4, false> input_num_fetches;
-  ac_int<4, false> input_packing_shift;
-  ac_int<10, false> input_fetch_width;
+  ac_int<10, false> input_burst_size;
+  ac_int<4, false> input_num_beats;
+  ac_int<4, false> input_packing_factor_power;
 
   ac_int<DTYPE_INDEX_WIDTH, false> weight_dtype;
   bool use_weight_codebook;
-  ac_int<4, false> weight_num_fetches;
-  ac_int<4, false> weight_packing_shift;
-  ac_int<10, false> weight_fetch_width;
+  ac_int<10, false> weight_burst_size;
+  ac_int<4, false> weight_num_beats;
+  ac_int<4, false> weight_packing_factor_power;
 
   ac_int<DECODED_INPUT_DTYPE_WIDTH, false> input_code[NUM_CODEBOOK_ENTRIES];
   ac_int<DECODED_WEIGHT_DTYPE_WIDTH, false> weight_code[NUM_CODEBOOK_ENTRIES];
@@ -218,15 +218,15 @@ struct MatrixParams : BaseParams {
 
     m & input_dtype;
     m & use_input_codebook;
-    m & input_num_fetches;
-    m & input_packing_shift;
-    m & input_fetch_width;
+    m & input_burst_size;
+    m & input_num_beats;
+    m & input_packing_factor_power;
 
     m & weight_dtype;
     m & use_weight_codebook;
-    m & weight_num_fetches;
-    m & weight_packing_shift;
-    m & weight_fetch_width;
+    m & weight_burst_size;
+    m & weight_num_beats;
+    m & weight_packing_factor_power;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       m& input_code[i];
@@ -320,15 +320,17 @@ struct MatrixParams : BaseParams {
 
     os << "input_dtype: " << params.input_dtype << std::endl;
     os << "use_input_codebook: " << params.use_input_codebook << std::endl;
-    os << "input_num_fetches: " << params.input_num_fetches << std::endl;
-    os << "input_packing_shift: " << params.input_packing_shift << std::endl;
-    os << "input_fetch_width: " << params.input_fetch_width << std::endl;
+    os << "input_num_beats: " << params.input_num_beats << std::endl;
+    os << "input_packing_factor_power: " << params.input_packing_factor_power
+       << std::endl;
+    os << "input_burst_size: " << params.input_burst_size << std::endl;
 
     os << "weight_dtype: " << params.weight_dtype << std::endl;
     os << "use_weight_codebook: " << params.use_weight_codebook << std::endl;
-    os << "weight_num_fetches: " << params.weight_num_fetches << std::endl;
-    os << "weight_packing_shift: " << params.weight_packing_shift << std::endl;
-    os << "weight_fetch_width: " << params.weight_fetch_width << std::endl;
+    os << "weight_num_beats: " << params.weight_num_beats << std::endl;
+    os << "weight_packing_factor_power: " << params.weight_packing_factor_power
+       << std::endl;
+    os << "weight_burst_size: " << params.weight_burst_size << std::endl;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       os << "input_code[" << i << "]: " << params.input_code[i] << std::endl;
@@ -405,15 +407,17 @@ struct MatrixParams : BaseParams {
 
     if (lhs.input_dtype != rhs.input_dtype) return false;
     if (lhs.use_input_codebook != rhs.use_input_codebook) return false;
-    if (lhs.input_num_fetches != rhs.input_num_fetches) return false;
-    if (lhs.input_packing_shift != rhs.input_packing_shift) return false;
-    if (lhs.input_fetch_width != rhs.input_fetch_width) return false;
+    if (lhs.input_num_beats != rhs.input_num_beats) return false;
+    if (lhs.input_packing_factor_power != rhs.input_packing_factor_power)
+      return false;
+    if (lhs.input_burst_size != rhs.input_burst_size) return false;
 
     if (lhs.weight_dtype != rhs.weight_dtype) return false;
     if (lhs.use_weight_codebook != rhs.use_weight_codebook) return false;
-    if (lhs.weight_num_fetches != rhs.weight_num_fetches) return false;
-    if (lhs.weight_packing_shift != rhs.weight_packing_shift) return false;
-    if (lhs.weight_fetch_width != rhs.weight_fetch_width) return false;
+    if (lhs.weight_num_beats != rhs.weight_num_beats) return false;
+    if (lhs.weight_packing_factor_power != rhs.weight_packing_factor_power)
+      return false;
+    if (lhs.weight_burst_size != rhs.weight_burst_size) return false;
 
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       if (lhs.input_code[i] != rhs.input_code[i]) return false;
@@ -467,13 +471,12 @@ struct VectorInstructions {
     reduce_op = 0;
     rsqrt = 0;
     rreciprocal = 0;
+    rscale = 0;
     rduplicate = 0;
-    rbroadcast = 0;
     rdest = 0;
     immediate0 = 0;
     immediate1 = 0;
     immediate2 = 0;
-    VMAP_OFFSET = 0;
   }
 #endif
 
@@ -513,16 +516,12 @@ struct VectorInstructions {
   static const unsigned int vsub = 3;
 
   // Stage 1: exp, abs, activations
-  ac_int<3, false> vector_op1;
-  static const unsigned int vexp = 1;
+  ac_int<2, false> vector_op1;
+  static const unsigned int vpoly = 1;
   static const unsigned int vabs = 2;
   static const unsigned int vrelu = 3;
-  static const unsigned int vgelu = 4;
-  static const unsigned int vsilu = 5;
-  static const unsigned int vmap = 6;
-  static const unsigned int vpoly = 7;
 
-  // Stage 2: add, mult, square, div
+  // Stage 2: add, mult, square
   ac_int<2, false> vector_op2;
   static const unsigned int vsquare = 3;
 
@@ -531,14 +530,14 @@ struct VectorInstructions {
   static const unsigned int vquantize_mx = 2;
 
   ac_int<10, false> reduce_count;
-  ac_int<3, false> reduce_op;
+  ac_int<2, false> reduce_op;
   static const unsigned int radd = 1;
   static const unsigned int rmax = 2;
 
   ac_int<1, false> rsqrt;
   ac_int<1, false> rreciprocal;
+  ac_int<1, false> rscale;
   ac_int<1, false> rduplicate;
-  ac_int<1, false> rbroadcast;  // broadcast by immediate0
 
   ac_int<2, false> rdest;
   static const unsigned int to_op0 = 1;
@@ -553,9 +552,8 @@ struct VectorInstructions {
   ac_int<16, false> immediate0;
   ac_int<16, false> immediate1;
   ac_int<16, false> immediate2;
-  ac_int<64, false> VMAP_OFFSET;
 
-  static const unsigned int width = 201;
+  static const unsigned int width = 135;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -576,14 +574,13 @@ struct VectorInstructions {
     m & reduce_op;
     m & rsqrt;
     m & rreciprocal;
+    m & rscale;
     m & rduplicate;
-    m & rbroadcast;
     m & rdest;
     m & vdest;
     m & immediate0;
     m & immediate1;
     m & immediate2;
-    m & VMAP_OFFSET;
   }
 
   inline friend void sc_trace(sc_trace_file* tf,
@@ -611,14 +608,13 @@ struct VectorInstructions {
     os << "reduce_op: " << params.reduce_op << std::endl;
     os << "rsqrt: " << params.rsqrt << std::endl;
     os << "rreciprocal: " << params.rreciprocal << std::endl;
+    os << "rscale: " << params.rscale << std::endl;
     os << "rduplicate: " << params.rduplicate << std::endl;
-    os << "rbroadcast: " << params.rbroadcast << std::endl;
     os << "rdest: " << params.rdest << std::endl;
     os << "vdest: " << params.vdest << std::endl;
     os << "immediate0: " << params.immediate0 << std::endl;
     os << "immediate1: " << params.immediate1 << std::endl;
     os << "immediate2: " << params.immediate2 << std::endl;
-    os << "VMAP_OFFSET: " << params.VMAP_OFFSET << std::endl;
     return os;
   }
 
@@ -637,63 +633,69 @@ struct VectorInstructions {
            lhs.vector_dq_scale == rhs.vector_dq_scale &&
            lhs.reduce_count == rhs.reduce_count &&
            lhs.reduce_op == rhs.reduce_op && lhs.rsqrt == rhs.rsqrt &&
-           lhs.rreciprocal == rhs.rreciprocal &&
-           lhs.rduplicate == rhs.rduplicate &&
-           lhs.rbroadcast == rhs.rbroadcast && lhs.rdest == rhs.rdest &&
+           lhs.rreciprocal == rhs.rreciprocal && lhs.rscale == rhs.rscale &&
+           lhs.rduplicate == rhs.rduplicate && lhs.rdest == rhs.rdest &&
            lhs.vdest == rhs.vdest && lhs.immediate0 == rhs.immediate0 &&
-           lhs.immediate1 == rhs.immediate1 &&
-           lhs.immediate2 == rhs.immediate2 &&
-           lhs.VMAP_OFFSET == rhs.VMAP_OFFSET;
+           lhs.immediate1 == rhs.immediate1 && lhs.immediate2 == rhs.immediate2;
   }
 };
 
 struct VectorParams : BaseParams {
 #ifndef __SYNTHESIS__
   VectorParams() {
-    addr_gen0_mode = 0;
-    ADDRESS_GEN0_OFFSET = 0;
+    vector_fetch_0_mode = 0;
+    vector_fetch_0_offset = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        addr_gen0_loops[i][j] = 0;
+        vector_fetch_0_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      addr_gen0_y_loop_idx[i] = 0;
-      addr_gen0_x_loop_idx[i] = 1;
-      addr_gen0_k_loop_idx[i] = 2;
+      vector_fetch_0_y_loop_idx[i] = 0;
+      vector_fetch_0_x_loop_idx[i] = 1;
+      vector_fetch_0_k_loop_idx[i] = 2;
     }
-    addr_gen0_dq_scale = 0;
-    addr_gen0_dtype = 0;
+    vector_fetch_0_dq_scale = 0;
+    vector_fetch_0_dtype = 0;
+    vector_fetch_0_burst_size = 0;
+    vector_fetch_0_num_beats = 1;
+    vector_fetch_0_packing_factor = 1;
 
-    addr_gen1_mode = 0;
-    ADDRESS_GEN1_OFFSET = 0;
+    vector_fetch_1_mode = 0;
+    vector_fetch_1_offset = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        addr_gen1_loops[i][j] = 0;
+        vector_fetch_1_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      addr_gen1_y_loop_idx[i] = 0;
-      addr_gen1_x_loop_idx[i] = 1;
-      addr_gen1_k_loop_idx[i] = 2;
+      vector_fetch_1_y_loop_idx[i] = 0;
+      vector_fetch_1_x_loop_idx[i] = 1;
+      vector_fetch_1_k_loop_idx[i] = 2;
     }
-    addr_gen1_dq_scale = 0;
-    addr_gen1_dtype = 0;
+    vector_fetch_1_dq_scale = 0;
+    vector_fetch_1_dtype = 0;
+    vector_fetch_1_burst_size = 0;
+    vector_fetch_1_num_beats = 1;
+    vector_fetch_1_packing_factor = 1;
 
-    addr_gen2_mode = 0;
-    ADDRESS_GEN2_OFFSET = 0;
+    vector_fetch_2_mode = 0;
+    vector_fetch_2_offset = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        addr_gen2_loops[i][j] = 0;
+        vector_fetch_2_loops[i][j] = 0;
       }
     }
     for (int i = 0; i < 2; i++) {
-      addr_gen2_y_loop_idx[i] = 0;
-      addr_gen2_x_loop_idx[i] = 1;
-      addr_gen2_k_loop_idx[i] = 2;
+      vector_fetch_2_y_loop_idx[i] = 0;
+      vector_fetch_2_x_loop_idx[i] = 1;
+      vector_fetch_2_k_loop_idx[i] = 2;
     }
-    addr_gen2_dq_scale = 0;
-    addr_gen2_dtype = 0;
+    vector_fetch_2_dq_scale = 0;
+    vector_fetch_2_dtype = 0;
+    vector_fetch_2_burst_size = 0;
+    vector_fetch_2_num_beats = 1;
+    vector_fetch_2_packing_factor = 1;
 
     output_mode = 1;
     VECTOR_OUTPUT_OFFSET = 0;
@@ -715,23 +717,22 @@ struct VectorParams : BaseParams {
       output_pad_dim_idx[i] = 0;
     }
 
-    addr_gen0_broadcast = 0;
-    addr_gen1_broadcast = 0;
-    addr_gen2_broadcast = 0;
+    vector_fetch_0_broadcast = 0;
+    vector_fetch_1_broadcast = 0;
+    vector_fetch_2_broadcast = 0;
 
     has_slicing = false;
-    addr_gen0_dim = 0;
-    addr_gen0_start = 0;
-    addr_gen0_end = 0;
-    addr_gen0_step = 0;
+    vector_fetch_0_dim = 0;
+    vector_fetch_0_start = 0;
+    vector_fetch_0_end = 0;
+    vector_fetch_0_step = 0;
 
     has_permute = false;
     for (int i = 0; i < 6; i++) {
-      addr_gen0_dims[i] = i;
+      vector_fetch_0_dims[i] = i;
     }
 
     has_transpose = false;
-    has_transpose_with_padded_dimension = false;
 
     is_maxpool = false;
     for (int i = 0; i < 2; i++) {
@@ -755,35 +756,47 @@ struct VectorParams : BaseParams {
 
   static constexpr int LOOP_WIDTH = 16;
 
-  // Address generator 0 (vector input)
-  ac_int<2, false> addr_gen0_mode;
-  ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN0_OFFSET;
-  ac_int<LOOP_WIDTH, false> addr_gen0_loops[2][3];
-  ac_int<3, false> addr_gen0_x_loop_idx[2];
-  ac_int<3, false> addr_gen0_y_loop_idx[2];
-  ac_int<3, false> addr_gen0_k_loop_idx[2];
-  ac_int<16, false> addr_gen0_dq_scale;
-  ac_int<4, false> addr_gen0_dtype;
+  // Address generator 0
+  ac_int<2, false> vector_fetch_0_mode;
+  ac_int<ADDRESS_WIDTH, false> vector_fetch_0_offset;
+  ac_int<LOOP_WIDTH, false> vector_fetch_0_loops[2][3];
+  ac_int<3, false> vector_fetch_0_x_loop_idx[2];
+  ac_int<3, false> vector_fetch_0_y_loop_idx[2];
+  ac_int<3, false> vector_fetch_0_k_loop_idx[2];
+  ac_int<16, false> vector_fetch_0_dq_scale;
+  ac_int<4, false> vector_fetch_0_dtype;
 
-  // Address generator 1 (op0src1)
-  ac_int<2, false> addr_gen1_mode;
-  ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN1_OFFSET;
-  ac_int<LOOP_WIDTH, false> addr_gen1_loops[2][3];
-  ac_int<3, false> addr_gen1_x_loop_idx[2];
-  ac_int<3, false> addr_gen1_y_loop_idx[2];
-  ac_int<3, false> addr_gen1_k_loop_idx[2];
-  ac_int<16, false> addr_gen1_dq_scale;
-  ac_int<4, false> addr_gen1_dtype;
+  ac_int<10, false> vector_fetch_0_burst_size;
+  ac_int<4, false> vector_fetch_0_num_beats;
+  ac_int<4, false> vector_fetch_0_packing_factor;
 
-  // Address generator 2 (op3src1)
-  ac_int<2, false> addr_gen2_mode;
-  ac_int<ADDRESS_WIDTH, false> ADDRESS_GEN2_OFFSET;
-  ac_int<LOOP_WIDTH, false> addr_gen2_loops[2][3];
-  ac_int<3, false> addr_gen2_x_loop_idx[2];
-  ac_int<3, false> addr_gen2_y_loop_idx[2];
-  ac_int<3, false> addr_gen2_k_loop_idx[2];
-  ac_int<16, false> addr_gen2_dq_scale;
-  ac_int<4, false> addr_gen2_dtype;
+  // Address generator 1
+  ac_int<2, false> vector_fetch_1_mode;
+  ac_int<ADDRESS_WIDTH, false> vector_fetch_1_offset;
+  ac_int<LOOP_WIDTH, false> vector_fetch_1_loops[2][3];
+  ac_int<3, false> vector_fetch_1_x_loop_idx[2];
+  ac_int<3, false> vector_fetch_1_y_loop_idx[2];
+  ac_int<3, false> vector_fetch_1_k_loop_idx[2];
+  ac_int<16, false> vector_fetch_1_dq_scale;
+  ac_int<4, false> vector_fetch_1_dtype;
+
+  ac_int<10, false> vector_fetch_1_burst_size;
+  ac_int<4, false> vector_fetch_1_num_beats;
+  ac_int<4, false> vector_fetch_1_packing_factor;
+
+  // Address generator 2
+  ac_int<2, false> vector_fetch_2_mode;
+  ac_int<ADDRESS_WIDTH, false> vector_fetch_2_offset;
+  ac_int<LOOP_WIDTH, false> vector_fetch_2_loops[2][3];
+  ac_int<3, false> vector_fetch_2_x_loop_idx[2];
+  ac_int<3, false> vector_fetch_2_y_loop_idx[2];
+  ac_int<3, false> vector_fetch_2_k_loop_idx[2];
+  ac_int<16, false> vector_fetch_2_dq_scale;
+  ac_int<4, false> vector_fetch_2_dtype;
+
+  ac_int<10, false> vector_fetch_2_burst_size;
+  ac_int<4, false> vector_fetch_2_num_beats;
+  ac_int<4, false> vector_fetch_2_packing_factor;
 
   // Output address generator
   ac_int<2, false> output_mode;
@@ -799,22 +812,21 @@ struct VectorParams : BaseParams {
   ac_int<11, false> output_pad_dim_size;
   ac_int<3, false> output_pad_dim_idx[2];
 
-  ac_int<6, false> addr_gen0_broadcast;
-  ac_int<3, false> addr_gen1_broadcast;
-  ac_int<3, false> addr_gen2_broadcast;
+  ac_int<6, false> vector_fetch_0_broadcast;
+  ac_int<3, false> vector_fetch_1_broadcast;
+  ac_int<3, false> vector_fetch_2_broadcast;
 
   // Address generator 0 slicing and reshape
   bool has_slicing;
-  ac_int<3, false> addr_gen0_dim;
-  ac_int<11, false> addr_gen0_start;
-  ac_int<11, false> addr_gen0_end;
-  ac_int<11, false> addr_gen0_step;
+  ac_int<3, false> vector_fetch_0_dim;
+  ac_int<11, false> vector_fetch_0_start;
+  ac_int<11, false> vector_fetch_0_end;
+  ac_int<11, false> vector_fetch_0_step;
 
   bool has_permute;
-  ac_int<3, false> addr_gen0_dims[6];
+  ac_int<3, false> vector_fetch_0_dims[6];
 
   bool has_transpose;
-  bool has_transpose_with_padded_dimension;
 
   bool is_maxpool;
   ac_int<8, false> stride[2];
@@ -831,85 +843,94 @@ struct VectorParams : BaseParams {
   ac_int<MAX_DECODED_DTYPE_WIDTH + 1, true>
       output_code[NUM_CODEBOOK_ENTRIES - 1];
 
-  // Each address generator has a 2-bit mode flag, 64-bit address, 6 11-bit loop
-  // boundaries, 6 3-bit loop indices, a 16-bit dequantize scale, and a 2-bit
-  // data type
+  // Each address generator has a 2-bit mode flag, 64-bit address, 6 x 11-bit
+  // loop boundaries, 6 x 3-bit loop indices, a 16-bit dequantize scale, a 4-bit
+  // data type, and a 18-bit packing factor param
   static const unsigned int address_gen_width =
-      2 + ADDRESS_WIDTH + 6 * LOOP_WIDTH + 6 * 3 + 16 + 4;
+      2 + ADDRESS_WIDTH + 6 * LOOP_WIDTH + 6 * 3 + 16 + 4 + 18;
 
   static const unsigned int codebook_params_width =
       1 + (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
 
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
   // slicing params + 32-bit pooling param + 18-bit reshape params + 17-bit
-  // padded transpose params + 4-bit head size + 8 boolean flags + 64-bit scale
+  // padded transpose params + 4-bit head size + 7 boolean flags + 64-bit scale
   // offset
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
-                                    17 + 4 + 8 + ADDRESS_WIDTH - 16 +
+                                    17 + 4 + 7 + ADDRESS_WIDTH - 16 - 18 +
                                     codebook_params_width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     // Address generator 0
-    m & addr_gen0_mode;
-    m & ADDRESS_GEN0_OFFSET;
+    m & vector_fetch_0_mode;
+    m & vector_fetch_0_offset;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& addr_gen0_loops[i][j];
+        m& vector_fetch_0_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen0_x_loop_idx[i];
+      m& vector_fetch_0_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen0_y_loop_idx[i];
+      m& vector_fetch_0_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen0_k_loop_idx[i];
+      m& vector_fetch_0_k_loop_idx[i];
     }
-    m & addr_gen0_dq_scale;
-    m & addr_gen0_dtype;
+    m & vector_fetch_0_dq_scale;
+    m & vector_fetch_0_dtype;
+    m & vector_fetch_0_burst_size;
+    m & vector_fetch_0_num_beats;
+    m & vector_fetch_0_packing_factor;
 
     // Address generator 1
-    m & addr_gen1_mode;
-    m & ADDRESS_GEN1_OFFSET;
+    m & vector_fetch_1_mode;
+    m & vector_fetch_1_offset;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& addr_gen1_loops[i][j];
+        m& vector_fetch_1_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen1_x_loop_idx[i];
+      m& vector_fetch_1_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen1_y_loop_idx[i];
+      m& vector_fetch_1_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen1_k_loop_idx[i];
+      m& vector_fetch_1_k_loop_idx[i];
     }
-    m & addr_gen1_dq_scale;
-    m & addr_gen1_dtype;
+    m & vector_fetch_1_dq_scale;
+    m & vector_fetch_1_dtype;
+    m & vector_fetch_1_burst_size;
+    m & vector_fetch_1_num_beats;
+    m & vector_fetch_1_packing_factor;
 
     // Address generator 2
-    m & addr_gen2_mode;
-    m & ADDRESS_GEN2_OFFSET;
+    m & vector_fetch_2_mode;
+    m & vector_fetch_2_offset;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        m& addr_gen2_loops[i][j];
+        m& vector_fetch_2_loops[i][j];
       }
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen2_x_loop_idx[i];
+      m& vector_fetch_2_x_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen2_y_loop_idx[i];
+      m& vector_fetch_2_y_loop_idx[i];
     }
     for (int i = 0; i < 2; i++) {
-      m& addr_gen2_k_loop_idx[i];
+      m& vector_fetch_2_k_loop_idx[i];
     }
-    m & addr_gen2_dq_scale;
-    m & addr_gen2_dtype;
+    m & vector_fetch_2_dq_scale;
+    m & vector_fetch_2_dtype;
+    m & vector_fetch_2_burst_size;
+    m & vector_fetch_2_num_beats;
+    m & vector_fetch_2_packing_factor;
 
     // Output address generator
     m & output_mode;
@@ -935,24 +956,23 @@ struct VectorParams : BaseParams {
       m& output_pad_dim_idx[i];
     }
 
-    m & addr_gen0_broadcast;
-    m & addr_gen1_broadcast;
-    m & addr_gen2_broadcast;
+    m & vector_fetch_0_broadcast;
+    m & vector_fetch_1_broadcast;
+    m & vector_fetch_2_broadcast;
 
     // Slicing and reshape
     m & has_slicing;
-    m & addr_gen0_dim;
-    m & addr_gen0_start;
-    m & addr_gen0_end;
-    m & addr_gen0_step;
+    m & vector_fetch_0_dim;
+    m & vector_fetch_0_start;
+    m & vector_fetch_0_end;
+    m & vector_fetch_0_step;
 
     m & has_permute;
     for (int i = 0; i < 6; i++) {
-      m& addr_gen0_dims[i];
+      m& vector_fetch_0_dims[i];
     }
 
     m & has_transpose;
-    m & has_transpose_with_padded_dimension;
 
     m & is_maxpool;
     for (int i = 0; i < 2; i++) {
@@ -983,74 +1003,104 @@ struct VectorParams : BaseParams {
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorParams& params) {
-    os << "addr_gen0_mode: " << params.addr_gen0_mode << std::endl;
-    os << "ADDRESS_GEN0_OFFSET: " << params.ADDRESS_GEN0_OFFSET << std::endl;
+    os << "vector_fetch_0_mode: " << params.vector_fetch_0_mode << std::endl;
+    os << "vector_fetch_0_broadcast: " << params.vector_fetch_0_broadcast
+       << std::endl;
+    os << "vector_fetch_0_offset: " << params.vector_fetch_0_offset
+       << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "addr_gen0_loops[" << i << "][" << j
-           << "]: " << params.addr_gen0_loops[i][j] << std::endl;
+        os << "vector_fetch_0_loops[" << i << "][" << j
+           << "]: " << params.vector_fetch_0_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen0_y_loop_idx[" << i
-         << "]: " << params.addr_gen0_y_loop_idx[i] << std::endl;
+      os << "vector_fetch_0_y_loop_idx[" << i
+         << "]: " << params.vector_fetch_0_y_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen0_x_loop_idx[" << i
-         << "]: " << params.addr_gen0_x_loop_idx[i] << std::endl;
+      os << "vector_fetch_0_x_loop_idx[" << i
+         << "]: " << params.vector_fetch_0_x_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen0_k_loop_idx[" << i
-         << "]: " << params.addr_gen0_k_loop_idx[i] << std::endl;
+      os << "vector_fetch_0_k_loop_idx[" << i
+         << "]: " << params.vector_fetch_0_k_loop_idx[i] << std::endl;
     }
-    os << "addr_gen0_dq_scale: " << params.addr_gen0_dq_scale << std::endl;
-    os << "addr_gen0_dtype: " << params.addr_gen0_dtype << std::endl;
+    os << "vector_fetch_0_dq_scale: " << params.vector_fetch_0_dq_scale
+       << std::endl;
+    os << "vector_fetch_0_dtype: " << params.vector_fetch_0_dtype << std::endl;
+    os << "vector_fetch_0_burst_size: " << params.vector_fetch_0_burst_size
+       << std::endl;
+    os << "vector_fetch_0_num_beats: " << params.vector_fetch_0_num_beats
+       << std::endl;
+    os << "vector_fetch_0_packing_factor: "
+       << params.vector_fetch_0_packing_factor << std::endl;
 
-    os << "addr_gen1_mode: " << params.addr_gen1_mode << std::endl;
-    os << "ADDRESS_GEN1_OFFSET: " << params.ADDRESS_GEN1_OFFSET << std::endl;
+    os << "vector_fetch_1_mode: " << params.vector_fetch_1_mode << std::endl;
+    os << "vector_fetch_1_broadcast: " << params.vector_fetch_1_broadcast
+       << std::endl;
+    os << "vector_fetch_1_offset: " << params.vector_fetch_1_offset
+       << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "addr_gen1_loops[" << i << "][" << j
-           << "]: " << params.addr_gen1_loops[i][j] << std::endl;
+        os << "vector_fetch_1_loops[" << i << "][" << j
+           << "]: " << params.vector_fetch_1_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen1_y_loop_idx[" << i
-         << "]: " << params.addr_gen1_y_loop_idx[i] << std::endl;
+      os << "vector_fetch_1_y_loop_idx[" << i
+         << "]: " << params.vector_fetch_1_y_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen1_x_loop_idx[" << i
-         << "]: " << params.addr_gen1_x_loop_idx[i] << std::endl;
+      os << "vector_fetch_1_x_loop_idx[" << i
+         << "]: " << params.vector_fetch_1_x_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen1_k_loop_idx[" << i
-         << "]: " << params.addr_gen1_k_loop_idx[i] << std::endl;
+      os << "vector_fetch_1_k_loop_idx[" << i
+         << "]: " << params.vector_fetch_1_k_loop_idx[i] << std::endl;
     }
-    os << "addr_gen1_dq_scale: " << params.addr_gen1_dq_scale << std::endl;
-    os << "addr_gen1_dtype: " << params.addr_gen1_dtype << std::endl;
+    os << "vector_fetch_1_dq_scale: " << params.vector_fetch_1_dq_scale
+       << std::endl;
+    os << "vector_fetch_1_dtype: " << params.vector_fetch_1_dtype << std::endl;
+    os << "vector_fetch_1_burst_size: " << params.vector_fetch_1_burst_size
+       << std::endl;
+    os << "vector_fetch_1_num_beats: " << params.vector_fetch_1_num_beats
+       << std::endl;
+    os << "vector_fetch_1_packing_factor: "
+       << params.vector_fetch_1_packing_factor << std::endl;
 
-    os << "addr_gen2_mode: " << params.addr_gen2_mode << std::endl;
-    os << "ADDRESS_GEN2_OFFSET: " << params.ADDRESS_GEN2_OFFSET << std::endl;
+    os << "vector_fetch_2_mode: " << params.vector_fetch_2_mode << std::endl;
+    os << "vector_fetch_2_broadcast: " << params.vector_fetch_2_broadcast
+       << std::endl;
+    os << "vector_fetch_2_offset: " << params.vector_fetch_2_offset
+       << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        os << "addr_gen2_loops[" << i << "][" << j
-           << "]: " << params.addr_gen2_loops[i][j] << std::endl;
+        os << "vector_fetch_2_loops[" << i << "][" << j
+           << "]: " << params.vector_fetch_2_loops[i][j] << std::endl;
       }
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen2_y_loop_idx[" << i
-         << "]: " << params.addr_gen2_y_loop_idx[i] << std::endl;
+      os << "vector_fetch_2_y_loop_idx[" << i
+         << "]: " << params.vector_fetch_2_y_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen2_x_loop_idx[" << i
-         << "]: " << params.addr_gen2_x_loop_idx[i] << std::endl;
+      os << "vector_fetch_2_x_loop_idx[" << i
+         << "]: " << params.vector_fetch_2_x_loop_idx[i] << std::endl;
     }
     for (int i = 0; i < 2; i++) {
-      os << "addr_gen2_k_loop_idx[" << i
-         << "]: " << params.addr_gen2_k_loop_idx[i] << std::endl;
+      os << "vector_fetch_2_k_loop_idx[" << i
+         << "]: " << params.vector_fetch_2_k_loop_idx[i] << std::endl;
     }
-    os << "addr_gen2_dq_scale: " << params.addr_gen2_dq_scale << std::endl;
-    os << "addr_gen2_dtype: " << params.addr_gen2_dtype << std::endl;
+    os << "vector_fetch_2_dq_scale: " << params.vector_fetch_2_dq_scale
+       << std::endl;
+    os << "vector_fetch_2_dtype: " << params.vector_fetch_2_dtype << std::endl;
+    os << "vector_fetch_2_burst_size: " << params.vector_fetch_2_burst_size
+       << std::endl;
+    os << "vector_fetch_2_num_beats: " << params.vector_fetch_2_num_beats
+       << std::endl;
+    os << "vector_fetch_2_packing_factor: "
+       << params.vector_fetch_2_packing_factor << std::endl;
 
     os << "output_mode: " << params.output_mode << std::endl;
     os << "VECTOR_OUTPUT_OFFSET: " << params.VECTOR_OUTPUT_OFFSET << std::endl;
@@ -1081,25 +1131,19 @@ struct VectorParams : BaseParams {
          << std::endl;
     }
 
-    os << "addr_gen0_broadcast: " << params.addr_gen0_broadcast << std::endl;
-    os << "addr_gen1_broadcast: " << params.addr_gen1_broadcast << std::endl;
-    os << "addr_gen2_broadcast: " << params.addr_gen2_broadcast << std::endl;
-
     os << "has_slicing: " << params.has_slicing << std::endl;
-    os << "addr_gen0_dim: " << params.addr_gen0_dim << std::endl;
-    os << "addr_gen0_start: " << params.addr_gen0_start << std::endl;
-    os << "addr_gen0_end: " << params.addr_gen0_end << std::endl;
-    os << "addr_gen0_step: " << params.addr_gen0_step << std::endl;
+    os << "vector_fetch_0_dim: " << params.vector_fetch_0_dim << std::endl;
+    os << "vector_fetch_0_start: " << params.vector_fetch_0_start << std::endl;
+    os << "vector_fetch_0_end: " << params.vector_fetch_0_end << std::endl;
+    os << "vector_fetch_0_step: " << params.vector_fetch_0_step << std::endl;
 
     os << "has_permute: " << params.has_permute << std::endl;
     for (int i = 0; i < 6; i++) {
-      os << "addr_gen0_dims[" << i << "]: " << params.addr_gen0_dims[i]
-         << std::endl;
+      os << "vector_fetch_0_dims[" << i
+         << "]: " << params.vector_fetch_0_dims[i] << std::endl;
     }
 
     os << "has_transpose: " << params.has_transpose << std::endl;
-    os << "has_transpose_with_padded_dimension: "
-       << params.has_transpose_with_padded_dimension << std::endl;
 
     os << "is_maxpool: " << params.is_maxpool << std::endl;
     for (int i = 0; i < 2; i++) {
@@ -1128,64 +1172,85 @@ struct VectorParams : BaseParams {
   inline friend bool operator==(const VectorParams& lhs,
                                 const VectorParams& rhs) {
     // Compare Address Gen 0 members
-    if (lhs.addr_gen0_mode != rhs.addr_gen0_mode) return false;
-    if (lhs.ADDRESS_GEN0_OFFSET != rhs.ADDRESS_GEN0_OFFSET) return false;
+    if (lhs.vector_fetch_0_mode != rhs.vector_fetch_0_mode) return false;
+    if (lhs.vector_fetch_0_offset != rhs.vector_fetch_0_offset) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.addr_gen0_loops[i][j] != rhs.addr_gen0_loops[i][j])
+        if (lhs.vector_fetch_0_loops[i][j] != rhs.vector_fetch_0_loops[i][j])
           return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.addr_gen0_x_loop_idx[i] != rhs.addr_gen0_x_loop_idx[i])
+      if (lhs.vector_fetch_0_x_loop_idx[i] != rhs.vector_fetch_0_x_loop_idx[i])
         return false;
-      if (lhs.addr_gen0_y_loop_idx[i] != rhs.addr_gen0_y_loop_idx[i])
+      if (lhs.vector_fetch_0_y_loop_idx[i] != rhs.vector_fetch_0_y_loop_idx[i])
         return false;
-      if (lhs.addr_gen0_k_loop_idx[i] != rhs.addr_gen0_k_loop_idx[i])
+      if (lhs.vector_fetch_0_k_loop_idx[i] != rhs.vector_fetch_0_k_loop_idx[i])
         return false;
     }
-    if (lhs.addr_gen0_dq_scale != rhs.addr_gen0_dq_scale) return false;
-    if (lhs.addr_gen0_dtype != rhs.addr_gen0_dtype) return false;
+    if (lhs.vector_fetch_0_dq_scale != rhs.vector_fetch_0_dq_scale)
+      return false;
+    if (lhs.vector_fetch_0_dtype != rhs.vector_fetch_0_dtype) return false;
+    if (lhs.vector_fetch_0_burst_size != rhs.vector_fetch_0_burst_size)
+      return false;
+    if (lhs.vector_fetch_0_num_beats != rhs.vector_fetch_0_num_beats)
+      return false;
+    if (lhs.vector_fetch_0_packing_factor != rhs.vector_fetch_0_packing_factor)
+      return false;
 
     // Compare Address Gen 1 members
-    if (lhs.addr_gen1_mode != rhs.addr_gen1_mode) return false;
-    if (lhs.ADDRESS_GEN1_OFFSET != rhs.ADDRESS_GEN1_OFFSET) return false;
+    if (lhs.vector_fetch_1_mode != rhs.vector_fetch_1_mode) return false;
+    if (lhs.vector_fetch_1_offset != rhs.vector_fetch_1_offset) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.addr_gen1_loops[i][j] != rhs.addr_gen1_loops[i][j])
+        if (lhs.vector_fetch_1_loops[i][j] != rhs.vector_fetch_1_loops[i][j])
           return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.addr_gen1_x_loop_idx[i] != rhs.addr_gen1_x_loop_idx[i])
+      if (lhs.vector_fetch_1_x_loop_idx[i] != rhs.vector_fetch_1_x_loop_idx[i])
         return false;
-      if (lhs.addr_gen1_y_loop_idx[i] != rhs.addr_gen1_y_loop_idx[i])
+      if (lhs.vector_fetch_1_y_loop_idx[i] != rhs.vector_fetch_1_y_loop_idx[i])
         return false;
-      if (lhs.addr_gen1_k_loop_idx[i] != rhs.addr_gen1_k_loop_idx[i])
+      if (lhs.vector_fetch_1_k_loop_idx[i] != rhs.vector_fetch_1_k_loop_idx[i])
         return false;
     }
-    if (lhs.addr_gen1_dq_scale != rhs.addr_gen1_dq_scale) return false;
-    if (lhs.addr_gen1_dtype != rhs.addr_gen1_dtype) return false;
+    if (lhs.vector_fetch_1_dq_scale != rhs.vector_fetch_1_dq_scale)
+      return false;
+    if (lhs.vector_fetch_1_dtype != rhs.vector_fetch_1_dtype) return false;
+    if (lhs.vector_fetch_1_burst_size != rhs.vector_fetch_1_burst_size)
+      return false;
+    if (lhs.vector_fetch_1_num_beats != rhs.vector_fetch_1_num_beats)
+      return false;
+    if (lhs.vector_fetch_1_packing_factor != rhs.vector_fetch_1_packing_factor)
+      return false;
 
     // Compare Address Gen 2 members
-    if (lhs.addr_gen2_mode != rhs.addr_gen2_mode) return false;
-    if (lhs.ADDRESS_GEN2_OFFSET != rhs.ADDRESS_GEN2_OFFSET) return false;
+    if (lhs.vector_fetch_2_mode != rhs.vector_fetch_2_mode) return false;
+    if (lhs.vector_fetch_2_offset != rhs.vector_fetch_2_offset) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
-        if (lhs.addr_gen2_loops[i][j] != rhs.addr_gen2_loops[i][j])
+        if (lhs.vector_fetch_2_loops[i][j] != rhs.vector_fetch_2_loops[i][j])
           return false;
       }
     }
     for (int i = 0; i < 2; i++) {
-      if (lhs.addr_gen2_x_loop_idx[i] != rhs.addr_gen2_x_loop_idx[i])
+      if (lhs.vector_fetch_2_x_loop_idx[i] != rhs.vector_fetch_2_x_loop_idx[i])
         return false;
-      if (lhs.addr_gen2_y_loop_idx[i] != rhs.addr_gen2_y_loop_idx[i])
+      if (lhs.vector_fetch_2_y_loop_idx[i] != rhs.vector_fetch_2_y_loop_idx[i])
         return false;
-      if (lhs.addr_gen2_k_loop_idx[i] != rhs.addr_gen2_k_loop_idx[i])
+      if (lhs.vector_fetch_2_k_loop_idx[i] != rhs.vector_fetch_2_k_loop_idx[i])
         return false;
     }
-    if (lhs.addr_gen2_dq_scale != rhs.addr_gen2_dq_scale) return false;
-    if (lhs.addr_gen2_dtype != rhs.addr_gen2_dtype) return false;
+    if (lhs.vector_fetch_2_dq_scale != rhs.vector_fetch_2_dq_scale)
+      return false;
+    if (lhs.vector_fetch_2_dtype != rhs.vector_fetch_2_dtype) return false;
+    if (lhs.vector_fetch_2_burst_size != rhs.vector_fetch_2_burst_size)
+      return false;
+    if (lhs.vector_fetch_2_num_beats != rhs.vector_fetch_2_num_beats)
+      return false;
+    if (lhs.vector_fetch_2_packing_factor != rhs.vector_fetch_2_packing_factor)
+      return false;
 
     // Compare output and other members
     if (lhs.output_mode != rhs.output_mode) return false;
@@ -1208,25 +1273,26 @@ struct VectorParams : BaseParams {
       if (lhs.output_pad_dim_idx[i] != rhs.output_pad_dim_idx[i]) return false;
     }
 
-    if (lhs.addr_gen0_broadcast != rhs.addr_gen0_broadcast) return false;
-    if (lhs.addr_gen1_broadcast != rhs.addr_gen1_broadcast) return false;
-    if (lhs.addr_gen2_broadcast != rhs.addr_gen2_broadcast) return false;
+    if (lhs.vector_fetch_0_broadcast != rhs.vector_fetch_0_broadcast)
+      return false;
+    if (lhs.vector_fetch_1_broadcast != rhs.vector_fetch_1_broadcast)
+      return false;
+    if (lhs.vector_fetch_2_broadcast != rhs.vector_fetch_2_broadcast)
+      return false;
 
     if (lhs.has_slicing != rhs.has_slicing) return false;
-    if (lhs.addr_gen0_dim != rhs.addr_gen0_dim) return false;
-    if (lhs.addr_gen0_start != rhs.addr_gen0_start) return false;
-    if (lhs.addr_gen0_end != rhs.addr_gen0_end) return false;
-    if (lhs.addr_gen0_step != rhs.addr_gen0_step) return false;
+    if (lhs.vector_fetch_0_dim != rhs.vector_fetch_0_dim) return false;
+    if (lhs.vector_fetch_0_start != rhs.vector_fetch_0_start) return false;
+    if (lhs.vector_fetch_0_end != rhs.vector_fetch_0_end) return false;
+    if (lhs.vector_fetch_0_step != rhs.vector_fetch_0_step) return false;
 
     if (lhs.has_permute != rhs.has_permute) return false;
     for (int i = 0; i < 6; i++) {
-      if (lhs.addr_gen0_dims[i] != rhs.addr_gen0_dims[i]) return false;
+      if (lhs.vector_fetch_0_dims[i] != rhs.vector_fetch_0_dims[i])
+        return false;
     }
 
     if (lhs.has_transpose != rhs.has_transpose) return false;
-    if (lhs.has_transpose_with_padded_dimension !=
-        rhs.has_transpose_with_padded_dimension)
-      return false;
 
     if (lhs.is_maxpool != rhs.is_maxpool) return false;
     for (int i = 0; i < 2; i++) {
@@ -1299,14 +1365,14 @@ struct ApproxUnitConfig {
 #endif
 
   inline friend std::ostream& operator<<(std::ostream& os,
-                                          const ApproxUnitConfig& config) {
+                                         const ApproxUnitConfig& config) {
     for (int i = 0; i < NUM_MAXES; i++) {
       os << "maxes[" << i << "]: " << config.maxes[i] << std::endl;
     }
     for (int i = 0; i < NUM_RANGES; i++) {
       for (int j = 0; j < NUM_COEFFS; j++) {
         os << "range[" << i << "][" << j << "]: " << config.ranges[i][j]
-            << std::endl;
+           << std::endl;
       }
     }
     os << "clamp_min: " << config.clamp_min << std::endl;
@@ -1332,22 +1398,18 @@ struct ApproxUnitConfig {
 struct VectorInstructionConfig : BaseParams {
 #ifndef __SYNTHESIS__
   VectorInstructionConfig() {
-    for (int i = 0; i < 8; i++) {
-      instCount[i] = 0;
-    }
     instLen = 0;
     instLoopCount = 0;
   }
 #endif
 
   VectorInstructions inst[8];
-  ac_int<20, false> instCount[8];
   ac_int<3, false> instLen;
   ac_int<16, false> instLoopCount;
   ApproxUnitConfig approx;
 
   static const unsigned int width =
-      VectorInstructions::width * 8 + 20 * 8 + 3 + 16 + ApproxUnitConfig::width;
+      VectorInstructions::width * 8 + 3 + 16 + ApproxUnitConfig::width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -1401,10 +1463,10 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].rreciprocal;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rduplicate;
+      m& inst[j].rscale;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].rbroadcast;
+      m& inst[j].rduplicate;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].rdest;
@@ -1421,26 +1483,20 @@ struct VectorInstructionConfig : BaseParams {
     for (int j = 0; j < 8; j++) {
       m& inst[j].immediate2;
     }
-    for (int j = 0; j < 8; j++) {
-      m& inst[j].VMAP_OFFSET;
-    }
 
-    for (int i = 0; i < 8; i++) {
-      m& instCount[i];
-    }
     m & instLen;
     m & instLoopCount;
 
     for (int i = 0; i < NUM_MAXES; i++) {
       m & approx.maxes[i];
-    } 
+    }
     for (int i = 0; i < NUM_RANGES; i++) {
       for (int j = 0; j < NUM_COEFFS; j++) {
         m & approx.ranges[i][j];
       }
     }
     m & approx.clamp_min;
-    m & approx.clamp_max; 
+    m & approx.clamp_max;
   }
 
   inline friend void sc_trace(sc_trace_file* tf,
@@ -1454,7 +1510,6 @@ struct VectorInstructionConfig : BaseParams {
       ostream& os, const VectorInstructionConfig& params) {
     for (int i = 0; i < params.instLen; i++) {
       os << "instIndex: " << i << std::endl;
-      os << "instCount: " << params.instCount[i] << std::endl;
       os << params.inst[i] << std::endl;
     }
     os << "instLen: " << params.instLen << std::endl;
@@ -1465,14 +1520,12 @@ struct VectorInstructionConfig : BaseParams {
   inline friend bool operator==(const VectorInstructionConfig& lhs,
                                 const VectorInstructionConfig& rhs) {
     for (int i = 0; i < 8; i++) {
-      if (lhs.instCount[i] != rhs.instCount[i]) return false;
       if (!(lhs.inst[i] == rhs.inst[i])) return false;
     }
     if (lhs.instLen != rhs.instLen || lhs.instLoopCount != rhs.instLoopCount)
       return false;
-    if (lhs.instLen != rhs.instLen || lhs.instLoopCount != rhs.instLoopCount) return false;
     if (!(lhs.approx == rhs.approx)) return false;
-  
+
     return true;
   }
 };

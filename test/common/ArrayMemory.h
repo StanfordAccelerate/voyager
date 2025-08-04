@@ -18,9 +18,6 @@ class ArrayMemory : public MemoryInterface {
 
   char* get_memory(int partition);
 
-  std::vector<std::any> get_reference_outputs(
-      const codegen::Operation& operation) override;
-
   void write_bytes_to_memory(const long long address, const int partition,
                              const int num_bytes, const char* bytes) override;
 

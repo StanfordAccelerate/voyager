@@ -8,7 +8,7 @@
 #include "test/toolchain/MatrixVectorMultiply.h"
 #include "test/toolchain/Microscaling.h"
 #include "test/toolchain/Pooling.h"
-#include "test/toolchain/Softmax3.h"
+#include "test/toolchain/Softmax.h"
 #include "test/toolchain/VectorOps.h"
 
 void MapOperation(const Operation &operation,

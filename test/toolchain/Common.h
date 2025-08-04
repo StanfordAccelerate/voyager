@@ -9,7 +9,15 @@
 
 std::vector<std::set<std::string>> vector_unit_stages = {
     {"add", "add_", "sub", "sub_", "mul", "mul_", "div", "div_", "neg"},
-    {"exp", "abs", "relu", "relu_", "gelu", "gelu_", "silu", "silu_", "hardtanh_", "vmap"},
+    {"exp",          "abs",          "relu",      "relu_",      "gelu",
+     "gelu_",        "silu",         "silu_",     "elu",        "elu_",
+     "hardsigmoid",  "hardsigmoid_", "hardswish", "hardswish_", "log_sigmoid",
+     "log_sigmoid_", "selu",         "selu_",     "celu",       "celu_",
+     "sigmoid",      "sigmoid_",     "mish",      "mish_",      "softplus",
+     "softplus_",    "tanh",         "tanh_",     "tanh_1",     "tanh_1_",
+     "hardshrink",   "hardshrink_",  "hardtanh",  "hardtanh_",  "leaky_relu",
+     "leaky_relu_",  "rrelu",        "rrelu_",    "softshrink", "softshrink_",
+     "threshold",    "threshold_"},
     {"add", "add_", "mul", "mul_", "square", "div", "div_"},
     {"div", "div_", "quantize", "quantize_mx"},
 };
@@ -26,15 +34,48 @@ std::map<std::string, unsigned int> get_vector_instruction_mapping() {
   mapping["div_"] = VectorInstructions::vdiv;
   mapping["square"] = VectorInstructions::vsquare;
   mapping["neg"] = VectorInstructions::vsub;
-  mapping["exp"] = VectorInstructions::vexp;
+  mapping["exp"] = VectorInstructions::vpoly;
+  mapping["abs"] = VectorInstructions::vabs;
   mapping["relu"] = VectorInstructions::vrelu;
   mapping["relu_"] = VectorInstructions::vrelu;
-  mapping["gelu"] = VectorInstructions::vgelu;
-  mapping["gelu_"] = VectorInstructions::vgelu;
-  mapping["silu"] = VectorInstructions::vsilu;
-  mapping["silu_"] = VectorInstructions::vsilu;
+  mapping["gelu"] = VectorInstructions::vpoly;
+  mapping["gelu_"] = VectorInstructions::vpoly;
+  mapping["silu"] = VectorInstructions::vpoly;
+  mapping["silu_"] = VectorInstructions::vpoly;
+  mapping["elu"] = VectorInstructions::vpoly;
+  mapping["elu_"] = VectorInstructions::vpoly;
+  mapping["hardsigmoid"] = VectorInstructions::vpoly;
+  mapping["hardsigmoid_"] = VectorInstructions::vpoly;
+  mapping["hardswish"] = VectorInstructions::vpoly;
+  mapping["hardswish_"] = VectorInstructions::vpoly;
+  mapping["log_sigmoid"] = VectorInstructions::vpoly;
+  mapping["log_sigmoid_"] = VectorInstructions::vpoly;
+  mapping["selu"] = VectorInstructions::vpoly;
+  mapping["selu_"] = VectorInstructions::vpoly;
+  mapping["celu"] = VectorInstructions::vpoly;
+  mapping["celu_"] = VectorInstructions::vpoly;
+  mapping["sigmoid"] = VectorInstructions::vpoly;
+  mapping["sigmoid_"] = VectorInstructions::vpoly;
+  mapping["mish"] = VectorInstructions::vpoly;
+  mapping["mish_"] = VectorInstructions::vpoly;
+  mapping["softplus"] = VectorInstructions::vpoly;
+  mapping["softplus_"] = VectorInstructions::vpoly;
+  mapping["tanh"] = VectorInstructions::vpoly;
+  mapping["tanh_"] = VectorInstructions::vpoly;
+  mapping["tanh_1"] = VectorInstructions::vpoly;
+  mapping["tanh_1_"] = VectorInstructions::vpoly;
+  mapping["hardshrink"] = VectorInstructions::vpoly;
+  mapping["hardshrink_"] = VectorInstructions::vpoly;
+  mapping["hardtanh"] = VectorInstructions::vpoly;
   mapping["hardtanh_"] = VectorInstructions::vpoly;
-  mapping["vmap"] = VectorInstructions::vmap;
+  mapping["leaky_relu"] = VectorInstructions::vpoly;
+  mapping["leaky_relu_"] = VectorInstructions::vpoly;
+  mapping["rrelu"] = VectorInstructions::vpoly;
+  mapping["rrelu_"] = VectorInstructions::vpoly;
+  mapping["softshrink"] = VectorInstructions::vpoly;
+  mapping["softshrink_"] = VectorInstructions::vpoly;
+  mapping["threshold"] = VectorInstructions::vpoly;
+  mapping["threshold_"] = VectorInstructions::vpoly;
   mapping["quantize"] = VectorInstructions::vdiv;
   mapping["quantize_mx"] = VectorInstructions::vquantize_mx;
   return mapping;
@@ -258,7 +299,7 @@ void set_quantize_params(const codegen::Operation &param,
     bool force_scale_power_of_two =
         last_op.kwargs().at("force_scale_power_of_two").int_value();
 
-    assert(block_size == OC_DIMENSION);
+    assert(block_size == IC_DIMENSION);
 
     inst.vector_op3 = VectorInstructions::vquantize_mx;
 
@@ -270,7 +311,7 @@ void set_quantize_params(const codegen::Operation &param,
     }
 
     vector_params->quantize_output_mx = true;
-    vector_params->SCALE_OFFSET = param.outputs().tensors(0).memory().address();
+    vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
 
     if (last_op.kwargs().contains("quant_code")) {
       const auto code = last_op.kwargs().at("quant_code").tensor();
@@ -287,17 +328,6 @@ void set_quantize_params(const codegen::Operation &param,
       vector_params->use_output_codebook = true;
     }
   }
-}
-
-bool is_fc(const codegen::OpOverload &op) {
-  const auto input = op.kwargs().at("input").tensor();
-
-  int dim = 1;
-  for (int i = 0; i < input.shape_size() - 1; i++) {
-    dim *= input.shape(i);
-  }
-
-  return dim == 1;
 }
 
 template <typename T, size_t N, int PortWidth, typename... Ts>

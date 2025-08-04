@@ -126,11 +126,11 @@ union ufloat {
 template <int nbits, int es>
 class Posit {
  public:
-  static constexpr int width = nbits;
-  static constexpr int esbits = es;
+  static constexpr unsigned int width = nbits;
+  static constexpr unsigned int esbits = es;
   static constexpr int max_exp = (nbits - 2) * (1 << es);
-  static constexpr int sbits = ac::nbits<max_exp>::val + 1;
-  static constexpr int fbits = nbits - 3 - es;
+  static constexpr unsigned int sbits = ac::nbits<max_exp>::val + 1;
+  static constexpr unsigned int fbits = nbits - 3 - es;
   typedef StdFloat<fbits, sbits> decoded;
 
   ac_int<nbits, false> bits;

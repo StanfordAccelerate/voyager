@@ -7,7 +7,7 @@
 // Constants for Approximation Unit
 constexpr int NUM_MAXES = 6;
 constexpr int NUM_RANGES = 7;
-constexpr int NUM_COEFFS = 4;
+constexpr int NUM_COEFFS = 3;
 
 #if defined(P8_1)
 
@@ -141,7 +141,7 @@ using F9 = StdFloat<3, 5>;
 
 #define IC_PORT_WIDTH (IC_DIMENSION * 4)
 #define OC_PORT_WIDTH (OC_DIMENSION * 4)
-
+#define VECTOR_UNIT_WIDTH 16
 #define MV_UNIT_WIDTH (OC_DIMENSION * 2)
 #define MVU_SCALE_PORT_WIDTH (SCALE_DATATYPE::width * 2)
 
@@ -189,6 +189,10 @@ using F9 = StdFloat<3, 5>;
 
 #ifndef MV_UNIT_WIDTH
 #define MV_UNIT_WIDTH OC_DIMENSION
+#endif
+
+#ifndef VECTOR_UNIT_WIDTH
+#define VECTOR_UNIT_WIDTH OC_DIMENSION
 #endif
 
 // ================================================================

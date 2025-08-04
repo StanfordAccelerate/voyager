@@ -56,7 +56,7 @@ class StdFloat {
     return float_val.template convert_to_ac_int<width, is_signed>();
   }
 
-  ac_int<width, false> bits_rep() { return float_val.d; }
+  ac_int<width, false> bits_rep() const { return float_val.d; }
 
   void set_bits(int i) { float_val.d = i; }
 
@@ -157,6 +157,7 @@ class StdFloat {
 
   bool operator==(const StdFloat &rhs) const;
   bool operator<(const StdFloat &rhs) const;
+  bool operator<=(const StdFloat &rhs) const;
   operator float() const { return float_val.to_float(); }
 
 #ifndef NO_SYSC
@@ -290,6 +291,13 @@ template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
 inline bool StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>::operator<(
     const StdFloat &rhs) const {
   return float_val < rhs.float_val;
+}
+
+template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
+          ac_q_mode Q>
+inline bool StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>::operator<=(
+    const StdFloat &rhs) const {
+  return float_val <= rhs.float_val;
 }
 
 template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,

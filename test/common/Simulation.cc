@@ -67,7 +67,8 @@ Simulation::Simulation() {
   for (const std::string& s : sims) spdlog::info("{} ", s);
   spdlog::info("\n> Tolerance: {}", tolerance);
   spdlog::info("\n> Output dir: {}", out_dir);
-  spdlog::info("\n> SRAM: {} KB\n", SRAM_MEMORY_SIZE / 1024);
+  spdlog::info("\n> DRAM: {} KB", DRAM_SIZE_MB / 1024);
+  spdlog::info("\n> SRAM: {} KB\n", SRAM_SIZE_MB / 1024);
 }
 
 Simulation::~Simulation() {
@@ -80,15 +81,10 @@ Simulation::~Simulation() {
 }
 
 void Simulation::load_data() {
-  std::vector<uint64_t> memory_sizes{SRAM_MEMORY_SIZE, REFERENCE_MEMORY_SIZE};
-
-  bool is_cnn = model == "resnet18" || model == "resnet50" || model == "mobilenet_v2";
-  int num_classes;
-  if (model == "mobilebert" || model == "bert") {
-    num_classes = 2;
-  } else if (model == "resnet18" || model == "resnet50" || model == "mobilenet_v2") {
-    num_classes = 1000;
-  }
+  const char* env_val = std::getenv("CACHE_SIZE");
+  const int sram_size = env_val ? std::stoi(env_val) : SRAM_SIZE_MB;
+  const int memory_size = is_soc_sim() ? sram_size : DRAM_SIZE_MB;
+  std::vector<uint64_t> memory_sizes{memory_size, REFERENCE_MEMORY_SIZE};
 
   if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
     memories["gold"] = new ArrayMemory(memory_sizes);
@@ -133,14 +129,23 @@ void Simulation::print_ideal_runtime(const Operation operation) {
     const auto weight_shape = get_shape(weight);
     const auto output_shape = get_shape(output);
 
-    int K = weight_shape[weight_shape.size() - 1];
-
     // the total number of operations is X * Y * C * FX * FY * K.
-    long num_macs = get_size(output) * get_size(weight) / K;
-    cycles = num_macs / (IC_DIMENSION * OC_DIMENSION);
+    long num_macs = get_size(output) * get_size(weight);
 
-    if (operation.has_shrunk_tiling) {
-      cycles *= operation.shrink_factor;
+    if (is_fc(first_op)) {
+      int K = weight_shape[0];
+#if SUPPORT_MVM
+      cycles = num_macs / K / MV_UNIT_WIDTH;
+#else
+      cycles = num_macs / K / OC_DIMENSION;
+#endif
+    } else {
+      int K = weight_shape[weight_shape.size() - 1];
+      cycles = num_macs / K / (IC_DIMENSION * OC_DIMENSION);
+
+      if (operation.has_shrunk_tiling) {
+        cycles *= operation.shrink_factor;
+      }
     }
 
     spdlog::info("{}, matrix unit ideal runtime: {} ns\n", get_op_name(param),

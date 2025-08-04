@@ -17,14 +17,9 @@
 #include "test/compiler/proto/param.pb.h"
 // IWYU pragma: end_exports
 
-#ifndef NUM_SRAM_BANKS
-#define NUM_SRAM_BANKS 512
-#endif
-#define SRAM_MEMORY_SIZE (NUM_SRAM_BANKS * 1024LL * 1024LL)
-
-// Size of the reference memory used for verification in MB
-// Should be at least as large as the SRAM memory
-#define REFERENCE_MEMORY_SIZE (1024 * 1024 * 8)
+#define DRAM_SIZE_MB (1024 * 1024LL * 1024LL)
+#define SRAM_SIZE_MB (8 * 1024LL * 1024LL)
+#define REFERENCE_MEMORY_SIZE (8 * 1024 * 1024)
 
 static const std::unordered_set<std::string> GEMM_OPS = {
     "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx",
@@ -113,6 +108,17 @@ inline std::vector<codegen::Tensor> get_op_outputs(
   return outputs;
 }
 
+inline bool is_fc(const codegen::OpOverload& op) {
+  const auto input = op.kwargs().at("input").tensor();
+
+  int dim = 1;
+  for (int i = 0; i < input.shape_size() - 1; i++) {
+    dim *= input.shape(i);
+  }
+
+  return dim == 1;
+}
+
 inline float* read_constant_param(const codegen::Tensor& tensor) {
   const char* env_var = std::getenv("NETWORK");
   std::string model_name(env_var);
@@ -132,21 +138,21 @@ inline float* read_constant_param(const codegen::Tensor& tensor) {
 }
 
 inline std::string getenv(std::string const& name,
-  std::string const& default_value) {
-const char* val = std::getenv(name.c_str());
-return val == NULL ? default_value : std::string(val);
+                          std::string const& default_value) {
+  const char* val = std::getenv(name.c_str());
+  return val == NULL ? default_value : std::string(val);
 }
 
 inline bool is_soc_sim() {
-const char* env = std::getenv("SOC_SIM");
-return env != nullptr && std::string(env) == "1";
+  const char* env = std::getenv("SOC_SIM");
+  return env != nullptr && std::string(env) == "1";
 }
 
 inline uint64_t get_address(const codegen::Tensor& tensor) {
-if (is_soc_sim() && tensor.has_scratchpad()) {
-std::string offset = getenv("SOC_MEM_OFFSET", "0");
-return tensor.scratchpad().offset() + std::stoi(offset);
-} else {
-return tensor.memory().address();
-}
+  if (is_soc_sim() && tensor.has_scratchpad()) {
+    std::string offset = getenv("SOC_MEM_OFFSET", "0");
+    return tensor.scratchpad().offset() + std::stoi(offset);
+  } else {
+    return tensor.memory().address();
+  }
 }

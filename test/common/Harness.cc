@@ -64,8 +64,6 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.vector_fetch_1_resp(vector_fetch_1_resp);
   accelerator.vector_fetch_2_req(vector_fetch_2_req);
   accelerator.vector_fetch_2_resp(vector_fetch_2_resp);
-  accelerator.vector_fetch_3_req(vector_fetch_3_req);
-  accelerator.vector_fetch_3_resp(vector_fetch_3_resp);
   accelerator.vector_output(vector_output);
   accelerator.vector_output_address(vector_output_address);
   accelerator.scalar_output(scalar_output);
@@ -194,14 +192,6 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   async_reset_signal_is(rstn, false);
 
   SC_THREAD(sendResponseVector2);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-
-  SC_THREAD(readRequestVector3);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-
-  SC_THREAD(sendResponseVector3);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -415,14 +405,6 @@ void Harness::readRequestVector2() {
 
 void Harness::sendResponseVector2() {
   sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vector_fetch_2_resp);
-}
-
-void Harness::readRequestVector3() {
-  readMemoryRequest(&vector_fetch_3_req, &vectorFetch3DataResponse_fifo);
-}
-
-void Harness::sendResponseVector3() {
-  sendMemoryResponse(&vectorFetch3DataResponse_fifo, &vector_fetch_3_resp);
 }
 
 void Harness::storeVectorOutputs() {

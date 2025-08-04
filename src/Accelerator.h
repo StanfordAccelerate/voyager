@@ -54,7 +54,8 @@ SC_MODULE(Accelerator) {
 #if SUPPORT_MVM
   MatrixVectorUnit<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
                    ACCUM_DATATYPE, VECTOR_DATATYPE, SCALE_DATATYPE,
-                   OC_PORT_WIDTH, MV_UNIT_WIDTH, OC_DIMENSION>
+                   OC_PORT_WIDTH, MV_UNIT_WIDTH, IC_DIMENSION,
+                   VECTOR_UNIT_WIDTH>
       CCS_INIT_S1(matrix_vector_unit);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(
@@ -80,14 +81,14 @@ SC_MODULE(Accelerator) {
       matrix_vector_weight_scale_resp);
 #endif
 
-  Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>>
+  Connections::Combinational<Pack1D<VECTOR_DATATYPE, VECTOR_UNIT_WIDTH>>
       matrix_vector_unit_data;
   Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_start_signal);
   Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_done_signal);
 #endif
 
   VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
-             OC_DIMENSION>
+             VECTOR_UNIT_WIDTH, OC_DIMENSION>
       CCS_INIT_S1(vector_unit);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serialVectorParamsIn);
@@ -102,9 +103,6 @@ SC_MODULE(Accelerator) {
       vector_fetch_1_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_2_resp);
-
-  Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_3_req);
-  Connections::In<ac_int<16, false>> CCS_INIT_S1(vector_fetch_3_resp);
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
@@ -182,8 +180,6 @@ SC_MODULE(Accelerator) {
     vector_unit.vector_fetch_1_resp(vector_fetch_1_resp);
     vector_unit.vector_fetch_2_req(vector_fetch_2_req);
     vector_unit.vector_fetch_2_resp(vector_fetch_2_resp);
-    vector_unit.vector_fetch_3_req(vector_fetch_3_req);
-    vector_unit.vector_fetch_3_resp(vector_fetch_3_resp);
     vector_unit.vector_out(vector_output);
     vector_unit.vector_address_out(vector_output_address);
     vector_unit.scale_out(scalar_output);

@@ -88,7 +88,8 @@ SC_MODULE(MatrixUnit) {
   WeightScaleController<SCALE_DATATYPE, IC_DIMENSION, OC_DIMENSION,
                         OC_PORT_WIDTH>
       CCS_INIT_S1(weightScaleController);
-  DoubleBuffer<WEIGHT_BUFFER_SIZE, SCALE_DATATYPE::width * OC_DIMENSION>
+  DoubleBuffer<WEIGHT_BUFFER_SIZE / IC_DIMENSION,
+               SCALE_DATATYPE::width * OC_DIMENSION>
       CCS_INIT_S1(weightScaleBuffer);
   Connections::Out<MemoryRequest> CCS_INIT_S1(weightScaleAddressRequest);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(

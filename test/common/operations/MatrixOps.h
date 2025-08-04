@@ -740,7 +740,9 @@ inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
                     Input weight = weights[weight_addr];  // Use padded_weights
 
 #if SUPPORT_MX
-                    int input_scale_addr = input_y * ix + input_x;
+                    int num_blocks = (ic + block_size - 1) / block_size;
+                    int input_scale_addr = (input_y * ix + input_x) * 
+                                           num_blocks + ic_g / block_size;
                     int weight_scale_addr = weight_addr;
                     Scale input_scale =
                         input_scales[input_scale_addr];
