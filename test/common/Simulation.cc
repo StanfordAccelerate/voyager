@@ -75,22 +75,24 @@ Simulation::~Simulation() {
   for (const auto& [key, memory] : memories) {
     delete memory;
   }
-  for (const auto& [key, dataLoader] : dataLoaders) {
-    delete dataLoader;
+
+  for (const auto& [key, dataloader] : dataloaders) {
+    delete dataloader;
   }
 }
 
 void Simulation::load_data() {
-  const int memory_size = is_soc_sim() ? SRAM_SIZE_MB : DRAM_SIZE_MB;
-  std::vector<uint64_t> memory_sizes{memory_size, REFERENCE_MEMORY_SIZE};
+  std::vector<uint64_t> memory_sizes{DRAM_SIZE_MB, SRAM_SIZE_MB,
+                                     REFERENCE_MEMORY_SIZE};
 
   if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
     memories["gold"] = new ArrayMemory(memory_sizes);
-    dataLoaders["gold"] = new DataLoader(memories["gold"], false);
+    dataloaders["gold"] = new DataLoader(memories["gold"], false);
   }
+
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     memories["accelerator"] = new ArrayMemory(memory_sizes);
-    dataLoaders["accelerator"] = new DataLoader(memories["accelerator"], true);
+    dataloaders["accelerator"] = new DataLoader(memories["accelerator"], true);
   }
 
   std::string project_root = std::string(getenv("PROJECT_ROOT"));
@@ -101,7 +103,7 @@ void Simulation::load_data() {
 
   const auto operations = network->get_operations(tests, false);
 
-  for (const auto& [key, dataloader] : dataLoaders) {
+  for (const auto& [key, dataloader] : dataloaders) {
     dataloader->load_inputs(operations, data_dir);
     dataloader->load_outputs(operations.back().param, data_dir);
   }
@@ -157,29 +159,52 @@ void Simulation::print_ideal_runtime(const Operation operation) {
 }
 
 void Simulation::run() {
-  // Run gold models
-  for (const auto& operation : operations) {
-    const auto param = operation.param;
-    print_ideal_runtime(operation);
+  // Run gold model
+  if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
+    for (const auto& operation : operations) {
+      const auto param = operation.param;
+      print_ideal_runtime(operation);
 
-    if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
-      const auto memory = (ArrayMemory*)(memories["gold"]);
-      const auto kwargs = memory->get_args(param);
-      const auto outputs = run_gold_model(operation, kwargs);
-      const auto tensors = get_op_outputs(param);
+      if (is_soc_sim()) {
+        const auto l2_tiling = get_l2_tiling(param);
+        const int num_tiles = get_num_tiles(l2_tiling);
+        std::cerr << "Number of tiles to run: " << num_tiles << std::endl;
 
-      assert(outputs.size() == tensors.size());
+        // for SoC simulation, run operation num_tiles times
+        for (int i = 0; i < num_tiles; i++) {
+          dataloaders["gold"]->load_scratchpad(param, i);
 
-      for (int i = 0; i < outputs.size(); i++) {
-        memory->write_tensor(tensors[i], outputs[i]);
+          const auto memory = (ArrayMemory*)(memories["gold"]);
+          const auto kwargs = memory->get_args(param);
+          const auto outputs = run_gold_model(operation, kwargs);
+          const auto tensors = get_op_outputs(param);
+
+          assert(outputs.size() == tensors.size());
+
+          for (int i = 0; i < outputs.size(); i++) {
+            memory->write_tensor(tensors[i], outputs[i]);
+          }
+
+          dataloaders["gold"]->store_scratchpad(param, i);
+        }
+      } else {
+        const auto memory = (ArrayMemory*)(memories["gold"]);
+        const auto kwargs = memory->get_args(param);
+        const auto outputs = run_gold_model(operation, kwargs);
+        const auto tensors = get_op_outputs(param);
+
+        assert(outputs.size() == tensors.size());
+
+        for (int i = 0; i < outputs.size(); i++) {
+          memory->write_tensor(tensors[i], outputs[i]);
+        }
       }
     }
   }
 
-  // Run accelerator test
+  // Run accelerator
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    auto memory = (ArrayMemory*)(memories["accelerator"]);
-    run_accelerator(operations, memory->memories[0]);
+    run_accelerator(operations, dataloaders["accelerator"]);
   }
 }
 
@@ -189,7 +214,7 @@ bool compare_arrays(codegen::Tensor tensor, const std::any& output1,
                     const std::string& name2, const std::string& filename,
                     int& error_count) {
   if (tensor.dtype() == DataTypes::TypeName<T>::name()) {
-    const auto size = get_size(tensor);
+    const auto size = get_size(tensor, true, false);
     error_count += compare_arrays<T, T>(output1, name1, output2, name2, size,
                                         filename, false);
     return true;
@@ -285,9 +310,9 @@ int Simulation::check_outputs() {
   double rel_err = 0.0;
   const auto output_tensors = get_op_outputs(param);
 
-  for (int i = 0; i < outputs1.size(); i++) {
+  for (int i = 0; i < output_tensors.size(); i++) {
     std::string suffix = ".txt";
-    if (outputs1.size() > 1) {
+    if (output_tensors.size() > 1) {
       suffix = "_" + std::to_string(i) + ".txt";
     }
 

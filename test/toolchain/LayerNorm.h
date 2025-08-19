@@ -72,7 +72,7 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->vector_fetch_0_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   memory_map["outputs"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = mean_scratch_address;
+  vector_params->vector_output_offset = mean_scratch_address;
   vector_params->output_mode = 2;
 
   for (int i = 0; i < 3; i++) {
@@ -163,7 +163,7 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->vector_fetch_1_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   memory_map["outputs"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = var_scratch_address;
+  vector_params->vector_output_offset = var_scratch_address;
   vector_params->output_mode = 2;
 
   for (int i = 0; i < 3; i++) {
@@ -272,7 +272,7 @@ void MapLayerNorm(const codegen::Operation &param,
   vector_params->vector_fetch_2_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   memory_map["outputs"] = get_partition(input_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = get_address(input);
+  vector_params->vector_output_offset = get_address(input);
   vector_params->output_mode = 2;
 
   for (int i = 0; i < 3; i++) {
@@ -385,7 +385,7 @@ void MapLayerNorm(const codegen::Operation &param,
 
   const auto output_memory = output.memory();
   memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
+  vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
 
   for (int i = 0; i < 3; i++) {

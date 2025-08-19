@@ -12,12 +12,12 @@
 #include "test/toolchain/MapOperation.h"
 
 Harness::Harness(sc_module_name name, std::vector<Operation> operations,
-                 char *memory)
+                 DataLoader *dataloader)
     : sc_module(name),
       clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS,
           true),
       operations(operations),
-      memory(memory),
+      dataloader(dataloader),
       inputDataResponse_fifo("inputDataResponse_fifo", 1024),
       weightDataResponse_fifo("weightDataResponse_fifo", 1024),
       biasDataResponse_fifo("biasDataResponse_fifo", 1024),
@@ -83,127 +83,129 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 
   SC_CTHREAD(reset, clk);
 
-  SC_THREAD(readRequestInputs);
+  SC_THREAD(read_input_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseInputs);
+  SC_THREAD(send_input_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-#if SUPPORT_MX
-  SC_THREAD(readRequestInputScale);
+  SC_THREAD(read_weight_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseInputScale);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-#endif
-
-  SC_THREAD(readRequestWeights);
+  SC_THREAD(send_weight_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseWeights);
+  SC_THREAD(read_bias_request);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(send_bias_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
 #if SUPPORT_MX
-  SC_THREAD(readRequestWeightScale);
+  SC_THREAD(read_input_scale_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseWeightScale);
+  SC_THREAD(send_input_scale_response);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(read_weight_scale_request);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(send_weight_scale_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 #endif
-
-  SC_THREAD(readRequestBias);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
-
-  SC_THREAD(sendResponseBias);
-  sensitive << clk.posedge_event();
-  async_reset_signal_is(rstn, false);
 
 #if SUPPORT_MVM
-  SC_THREAD(readRequestMatrixVectorInput);
+  SC_THREAD(read_matrix_vector_unit_input_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseMatrixVectorInput);
+  SC_THREAD(send_matrix_vector_unit_input_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(readRequestMatrixVectorWeight);
+  SC_THREAD(read_matrix_vector_unit_weight_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseMatrixVectorWeight);
+  SC_THREAD(send_matrix_vector_unit_weight_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(readRequestMatrixVectorBias);
+  SC_THREAD(read_matrix_vector_unit_bias_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseMatrixVectorBias);
+  SC_THREAD(send_matrix_vector_unit_bias_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
 #if SUPPORT_MX
-  SC_THREAD(readRequestMatrixVectorInputScale);
+  SC_THREAD(read_matrix_vector_unit_input_scale_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseMatrixVectorInputScale);
+  SC_THREAD(send_matrix_vector_unit_input_scale_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(readRequestMatrixVectorWeightScale);
+  SC_THREAD(read_matrix_vector_unit_weight_scale_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseMatrixVectorWeightScale);
+  SC_THREAD(send_matrix_vector_unit_weight_scale_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 #endif
 #endif
 
-  SC_THREAD(readRequestVector0);
+  SC_THREAD(read_vector_fetch_0_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseVector0);
+  SC_THREAD(send_vector_fetch_0_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(readRequestVector1);
+  SC_THREAD(read_vector_fetch_1_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseVector1);
+  SC_THREAD(send_vector_fetch_1_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(readRequestVector2);
+  SC_THREAD(read_vector_fetch_2_request);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendResponseVector2);
+  SC_THREAD(send_vector_fetch_2_response);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(storeVectorOutputs);
+  SC_THREAD(store_vector_outputs);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(storeScalarOutputs);
+  SC_THREAD(store_scale_outputs);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  SC_THREAD(sendParams);
+  SC_THREAD(param_sender);
+  sensitive << clk.posedge_event();
+  async_reset_signal_is(rstn, false);
+
+  SC_THREAD(runtime_monitor);
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
@@ -216,12 +218,16 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 }
 
 template <int Width>
-void Harness::readMemoryRequest(
+void Harness::process_read_request(
     Connections::Combinational<MemoryRequest> *request_out,
     sc_fifo<ac_int<Width, false>> *data_fifo) {
   request_out->ResetRead();
 
   constexpr int num_bytes = Width / 8;
+
+  const auto array_memory = (ArrayMemory *)(dataloader->memory_interface);
+  const int mem_idx = is_soc_sim() ? 1 : 0;
+  char *memory = array_memory->memories[mem_idx];
 
   wait();
 
@@ -250,7 +256,7 @@ void Harness::readMemoryRequest(
 }
 
 template <int Width>
-void Harness::sendMemoryResponse(
+void Harness::send_data_response(
     sc_fifo<ac_int<Width, false>> *data_fifo,
     Connections::Combinational<ac_int<Width, false>> *response) {
   response->ResetWrite();
@@ -263,13 +269,17 @@ void Harness::sendMemoryResponse(
 }
 
 template <int Width>
-void Harness::storeMemoryResponse(
+void Harness::process_write_request(
     Connections::Combinational<ac_int<Width, false>> *data_out,
     Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> *address_out) {
   data_out->ResetRead();
   address_out->ResetRead();
 
   constexpr int num_bytes = Width / 8;
+
+  const auto array_memory = (ArrayMemory *)(dataloader->memory_interface);
+  const int mem_idx = is_soc_sim() ? 1 : 0;
+  char *memory = array_memory->memories[mem_idx];
 
   wait();
 
@@ -286,133 +296,130 @@ void Harness::storeMemoryResponse(
   }
 }
 
-void Harness::readRequestInputs() {
-  readMemoryRequest(&inputAddressRequest, &inputDataResponse_fifo);
+void Harness::read_input_request() {
+  process_read_request(&inputAddressRequest, &inputDataResponse_fifo);
 }
 
-void Harness::sendResponseInputs() {
-  sendMemoryResponse(&inputDataResponse_fifo, &inputDataResponse);
+void Harness::send_input_response() {
+  send_data_response(&inputDataResponse_fifo, &inputDataResponse);
 }
 
-void Harness::readRequestInputScale() {
+void Harness::read_weight_request() {
+  process_read_request(&weightAddressRequest, &weightDataResponse_fifo);
+}
+
+void Harness::send_weight_response() {
+  send_data_response(&weightDataResponse_fifo, &weightDataResponse);
+}
+
+void Harness::read_bias_request() {
+  process_read_request(&biasAddressRequest, &biasDataResponse_fifo);
+}
+
+void Harness::send_bias_response() {
+  send_data_response(&biasDataResponse_fifo, &biasDataResponse);
+}
+
 #if SUPPORT_MX
-  readMemoryRequest(&inputScaleAddressRequest, &inputScaleDataResponse_fifo);
+void Harness::read_input_scale_request() {
+  process_read_request(&inputScaleAddressRequest, &inputScaleDataResponse_fifo);
+}
+
+void Harness::send_input_scale_response() {
+  send_data_response(&inputScaleDataResponse_fifo, &inputScaleDataResponse);
+}
+
+void Harness::read_weight_scale_request() {
+  process_read_request(&weightScaleAddressRequest,
+                       &weightScaleDataResponse_fifo);
+}
+
+void Harness::send_weight_scale_response() {
+  send_data_response(&weightScaleDataResponse_fifo, &weightScaleDataResponse);
+}
 #endif
-}
-
-void Harness::sendResponseInputScale() {
-#if SUPPORT_MX
-  sendMemoryResponse(&inputScaleDataResponse_fifo, &inputScaleDataResponse);
-#endif
-}
-
-void Harness::readRequestWeights() {
-  readMemoryRequest(&weightAddressRequest, &weightDataResponse_fifo);
-}
-
-void Harness::sendResponseWeights() {
-  sendMemoryResponse(&weightDataResponse_fifo, &weightDataResponse);
-}
-
-void Harness::readRequestWeightScale() {
-#if SUPPORT_MX
-  readMemoryRequest(&weightScaleAddressRequest, &weightScaleDataResponse_fifo);
-#endif
-}
-
-void Harness::sendResponseWeightScale() {
-#if SUPPORT_MX
-  sendMemoryResponse(&weightScaleDataResponse_fifo, &weightScaleDataResponse);
-#endif
-}
-
-void Harness::readRequestBias() {
-  readMemoryRequest(&biasAddressRequest, &biasDataResponse_fifo);
-}
-
-void Harness::sendResponseBias() {
-  sendMemoryResponse(&biasDataResponse_fifo, &biasDataResponse);
-}
 
 #if SUPPORT_MVM
-void Harness::readRequestMatrixVectorInput() {
-  readMemoryRequest(&matrix_vector_input_req, &matrix_vector_input_resp_fifo);
+void Harness::read_matrix_vector_unit_input_request() {
+  process_read_request(&matrix_vector_input_req,
+                       &matrix_vector_input_resp_fifo);
 }
 
-void Harness::sendResponseMatrixVectorInput() {
-  sendMemoryResponse(&matrix_vector_input_resp_fifo, &matrix_vector_input_resp);
+void Harness::send_matrix_vector_unit_input_response() {
+  send_data_response(&matrix_vector_input_resp_fifo, &matrix_vector_input_resp);
 }
 
-void Harness::readRequestMatrixVectorWeight() {
-  readMemoryRequest(&matrix_vector_weight_req, &matrix_vector_weight_resp_fifo);
+void Harness::read_matrix_vector_unit_weight_request() {
+  process_read_request(&matrix_vector_weight_req,
+                       &matrix_vector_weight_resp_fifo);
 }
 
-void Harness::sendResponseMatrixVectorWeight() {
-  sendMemoryResponse(&matrix_vector_weight_resp_fifo,
+void Harness::send_matrix_vector_unit_weight_response() {
+  send_data_response(&matrix_vector_weight_resp_fifo,
                      &matrix_vector_weight_resp);
 }
 
-void Harness::readRequestMatrixVectorBias() {
-  readMemoryRequest(&matrix_vector_bias_req, &matrix_vector_bias_resp_fifo);
+void Harness::read_matrix_vector_unit_bias_request() {
+  process_read_request(&matrix_vector_bias_req, &matrix_vector_bias_resp_fifo);
 }
 
-void Harness::sendResponseMatrixVectorBias() {
-  sendMemoryResponse(&matrix_vector_bias_resp_fifo, &matrix_vector_bias_resp);
+void Harness::send_matrix_vector_unit_bias_response() {
+  send_data_response(&matrix_vector_bias_resp_fifo, &matrix_vector_bias_resp);
 }
 
 #if SUPPORT_MX
-void Harness::readRequestMatrixVectorInputScale() {
-  readMemoryRequest(&matrix_vector_input_scale_req,
-                    &matrix_vector_input_scale_resp_fifo);
+void Harness::read_matrix_vector_unit_input_scale_request() {
+  process_read_request(&matrix_vector_input_scale_req,
+                       &matrix_vector_input_scale_resp_fifo);
 }
 
-void Harness::sendResponseMatrixVectorInputScale() {
-  sendMemoryResponse(&matrix_vector_input_scale_resp_fifo,
+void Harness::send_matrix_vector_unit_input_scale_response() {
+  send_data_response(&matrix_vector_input_scale_resp_fifo,
                      &matrix_vector_input_scale_resp);
 }
 
-void Harness::readRequestMatrixVectorWeightScale() {
-  readMemoryRequest(&matrix_vector_weight_scale_req,
-                    &matrix_vector_weight_scale_resp_fifo);
+void Harness::read_matrix_vector_unit_weight_scale_request() {
+  process_read_request(&matrix_vector_weight_scale_req,
+                       &matrix_vector_weight_scale_resp_fifo);
 }
 
-void Harness::sendResponseMatrixVectorWeightScale() {
-  sendMemoryResponse(&matrix_vector_weight_scale_resp_fifo,
+void Harness::send_matrix_vector_unit_weight_scale_response() {
+  send_data_response(&matrix_vector_weight_scale_resp_fifo,
                      &matrix_vector_weight_scale_resp);
 }
 #endif
 #endif
 
-void Harness::readRequestVector0() {
-  readMemoryRequest(&vector_fetch_0_req, &vectorFetch0DataResponse_fifo);
+void Harness::read_vector_fetch_0_request() {
+  process_read_request(&vector_fetch_0_req, &vectorFetch0DataResponse_fifo);
 }
 
-void Harness::sendResponseVector0() {
-  sendMemoryResponse(&vectorFetch0DataResponse_fifo, &vector_fetch_0_resp);
+void Harness::send_vector_fetch_0_response() {
+  send_data_response(&vectorFetch0DataResponse_fifo, &vector_fetch_0_resp);
 }
 
-void Harness::readRequestVector1() {
-  readMemoryRequest(&vector_fetch_1_req, &vectorFetch1DataResponse_fifo);
+void Harness::read_vector_fetch_1_request() {
+  process_read_request(&vector_fetch_1_req, &vectorFetch1DataResponse_fifo);
 }
 
-void Harness::sendResponseVector1() {
-  sendMemoryResponse(&vectorFetch1DataResponse_fifo, &vector_fetch_1_resp);
+void Harness::send_vector_fetch_1_response() {
+  send_data_response(&vectorFetch1DataResponse_fifo, &vector_fetch_1_resp);
 }
 
-void Harness::readRequestVector2() {
-  readMemoryRequest(&vector_fetch_2_req, &vectorFetch2DataResponse_fifo);
+void Harness::read_vector_fetch_2_request() {
+  process_read_request(&vector_fetch_2_req, &vectorFetch2DataResponse_fifo);
 }
 
-void Harness::sendResponseVector2() {
-  sendMemoryResponse(&vectorFetch2DataResponse_fifo, &vector_fetch_2_resp);
+void Harness::send_vector_fetch_2_response() {
+  send_data_response(&vectorFetch2DataResponse_fifo, &vector_fetch_2_resp);
 }
 
-void Harness::storeVectorOutputs() {
-  storeMemoryResponse(&vector_output, &vector_output_address);
+void Harness::store_vector_outputs() {
+  process_write_request(&vector_output, &vector_output_address);
 }
 
-void Harness::storeScalarOutputs() {
-  storeMemoryResponse(&scalar_output, &scalar_output_address);
+void Harness::store_scale_outputs() {
+  process_write_request(&scalar_output, &scalar_output_address);
 }
 
 void Harness::reset() {
@@ -423,7 +430,7 @@ void Harness::reset() {
 }
 
 template <typename T, unsigned int interfaceWidth>
-void sendSerializedParams(
+void send_serialized_params(
     T params,
     Connections::Combinational<ac_int<interfaceWidth, false>> *serialParamsIn) {
   ac_int<T::width, false> serializedParam;
@@ -440,122 +447,235 @@ void sendSerializedParams(
   }
 }
 
-void Harness::sendParams() {
+void Harness::send_params(const std::deque<BaseParams *> &params) {
+  for (size_t idx = 0; idx < params.size(); idx++) {
+    if (auto *matrix_params = dynamic_cast<MatrixParams *>(params[idx])) {
+#if SUPPORT_MVM
+      if (matrix_params->is_fc) {
+        send_serialized_params<MatrixParams, 64>(
+            *matrix_params, &serial_matrix_vector_params_in);
+      } else
+#endif
+      {
+        send_serialized_params<MatrixParams, 64>(*matrix_params,
+                                                 &serialMatrixParamsIn);
+      }
+
+      idx++;
+    }
+
+    if (auto *vector_params = dynamic_cast<VectorParams *>(params[idx])) {
+      VectorInstructionConfig *vector_config =
+          dynamic_cast<VectorInstructionConfig *>(params[++idx]);
+
+      send_serialized_params<VectorParams, 64>(*vector_params,
+                                               &serialVectorParamsIn);
+      send_serialized_params<VectorInstructionConfig, 64>(
+          *vector_config, &serialVectorParamsIn);
+    }
+  }
+}
+
+void Harness::count_runtime(const std::deque<BaseParams *> &params,
+                            const Operation &operation, int runtime_scale) {
+  for (size_t idx = 0; idx < params.size(); idx++) {
+    BaseParams *base_param = params[idx];
+    MatrixParams *matrix_params = dynamic_cast<MatrixParams *>(base_param);
+    bool has_matrix_params = matrix_params != nullptr;
+
+    if (has_matrix_params) {
+      base_param = params[++idx];
+    }
+
+    VectorParams *vector_params = dynamic_cast<VectorParams *>(base_param);
+    VectorInstructionConfig *vector_config = nullptr;
+    bool has_vector_params = vector_params != nullptr;
+
+    if (has_vector_params) {
+      base_param = params[++idx];
+      vector_config = dynamic_cast<VectorInstructionConfig *>(base_param);
+    }
+
+    // --- Wait for start signals ---
+    if (has_matrix_params) {
+#if SUPPORT_MVM
+      if (matrix_params->is_fc) {
+        matrix_vector_unit_start_signal.SyncPop();
+      } else
+#endif
+      {
+        matrixUnitStartSignal.SyncPop();
+      }
+    }
+
+    sc_time start = sc_time_stamp();
+    CCS_LOG("----- Accelerator Layer '" << operation.name
+                                        << "' Started. -----");
+
+    if (has_vector_params) {
+      vectorUnitStartSignal.SyncPop();
+    }
+
+    // --- Wait for done signals ---
+    if (has_matrix_params) {
+#if SUPPORT_MVM
+      if (matrix_params->is_fc) {
+        matrix_vector_unit_done_signal.SyncPop();
+      } else
+#endif
+      {
+        matrixUnitDoneSignal.SyncPop();
+      }
+    }
+
+    if (has_vector_params) {
+      vectorUnitDoneSignal.SyncPop();
+    }
+
+    CCS_LOG("----- Accelerator Layer '" << operation.name
+                                        << "' Finished. -----");
+
+    sc_time end = sc_time_stamp();
+    int runtime = runtime_scale * int(end.to_default_time_units() -
+                                      start.to_default_time_units());
+
+    std::cout << "Default time unit: " << sc_get_default_time_unit()
+              << std::endl;
+    std::cout << "Runtime: " << runtime << " ns" << std::endl;
+
+    accessCounter->print_summary(operation.tiling, operation.has_valid_tiling);
+  }
+}
+
+std::deque<BaseParams *> offset_param_addresses(std::deque<BaseParams *> params,
+                                                int offset) {
+  std::deque<BaseParams *> new_params;
+  for (const auto base_param : params) {
+    if (auto *mp = dynamic_cast<MatrixParams *>(base_param)) {
+      auto *param = new MatrixParams(*mp);
+      param->INPUT_OFFSET += offset;
+      param->WEIGHT_OFFSET += offset;
+      param->BIAS_OFFSET += offset;
+      param->INPUT_SCALE_OFFSET += offset;
+      param->WEIGHT_SCALE_OFFSET += offset;
+      new_params.push_back(param);
+    } else if (auto *vp = dynamic_cast<VectorParams *>(base_param)) {
+      auto *param = new VectorParams(*vp);
+      param->vector_fetch_0_offset += offset;
+      param->vector_fetch_1_offset += offset;
+      param->vector_fetch_2_offset += offset;
+      param->vector_output_offset += offset;
+      new_params.push_back(param);
+    } else {
+      new_params.push_back(base_param);
+    }
+  }
+  return new_params;
+}
+
+void Harness::param_sender() {
+  serialMatrixParamsIn.ResetWrite();
+  serialVectorParamsIn.ResetWrite();
+#if SUPPORT_MVM
+  serial_matrix_vector_params_in.ResetWrite();
+#endif
+  l2_tile_done[0].ResetRead();
+  l2_tile_done[1].ResetRead();
+
+  wait();
+
+  for (int i = 0; i < operations.size(); i++) {
+    const auto operation = operations.at(i);
+    const auto param = operation.param;
+
+    std::deque<AcceleratorMemoryMap> memory_maps;
+    std::deque<BaseParams *> accelerator_params;
+    MapOperation(operation, accelerator_params, memory_maps);
+
+    int runtime_scale_factor = 1;
+    std::cout << "Operation: " << operation.name << std::endl;
+    if (operation.has_shrunk_tiling) {
+      runtime_scale_factor = operation.shrink_factor;
+      std::cout << "Scaling operation by " << runtime_scale_factor << std::endl;
+    }
+
+    if (is_soc_sim()) {
+      const auto l2_tiling = get_l2_tiling(param);
+      const int num_tiles = get_num_tiles(l2_tiling);
+      std::cerr << "Number of accelerator tiles to run: " << num_tiles
+                << std::endl;
+
+      const int cache_size = getenv_int("CACHE_SIZE");
+      auto adjusted_params =
+          offset_param_addresses(accelerator_params, cache_size);
+
+      bool bank_index = 0;
+
+      for (int j = 0; j < num_tiles; j++) {
+        if (j > 1) {
+          l2_tile_done[bank_index].SyncPop();
+        }
+
+        std::cerr << "Sending tile " << j << " params" << std::endl;
+        dataloader->load_scratchpad(param, j, bank_index ? cache_size : 0);
+        send_params(bank_index ? adjusted_params : accelerator_params);
+        bank_index = !bank_index;
+      }
+    } else {
+      send_params(accelerator_params);
+    }
+  }
+}
+
+void Harness::runtime_monitor() {
   matrixUnitStartSignal.ResetRead();
   matrixUnitDoneSignal.ResetRead();
   vectorUnitStartSignal.ResetRead();
   vectorUnitDoneSignal.ResetRead();
-
-  serialMatrixParamsIn.ResetWrite();
-  serialVectorParamsIn.ResetWrite();
-
 #if SUPPORT_MVM
   matrix_vector_unit_start_signal.ResetRead();
   matrix_vector_unit_done_signal.ResetRead();
-  serial_matrix_vector_params_in.ResetWrite();
 #endif
+  l2_tile_done[0].ResetWrite();
+  l2_tile_done[1].ResetWrite();
 
   wait();
 
-  // Iterate through all params, ie all layers
   for (int i = 0; i < operations.size(); i++) {
-    currentOperation = operations.at(i);
+    const auto operation = operations.at(i);
+    const auto param = operation.param;
 
-    std::deque<AcceleratorMemoryMap> accelerator_memory_maps;
+    std::deque<AcceleratorMemoryMap> memory_maps;
     std::deque<BaseParams *> accelerator_params;
-    MapOperation(currentOperation, accelerator_params, accelerator_memory_maps);
+    MapOperation(operation, accelerator_params, memory_maps);
 
     int runtime_scale_factor = 1;
-    std::cout << "Operation: " << currentOperation.name << std::endl;
-    if (currentOperation.has_shrunk_tiling) {
-      runtime_scale_factor = currentOperation.shrink_factor;
+    std::cout << "Operation: " << operation.name << std::endl;
+    if (operation.has_shrunk_tiling) {
+      runtime_scale_factor = operation.shrink_factor;
       std::cout << "Scaling operation by " << runtime_scale_factor << std::endl;
     }
 
-    while (accelerator_params.size() > 0) {
-      bool matrixParamsValid, vectorParamsValid;
+    if (is_soc_sim()) {
+      const auto l2_tiling = get_l2_tiling(param);
+      const int num_tiles = get_num_tiles(l2_tiling);
 
-      BaseParams *baseParam = accelerator_params.front();
+      const int cache_size = getenv_int("CACHE_SIZE");
+      bool bank_index = 0;
 
-      MatrixParams *matrixParams = dynamic_cast<MatrixParams *>(baseParam);
-      matrixParamsValid = matrixParams != NULL;
+      for (int j = 0; j < num_tiles; j++) {
+        std::cerr << "Waiting for tile " << j << " to complete" << std::endl;
+        count_runtime(accelerator_params, operation, runtime_scale_factor);
+        dataloader->store_scratchpad(param, j, bank_index ? cache_size : 0);
 
-      if (matrixParamsValid) {
-        accelerator_params.pop_front();
-        baseParam = accelerator_params.front();
-      }
-
-      VectorParams *vectorParams = dynamic_cast<VectorParams *>(baseParam);
-      VectorInstructionConfig *vectorInstructionConfig;
-      vectorParamsValid = vectorParams != NULL;
-
-      if (vectorParamsValid) {
-        accelerator_params.pop_front();
-        baseParam = accelerator_params.front();
-
-        vectorInstructionConfig =
-            dynamic_cast<VectorInstructionConfig *>(baseParam);
-        accelerator_params.pop_front();
-      }
-
-      if (matrixParamsValid) {
-#if SUPPORT_MVM
-        if (matrixParams->is_fc) {
-          sendSerializedParams<MatrixParams, 64>(
-              *matrixParams, &serial_matrix_vector_params_in);
-          matrix_vector_unit_start_signal.SyncPop();
-        } else
-#endif
-        {
-          sendSerializedParams<MatrixParams, 64>(*matrixParams,
-                                                 &serialMatrixParamsIn);
-          matrixUnitStartSignal.SyncPop();
+        if (j < num_tiles - 2) {
+          l2_tile_done[bank_index].SyncPush();
         }
+
+        bank_index = !bank_index;
       }
-
-      sc_time start = sc_time_stamp();
-      CCS_LOG("----- Accelerator Layer '" << currentOperation.name
-                                          << "' Started. -----");
-
-      if (vectorParamsValid) {
-        sendSerializedParams<VectorParams, 64>(*vectorParams,
-                                               &serialVectorParamsIn);
-        sendSerializedParams<VectorInstructionConfig, 64>(
-            *vectorInstructionConfig, &serialVectorParamsIn);
-        vectorUnitStartSignal.SyncPop();
-      }
-
-      CCS_LOG("----- Accelerator Layer '" << currentOperation.name
-                                          << "' Started. -----");
-
-      if (matrixParamsValid) {
-#if SUPPORT_MVM
-        if (matrixParams->is_fc) {
-          matrix_vector_unit_done_signal.SyncPop();
-        } else
-#endif
-        {
-          matrixUnitDoneSignal.SyncPop();
-        }
-      }
-      if (vectorParamsValid) {
-        vectorUnitDoneSignal.SyncPop();
-      }
-      CCS_LOG("----- Accelerator Layer '" << currentOperation.name
-                                          << "' Finished. -----");
-      sc_time end = sc_time_stamp();
-
-      std::cout << "Default time unit: " << sc_get_default_time_unit()
-                << std::endl;
-
-      int runtime = runtime_scale_factor * int(end.to_default_time_units() -
-                                               start.to_default_time_units());
-      std::cout << "Runtime: " << runtime << " ns" << std::endl;
-
-      accessCounter->print_summary(currentOperation.tiling,
-                                   currentOperation.has_valid_tiling);
-
-      accelerator_memory_maps.pop_front();
+    } else {
+      count_runtime(accelerator_params, operation, runtime_scale_factor);
     }
   }
 
@@ -564,14 +684,15 @@ void Harness::sendParams() {
 
 #endif
 
-void run_accelerator(std::vector<Operation> operations, char *memory) {
+void run_accelerator(std::vector<Operation> operations,
+                     DataLoader *dataloader) {
 #ifdef CFLOAT
   spdlog::error(
       "The SystemC model does not support the CFloat datatype. Only the gold "
       "model should be used for CFloat.\n");
   std::abort();
 #else
-  Harness harness("harness", operations, memory);
+  Harness harness("harness", operations, dataloader);
   sc_start();
 #endif
 }

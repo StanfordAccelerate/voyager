@@ -282,7 +282,7 @@ SC_MODULE(OutputController) {
                   bool found =
                       (send_output_address<OutputTypes, Width, OC_PORT_WIDTH,
                                            OutputTypes...>(
-                           params.output_dtype, params.VECTOR_OUTPUT_OFFSET,
+                           params.output_dtype, params.vector_output_offset,
                            address, vector_address_out) ||
                        ...);
 

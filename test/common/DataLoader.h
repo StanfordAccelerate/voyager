@@ -16,15 +16,23 @@ class DataLoader {
  public:
   DataLoader(MemoryInterface*, bool);
 
+  MemoryInterface* memory_interface;
+  bool is_dut;  // special memory addressing for DUT (ex. replication)
+
   void load_tensor(const codegen::Tensor& tensor, std::string data_dir,
-                   bool transpose = false, bool replication = false);
+                   bool replication = false);
   void load_inputs(const std::vector<Operation>, std::string data_dir);
   void load_outputs(const codegen::Operation param, std::string data_dir);
 
-  float* read_tensor_from_file(const std::string& filename, int size);
+  void copy_tile(const std::string& dtype, const std::vector<int>& full_shape,
+                 const std::vector<int>& tiled_shape,
+                 const std::vector<int>& tile_index, int src_partition,
+                 uint64_t src_address, bool src_contiguous, int dst_partition,
+                 uint64_t dst_address, bool dst_contiguous);
+  void load_scratchpad(const codegen::Operation& param, const int tile_index,
+                       const int offset = 0);
+  void store_scratchpad(const codegen::Operation& param, const int tile_index,
+                        const int offset = 0);
 
- private:
-  MemoryInterface* memory_interface;
-  // special addressing is sometimes needed for DUT memory (ex. replication)
-  bool is_dut;
+  float* read_tensor_from_file(const std::string& filename, int size);
 };

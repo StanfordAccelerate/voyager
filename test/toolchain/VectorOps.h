@@ -382,7 +382,7 @@ void MapVectorOperations(const codegen::Operation &param,
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
+  vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
 
   auto output_shape = get_shape(output);

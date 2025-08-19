@@ -698,7 +698,7 @@ struct VectorParams : BaseParams {
     vector_fetch_2_packing_factor = 1;
 
     output_mode = 1;
-    VECTOR_OUTPUT_OFFSET = 0;
+    vector_output_offset = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         output_loops[i][j] = 0;
@@ -800,7 +800,7 @@ struct VectorParams : BaseParams {
 
   // Output address generator
   ac_int<2, false> output_mode;
-  ac_int<ADDRESS_WIDTH, false> VECTOR_OUTPUT_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> vector_output_offset;
   ac_int<LOOP_WIDTH, false> output_loops[2][3];
   ac_int<3, false> output_x_loop_idx[2];
   ac_int<3, false> output_y_loop_idx[2];
@@ -934,7 +934,7 @@ struct VectorParams : BaseParams {
 
     // Output address generator
     m & output_mode;
-    m & VECTOR_OUTPUT_OFFSET;
+    m & vector_output_offset;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         m& output_loops[i][j];
@@ -1103,7 +1103,7 @@ struct VectorParams : BaseParams {
        << params.vector_fetch_2_packing_factor << std::endl;
 
     os << "output_mode: " << params.output_mode << std::endl;
-    os << "VECTOR_OUTPUT_OFFSET: " << params.VECTOR_OUTPUT_OFFSET << std::endl;
+    os << "vector_output_offset: " << params.vector_output_offset << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         os << "output_loops[" << i << "][" << j
@@ -1254,7 +1254,7 @@ struct VectorParams : BaseParams {
 
     // Compare output and other members
     if (lhs.output_mode != rhs.output_mode) return false;
-    if (lhs.VECTOR_OUTPUT_OFFSET != rhs.VECTOR_OUTPUT_OFFSET) return false;
+    if (lhs.vector_output_offset != rhs.vector_output_offset) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         if (lhs.output_loops[i][j] != rhs.output_loops[i][j]) return false;

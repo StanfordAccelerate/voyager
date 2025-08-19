@@ -11,15 +11,17 @@ DataLoader::DataLoader(MemoryInterface* memory_interface, bool is_dut)
     : memory_interface(memory_interface), is_dut(is_dut) {}
 
 void DataLoader::load_tensor(const codegen::Tensor& tensor,
-                             std::string data_dir, bool transpose,
-                             bool replication) {
-  const auto shape = get_shape(tensor, false);
+                             std::string data_dir, bool replication) {
+  const auto shape = get_shape(tensor, false, false);
   const int size = get_size(shape);
-  const uint64_t offset = get_address(tensor);
 
   if (size == 1 && !tensor.has_memory()) {
     return;
   }
+
+  const auto& memory = tensor.memory();
+  const int partition = memory.partition();
+  const uint64_t address = memory.address();
 
   spdlog::debug("Loading tensor: {}\n", tensor.node());
   spdlog::debug("Shape: ");
@@ -28,22 +30,12 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   }
   spdlog::debug("\n");
   spdlog::debug("Datatype: {}\n", tensor.dtype());
-  spdlog::debug("Address: {}\n", offset);
-  spdlog::debug("Transposed: {}\n", transpose);
+  spdlog::debug("Address: {}\n", address);
   spdlog::debug("Replication: {}\n", replication);
 
   std::string filename = data_dir + "/" + tensor.node() + ".bin";
   auto array_ptr = read_tensor_from_file(filename, size);
   auto array = xt::adapt(array_ptr, size, xt::no_ownership(), shape);
-
-  // Accelerator expect the data to be layed out in a different order
-  if (transpose) {
-    if (shape.size() == 4) {
-      array = xt::transpose(array, {2, 3, 1, 0});
-    } else if (shape.size() == 2) {
-      array = xt::transpose(array, {1, 0});
-    }
-  }
 
   // number of elements packed into a single word for replication
   const int packing_factor = IC_DIMENSION / 4 * 3;
@@ -51,13 +43,14 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
     spdlog::debug("packing factor: {}", packing_factor);
   }
 
-  int address = 0;
+  int index = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
-    memory_interface->write_data(tensor, address, *it);
+    memory_interface->write_value(partition, address, index, tensor.dtype(),
+                                  *it);
 
-    address++;
-    if (replication && address % IC_DIMENSION == packing_factor) {
-      address += IC_DIMENSION - packing_factor;
+    index++;
+    if (replication && index % IC_DIMENSION == packing_factor) {
+      index += IC_DIMENSION - packing_factor;
     }
   }
 
@@ -104,7 +97,7 @@ void DataLoader::load_inputs(const std::vector<Operation> operations,
     }
 
     if (!found) {
-      load_tensor(tensor, data_dir, false, false);
+      load_tensor(tensor, data_dir, false);
     }
   }
 
@@ -118,7 +111,7 @@ void DataLoader::load_inputs(const std::vector<Operation> operations,
     }
 
     if (!found) {
-      load_tensor(tensor, data_dir, false, true);
+      load_tensor(tensor, data_dir, true);
     }
   }
 }
@@ -137,12 +130,7 @@ void DataLoader::load_outputs(const codegen::Operation param,
     output_tensor.CopyFrom(tensor);
     // Store output in the last memory partition
     output_tensor.mutable_memory()->set_partition(-1);
-
-    if (is_soc_sim()) {
-      output_tensor.mutable_scratchpad()->set_offset(address);
-    } else {
-      output_tensor.mutable_memory()->set_address(address);
-    }
+    output_tensor.mutable_memory()->set_address(address);
 
     load_tensor(output_tensor, data_dir);
     address += get_size(tensor);
@@ -162,4 +150,138 @@ float* DataLoader::read_tensor_from_file(const std::string& filename,
         "Failed to read the expected amount of data from the file");
   }
   return value_ptr;
+}
+
+static inline std::vector<int> rm_strides(const std::vector<int>& shape) {
+  const int r = (int)shape.size();
+  std::vector<int> s(r, 1);
+  for (int i = r - 2; i >= 0; --i) s[i] = s[i + 1] * shape[i + 1];
+  return s;
+}
+
+void DataLoader::copy_tile(const std::string& dtype,
+                           const std::vector<int>& full_shape,
+                           const std::vector<int>& tiled_shape,
+                           const std::vector<int>& tile_index,
+                           int src_partition, uint64_t src_address,
+                           bool src_contiguous, int dst_partition,
+                           uint64_t dst_address, bool dst_contiguous) {
+  const int rank = full_shape.size();
+
+  std::vector<int> start(rank);
+  for (int d = 0; d < rank; ++d) {
+    start[d] = tile_index[d] * tiled_shape[d];
+  }
+
+  const int size = get_size(tiled_shape);
+  const auto strides = rm_strides(full_shape);
+  std::vector<int> indices(rank, 0);
+
+  // std::cerr << "copying tile from " << src_partition << ":" << src_address
+  //           << " to " << dst_partition << ":" << dst_address << std::endl;
+
+  for (int i = 0; i < size; ++i) {
+    int flat = 0;
+    for (int d = 0; d < rank; ++d) {
+      flat += (start[d] + indices[d]) * strides[d];
+    }
+
+    int src_index = src_contiguous ? i : flat;
+    int dst_index = dst_contiguous ? i : flat;
+
+    float value = memory_interface->read_value(src_partition, src_address,
+                                               src_index, dtype);
+    memory_interface->write_value(dst_partition, dst_address, dst_index, dtype,
+                                  value);
+
+    // increment indices (row-major)
+    for (int d = rank - 1; d >= 0; --d) {
+      if (++indices[d] < tiled_shape[d]) break;
+      indices[d] = 0;
+    }
+  }
+}
+
+void DataLoader::load_scratchpad(const codegen::Operation& param,
+                                 const int tile_index, const int offset) {
+  const auto output = param.output();
+  const auto output_full_shape = get_shape(output, false, false);
+  const auto output_tiled_shape = get_shape(output, false);
+  const auto output_tiles = get_tiles(output_full_shape, output_tiled_shape);
+  const int k_tile = output_tiles.back();
+
+  const auto op_list = get_op_list(param);
+
+  for (const auto op : op_list) {
+    for (const auto [key, value] : op.kwargs()) {
+      if (!value.has_tensor() || !value.tensor().has_memory()) {
+        continue;
+      }
+
+      const auto tensor = value.tensor();
+      spdlog::debug("Loading scratchpad tensor: {}\n", tensor.node());
+
+      std::string dtype = tensor.dtype();
+      const auto full_shape = get_shape(tensor, false, false);
+      const auto tiled_shape = get_shape(tensor, false);
+
+      const int partition = tensor.memory().partition();
+      const uint64_t address = tensor.memory().address();
+
+      const auto scratch = tensor.scratchpad();
+      const int scratch_par = scratch.partition();
+      const uint64_t scratch_addr = scratch.address() + offset;
+
+      int curr_tile_index = tile_index;
+
+      if (GEMM_OPS.find(op.target()) != GEMM_OPS.end()) {
+        if (key == "input" || key == "input_scale") {
+          curr_tile_index = tile_index / k_tile;
+        } else if (key == "weight" || key == "other" || key == "weight_scale") {
+          curr_tile_index = tile_index % k_tile;
+        }
+      }
+
+      auto tiles = get_tiles(full_shape, tiled_shape);
+      auto actual_tiles = get_tile_index(tiles, curr_tile_index);
+
+      // std::cerr << "tile_index: " << tile_index << std::endl;
+      // std::cerr << "adjusted tile_index: " << curr_tile_index << std::endl;
+      // std::cerr << "tiles and actual tiles" << std::endl;
+      // print_shape(tiles);
+      // print_shape(actual_tiles);
+
+      copy_tile(dtype, full_shape, tiled_shape, actual_tiles, partition,
+                address, false, scratch_par, scratch_addr, true);
+    }
+  }
+}
+
+void DataLoader::store_scratchpad(const codegen::Operation& param,
+                                  const int tile_index, const int offset) {
+  const auto tensors = get_op_outputs(param);
+  for (const auto& tensor : tensors) {
+    spdlog::debug("Storing scratchpad tensor: {}\n", tensor.node());
+
+    std::string dtype = tensor.dtype();
+    const auto full_shape = get_shape(tensor, false, false);
+    const auto tiled_shape = get_shape(tensor, false);
+
+    const int partition = tensor.memory().partition();
+    const uint64_t address = tensor.memory().address();
+
+    const auto scratch = tensor.scratchpad();
+    const int scratch_par = scratch.partition();
+    const uint64_t scratch_addr = scratch.address() + offset;
+
+    auto tiles = get_tiles(full_shape, tiled_shape);
+    auto actual_tiles = get_tile_index(tiles, tile_index);
+
+    // std::cerr << "tiles and actual tiles" << std::endl;
+    // print_shape(tiles);
+    // print_shape(actual_tiles);
+
+    copy_tile(dtype, full_shape, tiled_shape, actual_tiles, scratch_par,
+              scratch_addr, true, partition, address, false);
+  }
 }
