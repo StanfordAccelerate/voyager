@@ -674,8 +674,8 @@ void Harness::param_sender() {
       }
 
       // drain out remaining done signals
-      auto &done_signal =
-          bank_index ? scratchpad_bank_1_done : scratchpad_bank_0_done;
+      auto &done_signal = bank_index && num_tiles > 1 ? scratchpad_bank_1_done
+                                                      : scratchpad_bank_0_done;
       done_signal.SyncPop();
 
       if (num_tiles > 1) {

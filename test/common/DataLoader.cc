@@ -177,9 +177,6 @@ void DataLoader::copy_tile(const std::string& dtype,
   const auto strides = rm_strides(full_shape);
   std::vector<int> indices(rank, 0);
 
-  // std::cerr << "copying tile from " << src_partition << ":" << src_address
-  //           << " to " << dst_partition << ":" << dst_address << std::endl;
-
   for (int i = 0; i < size; ++i) {
     int flat = 0;
     for (int d = 0; d < rank; ++d) {
@@ -265,7 +262,8 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
 
     std::string dtype = tensor.dtype();
     const auto full_shape = get_shape(tensor, false, false);
-    const auto tiled_shape = get_shape(tensor, false);
+    auto tiled_shape = get_shape(tensor, false);
+    pad_shape_to_ndim(tiled_shape, full_shape.size());
 
     const int partition = tensor.memory().partition();
     const uint64_t address = tensor.memory().address();

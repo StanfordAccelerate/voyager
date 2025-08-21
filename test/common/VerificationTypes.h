@@ -86,6 +86,18 @@ inline void print_shape(const std::vector<int>& shape) {
   spdlog::error("\n");
 }
 
+inline int pad_shape_to_ndim(std::vector<int>& shape, const int ndim) {
+  const int padding = ndim - shape.size();
+  if (padding < 0) {
+    throw std::invalid_argument("Number of dimensions exceeds the limit!");
+  }
+
+  for (int i = 0; i < padding; i++) {
+    shape.insert(shape.begin(), 1);
+  }
+  return padding;
+}
+
 inline std::vector<codegen::OpOverload> get_op_list(
     const codegen::Operation& param) {
   std::vector<codegen::OpOverload> ops;
@@ -225,6 +237,8 @@ inline std::vector<int> get_tiles(std::vector<int> full_shape,
                                   std::vector<int> tiled_shape) {
   const int rank = full_shape.size();
   std::vector<int> tiles(rank);
+
+  pad_shape_to_ndim(tiled_shape, rank);
 
   for (int d = 0; d < rank; ++d) {
     tiles[d] = full_shape[d] / tiled_shape[d];

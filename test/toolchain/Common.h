@@ -192,18 +192,6 @@ std::vector<int> adjust_loop_indices(const std::vector<int> &loops,
   return result;
 }
 
-int pad_shape_to_ndim(std::vector<int> &shape, const int ndim) {
-  const int padding = ndim - shape.size();
-  if (padding < 0) {
-    throw std::invalid_argument("Number of dimensions exceeds the limit!");
-  }
-
-  for (int i = 0; i < padding; i++) {
-    shape.insert(shape.begin(), 1);
-  }
-  return padding;
-}
-
 bool is_transpose(const std::vector<int> &dims) {
   int n = dims.size();
   // If there are fewer than 2 axes, there's nothing to swap.
