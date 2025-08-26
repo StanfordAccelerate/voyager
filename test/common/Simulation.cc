@@ -122,6 +122,9 @@ void Simulation::print_ideal_runtime(const Operation operation) {
   char* clock_period = std::getenv("CLOCK_PERIOD");
   long clock_period_ns = clock_period ? std::stoi(clock_period) : 1;
 
+  const auto l2_tiling = get_l2_tiling(param);
+  const int num_tiles = is_soc_sim() ? get_num_tiles(l2_tiling) : 1;
+
   if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
     bool is_matmul = first_op.target().find("matmul") != std::string::npos;
     std::string weight_key = is_matmul ? "other" : "weight";
@@ -130,7 +133,7 @@ void Simulation::print_ideal_runtime(const Operation operation) {
     const auto output_shape = get_shape(output);
 
     // the total number of operations is X * Y * C * FX * FY * K.
-    long num_macs = get_size(output) * get_size(weight);
+    long num_macs = get_size(output) * get_size(weight) * num_tiles;
 
     if (is_fc(first_op)) {
       int K = weight_shape[0];
@@ -152,7 +155,7 @@ void Simulation::print_ideal_runtime(const Operation operation) {
                  cycles * clock_period_ns);
   } else {
     long num_ops = get_size(output);
-    cycles = num_ops / OC_DIMENSION;
+    cycles = num_ops / OC_DIMENSION * num_tiles;
     spdlog::info("{}, vector unit ideal runtime: {} ns\n", get_op_name(param),
                  cycles * clock_period_ns);
   }
