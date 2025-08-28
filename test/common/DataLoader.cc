@@ -119,20 +119,15 @@ void DataLoader::load_inputs(const std::vector<Operation> operations,
 void DataLoader::load_outputs(const codegen::Operation param,
                               std::string data_dir) {
   const auto tensors = get_op_outputs(param);
-
-  const auto op_list = get_op_list(param);
-  std::string opcode = op_list[0].target();
-
   uint64_t address = 0;
 
-  for (const auto& tensor : tensors) {
-    codegen::Tensor output_tensor;
-    output_tensor.CopyFrom(tensor);
+  for (auto tensor : tensors) {
     // Store output in the last memory partition
-    output_tensor.mutable_memory()->set_partition(-1);
-    output_tensor.mutable_memory()->set_address(address);
+    tensor.mutable_memory()->set_partition(-1);
+    tensor.mutable_memory()->set_address(address);
+    tensor.clear_tiled_shape();
 
-    load_tensor(output_tensor, data_dir);
+    load_tensor(tensor, data_dir);
     address += get_size(tensor);
   }
 }
@@ -217,7 +212,6 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
       }
 
       const auto tensor = value.tensor();
-      spdlog::debug("Loading scratchpad tensor: {}\n", tensor.node());
 
       std::string dtype = tensor.dtype();
       const auto full_shape = get_shape(tensor, false, false);
@@ -243,6 +237,21 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
       auto tiles = get_tiles(full_shape, tiled_shape);
       auto actual_tiles = get_tile_index(tiles, curr_tile_index);
 
+      spdlog::debug("Loading scratchpad tensor: {}\n", tensor.node());
+      spdlog::debug("Shape: ");
+      for (const auto& dim : tiled_shape) {
+        spdlog::debug("{} ", dim);
+      }
+      spdlog::debug("\n");
+      spdlog::debug("Tile: ");
+      for (const auto& dim : actual_tiles) {
+        spdlog::debug("{} ", dim);
+      }
+      spdlog::debug("\n");
+      spdlog::debug("Datatype: {}\n", dtype);
+      spdlog::debug("Main Memory Address: {}\n", address);
+      spdlog::debug("Scratchpad Address: {}\n", scratch_addr);
+
       copy_tile(dtype, full_shape, tiled_shape, actual_tiles, partition,
                 address, false, scratch_par, scratch_addr, true);
     }
@@ -253,8 +262,6 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
                                   const int tile_index, const int offset) {
   const auto tensors = get_op_outputs(param);
   for (const auto& tensor : tensors) {
-    spdlog::debug("Storing scratchpad tensor: {}\n", tensor.node());
-
     std::string dtype = tensor.dtype();
     const auto full_shape = get_shape(tensor, false, false);
     auto tiled_shape = get_shape(tensor, false);
@@ -269,6 +276,21 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
 
     auto tiles = get_tiles(full_shape, tiled_shape);
     auto actual_tiles = get_tile_index(tiles, tile_index);
+
+    spdlog::debug("Storing scratchpad tensor: {}\n", tensor.node());
+    spdlog::debug("Shape: ");
+    for (const auto& dim : tiled_shape) {
+      spdlog::debug("{} ", dim);
+    }
+    spdlog::debug("\n");
+    spdlog::debug("Tile: ");
+    for (const auto& dim : actual_tiles) {
+      spdlog::debug("{} ", dim);
+    }
+    spdlog::debug("\n");
+    spdlog::debug("Datatype: {}\n", dtype);
+    spdlog::debug("Main Memory Address: {}\n", address);
+    spdlog::debug("Scratchpad Address: {}\n", scratch_addr);
 
     copy_tile(dtype, full_shape, tiled_shape, actual_tiles, scratch_par,
               scratch_addr, true, partition, address, false);

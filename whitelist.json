@@ -17,6 +17,25 @@
     {
         "datatype": "MXNF4",
         "model": [
+            "llama_prefill",
+            "llama_prefill_mp"
+        ],
+        "sim_type": [
+            "systemc",
+            "fast-systemc",
+            "rtl"
+        ],
+        "block_size": 32,
+        "layers": [
+            "slice_tensor",
+            "slice_tensor_1",
+            "slice_tensor_2",
+            "slice_tensor_3"
+        ]
+    },
+    {
+        "datatype": "MXNF4",
+        "model": [
             "llama_decode",
             "llama_decode_mp"
         ],
