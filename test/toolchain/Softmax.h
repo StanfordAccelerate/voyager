@@ -73,7 +73,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   // Output: Scratch memory for max.
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = max_scratch_memory;
+  vector_params->vector_output_offset = max_scratch_memory;
   vector_params->output_mode = 2;
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
@@ -158,7 +158,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   // Output: Scratch memory for sum.
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = sum_scratch_memory;
+  vector_params->vector_output_offset = sum_scratch_memory;
   vector_params->output_mode = 2;
   vector_params->output_dtype =
       get_type_index<VECTOR_DATATYPE, OUTPUT_DATATYPES>();
@@ -273,7 +273,7 @@ void MapSoftmax(const codegen::Operation &param,
 
   // Output
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
+  vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
   vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());

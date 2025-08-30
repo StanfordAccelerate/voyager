@@ -16,11 +16,11 @@ struct BaseParams {
 struct MatrixParams : BaseParams {
 #ifndef __SYNTHESIS__
   MatrixParams() {
-    INPUT_OFFSET = 0;
-    INPUT_SCALE_OFFSET = 0;
-    WEIGHT_OFFSET = 0;
-    WEIGHT_SCALE_OFFSET = 0;
-    BIAS_OFFSET = 0;
+    input_offset = 0;
+    input_scale_offset = 0;
+    weight_offset = 0;
+    weight_scale_offset = 0;
+    bias_offset = 0;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
@@ -92,11 +92,11 @@ struct MatrixParams : BaseParams {
 
   static constexpr int LOOP_WIDTH = 16;
 
-  ac_int<ADDRESS_WIDTH, false> INPUT_OFFSET;
-  ac_int<ADDRESS_WIDTH, false> INPUT_SCALE_OFFSET;
-  ac_int<ADDRESS_WIDTH, false> WEIGHT_OFFSET;
-  ac_int<ADDRESS_WIDTH, false> WEIGHT_SCALE_OFFSET;
-  ac_int<ADDRESS_WIDTH, false> BIAS_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> input_offset;
+  ac_int<ADDRESS_WIDTH, false> input_scale_offset;
+  ac_int<ADDRESS_WIDTH, false> weight_offset;
+  ac_int<ADDRESS_WIDTH, false> weight_scale_offset;
+  ac_int<ADDRESS_WIDTH, false> bias_offset;
 
   // systolic array loop
   ac_int<LOOP_WIDTH, false> loops[2][6];
@@ -167,11 +167,11 @@ struct MatrixParams : BaseParams {
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    m & INPUT_OFFSET;
-    m & INPUT_SCALE_OFFSET;
-    m & WEIGHT_OFFSET;
-    m & WEIGHT_SCALE_OFFSET;
-    m & BIAS_OFFSET;
+    m & input_offset;
+    m & input_scale_offset;
+    m & weight_offset;
+    m & weight_scale_offset;
+    m & bias_offset;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
@@ -259,11 +259,11 @@ struct MatrixParams : BaseParams {
 
   inline friend std::ostream& operator<<(ostream& os,
                                          const MatrixParams& params) {
-    os << "INPUT_OFFSET: " << params.INPUT_OFFSET << std::endl;
-    os << "INPUT_SCALE_OFFSET: " << params.INPUT_SCALE_OFFSET << std::endl;
-    os << "WEIGHT_OFFSET: " << params.WEIGHT_OFFSET << std::endl;
-    os << "WEIGHT_SCALE_OFFSET: " << params.WEIGHT_SCALE_OFFSET << std::endl;
-    os << "BIAS_OFFSET: " << params.BIAS_OFFSET << std::endl;
+    os << "input_offset: " << params.input_offset << std::endl;
+    os << "input_scale_offset: " << params.input_scale_offset << std::endl;
+    os << "weight_offset: " << params.weight_offset << std::endl;
+    os << "weight_scale_offset: " << params.weight_scale_offset << std::endl;
+    os << "bias_offset: " << params.bias_offset << std::endl;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
@@ -363,11 +363,11 @@ struct MatrixParams : BaseParams {
 
   inline friend bool operator==(const MatrixParams& lhs,
                                 const MatrixParams& rhs) {
-    if (lhs.INPUT_OFFSET != rhs.INPUT_OFFSET ||
-        lhs.INPUT_SCALE_OFFSET != rhs.INPUT_SCALE_OFFSET ||
-        lhs.WEIGHT_OFFSET != rhs.WEIGHT_OFFSET ||
-        lhs.WEIGHT_SCALE_OFFSET != rhs.WEIGHT_SCALE_OFFSET ||
-        lhs.BIAS_OFFSET != rhs.BIAS_OFFSET)
+    if (lhs.input_offset != rhs.input_offset ||
+        lhs.input_scale_offset != rhs.input_scale_offset ||
+        lhs.weight_offset != rhs.weight_offset ||
+        lhs.weight_scale_offset != rhs.weight_scale_offset ||
+        lhs.bias_offset != rhs.bias_offset)
       return false;
 
     // Compare the 2D arrays
@@ -427,7 +427,7 @@ struct MatrixParams : BaseParams {
     if (lhs.head_size_power_of_two != rhs.head_size_power_of_two) return false;
 
     // Compare boolean values
-    if (lhs.has_bias != rhs.has_bias || lhs.BIAS_OFFSET != rhs.BIAS_OFFSET)
+    if (lhs.has_bias != rhs.has_bias || lhs.bias_offset != rhs.bias_offset)
       return false;
     if (lhs.has_input_transpose != rhs.has_input_transpose) return false;
     if (lhs.has_weight_transpose != rhs.has_weight_transpose) return false;
@@ -698,7 +698,7 @@ struct VectorParams : BaseParams {
     vector_fetch_2_packing_factor = 1;
 
     output_mode = 1;
-    VECTOR_OUTPUT_OFFSET = 0;
+    vector_output_offset = 0;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         output_loops[i][j] = 0;
@@ -746,7 +746,7 @@ struct VectorParams : BaseParams {
     has_attn_head_permute = false;
 
     quantize_output_mx = false;
-    SCALE_OFFSET = 0;
+    mx_scale_offset = 0;
     use_output_codebook = false;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       output_code[i] = 0;
@@ -800,7 +800,7 @@ struct VectorParams : BaseParams {
 
   // Output address generator
   ac_int<2, false> output_mode;
-  ac_int<ADDRESS_WIDTH, false> VECTOR_OUTPUT_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> vector_output_offset;
   ac_int<LOOP_WIDTH, false> output_loops[2][3];
   ac_int<3, false> output_x_loop_idx[2];
   ac_int<3, false> output_y_loop_idx[2];
@@ -837,7 +837,7 @@ struct VectorParams : BaseParams {
   bool has_attn_head_permute;
 
   bool quantize_output_mx;
-  ac_int<ADDRESS_WIDTH, false> SCALE_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> mx_scale_offset;
 
   bool use_output_codebook;
   ac_int<MAX_DECODED_DTYPE_WIDTH + 1, true>
@@ -934,7 +934,7 @@ struct VectorParams : BaseParams {
 
     // Output address generator
     m & output_mode;
-    m & VECTOR_OUTPUT_OFFSET;
+    m & vector_output_offset;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         m& output_loops[i][j];
@@ -987,7 +987,7 @@ struct VectorParams : BaseParams {
     m & has_attn_head_permute;
 
     m & quantize_output_mx;
-    m & SCALE_OFFSET;
+    m & mx_scale_offset;
 
     m & use_output_codebook;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
@@ -1103,7 +1103,7 @@ struct VectorParams : BaseParams {
        << params.vector_fetch_2_packing_factor << std::endl;
 
     os << "output_mode: " << params.output_mode << std::endl;
-    os << "VECTOR_OUTPUT_OFFSET: " << params.VECTOR_OUTPUT_OFFSET << std::endl;
+    os << "vector_output_offset: " << params.vector_output_offset << std::endl;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         os << "output_loops[" << i << "][" << j
@@ -1159,7 +1159,7 @@ struct VectorParams : BaseParams {
        << std::endl;
 
     os << "quantize_output_mx: " << params.quantize_output_mx << std::endl;
-    os << "SCALE_OFFSET: " << params.SCALE_OFFSET << std::endl;
+    os << "mx_scale_offset: " << params.mx_scale_offset << std::endl;
 
     os << "use_output_codebook: " << params.use_output_codebook << std::endl;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
@@ -1254,7 +1254,7 @@ struct VectorParams : BaseParams {
 
     // Compare output and other members
     if (lhs.output_mode != rhs.output_mode) return false;
-    if (lhs.VECTOR_OUTPUT_OFFSET != rhs.VECTOR_OUTPUT_OFFSET) return false;
+    if (lhs.vector_output_offset != rhs.vector_output_offset) return false;
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 3; j++) {
         if (lhs.output_loops[i][j] != rhs.output_loops[i][j]) return false;
@@ -1306,7 +1306,7 @@ struct VectorParams : BaseParams {
     if (lhs.has_attn_head_permute != rhs.has_attn_head_permute) return false;
 
     if (lhs.quantize_output_mx != rhs.quantize_output_mx) return false;
-    if (lhs.SCALE_OFFSET != rhs.SCALE_OFFSET) return false;
+    if (lhs.mx_scale_offset != rhs.mx_scale_offset) return false;
     if (lhs.use_output_codebook != rhs.use_output_codebook) return false;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       if (lhs.output_code[i] != rhs.output_code[i]) return false;

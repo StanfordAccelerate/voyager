@@ -16,7 +16,10 @@
     },
     {
         "datatype": "MXNF4",
-        "model": "llama_prefill_mp",
+        "model": [
+            "llama_prefill",
+            "llama_prefill_mp"
+        ],
         "sim_type": [
             "systemc",
             "fast-systemc",
@@ -24,44 +27,10 @@
         ],
         "block_size": 32,
         "layers": [
-            "model_layers_0_mlp_down_proj_fused"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": "llama_prefill",
-        "sim_type": [
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 64,
-        "layers": [
-            "permute_default_1_fused",
-            "permute_default_fused",
-            "slice_1",
-            "slice_2_fused",
-            "slice_3",
-            "slice_4_fused"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": "llama_prefill_mp",
-        "sim_type": [
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 64,
-        "layers": [
-            "model_layers_0_mlp_down_proj_fused",
-            "permute_default_1_fused",
-            "permute_default_fused",
-            "slice_1",
-            "slice_2_fused",
-            "slice_3",
-            "slice_4_fused"
+            "slice_tensor",
+            "slice_tensor_1",
+            "slice_tensor_2",
+            "slice_tensor_3"
         ]
     },
     {
@@ -77,16 +46,16 @@
         ],
         "block_size": 32,
         "layers": [
-            "calculate_mx_qparam_default",
-            "calculate_mx_qparam_default_1",
             "index_copy_",
-            "index_copy__1",
-            "model_layers_0_mlp_down_proj_fused"
+            "index_copy__1"
         ]
     },
     {
         "datatype": "MXNF4",
-        "model": "llama_decode",
+        "model": [
+            "llama_prefill",
+            "llama_prefill_mp"
+        ],
         "sim_type": [
             "systemc",
             "fast-systemc",
@@ -94,21 +63,24 @@
         ],
         "block_size": 64,
         "layers": [
-            "calculate_mx_qparam_default",
-            "calculate_mx_qparam_default_1",
-            "index_copy_",
-            "index_copy__1",
-            "permute_default_1_fused",
-            "permute_default_fused",
+            "permute_default",
+            "permute_default_1",
             "slice_1",
             "slice_2_fused",
             "slice_3",
-            "slice_4_fused"
+            "slice_4_fused",
+            "slice_tensor",
+            "slice_tensor_1",
+            "slice_tensor_2",
+            "slice_tensor_3"
         ]
     },
     {
         "datatype": "MXNF4",
-        "model": "llama_decode_mp",
+        "model": [
+            "llama_decode",
+            "llama_decode_mp"
+        ],
         "sim_type": [
             "systemc",
             "fast-systemc",
@@ -116,12 +88,10 @@
         ],
         "block_size": 64,
         "layers": [
-            "calculate_mx_qparam_default_1",
             "index_copy_",
             "index_copy__1",
-            "model_layers_0_mlp_down_proj_fused",
-            "permute_default_1_fused",
-            "permute_default_fused",
+            "permute_default",
+            "permute_default_1",
             "slice_1",
             "slice_2_fused",
             "slice_3",

@@ -69,7 +69,7 @@ void MapMicroscaling(const codegen::Operation &param,
 
   const auto output_memory = output.memory();
   memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
+  vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 1;
 
   vector_params->output_loops[0][0] = input_shape[0];

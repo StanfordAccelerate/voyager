@@ -181,7 +181,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                           }
 
                           send_packed_request<WeightTypes...>(
-                              params.weight_dtype, params.WEIGHT_OFFSET,
+                              params.weight_dtype, params.weight_offset,
                               address, params.weight_burst_size, weight_req);
                           fetcher_done.write(false);
                           if (!params.has_weight_transpose) {
@@ -900,7 +900,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                             k2 * K1 * NCols + k1 * NCols;
 
                         MemoryRequest request = {
-                            params.BIAS_OFFSET + address * Bias::width / 8,
+                            params.bias_offset + address * Bias::width / 8,
                             NCols * Bias::width / 8};
 
                         bias_req.Push(request);

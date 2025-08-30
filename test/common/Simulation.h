@@ -10,7 +10,7 @@
 #include "test/common/operations/Common.h"
 #include "test/compiler/proto/param.pb.h"
 
-void run_accelerator(std::vector<Operation> params, char *memory);
+void run_accelerator(std::vector<Operation> params, DataLoader *memory);
 
 class Simulation {
  public:
@@ -32,7 +32,7 @@ class Simulation {
   Network *network;
   std::vector<Operation> operations;
   std::map<std::string, MemoryInterface *> memories;
-  std::map<std::string, DataLoader *> dataLoaders;
+  std::map<std::string, DataLoader *> dataloaders;
 
  private:
   std::string get_env_var(std::string const &name);

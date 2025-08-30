@@ -28,76 +28,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   static constexpr int LOOP_WIDTH = 16;
   using loop_t = ac_int<LOOP_WIDTH, false>;
 
-  struct MatrixVectorParam {
-    ac_int<32, false> K;
-    ac_int<32, false> C;
-    ac_int<64, false> INPUT_OFFSET;
-    ac_int<64, false> WEIGHT_OFFSET;
-    ac_int<64, false> BIAS_OFFSET;
-    ac_int<64, false> INPUT_SCALE_OFFSET;
-    ac_int<64, false> WEIGHT_SCALE_OFFSET;
-
-    /** \brief Project the route from the instruction. */
-    static MatrixVectorParam from_instructions(const MatrixParams& params) {
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
-      ac_int<32, false> K = K2 * K1;
-      ac_int<32, false> C = C2 * C1;
-      return MatrixVectorParam{K,
-                               C,
-                               params.INPUT_OFFSET,
-                               params.WEIGHT_OFFSET,
-                               params.BIAS_OFFSET,
-                               params.INPUT_SCALE_OFFSET,
-                               params.WEIGHT_SCALE_OFFSET};
-    }
-
-    static const unsigned int width = 32 * 2 + 64 * 5;
-
-#ifndef NO_SYSC
-    template <unsigned int Size>
-    void Marshall(Marshaller<Size>& m) {
-      m & K;
-      m & C;
-      m & INPUT_OFFSET;
-      m & WEIGHT_OFFSET;
-      m & BIAS_OFFSET;
-      m & INPUT_SCALE_OFFSET;
-      m & WEIGHT_SCALE_OFFSET;
-    }
-#endif
-
-    inline friend void sc_trace(sc_trace_file* tf,
-                                const MatrixVectorParam& params,
-                                const std::string& name) {
-      // TODO
-    }
-
-    inline friend std::ostream& operator<<(std::ostream& os,
-                                           const MatrixVectorParam& route) {
-      os << "K: " << route.K << std::endl;
-      os << "C: " << route.C << std::endl;
-      os << "INPUT_OFFSET: " << route.INPUT_OFFSET << std::endl;
-      os << "WEIGHT_OFFSET: " << route.WEIGHT_OFFSET << std::endl;
-      os << "BIAS_OFFSET: " << route.BIAS_OFFSET << std::endl;
-      os << "INPUT_SCALE_OFFSET: " << route.INPUT_SCALE_OFFSET << std::endl;
-      os << "WEIGHT_SCALE_OFFSET: " << route.WEIGHT_SCALE_OFFSET << std::endl;
-      return os;
-    }
-
-    inline friend bool operator==(const MatrixVectorParam& lhs,
-                                  const MatrixVectorParam& rhs) {
-      return (lhs.K == rhs.K) && (lhs.C == rhs.C) &&
-             (lhs.INPUT_OFFSET == rhs.INPUT_OFFSET) &&
-             (lhs.WEIGHT_OFFSET == rhs.WEIGHT_OFFSET) &&
-             (lhs.BIAS_OFFSET == rhs.BIAS_OFFSET) &&
-             (lhs.INPUT_SCALE_OFFSET == rhs.INPUT_SCALE_OFFSET) &&
-             (lhs.WEIGHT_SCALE_OFFSET == rhs.WEIGHT_SCALE_OFFSET);
-    }
-  };
-
   MatrixParamsDeserializer<1> CCS_INIT_S1(params_deserializer);
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(params_in);
@@ -217,13 +147,13 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
         for (ac_int<32, false> c = 0;; c++) {
           (fetch_matrix_input<InputTypes, Width, InputTypes...>(
-               params.input_dtype, params.INPUT_OFFSET, address, input_req),
+               params.input_dtype, params.input_offset, address, input_req),
            ...);
 
 #if SUPPORT_MX
           if (params.is_mx_op) {
             send_input_request<Scale, Width / BS>(
-                params.INPUT_SCALE_OFFSET, address / BS, input_scale_req);
+                params.input_scale_offset, address / BS, input_scale_req);
           }
 #endif
           address += Width;
@@ -236,7 +166,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-      std::cerr << "fetch inputs done" << std::endl;
     }
   }
 
@@ -305,7 +234,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-      std::cerr << "process inputs done" << std::endl;
     }
   }
 #if SUPPORT_MX
@@ -351,7 +279,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-      std::cerr << "process input scales done" << std::endl;
     }
   }
 #endif
@@ -381,13 +308,13 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         for (ac_int<32, false> c = 0;; c++) {
           ac_int<32, false> address = k * C + c * Width;
           (fetch_matrix_input<WeightTypes, Width, WeightTypes...>(
-               params.weight_dtype, params.WEIGHT_OFFSET, address, weight_req),
+               params.weight_dtype, params.weight_offset, address, weight_req),
            ...);
 
 #if SUPPORT_MX
           if (params.is_mx_op) {
             ac_int<32, false> address = k * (C / BS) + c * (Width / BS);
-            send_input_request<Scale, Width / BS>(params.WEIGHT_SCALE_OFFSET,
+            send_input_request<Scale, Width / BS>(params.weight_scale_offset,
                                                   address, weight_scale_req);
           }
 #endif
@@ -400,7 +327,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-      std::cerr << "fetch weights done" << std::endl;
     }
   }
 
@@ -470,7 +396,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-      std::cerr << "process weights done" << std::endl;
     }
   }
 #if SUPPORT_MX
@@ -488,8 +413,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
       loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
       loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
-      ac_int<32, false> loop_bound =
-          K2 * K1 * (C2 * C1 + Width - 1) / Width - 1;
+      loop_t c_bound = (C2 * C1 + Width - 1) / Width;
+      ac_int<32, false> loop_bound = K2 * K1 * c_bound - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -510,8 +435,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-
-      std::cerr << "process weight scales done" << std::endl;
     }
   }
 #endif
@@ -535,7 +458,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_stall_mode flush
       for (ac_int<32, false> k = 0;; k++) {
         send_input_request<Output, VectorUnitWidth>(
-            params.BIAS_OFFSET, k * VectorUnitWidth, bias_req);
+            params.bias_offset, k * VectorUnitWidth, bias_req);
 
         ac_int<Output::width * VectorUnitWidth, false> bits = 0;
         process_matrix_input<Output, VectorUnitWidth, PortWidth,
@@ -573,9 +496,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
     while (true) {
       MatrixParams params = run_accumulation_param.Pop();
-
-      std::cerr << "MatrixVectorUnit params: " << std::endl
-                << params << std::endl;
 
       start_signal.SyncPush();
 
@@ -663,7 +583,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         }
       }
 
-      std::cerr << "run accumulation done" << std::endl;
       done_signal.SyncPush();
     }
   }
@@ -708,8 +627,6 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           break;
         }
       }
-
-      std::cerr << "send outputs done" << std::endl;
     }
   }
 

@@ -21,27 +21,22 @@ inline T *layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
     // In the first pass, scale inputs by 1 / outer_dim
     T normalized_inputs[outer_dim];
     for (int j = 0; j < outer_dim; j++) {
-      T normalized_input = inputs[i * outer_dim + j] * size_inv;
-      normalized_inputs[j] = normalized_input;
+      normalized_inputs[j] = inputs[i * outer_dim + j] * size_inv;
     }
 
-    // Perform a tree addition to compute the mean
-    T mean = 0.0;
-    for (int j = 0; j < outer_dim; j += OC_DIMENSION) {
-      T buffer[OC_DIMENSION];
-      for (int k = 0; k < OC_DIMENSION; k++) {
+    // Compute the mean
+    T sums[2] = {0, 0};
+    int index = 0;
+
+    for (int j = 0; j < outer_dim; j += VECTOR_UNIT_WIDTH) {
+      T buffer[VECTOR_UNIT_WIDTH];
+      for (int k = 0; k < VECTOR_UNIT_WIDTH; k++) {
         buffer[k] = normalized_inputs[j + k];
       }
-
-      int depth = OC_DIMENSION;
-      while (depth > 1) {
-        for (int k = 0; k < depth; k += 2) {
-          buffer[k / 2] = static_cast<T>(buffer[k] + buffer[k + 1]);
-        }
-        depth = depth / 2;
-      }
-      mean += buffer[0];
+      sums[index++ % 2] += tree_reduce(buffer, VECTOR_UNIT_WIDTH);
     }
+
+    T mean = tree_reduce(sums, 2);
 
     // In the second pass, subtract the mean from the tensor and square the
     // result
@@ -51,24 +46,20 @@ inline T *layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
       squares[j] = static_cast<T>(input * input);
     }
 
-    // Perform a tree addition to compute the variance
-    T variance = 0.0;
-    for (int j = 0; j < outer_dim; j += OC_DIMENSION) {
-      T buffer[OC_DIMENSION];
-      for (int k = 0; k < OC_DIMENSION; k++) {
+    // Compute the variance
+    sums[0] = 0;
+    sums[1] = 0;
+    index = 0;
+
+    for (int j = 0; j < outer_dim; j += VECTOR_UNIT_WIDTH) {
+      T buffer[VECTOR_UNIT_WIDTH];
+      for (int k = 0; k < VECTOR_UNIT_WIDTH; k++) {
         buffer[k] = squares[j + k];
       }
-
-      int depth = OC_DIMENSION;
-      while (depth > 1) {
-        for (int k = 0; k < depth; k += 2) {
-          buffer[k / 2] = static_cast<T>(buffer[k] + buffer[k + 1]);
-        }
-        depth = depth / 2;
-      }
-      variance += buffer[0];
+      sums[index++ % 2] += tree_reduce(buffer, VECTOR_UNIT_WIDTH);
     }
 
+    T variance = tree_reduce(sums, 2);
     T divisor = sqrt(outer_dim);
     T stddev_inv = variance.inv_sqrt() * divisor;
 

@@ -192,18 +192,6 @@ std::vector<int> adjust_loop_indices(const std::vector<int> &loops,
   return result;
 }
 
-int pad_shape_to_ndim(std::vector<int> &shape, const int ndim) {
-  const int padding = ndim - shape.size();
-  if (padding < 0) {
-    throw std::invalid_argument("Number of dimensions exceeds the limit!");
-  }
-
-  for (int i = 0; i < padding; i++) {
-    shape.insert(shape.begin(), 1);
-  }
-  return padding;
-}
-
 bool is_transpose(const std::vector<int> &dims) {
   int n = dims.size();
   // If there are fewer than 2 axes, there's nothing to swap.
@@ -265,12 +253,16 @@ std::pair<std::vector<int>, std::vector<int>> factor_out_non_broadcastable_dim(
 
 void update_tensor_shape(codegen::Tensor &tensor,
                          const std::vector<int> &new_shape) {
-  // Clear the existing shape
-  tensor.clear_shape();
-
-  // Add new values from the vector
-  for (int dim : new_shape) {
-    tensor.add_shape(dim);
+  if (is_soc_sim()) {
+    tensor.clear_tiled_shape();
+    for (int dim : new_shape) {
+      tensor.add_tiled_shape(dim);
+    }
+  } else {
+    tensor.clear_shape();
+    for (int dim : new_shape) {
+      tensor.add_shape(dim);
+    }
   }
 }
 
@@ -311,7 +303,7 @@ void set_quantize_params(const codegen::Operation &param,
     }
 
     vector_params->quantize_output_mx = true;
-    vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
+    vector_params->mx_scale_offset = get_address(param.outputs().tensors(0));
 
     if (last_op.kwargs().contains("quant_code")) {
       const auto code = last_op.kwargs().at("quant_code").tensor();

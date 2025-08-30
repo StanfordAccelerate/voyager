@@ -1,8 +1,8 @@
 #pragma once
 
 #include "Common.h"
-#include "test/toolchain/ApproximationConstants.h"
 #include "VectorOps.h"
+#include "test/toolchain/ApproximationConstants.h"
 
 template <typename T>
 inline T *softmax(std::any input_ptr, const std::vector<int> shape) {
@@ -25,32 +25,24 @@ inline T *softmax(std::any input_ptr, const std::vector<int> shape) {
 
     for (int j = 0; j < num_cols; j++) {
       T normalized = static_cast<T>(inputs[offset + j] - max);
-      outputs[offset + j] = poly_approx(normalized,
-          EXP_MAXES,
-          EXP_RANGES,
-          EXP_CLAMP_MIN,
-          EXP_CLAMP_MAX);
+      outputs[offset + j] = poly_approx(normalized, EXP_MAXES, EXP_RANGES,
+                                        EXP_CLAMP_MIN, EXP_CLAMP_MAX);
     }
 
-    // perform a tree addition
-    T sum = 0.0;
-    for (int j = 0; j < num_cols; j += OC_DIMENSION) {
-      T buffer[OC_DIMENSION];
-      for (int k = 0; k < OC_DIMENSION; k++) {
+    T sums[2] = {0, 0};
+    int index = 0;
+
+    for (int j = 0; j < num_cols; j += VECTOR_UNIT_WIDTH) {
+      T buffer[VECTOR_UNIT_WIDTH];
+      for (int k = 0; k < VECTOR_UNIT_WIDTH; k++) {
         buffer[k] = j + k < num_cols ? outputs[offset + j + k] : T(0.0);
       }
-
-      int depth = OC_DIMENSION;
-      while (depth > 1) {
-        for (int k = 0; k < depth; k += 2) {
-          buffer[k / 2] = static_cast<T>(buffer[k] + buffer[k + 1]);
-        }
-        depth = depth / 2;
-      }
-      sum = static_cast<T>(sum + buffer[0]);
+      sums[index++ % 2] += tree_reduce(buffer, VECTOR_UNIT_WIDTH);
     }
 
+    T sum = tree_reduce(sums, 2);
     T divisor = sum.reciprocal();
+
     for (int j = 0; j < num_cols; j++) {
       outputs[offset + j] *= divisor;
     }

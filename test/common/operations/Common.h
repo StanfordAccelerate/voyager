@@ -36,3 +36,15 @@ inline int get_flat_index(const std::vector<int> &indices,
   }
   return flat_idx;
 }
+
+template <typename T>
+inline T tree_reduce(T *buffer, int length) {
+  int depth = length;
+  while (depth > 1) {
+    for (int j = 0; j < depth; j += 2) {
+      buffer[j / 2] = buffer[j] + buffer[j + 1];
+    }
+    depth = depth / 2;
+  }
+  return buffer[0];
+}

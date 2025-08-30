@@ -133,12 +133,12 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
         for (ac_int<32, false> c = 0;; c++) {
           (fetch_matrix_input<InputTypes, BS, InputTypes...>(
-               params.input_dtype, params.INPUT_OFFSET, address, input_req),
+               params.input_dtype, params.input_offset, address, input_req),
            ...);
 
 #if SUPPORT_MX
           if (params.is_mx_op) {
-            send_input_request<Scale, 1>(params.INPUT_SCALE_OFFSET,
+            send_input_request<Scale, 1>(params.input_scale_offset,
                                          address / BS, input_scale_req);
           }
 #endif
@@ -274,14 +274,14 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         ac_int<32, false> offset = k * W;
 
         if (params.has_bias) {
-          send_input_request<Output, W>(params.BIAS_OFFSET, offset, bias_req);
+          send_input_request<Output, W>(params.bias_offset, offset, bias_req);
         }
 
         for (loop_t c2 = 0;; c2++) {
           for (loop_t c1 = 0;; c1++) {
             ac_int<32, false> address = (c2 * C1 + c1) * K + offset;
             (fetch_matrix_input<WeightTypes, W, WeightTypes...>(
-                 params.weight_dtype, params.WEIGHT_OFFSET, address,
+                 params.weight_dtype, params.weight_offset, address,
                  weight_req),
              ...);
 
@@ -296,7 +296,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #if SUPPORT_MX
           if (params.is_mx_op) {
             ac_int<32, false> address = c2 * K + offset;
-            send_input_request<Scale, W>(params.WEIGHT_SCALE_OFFSET, address,
+            send_input_request<Scale, W>(params.weight_scale_offset, address,
                                          weight_scale_req);
           }
 #endif

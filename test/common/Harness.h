@@ -10,49 +10,12 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 #include "test/common/AccessCounter.h"
+#include "test/common/DataLoader.h"
 #include "test/common/Network.h"
 #include "test/common/VerificationTypes.h"
 
 #ifndef CFLOAT
 #include "Accelerator.h"
-
-template <typename T>
-class LoggingCombinational : public Connections::Combinational<T> {
- public:
-  typedef Wrapped<T> WT;
-  static const unsigned int lv_width = T::width;
-  typedef sc_lv<WT::width> lv_bits;
-
-  std::deque<lv_bits> *dataQueue;
-
-  LoggingCombinational()
-      : Connections::Combinational<T>(), dataQueue(new std::deque<lv_bits>) {}
-  explicit LoggingCombinational(const char *name)
-      : Connections::Combinational<T>(name),
-        dataQueue(new std::deque<lv_bits>) {}
-
-  void Push(const T &m) {
-    Marshaller<WT::width> marshaller;
-    WT wt(m);
-    wt.Marshall(marshaller);
-    lv_bits bits = marshaller.GetResult();
-
-    dataQueue->push_back(bits);
-    Connections::Combinational<T>::Push(m);
-  }
-
-  T Pop() {
-    T m = Connections::Combinational<T>::Pop();
-    Marshaller<WT::width> marshaller;
-    WT wt(m);
-    wt.Marshall(marshaller);
-    lv_bits bits = marshaller.GetResult();
-    dataQueue->push_back(bits);
-    return m;
-  }
-
-  std::deque<lv_bits> *getDataQueue() { return dataQueue; }
-};
 
 SC_MODULE(Harness) {
   sc_clock CCS_INIT_S1(clk);
@@ -61,7 +24,7 @@ SC_MODULE(Harness) {
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
       serialMatrixParamsIn);
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serialVectorParamsIn);
+      serial_vector_params_in);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(inputAddressRequest);
   sc_fifo<IC_PORT_TYPE> inputDataResponse_fifo;
@@ -157,17 +120,21 @@ SC_MODULE(Harness) {
 
   Connections::SyncChannel CCS_INIT_S1(matrixUnitStartSignal);
   Connections::SyncChannel CCS_INIT_S1(matrixUnitDoneSignal);
-  Connections::SyncChannel CCS_INIT_S1(vectorUnitStartSignal);
-  Connections::SyncChannel CCS_INIT_S1(vectorUnitDoneSignal);
+  Connections::SyncChannel CCS_INIT_S1(vector_unit_start_signal);
+  Connections::SyncChannel CCS_INIT_S1(vector_unit_done_signal);
 
-  Harness(sc_module_name, std::vector<Operation>, char *);
+  Connections::SyncChannel CCS_INIT_S1(tile_done);
+  Connections::SyncChannel CCS_INIT_S1(operation_done);
+
+  std::deque<sc_time> start_times;
+  std::deque<sc_time> operation_start_times;
+
+  Harness(sc_module_name, std::vector<Operation>, DataLoader *);
   SC_HAS_PROCESS(Harness);
 
  private:
   std::vector<Operation> operations;
-  Operation currentOperation;
-  char *memory;
-  AcceleratorMemoryMap currentMemoryMap;
+  DataLoader *dataloader;
   AccessCounter *accessCounter;
 
 #ifdef SIM_Accelerator
@@ -177,62 +144,67 @@ SC_MODULE(Harness) {
 #endif
 
   template <int Width>
-  void readMemoryRequest(
+  void process_read_request(
       Connections::Combinational<MemoryRequest> * request_out,
       sc_fifo<ac_int<Width, false>> * data_fifo);
 
   template <int Width>
-  void sendMemoryResponse(
+  void send_data_response(
       sc_fifo<ac_int<Width, false>> * data_fifo,
       Connections::Combinational<ac_int<Width, false>> * response);
 
   template <int Width>
-  void storeMemoryResponse(
+  void process_write_request(
       Connections::Combinational<ac_int<Width, false>> * data_out,
       Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> * address_out);
 
-  void readRequestInputs();
-  void sendResponseInputs();
-
-  void readRequestInputScale();
-  void sendResponseInputScale();
-
-  void readRequestWeights();
-  void sendResponseWeights();
-
-  void readRequestWeightScale();
-  void sendResponseWeightScale();
-
-  void readRequestBias();
-  void sendResponseBias();
-
-  void readRequestMatrixVectorInput();
-  void sendResponseMatrixVectorInput();
-  void readRequestMatrixVectorWeight();
-  void sendResponseMatrixVectorWeight();
-  void readRequestMatrixVectorBias();
-  void sendResponseMatrixVectorBias();
+  void read_input_request();
+  void send_input_response();
+  void read_weight_request();
+  void send_weight_response();
+  void read_bias_request();
+  void send_bias_response();
 
 #if SUPPORT_MX
-  void readRequestMatrixVectorInputScale();
-  void sendResponseMatrixVectorInputScale();
-  void readRequestMatrixVectorWeightScale();
-  void sendResponseMatrixVectorWeightScale();
+  void read_input_scale_request();
+  void send_input_scale_response();
+  void read_weight_scale_request();
+  void send_weight_scale_response();
 #endif
 
-  void readRequestVector0();
-  void sendResponseVector0();
+  void read_matrix_vector_unit_input_request();
+  void send_matrix_vector_unit_input_response();
+  void read_matrix_vector_unit_weight_request();
+  void send_matrix_vector_unit_weight_response();
+  void read_matrix_vector_unit_bias_request();
+  void send_matrix_vector_unit_bias_response();
 
-  void readRequestVector1();
-  void sendResponseVector1();
+#if SUPPORT_MX
+  void read_matrix_vector_unit_input_scale_request();
+  void send_matrix_vector_unit_input_scale_response();
+  void read_matrix_vector_unit_weight_scale_request();
+  void send_matrix_vector_unit_weight_scale_response();
+#endif
 
-  void readRequestVector2();
-  void sendResponseVector2();
+  void read_vector_fetch_0_request();
+  void send_vector_fetch_0_response();
+  void read_vector_fetch_1_request();
+  void send_vector_fetch_1_response();
+  void read_vector_fetch_2_request();
+  void send_vector_fetch_2_response();
 
-  void storeVectorOutputs();
-  void storeScalarOutputs();
+  void store_vector_outputs();
+  void store_scale_outputs();
 
   void reset();
-  void sendParams();
+  void param_sender();
+  void start_monitor();
+  void done_monitor();
+
+  void send_params(const std::deque<BaseParams *> &params);
+  void record_start(const std::deque<BaseParams *> &params,
+                    const Operation &operation, bool is_first);
+  void record_done(const std::deque<BaseParams *> &params,
+                   const Operation &operation, int runtime_scale, bool is_last);
 };
 #endif

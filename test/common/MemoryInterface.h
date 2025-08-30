@@ -31,7 +31,7 @@ class MemoryInterface {
     }
 
     const uint64_t address = get_address(tensor);
-    const int partition = tensor.memory().partition();
+    const int partition = get_partition(tensor);
     const int size = get_size(tensor, false);
 
     int num_bytes = (size * T::width + 7) / 8;
@@ -119,7 +119,7 @@ class MemoryInterface {
     }
 
     const uint64_t address = get_address(tensor);
-    const int partition = tensor.memory().partition();
+    const int partition = get_partition(tensor);
     const int size = get_size(tensor, false);
     T* casted = std::any_cast<T*>(data);
 
@@ -169,14 +169,11 @@ class MemoryInterface {
   }
 
   template <typename T>
-  bool write_value_to_memory(const codegen::Tensor& tensor, const int index,
-                             T value) {
-    if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+  bool read_value_with_type(const int partition, const int address,
+                            const int index, std::string dtype, float& value) {
+    if (dtype != DataTypes::TypeName<T>::name()) {
       return false;
     }
-
-    const uint64_t address = get_address(tensor);
-    const int partition = tensor.memory().partition();
 
     int start = index * T::width / 8;
     int end = (index + 1) * T::width / 8;
@@ -186,12 +183,62 @@ class MemoryInterface {
     int bits_remaining = num_bytes * 8 - T::width - offset;
     num_bytes = num_bytes - bits_remaining / 8;
 
-    constexpr int buf_width = (T::width / 8 + 2) * 8;
-    ac_int<buf_width, false> bytes = value.bits_rep();
-    ac_int<buf_width, false> masks = ((1UL << T::width) - 1);
+    char buffer[num_bytes];
+    read_bytes_from_memory(address + start, partition, num_bytes, buffer);
 
-    bytes = bytes << offset;
-    masks = masks << offset;
+    constexpr int buf_width = (T::width / 8 + 2) * 8;
+    ac_int<buf_width, false> bits;
+    for (int i = 0; i < num_bytes; i++) {
+      bits.set_slc(i * 8, static_cast<ac_int<8, false>>(buffer[i]));
+    }
+
+    T typed;
+    typed.set_bits(bits >> offset);
+
+    value = static_cast<float>(typed);
+
+    return true;
+  }
+
+  template <typename... Ts>
+  void read_value_helper(const int partition, const int address,
+                         const int index, std::string dtype, float& value) {
+    bool matched =
+        (read_value_with_type<Ts>(partition, address, index, dtype, value) ||
+         ...);
+    if (!matched) {
+      throw std::runtime_error("Dataloader: Unsupported tensor dtype: " +
+                               dtype);
+    }
+  }
+
+  float read_value(const int partition, const int address, const int index,
+                   std::string dtype) {
+    float value;
+    read_value_helper<SUPPORTED_TYPES>(partition, address, index, dtype, value);
+    return value;
+  }
+
+  template <typename T>
+  bool write_value_with_type(const int partition, const int address,
+                             const int index, std::string dtype, T value) {
+    if (dtype != DataTypes::TypeName<T>::name()) {
+      return false;
+    }
+
+    int start = index * T::width / 8;
+    int end = (index + 1) * T::width / 8;
+    int num_bytes = (end - start + 1) * 8;
+    int offset = (index * T::width) % 8;
+
+    int bits_remaining = num_bytes * 8 - T::width - offset;
+    num_bytes = num_bytes - bits_remaining / 8;
+
+    constexpr int buf_width = (T::width / 8 + 2) * 8;
+    ac_int<buf_width, false> bits = ((ac_int<buf_width, false>)value.bits_rep())
+                                    << offset;
+    ac_int<buf_width, false> masks =
+        ((ac_int<buf_width, false>(1) << T::width) - 1) << offset;
 
     char buffer[num_bytes];
 
@@ -200,7 +247,7 @@ class MemoryInterface {
 
     for (int i = 0; i < num_bytes; i++) {
       char mask = masks.template slc<8>(i * 8);
-      char new_data = bytes.template slc<8>(i * 8) & mask;
+      char new_data = bits.template slc<8>(i * 8) & mask;
       char orig_data = buffer[i] & ~mask;
       buffer[i] = new_data | orig_data;
     }
@@ -211,17 +258,21 @@ class MemoryInterface {
   }
 
   template <typename... Ts>
-  void write_data_helper(const codegen::Tensor& tensor, int index,
-                         float value) {
-    bool matched = (write_value_to_memory<Ts>(tensor, index, value) || ...);
+  void write_value_helper(const int partition, const int address,
+                          const int index, std::string dtype, float value) {
+    bool matched =
+        (write_value_with_type<Ts>(partition, address, index, dtype, value) ||
+         ...);
     if (!matched) {
       throw std::runtime_error("Dataloader: Unsupported tensor dtype: " +
-                               tensor.dtype());
+                               dtype);
     }
   }
 
-  void write_data(const codegen::Tensor& tensor, int index, float value) {
-    write_data_helper<SUPPORTED_TYPES>(tensor, index, value);
+  void write_value(const int partition, const int address, const int index,
+                   std::string dtype, float value) {
+    write_value_helper<SUPPORTED_TYPES>(partition, address, index, dtype,
+                                        value);
   }
 
   std::map<std::string, std::any> get_args(const codegen::Operation& param) {
@@ -233,7 +284,7 @@ class MemoryInterface {
       for (const auto [key, value] : op.kwargs()) {
         if (value.has_tensor() &&
             (value.tensor().has_memory() || get_size(value.tensor()) == 1)) {
-          spdlog::debug("Pushing tensor: {}\n", value.tensor().node());
+          spdlog::debug("Reading tensor: {}\n", value.tensor().node());
           kwargs[value.tensor().node()] = read_tensor(value.tensor());
         }
       }
@@ -245,7 +296,16 @@ class MemoryInterface {
   std::vector<std::any> get_outputs(const codegen::Operation& param) {
     const auto tensors = get_op_outputs(param);
     std::vector<std::any> outputs;
-    for (const auto& tensor : tensors) {
+    for (auto tensor : tensors) {
+      // HACK: set scratch location to main memory
+      if (is_soc_sim()) {
+        auto memory = tensor.memory();
+        auto scratchpad = tensor.mutable_scratchpad();
+        scratchpad->set_partition(memory.partition());
+        scratchpad->set_address(memory.address());
+        tensor.clear_tiled_shape();
+      }
+
       outputs.push_back(read_tensor(tensor));
     }
     return outputs;
@@ -257,19 +317,19 @@ class MemoryInterface {
 
     uint64_t address = 0;
 
-    for (const auto& tensor : tensors) {
-      codegen::Tensor tensor_copy;
-      tensor_copy.CopyFrom(tensor);
-      auto memory = tensor_copy.mutable_memory();
-      memory->set_partition(-1);
-
+    for (auto tensor : tensors) {
+      tensor.clear_tiled_shape();
       if (is_soc_sim()) {
-        tensor_copy.mutable_scratchpad()->set_offset(address);
+        auto scratchpad = tensor.mutable_scratchpad();
+        scratchpad->set_partition(-1);
+        scratchpad->set_address(address);
       } else {
-        tensor_copy.mutable_memory()->set_address(address);
+        auto memory = tensor.mutable_memory();
+        memory->set_partition(-1);
+        memory->set_address(address);
       }
 
-      outputs.push_back(read_tensor(tensor_copy));
+      outputs.push_back(read_tensor(tensor));
       address += get_size(tensor);
     }
 

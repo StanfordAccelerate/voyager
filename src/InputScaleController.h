@@ -204,7 +204,7 @@ SC_MODULE(InputScaleController) {
                               }
 
                               send_input_request<Scale, 1>(
-                                  params.INPUT_SCALE_OFFSET, address,
+                                  params.input_scale_offset, address,
                                   scale_req);
                             }
 

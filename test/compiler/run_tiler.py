@@ -1,6 +1,7 @@
 import argparse
 import interstellar
 import math
+import os
 
 from google.protobuf import text_format
 
@@ -276,14 +277,22 @@ def main():
             print(f"Unsupported operation: {matrix_op.target}, skipping")
             continue
 
+        def get_shape(tensor):
+            return (
+                tensor.tiled_shape
+                if "SOC_SIM" in os.environ and tensor.tiled_shape
+                else tensor.shape
+            )
+
         # FC doesn't need tiling
         input = matrix_op.kwargs["input"].tensor
-        if math.prod(input.shape[:-1]) == 1:
+        input_shape = get_shape(input)
+        if math.prod(input_shape[:-1]) == 1:
             print(f"Skipping {param_name} as it is a fully connected layer with no tiling")
             continue
 
         # Skip first layer of torchvision models
-        if matrix_op.target in ["conv2d", "conv2d_mx"] and input.shape[-1] == 3:
+        if matrix_op.target in ["conv2d", "conv2d_mx"] and input_shape[-1] == 3:
             print(f"Skipping {param_name} as it is a 3-channel input")
             continue
 
@@ -294,7 +303,7 @@ def main():
         if weight.HasField("reshape"):
             weights_shape = weight.reshape.kwargs["output_shape"].int_list.values
         else:
-            weights_shape = weight.shape
+            weights_shape = get_shape(weight)
 
         output = param.output if param.HasField("output") else param.outputs.tensors[1]
 
@@ -302,7 +311,7 @@ def main():
         if output.HasField("reshape"):
             output_shape = matrix_op.kwargs["input"].tensor.shape
         else:
-            output_shape = output.shape
+            output_shape = get_shape(output)
 
         if matrix_op.target in ["conv2d", "conv2d_mx"]:
             assert len(weights_shape) == 4, "Expected weights shape to be 4D for convolution"

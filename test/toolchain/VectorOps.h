@@ -184,6 +184,7 @@ void MapVectorOperations(const codegen::Operation &param,
 
   // Use the original shape without permute/slice
   auto input_shape = get_shape(input, false);
+  const int input_ndim = input_shape.size();
 
   if (input.has_reshape() ||
       MEMORY_OPS.find(op_list[0].target()) != MEMORY_OPS.end()) {
@@ -263,16 +264,16 @@ void MapVectorOperations(const codegen::Operation &param,
     int dim0 = reshape_kwargs.at("dim0").int_value();
     int dim1 = reshape_kwargs.at("dim1").int_value();
 
-    dim0 = dim0 < 0 ? dim0 + input.shape_size() : dim0;
-    dim1 = dim1 < 0 ? dim1 + input.shape_size() : dim1;
+    dim0 = dim0 < 0 ? dim0 + input_ndim : dim0;
+    dim1 = dim1 < 0 ? dim1 + input_ndim : dim1;
 
     if (dim0 > dim1) {
       std::swap(dim0, dim1);
     }
 
-    if (dim0 == input.shape_size() - 2 && dim1 == input.shape_size() - 1) {
+    if (dim0 == input_ndim - 2 && dim1 == input_ndim - 1) {
       vector_params->has_transpose = true;
-    } else if (dim1 != input.shape_size() - 1) {
+    } else if (dim1 != input_ndim - 1) {
       vector_params->has_permute = true;
     } else {
       throw std::invalid_argument("Unsupported transpose operation!");
@@ -312,7 +313,7 @@ void MapVectorOperations(const codegen::Operation &param,
     const int BUFSIZE =
         std::min({1024 / OC_DIMENSION, OC_DIMENSION, VECTOR_UNIT_WIDTH});
 
-    std::vector<int> input_shape(input.shape().begin(), input.shape().end());
+    auto input_shape = get_shape(input, false);
     input_shape = squeeze_shape(input_shape);
     int padded_dims = pad_shape_to_ndim(input_shape, 3);
 
@@ -382,7 +383,7 @@ void MapVectorOperations(const codegen::Operation &param,
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  vector_params->VECTOR_OUTPUT_OFFSET = get_address(output);
+  vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
 
   auto output_shape = get_shape(output);
@@ -544,7 +545,7 @@ void MapVectorOperations(const codegen::Operation &param,
       }
 
       vector_params->quantize_output_mx = true;
-      vector_params->SCALE_OFFSET = get_address(param.outputs().tensors(0));
+      vector_params->mx_scale_offset = get_address(param.outputs().tensors(0));
 
       // Copy coefficients from ApproximationConstants.h
     } else if (opcode == "gelu" || opcode == "gelu_") {

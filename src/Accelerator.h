@@ -91,7 +91,7 @@ SC_MODULE(Accelerator) {
              VECTOR_UNIT_WIDTH, OC_DIMENSION>
       CCS_INIT_S1(vector_unit);
 
-  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialVectorParamsIn);
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_vector_params_in);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_req);
@@ -112,8 +112,8 @@ SC_MODULE(Accelerator) {
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       scalar_output_address);
 
-  Connections::SyncOut CCS_INIT_S1(vectorUnitStartSignal);
-  Connections::SyncOut CCS_INIT_S1(vectorUnitDoneSignal);
+  Connections::SyncOut CCS_INIT_S1(vector_unit_start_signal);
+  Connections::SyncOut CCS_INIT_S1(vector_unit_done_signal);
 
   SC_CTOR(Accelerator) {
     matrixUnit.clk(clk);
@@ -173,7 +173,7 @@ SC_MODULE(Accelerator) {
 
     vector_unit.clk(clk);
     vector_unit.rstn(rstn);
-    vector_unit.serial_params_in(serialVectorParamsIn);
+    vector_unit.serial_params_in(serial_vector_params_in);
     vector_unit.vector_fetch_0_req(vector_fetch_0_req);
     vector_unit.vector_fetch_0_resp(vector_fetch_0_resp);
     vector_unit.vector_fetch_1_req(vector_fetch_1_req);
@@ -184,8 +184,8 @@ SC_MODULE(Accelerator) {
     vector_unit.vector_address_out(vector_output_address);
     vector_unit.scale_out(scalar_output);
     vector_unit.scale_address_out(scalar_output_address);
-    vector_unit.start(vectorUnitStartSignal);
-    vector_unit.done(vectorUnitDoneSignal);
+    vector_unit.start(vector_unit_start_signal);
+    vector_unit.done(vector_unit_done_signal);
     vector_unit.matrix_unit_output(matrixUnitOutput);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER

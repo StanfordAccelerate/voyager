@@ -137,7 +137,6 @@ using F9 = StdFloat<3, 5>;
 #define OC_PORT_WIDTH (OC_DIMENSION * 4)
 #define VECTOR_UNIT_WIDTH 16
 #define MV_UNIT_WIDTH (OC_DIMENSION * 2)
-#define MVU_SCALE_PORT_WIDTH (SCALE_DATATYPE::width * 2)
 
 #define SUPPORT_MX true
 #define SUPPORT_CODEBOOK_QUANT true
@@ -186,6 +185,9 @@ using F9 = StdFloat<3, 5>;
 #ifndef VECTOR_UNIT_WIDTH
 #define VECTOR_UNIT_WIDTH OC_DIMENSION
 #endif
+
+#define MVU_SCALE_PORT_WIDTH \
+  (SCALE_DATATYPE::width * MV_UNIT_WIDTH / OC_DIMENSION)
 
 // ================================================================
 // Default Datatypes

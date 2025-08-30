@@ -210,11 +210,6 @@ SC_MODULE(VectorUnit) {
     output_controller.scale_address_out(scale_address_out);
     output_controller.done(done);
 
-    // Param / Instruction handling
-    SC_THREAD(read_params);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
     SC_THREAD(send_instructions);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -228,22 +223,6 @@ SC_MODULE(VectorUnit) {
     async_reset_signal_is(rstn, false);
   }
 
-  void read_params() {
-    vector_params.ResetRead();
-    vector_fetch_params.ResetWrite();
-    output_controller_params.ResetWrite();
-    send_output_params.ResetWrite();
-
-    wait();
-
-    while (true) {
-      VectorParams params = vector_params.Pop();
-      vector_fetch_params.Push(params);
-      output_controller_params.Push(params);
-      send_output_params.Push(params);
-    }
-  }
-
   void send_instructions() {
     vector_instruction.ResetRead();
     pipeline_instr.ResetWrite();
@@ -252,35 +231,46 @@ SC_MODULE(VectorUnit) {
     approx_unit_config.ResetWrite();
     output_instruction.ResetWrite();
 
+    vector_params.ResetRead();
+    vector_fetch_params.ResetWrite();
+    output_controller_params.ResetWrite();
+    send_output_params.ResetWrite();
+
     start.Reset();
 
     wait();
 
     while (true) {
-      VectorInstructionConfig vector_inst_config = vector_instruction.Pop();
-      output_instruction.Push(vector_inst_config);
+      VectorParams params = vector_params.Pop();
+      VectorInstructionConfig instruction_config = vector_instruction.Pop();
+
       start.SyncPush();
+
+      vector_fetch_params.Push(params);
+      output_controller_params.Push(params);
+      send_output_params.Push(params);
+      output_instruction.Push(instruction_config);
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (decltype(vector_inst_config.instLoopCount) loop = 0;; loop++) {
-        for (decltype(vector_inst_config.instLen) i = 0;; i++) {
-          VectorInstructions inst = vector_inst_config.inst[i];
+      for (decltype(instruction_config.instLoopCount) loop = 0;; loop++) {
+        for (decltype(instruction_config.instLen) i = 0;; i++) {
+          VectorInstructions inst = instruction_config.inst[i];
 
           if (inst.op_type == VectorInstructions::vector) {
             pipeline_instr.Push(inst);
-            approx_unit_config.Push(vector_inst_config.approx);
+            approx_unit_config.Push(instruction_config.approx);
           } else if (inst.op_type == VectorInstructions::accumulation) {
             accumulator_instr.Push(inst);
           } else {
             reducer_instr.Push(inst);
           }
 
-          if (i == vector_inst_config.instLen - 1) {
+          if (i == instruction_config.instLen - 1) {
             break;
           }
         }
-        if (loop == vector_inst_config.instLoopCount - 1) {
+        if (loop == instruction_config.instLoopCount - 1) {
           break;
         }
       }
@@ -324,8 +314,8 @@ SC_MODULE(VectorUnit) {
     wait();
 
     while (1) {
-      VectorInstructionConfig vector_inst_config = output_instruction.Pop();
       VectorParams params = send_output_params.Pop();
+      VectorInstructionConfig instruction_config = output_instruction.Pop();
 
       constexpr int packing_factor = OcDimension / Width;
 
@@ -336,8 +326,8 @@ SC_MODULE(VectorUnit) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (decltype(vector_inst_config.instLen) i = 0;; i++) {
-        VectorInstructions inst = vector_inst_config.inst[i];
+      for (decltype(instruction_config.instLen) i = 0;; i++) {
+        VectorInstructions inst = instruction_config.inst[i];
 
         if (inst.vdest == VectorInstructions::to_output ||
             inst.rdest == VectorInstructions::to_memory) {
@@ -371,7 +361,7 @@ SC_MODULE(VectorUnit) {
           }
           break;
         }
-        if (i == vector_inst_config.instLen - 1) {
+        if (i == instruction_config.instLen - 1) {
           break;
         }
       }

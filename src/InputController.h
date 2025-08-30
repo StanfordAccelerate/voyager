@@ -243,7 +243,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                               }
 
                               send_packed_request<InputTypes...>(
-                                  params.input_dtype, params.INPUT_OFFSET,
+                                  params.input_dtype, params.input_offset,
                                   address, params.input_burst_size, input_req);
                               fetcher_done.write(false);
 

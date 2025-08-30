@@ -135,7 +135,7 @@ SC_MODULE(WeightScaleController) {
                                 c / BLOCK_SIZE * c_stride + k;
 
                             send_input_request<Scale, NCols>(
-                                params.WEIGHT_SCALE_OFFSET, address,
+                                params.weight_scale_offset, address,
                                 weight_scale_req);
                           }
 

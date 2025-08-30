@@ -391,7 +391,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
 
 // template <typename Input, typename Weight, typename Psum, typename Output,
 //           typename Scale, int N>
-// inline Output *simd_matrix_vector_multiply(
+// inline Output *gemv(
 //     std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
 //     std::any weight_scale_ptr, std::any bias_ptr, const Operation &operation)
 //     {
@@ -475,10 +475,12 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
 
 template <typename Input, typename Weight, typename Psum, typename Output,
           typename Scale, int N>
-inline Output *simd_matrix_vector_multiply(
-    std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
-    std::any weight_scale_ptr, std::any bias_ptr, const Operation &operation) {
-  spdlog::debug("Performing SIMD matrix-vector multiply\n");
+inline Output *gemv(std::any input_ptr, std::any input_scale_ptr,
+                    std::any weight_ptr, std::any weight_scale_ptr,
+                    std::any bias_ptr, const Operation &operation) {
+  spdlog::debug("Performing matrix-vector multiply\n");
+
+  const int FEEDBACK_DELAY = 4;
 
   const auto op_list = get_op_list(operation.param);
   const auto matrix_op = op_list.front();
@@ -508,6 +510,11 @@ inline Output *simd_matrix_vector_multiply(
   }
 
   for (int k = 0; k < K; k++) {
+    Output psums[FEEDBACK_DELAY];
+    for (int i = 0; i < FEEDBACK_DELAY; i++) {
+      psums[i] = Output::zero();
+    }
+
     for (int c = 0; c < num_tiles; c++) {
       Psum product[N];
       for (int i = 0; i < N; i++) {
@@ -527,14 +534,7 @@ inline Output *simd_matrix_vector_multiply(
           buffer[j] = product[i * block_size + j];
         }
 
-        // perform a tree addition
-        int depth = block_size;
-        while (depth > 1) {
-          for (int j = 0; j < depth; j += 2) {
-            buffer[j / 2] = static_cast<Psum>(buffer[j] + buffer[j + 1]);
-          }
-          depth = depth / 2;
-        }
+        Psum reduced_val = tree_reduce(buffer, block_size);
 
         if (input_scales && weight_scales) {
           Scale input_scale = input_scales[c * num_blocks + i];
@@ -542,22 +542,18 @@ inline Output *simd_matrix_vector_multiply(
               weight_scales[k * C / block_size + c * num_blocks + i];
           output_block[i] = static_cast<Output>(input_scale) *
                             static_cast<Output>(weight_scale) *
-                            static_cast<Output>(buffer[0]);
+                            static_cast<Output>(reduced_val);
         } else {
           output_block[i] = static_cast<Output>(product[0]);
         }
       }
 
-      // perform a tree addition for the output blocks
-      int depth = num_blocks;
-      while (depth > 1) {
-        for (int i = 0; i < depth; i += 2) {
-          output_block[i / 2] = output_block[i] + output_block[i + 1];
-        }
-        depth = depth / 2;
-      }
-      outputs[k] += output_block[0];
+      // tree reduce over output blocks
+      psums[c % FEEDBACK_DELAY] += tree_reduce(output_block, num_blocks);
     }
+
+    // tree reduce psums
+    outputs[k] = tree_reduce(psums, FEEDBACK_DELAY);
 
     if (biases != nullptr) {
       outputs[k] += biases[k];

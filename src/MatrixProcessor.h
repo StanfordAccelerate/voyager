@@ -46,6 +46,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   Connections::Fifo<Pack1D<Buffer, NCols>, FIFO_DEPTH> CCS_INIT_S1(
       accumulation_fifo);
+  Connections::Combinational<Pack1D<Buffer, NCols>> accumulation_enq;
+  Connections::Combinational<Pack1D<Buffer, NCols>> accumulation_deq;
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
@@ -71,17 +73,20 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   Connections::In<MatrixParams> CCS_INIT_S1(paramsIn);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(push_weights_params);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(
-      process_accumulation_param);
-  Connections::Combinational<MatrixParams> CCS_INIT_S1(write_back_params);
+
+  Connections::Fifo<MatrixParams, 1> CCS_INIT_S1(
+      process_accumulation_params_fifo);
+  Connections::Combinational<MatrixParams> process_accumulation_params_enq;
+  Connections::Combinational<MatrixParams> process_accumulation_params_deq;
+
+  Connections::Fifo<MatrixParams, 1> CCS_INIT_S1(write_back_params_fifo);
+  Connections::Combinational<MatrixParams> write_back_params_enq;
+  Connections::Combinational<MatrixParams> write_back_params_deq;
 
   Connections::Combinational<PEInput<Input>> inputsToSystolicArray[NRows];
   Connections::Combinational<PEWeight<Weight>> weightsToSystolicArray[NCols];
   Connections::Combinational<Psum> psumsToSystolicArray[NCols];
   Connections::Combinational<Psum> outputsFromSystolicArray[NCols];
-
-  Connections::Combinational<Pack1D<Buffer, NCols>> accumulation_enq;
-  Connections::Combinational<Pack1D<Buffer, NCols>> accumulation_deq;
 
 #if SUPPORT_MX
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(inputScaleChannel);
@@ -130,6 +135,16 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     accumulation_fifo.rst(rstn);
     accumulation_fifo.enq(accumulation_enq);
     accumulation_fifo.deq(accumulation_deq);
+
+    process_accumulation_params_fifo.clk(clk);
+    process_accumulation_params_fifo.rst(rstn);
+    process_accumulation_params_fifo.enq(process_accumulation_params_enq);
+    process_accumulation_params_fifo.deq(process_accumulation_params_deq);
+
+    write_back_params_fifo.clk(clk);
+    write_back_params_fifo.rst(rstn);
+    write_back_params_fifo.enq(write_back_params_enq);
+    write_back_params_fifo.deq(write_back_params_deq);
 
     SC_THREAD(push_weights);
     sensitive << clk.pos();
@@ -255,8 +270,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     inputsChannel.Reset();
     psumOutSkewerDout.ResetRead();
     push_weights_params.ResetWrite();
-    process_accumulation_param.ResetWrite();
-    write_back_params.ResetWrite();
+    process_accumulation_params_enq.ResetWrite();
+    write_back_params_enq.ResetWrite();
     inputSkewerDin.ResetWrite();
 
     startSignal.Reset();
@@ -266,8 +281,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = paramsIn.Pop();
       push_weights_params.Push(params);
-      process_accumulation_param.Push(params);
-      write_back_params.Push(params);
+      process_accumulation_params_enq.Push(params);
+      write_back_params_enq.Push(params);
 
       startSignal.SyncPush();
 
@@ -365,7 +380,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   }
 
   void process_accumulation() {
-    process_accumulation_param.ResetRead();
+    process_accumulation_params_deq.ResetRead();
     psumOutSkewerDout.ResetRead();
 #if SUPPORT_MX
     inputScaleChannel.Reset();
@@ -385,7 +400,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     wait();
 
     while (true) {
-      const MatrixParams params = process_accumulation_param.Pop();
+      const MatrixParams params = process_accumulation_params_deq.Pop();
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
@@ -557,7 +572,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   }
 
   void write_back() {
-    write_back_params.ResetRead();
+    write_back_params_deq.ResetRead();
     accumulation_deq.ResetRead();
     accumulation_buffer_write_request[0].Reset();
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
@@ -573,7 +588,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     wait();
 
     while (true) {
-      const MatrixParams params = write_back_params.Pop();
+      const MatrixParams params = write_back_params_deq.Pop();
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
