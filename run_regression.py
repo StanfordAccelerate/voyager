@@ -50,6 +50,13 @@ ACCURACY_RESULTS = {
         "MXINT8": 83.3,
         "P8_1": 84.1,
     },
+    "mobilenet_v2": {
+        "E4M3":  62.0,
+        "CFLOAT": 70.0,
+        "INT8": 66.0,
+        "MXINT8": 70.0,
+        "P8_1": 63.0,
+    },
 }
 
 

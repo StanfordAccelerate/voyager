@@ -65,9 +65,9 @@ $(CODEGEN_DIR)/networks/segformer/%/model.txt: quantized-training/test/test_code
 	mkdir -p $(dir $@)
 	python -u quantized-training/test/test_codegen.py segformer $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
-$(CODEGEN_DIR)/networks/mobilenet_v2/%/model.txt: voyager-compiler/test/test_codegen.py
+$(CODEGEN_DIR)/networks/mobilenet_v2/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py mobilenet_v2 $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py mobilenet_v2 $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
 
 ################################################################################
 # Gesture
