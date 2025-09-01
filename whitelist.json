@@ -101,7 +101,7 @@
     {
         "datatype": "MXINT8",
         "model": [
-            "mobilenet_v2",
+            "mobilenet_v2"
         ],
         "sim_type": [
             "systemc",
@@ -111,7 +111,7 @@
         "block_size": "*",
         "layers": [
             "pad_default",
-            "slice_tensor_fused",
+            "slice_tensor_fused"
         ]
     }
 ]
