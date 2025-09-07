@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import json
+import math
 import multiprocessing as mp
 import os
 import subprocess
@@ -703,17 +704,12 @@ def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
         params_dict = MessageToDict(params, preserving_proto_field_name=True)
 
         def delete_nested_keys(data, key):
-            # if the current element is a dict
             if isinstance(data, dict):
-                # use list() to create a copy, avoiding modifying the dictionary while iterating
                 for k in list(data.keys()):
                     if k == key:
                         del data[k]
                     else:
-                        # recursively check the value of the current key
                         delete_nested_keys(data[k], key)
-
-            # if the current element is a list
             elif isinstance(data, list):
                 for item in data:
                     delete_nested_keys(item, key)
@@ -736,17 +732,26 @@ def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
             delete_nested_keys(op, "scratchpad")
             delete_nested_keys(op, "node")
 
+            if "op" in op:
+                kwargs = op["op"]["kwargs"]
+            else:
+                kwargs = op["fused_op"]["op_list"][0]["kwargs"]
+
+            l2_values = kwargs.get("l2_tiling", {}).get("int_list", {}).get("values", [])
+            l2_values = [int(v) for v in l2_values]
+            l2_count = math.prod(l2_values) if l2_values else 1
+
             is_unique_layer = True
             for op_name, op_val in unique_layers.items():
                 if not DeepDiff(op, op_val, ignore_order=True):
-                    layer_counts[network][op_name] += 1
+                    layer_counts[network][op_name] += l2_count
                     is_unique_layer = False
                     break
 
             if is_unique_layer:
                 unique_layers[name] = op
                 layers[network].append(name)
-                layer_counts[network][name] = 1
+                layer_counts[network][name] = l2_count
 
 
 def matches(value, rule_value):

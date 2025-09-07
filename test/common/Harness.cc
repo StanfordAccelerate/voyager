@@ -477,6 +477,11 @@ void Harness::send_params(const std::deque<BaseParams *> &params) {
       send_serialized_params<VectorInstructionConfig, 64>(
           *vector_config, &serial_vector_params_in);
     }
+
+    // Wait for last operation to finish
+    if (idx != params.size() - 1) {
+      operation_done.SyncPop();
+    }
   }
 }
 
@@ -538,11 +543,6 @@ void Harness::record_start(const std::deque<BaseParams *> &params,
 
       CCS_LOG("----- Accelerator Layer '" << operation.name
                                           << "' Started. -----");
-    }
-
-    // Wait for last operation to finish
-    if (idx != params.size() - 1) {
-      operation_done.SyncPop();
     }
   }
 }
@@ -645,6 +645,7 @@ void Harness::param_sender() {
 #if SUPPORT_MVM
   serial_matrix_vector_params_in.ResetWrite();
 #endif
+  operation_done.ResetRead();
   tile_done.ResetRead();
 
   wait();
@@ -660,14 +661,10 @@ void Harness::param_sender() {
     if (is_soc_sim()) {
       const auto l2_tiling = get_l2_tiling(param);
       const int num_tiles = get_num_tiles(l2_tiling);
-      std::cerr << "Number of accelerator tiles to run: " << num_tiles
-                << std::endl;
+      const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
 
-      const int cache_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
-      auto adjusted_params =
-          offset_param_addresses(accelerator_params, cache_size);
-
-      bool bank_index = 0;
+      auto params_offseted =
+          offset_param_addresses(accelerator_params, bank_size);
 
       for (int j = 0; j < num_tiles; j++) {
         if (accelerator_params.size() < 4 && j > 1) {
@@ -675,9 +672,7 @@ void Harness::param_sender() {
         }
 
         std::cerr << "Sending tile " << j << " params" << std::endl;
-        dataloader->load_scratchpad(param, j, bank_index ? cache_size : 0);
-        send_params(bank_index ? adjusted_params : accelerator_params);
-        bank_index = !bank_index;
+        send_params(j % 2 == 0 ? accelerator_params : params_offseted);
       }
 
       // drain out remaining done signals
@@ -700,7 +695,6 @@ void Harness::start_monitor() {
 #if SUPPORT_MVM
   matrix_vector_unit_start_signal.ResetRead();
 #endif
-  operation_done.ResetRead();
 
   wait();
 
@@ -717,10 +711,9 @@ void Harness::start_monitor() {
       const int num_tiles = get_num_tiles(l2_tiling);
 
       for (int j = 0; j < num_tiles; j++) {
-        std::cerr << "Waiting for tile " << j << " start signal" << std::endl;
+        std::cerr << "Waiting for tile " << j << " to start" << std::endl;
         bool is_first = j == 0;
         record_start(accelerator_params, operation, is_first);
-        std::cerr << "Tile " << j << " started" << std::endl;
       }
     } else {
       record_start(accelerator_params, operation, true);
@@ -734,8 +727,8 @@ void Harness::done_monitor() {
 #if SUPPORT_MVM
   matrix_vector_unit_done_signal.ResetRead();
 #endif
-  tile_done.ResetWrite();
   operation_done.ResetWrite();
+  tile_done.ResetWrite();
 
   wait();
 
@@ -757,19 +750,25 @@ void Harness::done_monitor() {
     if (is_soc_sim()) {
       const auto l2_tiling = get_l2_tiling(param);
       const int num_tiles = get_num_tiles(l2_tiling);
+      const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
 
-      const int cache_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
-      bool bank_index = 0;
+      dataloader->load_scratchpad(param, 0, 0);
+
+      if (num_tiles > 1) {
+        dataloader->load_scratchpad(param, 1, bank_size);
+      }
 
       for (int j = 0; j < num_tiles; j++) {
-        std::cerr << "Waiting for tile " << j << " to complete" << std::endl;
-
+        std::cerr << "Waiting for tile " << j << " to finish" << std::endl;
         bool is_last = j == num_tiles - 1;
         record_done(accelerator_params, operation, runtime_scale, is_last);
-        dataloader->store_scratchpad(param, j, bank_index ? cache_size : 0);
-        bank_index = !bank_index;
 
-        std::cerr << "Tile " << j << " finished" << std::endl;
+        int offset = j % 2 == 0 ? 0 : bank_size;
+        dataloader->store_scratchpad(param, j, offset);
+
+        if (j + 2 < num_tiles) {
+          dataloader->load_scratchpad(param, j + 2, offset);
+        }
 
         if (accelerator_params.size() < 4) {
           tile_done.SyncPush();
