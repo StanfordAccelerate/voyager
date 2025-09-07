@@ -226,6 +226,7 @@ SC_MODULE(DwCParamsDeserializer) {
     serialParamsIn.Reset();
     deserializedParams.ResetWrite();
     convertedParams.ResetRead();
+    dwcParamsOut.Reset();
 
     wait();
 
