@@ -252,10 +252,10 @@ if (matrix_op.target().find("conv2d") != std::string::npos &&
   accelerator_memory_map["weights"] = get_partition(weight_memory.partition());
   accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
   accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
-  dwc_params->INPUT_OFFSET = input_memory.address();
-  dwc_params->WEIGHT_OFFSET = weight_memory.address();
-  dwc_params->BIAS_OFFSET = bias_memory.address();
-  dwc_params->OUTPUT_OFFSET = output_memory.address();
+  dwc_params->INPUT_OFFSET = get_address(input);
+  dwc_params->WEIGHT_OFFSET = get_address(weight);
+  dwc_params->BIAS_OFFSET = get_address(bias);
+  dwc_params->OUTPUT_OFFSET = get_address(output);
   if (is_mx_op) {
     const auto input_scale = matrix_op.kwargs().at("input_scale").tensor();
     dwc_params->INPUT_SCALE_OFFSET = get_address(input_scale);
