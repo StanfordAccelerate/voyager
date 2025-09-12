@@ -499,7 +499,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                       numPadding = NRows - 9;
                                       replicationBound = 3;
                                     }
-                                  } else if (NRows == 32) {
+                                  } else if (NRows == 32 || NRows == 64) {
                                     replicationBound = 7;
                                     numPadding = NRows - replicationBound * 3;
                                   }
@@ -547,7 +547,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                         fx = loop_counters[1][params.fxIndex] *
                                                  4 +
                                              fx_repl;
-                                      } else if (NRows == 32) {
+                                      } else if (NRows == 32 || NRows == 64) {
                                         fx = fx_repl;
                                       }
                                       FX = 7;

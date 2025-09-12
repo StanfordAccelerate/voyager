@@ -24,6 +24,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                         : (NRows == 8)  ? 2
                                         : (NRows == 16) ? 4
                                         : (NRows == 32) ? 8
+                                        : (NRows == 64) ? 8
                                                         : 0;
 
   // num words needed to store the boundary pixels. essentially
@@ -32,6 +33,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                         : (NRows == 8)  ? 2
                                         : (NRows == 16) ? 1
                                         : (NRows == 32) ? 1
+                                        : (NRows == 64) ? 1
                                                         : 0;
 
   sc_in<bool> CCS_INIT_S1(clk);
@@ -726,13 +728,14 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
         unrollingFactor = 4;
         additionalUnrollingFactor = 1;
         shiftFactor = 2;
-      } else if (NRows == 32) {
+      } else if (NRows == 32 || NRows == 64) {
         unrollingFactor = 7;
         additionalUnrollingFactor = 0;
         shiftFactor = 2;
       }
 
-      if (params.is_resnet_replication && (NRows == 16 || NRows == 32)) {
+      if (params.is_resnet_replication &&
+          (NRows == 16 || NRows == 32 || NRows == 64)) {
         // #pragma hls_pipeline_init_interval 1
         // #pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0; loop_counters[0][0] < loop_bounds[0][0];

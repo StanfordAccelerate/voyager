@@ -30,6 +30,7 @@ SC_MODULE(InputScaleController) {
                                         : (NRows == 8)  ? 2
                                         : (NRows == 16) ? 4
                                         : (NRows == 32) ? 8
+                                        : (NRows == 64) ? 8
                                                         : 0;
 
   // num words needed to store the boundary pixels. essentially
@@ -38,6 +39,7 @@ SC_MODULE(InputScaleController) {
                                         : (NRows == 8)  ? 2
                                         : (NRows == 16) ? 1
                                         : (NRows == 32) ? 1
+                                        : (NRows == 64) ? 1
                                                         : 0;
 
   SC_CTOR(InputScaleController) {

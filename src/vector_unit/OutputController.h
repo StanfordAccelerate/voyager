@@ -24,6 +24,10 @@ SC_MODULE(OutputController) {
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
   Connections::Combinational<ScaleType> CCS_INIT_S1(scale_deq);
 
+#if SUPPORT_DWC
+  Connections::In<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(dwc_address_in);
+#endif
+
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_address_out);
@@ -182,6 +186,9 @@ SC_MODULE(OutputController) {
     quantizer_params.ResetWrite();
     vector_address_out.Reset();
     scale_address_out.Reset();
+#if SUPPORT_DWC
+    dwc_address_in.Reset();
+#endif
 
     wait();
 
@@ -222,6 +229,36 @@ SC_MODULE(OutputController) {
       ac_int<16, false> loop_bound_2 = params.output_loops[1][0] * loop_bound_3;
       ac_int<16, false> loop_bound_1 = params.output_loops[0][2] * loop_bound_2;
       ac_int<16, false> loop_bound_0 = params.output_loops[0][1] * loop_bound_1;
+
+#if SUPPORT_DWC
+      if (params.addr_from_dwc) {
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (true) {
+          ac_int<ADDRESS_WIDTH, false> address = dwc_address_in.Pop();
+          bool found =
+            (send_output_address<OutputTypes, Width, OC_PORT_WIDTH,
+                                OutputTypes...>(
+                params.output_dtype, params.vector_output_offset,
+                address, vector_address_out) ||
+            ...);
+
+#ifndef __SYNTHESIS__
+      if (!found) {
+        std::cerr << "Error: output type '" << params.output_dtype
+                  << "' is not valid.\n";
+      }
+#endif
+#if SUPPORT_MX
+          if (params.quantize_output_mx) {
+            scale_address_out.Push(params.mx_scale_offset +
+                                    address / Width * ScaleType::width /
+                                        8);
+          }
+#endif
+        }
+      }
+#endif
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush

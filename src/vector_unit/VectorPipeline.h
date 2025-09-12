@@ -26,6 +26,10 @@ SC_MODULE(VectorPipeline) {
   Connections::In<Pack1D<VectorType, Width>> matrix_vector_unit_data;
 #endif
 
+#if SUPPORT_DWC
+  Connections::In<Pack1D<BufferType, Width>> dwc_unit_in;
+#endif
+
   Connections::In<Pack1D<VectorType, Width>> vector_fetch_0_data;
   Connections::In<Pack1D<VectorType, Width>> vector_fetch_1_data;
   Connections::In<Pack1D<VectorType, Width>> vector_fetch_2_data;
@@ -105,6 +109,9 @@ SC_MODULE(VectorPipeline) {
 #if SUPPORT_MVM
     matrix_vector_unit_data.Reset();
 #endif
+#if SUPPORT_DWC
+    dwc_unit_in.Reset();
+#endif
     stage0_input.ResetWrite();
     stage2_inst.ResetWrite();
 
@@ -183,6 +190,32 @@ SC_MODULE(VectorPipeline) {
           Pack1D<VectorType, Width> temp = matrix_vector_unit_data.Pop();
           if (inst.vector_op0_src0 ==
               VectorInstructions::from_matrix_vector_unit) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
+          }
+        }
+#endif
+
+#if SUPPORT_DWC
+        if (inst.vector_op0_src0 ==
+                VectorInstructions::from_dwc_unit ||
+            inst.vector_op0_src1 ==
+                VectorInstructions::from_dwc_unit) {
+          Pack1D<BufferType, Width> sa_output = dwc_unit_in.Pop();
+          Pack1D<VectorType, Width> temp;
+          if (inst.vdequantize) {
+            vdequantize<BufferType, VectorType, Width>(sa_output, temp,
+                                                       inst.vector_dq_scale);
+          } else {
+#pragma hls_unroll yes
+            for (int i = 0; i < Width; i++) {
+              temp[i] = sa_output[i];
+            }
+          }
+
+          if (inst.vector_op0_src0 ==
+              VectorInstructions::from_dwc_unit) {
             op0_src0 = temp;
           } else {
             op0_src1 = temp;

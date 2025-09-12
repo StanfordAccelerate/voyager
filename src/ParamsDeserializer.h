@@ -198,3 +198,52 @@ SC_MODULE(VectorParamsDeserializer) {
     }
   }
 };
+
+SC_MODULE(DwCParamsDeserializer) {
+  sc_in<bool> CCS_INIT_S1(clk);
+  sc_in<bool> CCS_INIT_S1(rstn);
+
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serialParamsIn);
+  Connections::Out<DwCParams> CCS_INIT_S1(dwcParamsOut);
+
+  Connections::Combinational<ac_int<DwCParams::width, false>> CCS_INIT_S1(
+    deserializedParams);
+  Connections::Combinational<DwCParams> convertedParams;
+  TypeConverter<DwCParams> CCS_INIT_S1(paramsConverter);
+
+  SC_CTOR(DwCParamsDeserializer) {
+    paramsConverter.clk(clk);
+    paramsConverter.rstn(rstn);
+    paramsConverter.bitsIn(deserializedParams);
+    paramsConverter.typeOut(convertedParams);
+
+    SC_THREAD(run);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+  }
+
+  void run() {
+    serialParamsIn.Reset();
+    deserializedParams.ResetWrite();
+    convertedParams.ResetRead();
+    dwcParamsOut.Reset();
+
+    wait();
+
+    while (true) {
+      ac_int<DwCParams::width, false> dwcParams = 
+          getSerializedParams<DwCParams, 64>(serialParamsIn);
+      deserializedParams.Push(dwcParams);
+      DwCParams params = convertedParams.Pop();
+
+#ifndef __SYNTHESIS__
+      std::ostringstream oss;
+      oss << "DwC Params: " << std::endl << params << std::endl;
+      spdlog::debug(oss.str());
+      oss.clear();
+#endif
+
+      dwcParamsOut.Push(params);
+    }
+  }
+};

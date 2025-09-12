@@ -174,6 +174,10 @@ if {![info exists SUPPORT_MVM]} {
   set SUPPORT_MVM false
 }
 
+if {![info exists SUPPORT_DWC]} {
+  set SUPPORT_DWC false
+}
+
 if {![info exists MV_UNIT_WIDTH]} {
   set MV_UNIT_WIDTH $OC_DIMENSION
 }
@@ -204,9 +208,9 @@ if {![info exists SCALE_DATATYPE]} {
 
 if {![info exists VU_INPUT_TYPES]} {
   if {$SUPPORT_MX} {
-    set VU_INPUT_TYPES "$VECTOR_DATATYPE, $SCALE_DATATYPE"
+    set VU_INPUT_TYPES "$VECTOR_DATATYPE, $SCALE_DATATYPE, $INPUT_DATATYPE"
   } else {
-    set VU_INPUT_TYPES "$INPUT_DATATYPE, $VECTOR_DATATYPE"
+    set VU_INPUT_TYPES "$INPUT_DATATYPE, $VECTOR_DATATYPE, $ACCUM_BUFFER_DATATYPE"
   }
 }
 
@@ -267,4 +271,17 @@ if {![info exists WEIGHT_BUFFER_WIDTH]} {
 
 if {![info exists ACCUM_BUFFER_SIZE]} {
   set ACCUM_BUFFER_SIZE 1024
+}
+
+# ================================================================
+# DwC Configurations
+# ================================================================
+
+if {$SUPPORT_DWC} {
+  set DWC_WIDTH 40
+  set UNROLLFACTOR $OC_DIMENSION
+  set DWC_KERNEL_DIM 3
+  set DWC_KERNEL_SIZE [expr $DWC_KERNEL_DIM*$DWC_KERNEL_DIM]
+  set DWC_DATATYPE $INPUT_DATATYPE
+  set DWC_PSUM $ACCUM_DATATYPE
 }

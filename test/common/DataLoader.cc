@@ -72,7 +72,8 @@ void DataLoader::load_inputs(const std::vector<Operation> operations,
             (value.tensor().has_memory() || get_size(value.tensor()) == 1)) {
           bool is_conv2d = op.target().find("conv2d") != std::string::npos;
           if (is_dut && is_conv2d && tensor.shape_size() == 4 &&
-              tensor.shape(3) == 3) {
+              tensor.shape(3) == 3 && op.kwargs().at("groups").int_value() == 1 &&
+              key.find("_scale") == std::string::npos) {
             inputs_with_replication.push_back(value.tensor());
           } else {
             inputs.push_back(value.tensor());

@@ -35,6 +35,11 @@ SC_MODULE(VectorUnit) {
       matrix_vector_unit_data);
 #endif
 
+#if SUPPORT_DWC
+  Connections::In<Pack1D<BufferType, Width>> CCS_INIT_S1(dwc_unit_in);
+  Connections::In<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(dwc_address_in);
+#endif
+
   Connections::In<Pack1D<BufferType, OcDimension>> CCS_INIT_S1(
       matrix_unit_output);
   Connections::Combinational<Pack1D<BufferType, Width>> CCS_INIT_S1(
@@ -169,6 +174,9 @@ SC_MODULE(VectorUnit) {
 #if SUPPORT_MVM
     pipeline.matrix_vector_unit_data(matrix_vector_unit_data);
 #endif
+#if SUPPORT_DWC
+    pipeline.dwc_unit_in(dwc_unit_in);
+#endif
     pipeline.vector_fetch_0_data(vector_fetch_0_data);
     pipeline.vector_fetch_1_data(vector_fetch_1_data);
     pipeline.vector_fetch_2_data(vector_fetch_2_data);
@@ -209,6 +217,9 @@ SC_MODULE(VectorUnit) {
     output_controller.scale_out(scale_out);
     output_controller.scale_address_out(scale_address_out);
     output_controller.done(done);
+  #if SUPPORT_DWC
+    output_controller.dwc_address_in(dwc_address_in);
+  #endif
 
     SC_THREAD(send_instructions);
     sensitive << clk.pos();

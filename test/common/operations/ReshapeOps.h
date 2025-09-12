@@ -4,23 +4,53 @@
 
 template <typename T>
 inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
-                     const int pad_amount) {
-  spdlog::debug("Padding tensor with amount: {}\n", pad_amount);
+                     const std::vector<int>& pad_list) {
+  for (int i = 0; i < pad_list.size(); i++) {
+    spdlog::debug("Padding tensor with amount: {}\n", pad_list[i]);
+  }
   T* inputs = std::any_cast<T*>(input_ptr);
 
   std::vector<int> output_shape(input_shape);
-  output_shape[1] += pad_amount;
+  int pad_dim = pad_list.size()/2;
+  std::vector<int> output_start(pad_dim, 0);
+  std::vector<int> output_end(pad_dim, 0);
+  assert(pad_dim <= output_shape.size());
 
-  // copy the input tensor to the output tensor
-  T* outputs = new T[get_size(output_shape)];
-  for (int i = 0; i < get_size(input_shape); i++) {
-    outputs[i] = inputs[i];
+  for (int i = 0; i < pad_dim; i++) {
+    output_start[i] = pad_list[i * 2];
+    output_end[i] = pad_list[i * 2 + 1];
+    output_shape[output_shape.size() - i - 1] += output_start[i] + output_end[i];
   }
 
-  // pad the first dimension of the output tensor
-  for (int i = input_shape[1]; i < input_shape[1] + pad_amount; i++) {
-    for (int j = 0; j < input_shape[2]; j++) {
-      outputs[i * input_shape[2] + j] = T::zero();
+  T* outputs = new T[get_size(output_shape)];
+
+  for (int i = 0; i < get_size(output_shape); i++) {
+    std::vector<int> indices(output_shape.size(), 0);
+    int index = i;
+    for (int j = output_shape.size() - 1; j >= 0; --j) {
+      indices[j] = index % output_shape[j];
+      index /= output_shape[j];
+    }
+
+    bool out_bound = false;
+    for (int j = 0; j < pad_dim; j++) {
+      if (indices[output_shape.size() - j - 1] < output_start[j] ||
+          indices[output_shape.size() - j - 1] >=
+              output_shape[output_shape.size() - j - 1] - output_end[j]) {
+        out_bound = true;
+        break;
+      }
+    }
+
+    if (out_bound) {
+      outputs[i] = T::zero();  // Fill padded area with zero
+    } else {
+      std::vector<int> input_indices(indices);
+      for (int j = 0; j < pad_dim; j++) {
+        input_indices[output_shape.size() - j - 1] -= output_start[j];
+      }
+      int input_index = get_flat_index(input_indices, input_shape);
+      outputs[i] = inputs[input_index];
     }
   }
 
@@ -34,9 +64,10 @@ inline T* pad_tensor(std::any input_ptr, const codegen::OpOverload op) {
   const auto input = op.kwargs().at("input").tensor();
   const auto input_shape = get_shape(input);
   const auto pad_list = op.kwargs().at("pad").int_list().values();
-  const auto pad_amount = pad_list[pad_list.size() - 1];
+  std::vector<int> pad_list_vector(pad_list.begin(), pad_list.end());
+  // const auto pad_amount = pad_list[pad_list.size() - 1];
 
-  return pad_tensor<T>(input_ptr, input_shape, pad_amount);
+  return pad_tensor<T>(input_ptr, input_shape, pad_list_vector);
 }
 
 template <typename T>

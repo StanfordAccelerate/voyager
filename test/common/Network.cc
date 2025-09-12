@@ -237,6 +237,7 @@ Network::Network(std::string& model_name) {
   if (!std::filesystem::exists(filename)) {
     throw std::runtime_error("Error: File " + filename + " does not exist.");
   }
+  std::cerr << "Reading tilings from file: " << filename << std::endl;
   std::ifstream input(filename);
   std::stringstream buffer;
   buffer << input.rdbuf();
@@ -329,6 +330,7 @@ std::vector<Operation> Network::get_operations(
     bool found_first = false;
     bool found_second = false;
     for (const auto& operation : operations) {
+      std::cerr << get_op_name(operation.param) << std::endl;
       const auto param = operation.param;
       if (get_op_name(param) == names[0]) {
         found_first = true;

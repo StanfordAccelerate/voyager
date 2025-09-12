@@ -504,6 +504,7 @@ struct VectorInstructions {
   static const unsigned int from_immediate_0 = 10;
   static const unsigned int from_immediate_1 = 11;
   static const unsigned int from_immediate_2 = 12;
+  static const unsigned int from_dwc_unit = 13;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
@@ -751,6 +752,8 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       output_code[i] = 0;
     }
+
+    addr_from_dwc = false;
   }
 #endif
 
@@ -843,6 +846,8 @@ struct VectorParams : BaseParams {
   ac_int<MAX_DECODED_DTYPE_WIDTH + 1, true>
       output_code[NUM_CODEBOOK_ENTRIES - 1];
 
+  bool addr_from_dwc;
+
   // Each address generator has a 2-bit mode flag, 64-bit address, 6 x 11-bit
   // loop boundaries, 6 x 3-bit loop indices, a 16-bit dequantize scale, a 4-bit
   // data type, and a 18-bit packing factor param
@@ -855,10 +860,10 @@ struct VectorParams : BaseParams {
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
   // slicing params + 32-bit pooling param + 18-bit reshape params + 17-bit
   // padded transpose params + 4-bit head size + 7 boolean flags + 64-bit scale
-  // offset
+  // offset + 1-bit addr_from_dwc flag
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
                                     17 + 4 + 7 + ADDRESS_WIDTH - 16 - 18 +
-                                    codebook_params_width;
+                                    codebook_params_width + 1;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -993,6 +998,8 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       m& output_code[i];
     }
+
+    m & addr_from_dwc;
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const VectorParams& params,
@@ -1166,6 +1173,8 @@ struct VectorParams : BaseParams {
       os << "output_code[" << i << "]: " << params.output_code[i] << std::endl;
     }
 
+    os << "addr_from_dwc: " << params.addr_from_dwc << std::endl;
+
     return os;
   }
 
@@ -1311,6 +1320,7 @@ struct VectorParams : BaseParams {
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       if (lhs.output_code[i] != rhs.output_code[i]) return false;
     }
+    if (lhs.addr_from_dwc != rhs.addr_from_dwc) return false;
 
     // If all members are equal, return true
     return true;
@@ -1526,6 +1536,185 @@ struct VectorInstructionConfig : BaseParams {
       return false;
     if (!(lhs.approx == rhs.approx)) return false;
 
+    return true;
+  }
+};
+
+struct DwCParams : BaseParams {
+#ifndef __SYNTHESIS__
+  DwCParams() {
+    INPUT_OFFSET = 0;
+    INPUT_SCALE_OFFSET = 0;
+    WEIGHT_OFFSET = 0;
+    WEIGHT_SCALE_OFFSET = 0;
+    BIAS_OFFSET = 0;
+
+    OUTPUT_OFFSET = 0;
+
+    for (int i = 0; i < 2; i++) {  // Outer -> Inner, Y X C
+      for (int j = 0; j < 3; j++) {
+        loops[i][j] = 0;
+      }
+    }
+
+    for (int i = 0; i < 3; i++) {  // Y X C
+      bounds[i] = 0;
+    }
+
+    STRIDE = 1;
+
+    for (int i = 0; i < 2; i++) {  // Y X
+      for (int j = 0; j < 2; j++) {
+        padding[i][j] = 0;
+      }
+    }
+
+    fast_forward_mode = 0;  // 0: normal, 1: fast forward
+    block_size = 0;
+    use_mx = 0;
+  }
+#endif
+
+  ac_int<ADDRESS_WIDTH, false> INPUT_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> INPUT_SCALE_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> WEIGHT_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> WEIGHT_SCALE_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> BIAS_OFFSET;
+  ac_int<ADDRESS_WIDTH, false> OUTPUT_OFFSET;
+
+  // systolic array loop
+  ac_int<10, false> loops[2][3];
+  ac_int<10, false> bounds[3];
+  ac_int<10, false> outloops[3];  // Y X1 X0
+
+  ac_int<4, false> STRIDE;
+  ac_int<7, true> padding[2][2];       // Y X
+  ac_int<1, false> fast_forward_mode;  // 0: normal, 1: fast forward
+  ac_int<3, false> block_size;  // 2^bs
+  ac_int<1, false> use_mx;  // 0: no mx, 1: use mx
+
+  static const unsigned int width =
+      (4 + 2) * 64 /* OFFSETS */ + (6 + 3) * 10 /* Loops */ + (3) * 10 /* bounds */ +
+      4 /* STRIDE */ + (2 * 2) * 7 /* padding */ + 1 /* MODE */ + 3 /* block_size */ +
+      1 /* use_mx */;
+
+#ifndef NO_SYSC
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size>& m) {
+    m & INPUT_OFFSET;
+    m & INPUT_SCALE_OFFSET;
+    m & WEIGHT_OFFSET;
+    m & WEIGHT_SCALE_OFFSET;
+    m & BIAS_OFFSET;
+    m & OUTPUT_OFFSET;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        m& loops[i][j];
+      }
+    }
+
+    for (int i = 0; i < 3; i++) {
+      m& bounds[i];
+    }
+
+    for (int i = 0; i < 3; i++) {
+      m& outloops[i];
+    }
+
+    m & STRIDE;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        m& padding[i][j];
+      }
+    }
+
+    m & fast_forward_mode;
+    m & block_size;
+    m & use_mx;
+  }
+
+  inline friend void sc_trace(sc_trace_file* tf, const DwCParams& params,
+                              const std::string& name) {}
+#endif
+
+  inline friend std::ostream& operator<<(std::ostream& os,
+                                         const DwCParams& params) {
+    os << "INPUT_OFFSET: " << params.INPUT_OFFSET << std::endl;
+    os << "INPUT_SCALE_OFFSET: " << params.INPUT_SCALE_OFFSET << std::endl;
+    os << "WEIGHT_OFFSET: " << params.WEIGHT_OFFSET << std::endl;
+    os << "WEIGHT_SCALE_OFFSET: " << params.WEIGHT_SCALE_OFFSET << std::endl;
+    os << "BIAS_OFFSET: " << params.BIAS_OFFSET << std::endl;
+    os << "OUTPUT_OFFSET: " << params.OUTPUT_OFFSET << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        os << "loops[" << i << "][" << j << "]: " << params.loops[i][j]
+           << std::endl;
+      }
+    }
+
+    for (int i = 0; i < 3; i++) {
+      os << "bounds[" << i << "]: " << params.bounds[i] << std::endl;
+    }
+
+    for (int i = 0; i < 3; i++) {
+      os << "outloops[" << i << "]: " << params.outloops[i] << std::endl;
+    }
+
+    os << "STRIDE: " << params.STRIDE << std::endl;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        os << "padding[" << i << "][" << j << "]: " << params.padding[i][j]
+           << std::endl;
+      }
+    }
+
+    os << "fast_forward_mode: " << params.fast_forward_mode << std::endl;
+    os << "block_size: " << params.block_size << std::endl;
+    os << "use_mx: " << params.use_mx << std::endl;
+    return os;
+  }
+
+  inline friend bool operator==(const DwCParams& lhs, const DwCParams& rhs) {
+    if (lhs.INPUT_OFFSET != rhs.INPUT_OFFSET ||
+        lhs.INPUT_SCALE_OFFSET != rhs.INPUT_SCALE_OFFSET ||
+        lhs.WEIGHT_OFFSET != rhs.WEIGHT_OFFSET ||
+        lhs.WEIGHT_SCALE_OFFSET != rhs.WEIGHT_SCALE_OFFSET ||
+        lhs.BIAS_OFFSET != rhs.BIAS_OFFSET ||
+        lhs.OUTPUT_OFFSET != rhs.OUTPUT_OFFSET)
+      return false;
+
+    // Compare the 2D arrays
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 3; j++) {
+        if (lhs.loops[i][j] != rhs.loops[i][j]) return false;
+      }
+    }
+
+    // Compare other members
+    for (int i = 0; i < 3; i++) {
+      if (lhs.bounds[i] != rhs.bounds[i]) return false;
+    }
+
+    for (int i = 0; i < 3; i++) {
+      if (lhs.outloops[i] != rhs.outloops[i]) return false;
+    }
+
+    if (lhs.STRIDE != rhs.STRIDE) return false;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        if (lhs.padding[i][j] != rhs.padding[i][j]) return false;
+      }
+    }
+
+    if (lhs.fast_forward_mode != rhs.fast_forward_mode) return false;
+    if (lhs.block_size != rhs.block_size) return false;
+    if (lhs.use_mx != rhs.use_mx) return false;
+    // If all members are equal, return true
     return true;
   }
 };

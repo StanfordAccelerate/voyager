@@ -51,6 +51,13 @@ ACCURACY_RESULTS = {
         "MXINT8": 83.3,
         "P8_1": 84.1,
     },
+    "mobilenet_v2": {
+        "E4M3":  62.5,
+        "CFLOAT": 70.0,
+        "INT8": 66.0,
+        "MXINT8": 72.0,
+        "P8_1": 63.8,
+    },
 }
 
 
@@ -480,6 +487,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         model_path = "IMAGENET1K_V1"
     elif model == "resnet50":
         model_path = "IMAGENET1K_V2"
+    elif model == "mobilenet_v2":
+        model_path = "IMAGENET1K_V2"
     elif model == "mobilebert" and dataset == "sst2":
         model_path = "models/mobilebert/mobilebert-tiny-sst2-bf16/"
     elif model == "mobilebert" and dataset == "squad":
@@ -545,6 +554,10 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         ]
     elif env_vars["DATATYPE"] == "CFLOAT":
         quantization_args = []
+    elif env_vars["DATATYPE"] == "BF16":
+        quantization_args = [
+            "--bf16",
+        ]
     elif env_vars["DATATYPE"] == "MXINT8":
         quantization_args = [
             "--force_scale_power_of_two",
@@ -556,6 +569,12 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         ]
     else:
         raise ValueError("Invalid datatype")
+
+    if "mobilenet" in model:
+        quantization_args.extend([
+            "--hardware_unrolling",
+            str(os.environ["IC_DIMENSION"])+","+str(os.environ["OC_DIMENSION"]),
+        ])
 
     subprocess.run(
         [

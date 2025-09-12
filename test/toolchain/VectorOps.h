@@ -4,6 +4,8 @@
 #include "test/common/Tiling.h"
 #include "test/toolchain/ApproximationConstants.h"
 #include "test/toolchain/Common.h"
+#include "ApproximationConstants.h"
+#include "ArchitectureParams.h"
 
 inline bool are_broadcastable(const std::vector<int> &shape1,
                               const std::vector<int> &shape2) {
@@ -78,15 +80,15 @@ void set_vector_fetch_1(const codegen::Tensor &tensor,
   vector_params->vector_fetch_1_packing_factor =
       OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
-  for (int i = 0; i < 3; i++) {
-    vector_params->vector_fetch_1_loops[0][i] = 1;
-  }
+  pad_shape_to_ndim(output_shape, 6);
+  output_shape = adjust_loop_indices(output_shape, OC_DIMENSION);
 
-  pad_shape_to_ndim(output_shape, 3);
-  vector_params->vector_fetch_1_loops[1][0] = output_shape[0];
-  vector_params->vector_fetch_1_loops[1][1] = output_shape[1];
-  vector_params->vector_fetch_1_loops[1][2] =
-      output_shape.back() / OC_DIMENSION;
+  vector_params->vector_fetch_1_loops[0][0] = output_shape[0];
+  vector_params->vector_fetch_1_loops[0][1] = output_shape[1];
+  vector_params->vector_fetch_1_loops[0][2] = output_shape[2];
+  vector_params->vector_fetch_1_loops[1][0] = output_shape[3];
+  vector_params->vector_fetch_1_loops[1][1] = output_shape[4];
+  vector_params->vector_fetch_1_loops[1][2] = output_shape[5] / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
     vector_params->vector_fetch_1_y_loop_idx[i] = 0;

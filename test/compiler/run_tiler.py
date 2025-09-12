@@ -295,6 +295,12 @@ def main():
         if matrix_op.target in ["conv2d", "conv2d_mx"] and input_shape[-1] == 3:
             print(f"Skipping {param_name} as it is a 3-channel input")
             continue
+        
+        if "groups" in matrix_op.kwargs:
+            group = matrix_op.kwargs["groups"].int_value
+            if group != 1:
+                print("Skipping DwC")
+                continue
 
         print(f"Processing {param_name} with target {matrix_op.target}")
 

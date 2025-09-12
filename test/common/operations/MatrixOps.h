@@ -72,7 +72,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
       FX_UNROLL = 2;
     } else if (IC_DIMENSION == 16) {
       FX_UNROLL = 4;
-    } else if (IC_DIMENSION == 32) {
+    } else if (IC_DIMENSION == 32 || IC_DIMENSION == 64) {
       FX_UNROLL = 7;
     }
     tiling.loops[1][tiling.fx_index] = FX;
@@ -261,7 +261,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                   outputs[output_addr] += scaled_psum;
                                   accumulations[output_addr] = Psum(0.0);
                                 }
-                              } else if (IC_DIMENSION == 32) {
+                              } else if (IC_DIMENSION == 32 || IC_DIMENSION == 64) {
                                 if (counters[1][tiling.fx_index] == 6) {
                                   Buffer scaled_psum = static_cast<Buffer>(
                                       accumulations[output_addr]);
@@ -312,7 +312,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                     accumulations[output_addr]);
                                 accumulations[output_addr] = Psum(0.0);
                               }
-                            } else if (IC_DIMENSION == 32) {
+                            } else if (IC_DIMENSION == 32 || IC_DIMENSION == 64) {
                               if (counters[1][tiling.fx_index] == 6) {
                                 outputs[output_addr] += static_cast<Buffer>(
                                     accumulations[output_addr]);
@@ -631,5 +631,179 @@ inline Vector *matrix_vector_multiply(std::any input_ptr, std::any weight_ptr,
     delete[] biases;
   }
 
+  return outputs;
+}
+
+// arb kernel size model based on 3*3 kernel
+template <typename Input, typename Psum, typename Buffer, typename Scale>
+// Input: quantized input/weight type
+// Psum: accumulation type
+// Buffer: output type
+inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
+                   std::any weight_ptr, std::any weight_scale_ptr,
+                   std::any bias_ptr, const Operation &operation) {
+  std::vector<int> BUFFER_DIM = {2, 9, 9};  // IC, X, Y
+
+  const auto param = operation.param;
+  const auto op_list = get_op_list(param);
+  const auto first_op = op_list.front();
+  bool is_mx = first_op.target().find("mx") != std::string::npos;
+  int block_size = is_mx ? first_op.kwargs().at("block_size").int_value() : 0;
+
+  const auto &stride_vals = first_op.kwargs().at("stride").int_list().values();
+  int stride_y = stride_vals[0];
+  int stride_x = stride_vals[1];
+
+  int ibatch = first_op.kwargs().at("input").tensor().shape(0);
+  int ic     = first_op.kwargs().at("input").tensor().shape(3);
+  int iy     = first_op.kwargs().at("input").tensor().shape(1);  // input height
+  int ix     = first_op.kwargs().at("input").tensor().shape(2);  // input weight
+
+  int k_h = first_op.kwargs().at("weight").tensor().shape(2);
+  int k_w = first_op.kwargs().at("weight").tensor().shape(3);
+  int kernel_size = 3;
+
+  int x_pad = first_op.kwargs().at("padding").int_list().values()[1];
+  int y_pad = first_op.kwargs().at("padding").int_list().values()[0];
+
+  int obatch = 1;
+  int oc     = ic;
+  int oy     = floor((ix + 2*x_pad - kernel_size)/stride_x) + 1;
+  int ox     = floor((iy + 2*y_pad - kernel_size)/stride_y) + 1;
+
+  Buffer *outputs = new Buffer[obatch * oc * ox * oy];
+  Input *inputs = std::any_cast<Input *>(input_ptr);
+  Scale *input_scales = std::any_cast<Scale *>(input_scale_ptr);
+
+  Input *weights = std::any_cast<Input *>(weight_ptr);
+  Scale *weight_scales = std::any_cast<Scale *>(weight_scale_ptr);
+
+  Buffer *biases = std::any_cast<Buffer *>(bias_ptr);
+
+  spdlog::debug(
+      "Input shape: [{} {} {} {}], Weight shape: [{} {} {} {}], Output shape: "
+      "[{} {} {} {}]",
+      ibatch, ic, ix, iy, oc, 1, k_w, k_h, obatch, oc, ox, oy);
+
+  int IC1 = (ic + BUFFER_DIM[0] - 1) / BUFFER_DIM[0];
+  int IC0 = BUFFER_DIM[0];
+  int OX1 = (ox + BUFFER_DIM[1] - 1) / BUFFER_DIM[1];
+  int OX0 = BUFFER_DIM[1];
+  int OY1 = (oy + BUFFER_DIM[2] - 1) / BUFFER_DIM[2];
+  int OY0 = BUFFER_DIM[2];
+
+#if SUPPORT_MX
+  Buffer Partial_Sum[7];
+  Buffer Mul_Result[kernel_size*kernel_size];
+#else
+  Psum Partial_Sum[7];
+  Psum Mul_Result[kernel_size * kernel_size];
+#endif
+
+  int counter[2][3] = {0};
+  for (counter[0][0] = 0; counter[0][0] < IC1; counter[0][0]++) {
+    for (counter[0][1] = 0; counter[0][1] < OX1; counter[0][1]++) {
+      for (counter[0][2] = 0; counter[0][2] < OY1; counter[0][2]++) {
+        int ic1 = counter[0][0];
+        int ox1 = counter[0][1];
+        int oy1 = counter[0][2];
+
+        for (counter[1][0] = 0; counter[1][0] < IC0; counter[1][0]++) {
+          for (counter[1][1] = 0; counter[1][1] < OX0; counter[1][1]++) {
+            for (counter[1][2] = 0; counter[1][2] < OY0; counter[1][2]++) {
+              int ic0 = counter[1][0];
+              int ox0 = counter[1][1];
+              int oy0 = counter[1][2];
+
+              int ic_g = ic1 * IC0 + ic0;
+              int x = ox1 * OX0 + ox0;
+              int y = oy1 * OY0 + oy0;
+
+              if (x >= ox || y >= oy || ic_g >= ic) continue;
+
+              // For pad=0 (no padding), start from actual stride position
+              int x_start = x * stride_x;
+              int y_start = y * stride_y;
+
+              int output_addr = (y * ox + x) * oc + ic_g;
+              // outputs[output_addr] = biases[ic_g];
+
+              // Apply 3x3 kernel directly on input (pad=0 behavior)
+              for (int ky = 0; ky < kernel_size; ky++) {
+                for (int kx = 0; kx < kernel_size; kx++) {
+                  int input_x = x_start + kx - x_pad;
+                  int input_y = y_start + ky - y_pad;
+                  // Psum psum(0.0);
+                  // Check bounds to prevent core dump
+                  if (input_x >= 0 && input_x < ix && input_y >= 0 &&
+                      input_y < iy) {
+                    int input_addr = (input_y * ix + input_x) * ic + ic_g;
+                    Input input = inputs[input_addr];
+                    int weight_addr = ic_g * kernel_size * kernel_size +
+                                      ky * kernel_size + kx;
+                    Input weight = weights[weight_addr];  // Use padded_weights
+
+#if SUPPORT_MX
+                    if (block_size == 0){
+                      Mul_Result[ky * kernel_size + kx] =
+                            static_cast<Buffer>(input) * static_cast<Buffer>(weight);
+                    } else {
+                      int num_blocks = (ic + block_size - 1) / block_size;
+                      int input_scale_addr = (input_y * ix + input_x) * 
+                                            num_blocks + ic_g / block_size;
+                      int weight_scale_addr = weight_addr;
+                      Scale input_scale =
+                          input_scales[input_scale_addr];
+                      Scale weight_scale =
+                          weight_scales[weight_scale_addr];
+                      Buffer scale = static_cast<Buffer>(input_scale) *
+                                    static_cast<Buffer>(weight_scale);
+                      Mul_Result[ky * kernel_size + kx] =
+                            static_cast<Buffer>(static_cast<Psum>(input) * static_cast<Psum>(weight)) *
+                            scale;
+                    }
+#else
+                    Mul_Result[ky * kernel_size + kx] =
+                          static_cast<Psum>(input) * static_cast<Psum>(weight);
+#endif
+                    // outputs[output_addr] +=
+                    //     static_cast<Buffer>(input) * static_cast<Buffer>(weight) * scale;
+                  }
+                  else {
+#if SUPPORT_MX
+                    Mul_Result[ky * kernel_size + kx] = Buffer(0.0);
+#else
+                    Mul_Result[ky * kernel_size + kx] = Psum(0.0);
+#endif
+                  }
+                }
+              }
+              Partial_Sum[0] = Mul_Result[0] + Mul_Result[1];
+              Partial_Sum[1] = Mul_Result[2] + Mul_Result[3];
+              Partial_Sum[2] = Mul_Result[4] + Mul_Result[5];
+              Partial_Sum[3] = Mul_Result[6] + Mul_Result[7];
+              Partial_Sum[4] = Partial_Sum[0] + Partial_Sum[1];
+              Partial_Sum[5] = Partial_Sum[2] + Partial_Sum[3];
+              Partial_Sum[6] = Partial_Sum[4] + Partial_Sum[5] + Mul_Result[8];
+              outputs[output_addr] = biases[ic_g] + 
+                                      static_cast<Buffer>(Partial_Sum[6]);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  delete[] inputs;
+  if (input_scales != nullptr) {
+    delete[] input_scales;
+  }
+  delete[] weights;
+  if (weight_scales != nullptr) {
+    delete[] weight_scales;
+  }
+  delete[] biases;
+
+  spdlog::debug("Done with DwC\n");
   return outputs;
 }

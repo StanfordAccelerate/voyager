@@ -7,6 +7,7 @@
 #include "ArchitectureParams.h"
 #include "MatrixUnit.h"
 #include "MatrixVectorUnit2.h"
+#include "DwCUnit.h"
 #include "mc_scverify.h"
 #include "vector_unit/main.h"
 
@@ -115,6 +116,35 @@ SC_MODULE(Accelerator) {
   Connections::SyncOut CCS_INIT_S1(vector_unit_start_signal);
   Connections::SyncOut CCS_INIT_S1(vector_unit_done_signal);
 
+#if SUPPORT_DWC
+    DwCUnit<DWC_DATATYPE, DWC_DATATYPE, DWC_PSUM, ACCUM_BUFFER_DATATYPE, 
+            OC_DIMENSION, DWC_DATATYPE> CCS_INIT_S1(DwcUnit);
+
+    Connections::In<ac_int<64, false>> CCS_INIT_S1(serialDwCParamsIn);
+    Connections::In<ac_int<UNROLLFACTOR * DWC_DATATYPE::width, false>> CCS_INIT_S1(DwCInputDataResponse);
+    Connections::In<ac_int<DWC_KERNEL_SIZE * DWC_DATATYPE::width, false>> CCS_INIT_S1(DwCWeightDataResponse);
+    Connections::In<ac_int<ACCUM_BUFFER_DATATYPE::width, false>> CCS_INIT_S1(DwCBiasDataResponse);
+    Connections::Out<MemoryRequest> CCS_INIT_S1(DwCAddressRequestInput);
+    Connections::Out<MemoryRequest> CCS_INIT_S1(DwCAddressRequestWeight);
+    Connections::Out<MemoryRequest> CCS_INIT_S1(DwCAddressRequestBias);
+    Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(DwCOutputAddressOut);
+    Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+        CCS_INIT_S1(outputsFromDwC);
+
+#if SUPPORT_MX
+    Connections::Out<MemoryRequest> CCS_INIT_S1(DwC_address_request_input_scale);
+    Connections::Out<MemoryRequest> CCS_INIT_S1(DwC_address_request_weight_scale);
+
+    Connections::In<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
+        DwC_address_request_input_resp);
+    Connections::In<ac_int<DWC_KERNEL_SIZE * SCALE_DATATYPE::width, false>> CCS_INIT_S1(
+        DwC_address_request_weight_resp);
+#endif
+
+    Connections::SyncOut CCS_INIT_S1(DwCUnitStartSignal);
+    Connections::SyncOut CCS_INIT_S1(DwCUnitDoneSignal);
+#endif
+
   SC_CTOR(Accelerator) {
     matrixUnit.clk(clk);
     matrixUnit.rstn(rstn);
@@ -187,6 +217,10 @@ SC_MODULE(Accelerator) {
     vector_unit.start(vector_unit_start_signal);
     vector_unit.done(vector_unit_done_signal);
     vector_unit.matrix_unit_output(matrixUnitOutput);
+#if SUPPORT_DWC
+    vector_unit.dwc_unit_in(outputsFromDwC);
+    vector_unit.dwc_address_in(DwCOutputAddressOut);
+#endif
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     for (int i = 0; i < 2; i++) {
@@ -198,6 +232,28 @@ SC_MODULE(Accelerator) {
           accumulation_buffer_vu_write_request[i]);
       vector_unit.accumulation_buffer_done[i](accumulation_buffer_vu_done[i]);
     }
+#endif
+
+#if SUPPORT_DWC
+    DwcUnit.clk(clk);
+    DwcUnit.rstn(rstn);
+    DwcUnit.serialParamsIn(serialDwCParamsIn);
+    DwcUnit.address_request_weight(DwCAddressRequestWeight);
+    DwcUnit.address_request_bias(DwCAddressRequestBias);
+    DwcUnit.address_request_input(DwCAddressRequestInput);
+    DwcUnit.inputDataResponse(DwCInputDataResponse);
+    DwcUnit.weightDataResponse(DwCWeightDataResponse);
+    DwcUnit.biasDataResponse(DwCBiasDataResponse);
+    DwcUnit.DwC_output_address_out(DwCOutputAddressOut);
+    DwcUnit.DwC_output(outputsFromDwC);
+    DwcUnit.start(DwCUnitStartSignal);
+    DwcUnit.done(DwCUnitDoneSignal);
+#if SUPPORT_MX
+    DwcUnit.address_request_input_scale(DwC_address_request_input_scale);
+    DwcUnit.inputScaleDataResponse(DwC_address_request_input_resp);
+    DwcUnit.address_request_weight_scale(DwC_address_request_weight_scale);
+    DwcUnit.weightScaleDataResponse(DwC_address_request_weight_resp);
+#endif
 #endif
 
     SC_THREAD(run);

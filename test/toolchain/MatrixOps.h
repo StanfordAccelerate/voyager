@@ -204,7 +204,8 @@ static bool should_use_direct_path(const VectorParams *vector_params) {
 void MapMatrixOperation(const Operation &operation,
                         std::deque<BaseParams *> &mappedParams,
                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
-  MatrixParams *matrix_params = new MatrixParams;
+  MatrixParams *matrix_params;
+  DwCParams *dwc_params;
   AcceleratorMemoryMap accelerator_memory_map;
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
@@ -221,6 +222,110 @@ void MapMatrixOperation(const Operation &operation,
 
   Tiling tiling;
 
+  int DwC_enable = 0;
+#if SUPPORT_DWC
+
+if (matrix_op.target().find("conv2d") != std::string::npos && 
+    matrix_op.kwargs().at("groups").int_value() > 1) {
+  dwc_params = new DwCParams;
+  DwC_enable = 1;
+  const auto input = matrix_op.kwargs().at("input").tensor();
+  const auto weight = matrix_op.kwargs().at("weight").tensor();
+  const auto bias = matrix_op.kwargs().at("bias").tensor();
+  const auto output = get_op_outputs(param).back();
+  bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
+  if (is_mx_op) {
+    dwc_params->use_mx = 1;
+    assert(matrix_op.kwargs().at("block_size").int_value() % UNROLLFACTOR == 0);
+    dwc_params->block_size = log2(matrix_op.kwargs().at("block_size").int_value());
+    assert(1<<dwc_params->block_size == matrix_op.kwargs().at("block_size").int_value());
+  } else {
+    dwc_params->use_mx = 0;
+    dwc_params->block_size = 0;
+  }
+
+  const auto input_memory = input.memory();
+  const auto weight_memory = weight.memory();
+  const auto bias_memory = bias.memory();
+  const auto output_memory = output.memory();
+  accelerator_memory_map["inputs"] = get_partition(input_memory.partition());
+  accelerator_memory_map["weights"] = get_partition(weight_memory.partition());
+  accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
+  accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
+  dwc_params->INPUT_OFFSET = get_address(input);
+  dwc_params->WEIGHT_OFFSET = get_address(weight);
+  dwc_params->BIAS_OFFSET = get_address(bias);
+  dwc_params->OUTPUT_OFFSET = get_address(output);
+  if (is_mx_op) {
+    const auto input_scale = matrix_op.kwargs().at("input_scale").tensor();
+    dwc_params->INPUT_SCALE_OFFSET = get_address(input_scale);
+    const auto weight_scale = matrix_op.kwargs().at("weight_scale").tensor();
+    dwc_params->WEIGHT_SCALE_OFFSET = get_address(weight_scale);
+  }
+
+  dwc_params->bounds[0] = input.shape(1); // Y
+  dwc_params->bounds[1] = input.shape(2); // X
+  dwc_params->bounds[2] = input.shape(3); // C
+
+  int x_pad  = matrix_op.kwargs().at("padding").int_list().values()[1];
+  int y_pad  = matrix_op.kwargs().at("padding").int_list().values()[0];
+  dwc_params->STRIDE = matrix_op.kwargs().at("stride").int_list().values()[0];
+  assert(dwc_params->STRIDE < 7);
+  assert((input.shape(1) + y_pad + y_pad - 2) % dwc_params->STRIDE == 0);
+  assert((input.shape(2) + x_pad + x_pad - 2) % dwc_params->STRIDE == 0);
+
+  int X0 = ((DWC_WIDTH - 2) / dwc_params->STRIDE) * dwc_params->STRIDE;
+  int X1 = (input.shape(2) + x_pad + x_pad - 2 + X0 - 1) / X0; // Padding lines, asym in future
+  int C1 = (input.shape(3) + UNROLLFACTOR - 1) / UNROLLFACTOR;
+
+  dwc_params->loops[0][0] = input.shape(1); // Y
+  dwc_params->loops[1][0] = 0; // Unused
+  dwc_params->loops[0][1] = X1; // X
+  dwc_params->loops[1][1] = X0;
+  dwc_params->loops[0][2] = C1; // C
+  dwc_params->loops[1][2] = UNROLLFACTOR;
+
+  dwc_params->outloops[0] = (input.shape(1) + y_pad + y_pad - 2) / dwc_params->STRIDE; // Y
+  dwc_params->outloops[1] = (input.shape(2) + x_pad + x_pad - 2) / dwc_params->STRIDE; // X1
+  dwc_params->outloops[2] = X0 / dwc_params->STRIDE; // X0
+
+  dwc_params->padding[0][0] = y_pad; // Y
+  dwc_params->padding[0][1] = y_pad; // Y
+  dwc_params->padding[1][0] = x_pad; // X
+  dwc_params->padding[1][1] = x_pad; // X
+
+  if ((input.shape(2) + x_pad + x_pad - (X1 - 1) * X0 == 3)) {
+    dwc_params->fast_forward_mode = 1;
+  } else {
+    dwc_params->fast_forward_mode = 0;
+  }
+
+  // null tiling
+  for (int i = 0; i < 2; i++) {
+    if (i == 0) {
+      tiling.loops[i][0] = output.shape(1);
+      tiling.loops[i][1] = output.shape(2);
+      tiling.loops[i][2] = output.shape(3)/UNROLLFACTOR;
+      tiling.x_loop_index[i] = 0;
+      tiling.y_loop_index[i] = 0;
+      tiling.weight_loop_index[i] = 0;
+    } else{
+      tiling.loops[i][0] = 1;
+      tiling.loops[i][1] = 1;
+      tiling.loops[i][2] = 1;
+      tiling.x_loop_index[i] = 0;
+      tiling.y_loop_index[i] = 1;
+      tiling.weight_loop_index[i] = 2;
+    }
+    tiling.reduction_loop_index[i] = 0;
+    tiling.weight_reuse_index[i] = 0;
+    tiling.fy_index[i] = 0;
+  }
+  tiling.fx_index = 0;
+  tiling.stride = 1;
+} else {
+#endif
+  matrix_params = new MatrixParams;
   matrix_params->is_fc = is_fc(matrix_op);
 
   if (matrix_params->is_fc) {
@@ -511,9 +616,15 @@ void MapMatrixOperation(const Operation &operation,
     matrix_params->bias_offset = get_address(bias);
     accelerator_memory_map["bias"] = get_partition(bias_memory.partition());
   }
+#if SUPPORT_DWC
+  }
+#endif
 
   // vector instructions
   VectorParams *vector_params = new VectorParams;
+#if SUPPORT_DWC
+  if (!DwC_enable) {
+#endif
 
   // Rescale tiling for vector instructions
   if (matrix_params->is_fc) {
@@ -551,6 +662,9 @@ void MapMatrixOperation(const Operation &operation,
       }
     }
   }
+#if SUPPORT_DWC
+  }
+#endif
 
   const auto output = get_op_outputs(param).back();
   const auto output_memory = output.memory();
@@ -600,6 +714,8 @@ void MapMatrixOperation(const Operation &operation,
     vector_params->head_size_power_of_two = result;
   }
 
+  vector_params->addr_from_dwc = DwC_enable == 1;
+
   const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   VectorInstructions inst;
@@ -612,6 +728,12 @@ void MapMatrixOperation(const Operation &operation,
                     tiling.loops[1][tiling.weight_loop_index[1]] *
                     packing_factor;
 
+#if SUPPORT_DWC
+  if (DwC_enable) {
+    inst.inst_count = tiling.loops[0][0] * tiling.loops[0][1] * tiling.loops[0][2];
+    inst.vector_op0_src0 = VectorInstructions::from_dwc_unit;
+  } else {
+#endif
   if (matrix_params->is_fc) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_vector_unit;
   } else {
@@ -622,6 +744,9 @@ void MapMatrixOperation(const Operation &operation,
     inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
 #endif
   }
+#if SUPPORT_DWC
+  }
+#endif
 
   inst.vdest = VectorInstructions::to_output;
 
@@ -1028,11 +1153,17 @@ void MapMatrixOperation(const Operation &operation,
   }
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
+#if SUPPORT_DWC
+  if (DwC_enable == 0) {
+#endif
   if (should_use_direct_path(vector_params)) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
     vector_params->vector_fetch_0_mode = 0;
     matrix_params->write_output_to_accum_buffer = false;
   }
+#if SUPPORT_DWC
+  }
+#endif
 #endif
 
   // total output count
@@ -1040,7 +1171,15 @@ void MapMatrixOperation(const Operation &operation,
   vector_instruction_config->instLen = 1;
   vector_instruction_config->instLoopCount = 1;
 
+#if SUPPORT_DWC
+  if (DwC_enable) {
+    mappedParams.push_back(dwc_params);
+  } else {
+#endif
   mappedParams.push_back(matrix_params);
+#if SUPPORT_DWC
+  }
+#endif
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vector_instruction_config);
   opMemoryMaps.push_back(accelerator_memory_map);
