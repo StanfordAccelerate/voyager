@@ -184,17 +184,17 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       }
 
       // set irrelevant loop bounds to 1
-      loop_bounds[1][params.weightReuseIndex[0]] = 1;
-      loop_bounds[1][params.weightReuseIndex[1]] = 1;
+      loop_bounds[1][params.weight_reuse_idx[0]] = 1;
+      loop_bounds[1][params.weight_reuse_idx[1]] = 1;
 
       // extra loop to control reuse which only occurs during transpose and when
       // NCols > NRows
       int rep_bound = 1;
 
       if (params.has_weight_transpose && NCols > NRows) {
-        if (loop_bounds[0][params.reductionLoopIndex[0]] >= (NCols / NRows)) {
+        if (loop_bounds[0][params.reduction_loop_idx[0]] >= (NCols / NRows)) {
           // we are able to reuse the weights already in the buffer
-          loop_bounds[0][params.reductionLoopIndex[0]] /= (NCols / NRows);
+          loop_bounds[0][params.reduction_loop_idx[0]] /= (NCols / NRows);
           rep_bound = (NCols / NRows);
         }
       }
@@ -203,16 +203,16 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       // this loop is used when OX and OY are the innermost L2 loops. when this
       // occurs, we can move OX and/or OY into the buffer reuse L1 loop
       int buffer_reuse = 1;
-      if (params.loops[0][params.reductionLoopIndex[0]] == 1) {
+      if (params.loops[0][params.reduction_loop_idx[0]] == 1) {
         // OX loop can be absorbed
-        if (params.weightLoopIndex[0] < params.inputXLoopIndex[0]) {
-          buffer_reuse *= loop_bounds[0][params.inputXLoopIndex[0]];
-          loop_bounds[0][params.inputXLoopIndex[0]] = 1;
+        if (params.weight_loop_idx[0] < params.x_loop_idx[0]) {
+          buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+          loop_bounds[0][params.x_loop_idx[0]] = 1;
         }
         // OY loop can be absorbed
-        if (params.weightLoopIndex[0] < params.inputYLoopIndex[0]) {
-          buffer_reuse *= loop_bounds[0][params.inputYLoopIndex[0]];
-          loop_bounds[0][params.inputYLoopIndex[0]] = 1;
+        if (params.weight_loop_idx[0] < params.y_loop_idx[0]) {
+          buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+          loop_bounds[0][params.y_loop_idx[0]] = 1;
         }
       }
 
@@ -316,11 +316,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         Pack1D<PEInput<Input>, NRows> inputs;
 
         bool swap_weights;
-        if (params.weightReuseIndex[0] != params.weightReuseIndex[1]) {
-          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0) &&
-                         (loop_counters[1][params.weightReuseIndex[0]] == 0);
+        if (params.weight_reuse_idx[0] != params.weight_reuse_idx[1]) {
+          swap_weights = (loop_counters[1][params.weight_reuse_idx[1]] == 0) &&
+                         (loop_counters[1][params.weight_reuse_idx[0]] == 0);
         } else {
-          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0);
+          swap_weights = (loop_counters[1][params.weight_reuse_idx[1]] == 0);
         }
 
 #pragma hls_unroll yes
@@ -419,23 +419,24 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       ac_int<32, false> step = 0;
 
       ac_int<LOOP_WIDTH, false> c2_bound =
-          params.loops[0][params.reductionLoopIndex[0]] - 1;
+          params.loops[0][params.reduction_loop_idx[0]] - 1;
       ac_int<LOOP_WIDTH, false> c1_bound =
-          params.loops[1][params.reductionLoopIndex[1]] - 1;
+          params.loops[1][params.reduction_loop_idx[1]] - 1;
       ac_int<LOOP_WIDTH, false> k1_bound =
-          params.loops[1][params.weightLoopIndex[1]] - 1;
-      ac_int<LOOP_WIDTH, false> fx_bound = params.loops[1][params.fxIndex] - 1;
+          params.loops[1][params.weight_loop_idx[1]] - 1;
+      ac_int<LOOP_WIDTH, false> fx_bound =
+          params.loops[1][params.fx_loop_idx] - 1;
       ac_int<LOOP_WIDTH, false> fy0_bound =
-          params.loops[0][params.fyIndex[0]] - 1;
+          params.loops[0][params.fy_loop_idx[0]] - 1;
       ac_int<LOOP_WIDTH, false> fy1_bound =
-          params.loops[1][params.fyIndex[1]] - 1;
+          params.loops[1][params.fy_loop_idx[1]] - 1;
       ac_int<LOOP_WIDTH, false> y0_bound =
-          params.loops[1][params.inputYLoopIndex[1]] - 1;
+          params.loops[1][params.y_loop_idx[1]] - 1;
       ac_int<LOOP_WIDTH, false> x0_bound =
-          params.loops[1][params.inputXLoopIndex[1]] - 1;
+          params.loops[1][params.x_loop_idx[1]] - 1;
 
-      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
-      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.y_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.x_loop_idx[1]];
       ac_int<16, false> Y0_X0 = Y0 * X0;
 
       Pack1D<Buffer, NCols> bias;
@@ -448,7 +449,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       // loop indices that are used to determine when to read in a new bias
       int bias_reuse_indices[4] = {5, 5, 5, 5};
-      for (int i = 5; i > params.weightLoopIndex[1]; i--) {
+      for (int i = 5; i > params.weight_loop_idx[1]; i--) {
         bias_reuse_indices[5 - i] = i;
       }
 
@@ -464,11 +465,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         }
 
         bool swap_weights;
-        if (params.weightReuseIndex[0] != params.weightReuseIndex[1]) {
-          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0) &&
-                         (loop_counters[1][params.weightReuseIndex[0]] == 0);
+        if (params.weight_reuse_idx[0] != params.weight_reuse_idx[1]) {
+          swap_weights = (loop_counters[1][params.weight_reuse_idx[1]] == 0) &&
+                         (loop_counters[1][params.weight_reuse_idx[0]] == 0);
         } else {
-          swap_weights = (loop_counters[1][params.weightReuseIndex[1]] == 0);
+          swap_weights = (loop_counters[1][params.weight_reuse_idx[1]] == 0);
         }
 
         if (params.is_mx_op && (swap_weights || step == 0)) {
@@ -478,11 +479,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #endif
 
         bool is_non_accumulating_tile =
-            loop_counters[0][params.reductionLoopIndex[0]] == 0 &&
-            loop_counters[1][params.reductionLoopIndex[1]] == 0 &&
-            loop_counters[1][params.fxIndex] == 0 &&
-            loop_counters[0][params.fyIndex[0]] == 0 &&
-            loop_counters[1][params.fyIndex[1]] == 0;
+            loop_counters[0][params.reduction_loop_idx[0]] == 0 &&
+            loop_counters[1][params.reduction_loop_idx[1]] == 0 &&
+            loop_counters[1][params.fx_loop_idx] == 0 &&
+            loop_counters[0][params.fy_loop_idx[0]] == 0 &&
+            loop_counters[1][params.fy_loop_idx[1]] == 0;
 
         Pack1D<Buffer, NCols> previous_accumulation;
 
@@ -506,9 +507,9 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           }
         } else {
           ac_int<16, false> address =
-              loop_counters[1][params.weightLoopIndex[1]] * Y0_X0 +
-              loop_counters[1][params.inputYLoopIndex[1]] * X0 +
-              loop_counters[1][params.inputXLoopIndex[1]];
+              loop_counters[1][params.weight_loop_idx[1]] * Y0_X0 +
+              loop_counters[1][params.y_loop_idx[1]] * X0 +
+              loop_counters[1][params.x_loop_idx[1]];
 
           accumulation_buffer_read_address[accumulation_buffer_bank].Push(
               address);
@@ -535,14 +536,14 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
         if (params.write_output_to_accum_buffer) {
           bool output_tile_completed =
-              (loop_counters[0][params.reductionLoopIndex[0]] == c2_bound) &&
-              (loop_counters[1][params.reductionLoopIndex[1]] == c1_bound) &&
-              (loop_counters[1][params.weightLoopIndex[1]] == k1_bound) &&
-              (loop_counters[1][params.fxIndex] == fx_bound) &&
-              (loop_counters[0][params.fyIndex[0]] == fy0_bound) &&
-              (loop_counters[1][params.fyIndex[1]] == fy1_bound) &&
-              (loop_counters[1][params.inputXLoopIndex[1]] == x0_bound) &&
-              (loop_counters[1][params.inputYLoopIndex[1]] == y0_bound);
+              (loop_counters[0][params.reduction_loop_idx[0]] == c2_bound) &&
+              (loop_counters[1][params.reduction_loop_idx[1]] == c1_bound) &&
+              (loop_counters[1][params.weight_loop_idx[1]] == k1_bound) &&
+              (loop_counters[1][params.fx_loop_idx] == fx_bound) &&
+              (loop_counters[0][params.fy_loop_idx[0]] == fy0_bound) &&
+              (loop_counters[1][params.fy_loop_idx[1]] == fy1_bound) &&
+              (loop_counters[1][params.x_loop_idx[1]] == x0_bound) &&
+              (loop_counters[1][params.y_loop_idx[1]] == y0_bound);
 
           if (output_tile_completed) {
             accumulation_buffer_bank = !accumulation_buffer_bank;
@@ -607,23 +608,24 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       ac_int<32, false> step = 0;
 
       ac_int<LOOP_WIDTH, false> c2_bound =
-          params.loops[0][params.reductionLoopIndex[0]] - 1;
+          params.loops[0][params.reduction_loop_idx[0]] - 1;
       ac_int<LOOP_WIDTH, false> c1_bound =
-          params.loops[1][params.reductionLoopIndex[1]] - 1;
+          params.loops[1][params.reduction_loop_idx[1]] - 1;
       ac_int<LOOP_WIDTH, false> k1_bound =
-          params.loops[1][params.weightLoopIndex[1]] - 1;
-      ac_int<LOOP_WIDTH, false> fx_bound = params.loops[1][params.fxIndex] - 1;
+          params.loops[1][params.weight_loop_idx[1]] - 1;
+      ac_int<LOOP_WIDTH, false> fx_bound =
+          params.loops[1][params.fx_loop_idx] - 1;
       ac_int<LOOP_WIDTH, false> fy0_bound =
-          params.loops[0][params.fyIndex[0]] - 1;
+          params.loops[0][params.fy_loop_idx[0]] - 1;
       ac_int<LOOP_WIDTH, false> fy1_bound =
-          params.loops[1][params.fyIndex[1]] - 1;
+          params.loops[1][params.fy_loop_idx[1]] - 1;
       ac_int<LOOP_WIDTH, false> y0_bound =
-          params.loops[1][params.inputYLoopIndex[1]] - 1;
+          params.loops[1][params.y_loop_idx[1]] - 1;
       ac_int<LOOP_WIDTH, false> x0_bound =
-          params.loops[1][params.inputXLoopIndex[1]] - 1;
+          params.loops[1][params.x_loop_idx[1]] - 1;
 
-      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.inputYLoopIndex[1]];
-      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.inputXLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> Y0 = params.loops[1][params.y_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> X0 = params.loops[1][params.x_loop_idx[1]];
       ac_int<16, false> Y0_X0 = Y0 * X0;
 
 #pragma hls_pipeline_init_interval 1
@@ -632,11 +634,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         Pack1D<Buffer, NCols> previous_accumulation = accumulation_deq.Pop();
 
         bool accumulation_finished =
-            (loop_counters[0][params.reductionLoopIndex[0]] == c2_bound) &&
-            (loop_counters[1][params.reductionLoopIndex[1]] == c1_bound) &&
-            (loop_counters[1][params.fxIndex] == fx_bound) &&
-            (loop_counters[0][params.fyIndex[0]] == fy0_bound) &&
-            (loop_counters[1][params.fyIndex[1]] == fy1_bound);
+            (loop_counters[0][params.reduction_loop_idx[0]] == c2_bound) &&
+            (loop_counters[1][params.reduction_loop_idx[1]] == c1_bound) &&
+            (loop_counters[1][params.fx_loop_idx] == fx_bound) &&
+            (loop_counters[0][params.fy_loop_idx[0]] == fy0_bound) &&
+            (loop_counters[1][params.fy_loop_idx[1]] == fy1_bound);
 
         if ((accumulation_finished && !DOUBLE_BUFFERED_ACCUM_BUFFER) ||
             (accumulation_finished && DOUBLE_BUFFERED_ACCUM_BUFFER &&
@@ -645,9 +647,9 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           output_channel.Push(previous_accumulation);
         } else {
           ac_int<16, false> address =
-              loop_counters[1][params.weightLoopIndex[1]] * Y0_X0 +
-              loop_counters[1][params.inputYLoopIndex[1]] * X0 +
-              loop_counters[1][params.inputXLoopIndex[1]];
+              loop_counters[1][params.weight_loop_idx[1]] * Y0_X0 +
+              loop_counters[1][params.y_loop_idx[1]] * X0 +
+              loop_counters[1][params.x_loop_idx[1]];
 
           BufferWriteRequest<Pack1D<Buffer, NCols>> req;
           req.address = address;
@@ -658,14 +660,14 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
         if (params.write_output_to_accum_buffer) {
           bool output_tile_completed =
-              (loop_counters[0][params.reductionLoopIndex[0]] == c2_bound) &&
-              (loop_counters[1][params.reductionLoopIndex[1]] == c1_bound) &&
-              (loop_counters[1][params.weightLoopIndex[1]] == k1_bound) &&
-              (loop_counters[1][params.fxIndex] == fx_bound) &&
-              (loop_counters[0][params.fyIndex[0]] == fy0_bound) &&
-              (loop_counters[1][params.fyIndex[1]] == fy1_bound) &&
-              (loop_counters[1][params.inputXLoopIndex[1]] == x0_bound) &&
-              (loop_counters[1][params.inputYLoopIndex[1]] == y0_bound);
+              (loop_counters[0][params.reduction_loop_idx[0]] == c2_bound) &&
+              (loop_counters[1][params.reduction_loop_idx[1]] == c1_bound) &&
+              (loop_counters[1][params.weight_loop_idx[1]] == k1_bound) &&
+              (loop_counters[1][params.fx_loop_idx] == fx_bound) &&
+              (loop_counters[0][params.fy_loop_idx[0]] == fy0_bound) &&
+              (loop_counters[1][params.fy_loop_idx[1]] == fy1_bound) &&
+              (loop_counters[1][params.x_loop_idx[1]] == x0_bound) &&
+              (loop_counters[1][params.y_loop_idx[1]] == y0_bound);
 
           if (output_tile_completed) {
             accumulation_buffer_done[accumulation_buffer_bank].SyncPush();

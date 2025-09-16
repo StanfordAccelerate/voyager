@@ -78,7 +78,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     params_deserializer.clk(clk);
     params_deserializer.rstn(rstn);
     params_deserializer.serial_params_in(serial_params_in);
-    params_deserializer.paramsOut[0](params_in);
+    params_deserializer.params_out[0](params_in);
 
     SC_THREAD(fetch_inputs);
     sensitive << clk.pos();
@@ -133,10 +133,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = fetch_input_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
       ac_int<32, false> c_bound = (C2 * C1 + Width - 1) / Width - 1;
 
@@ -179,10 +179,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = process_input_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
       ac_int<32, false> c_bound = (C2 * C1 + Width - 1) / Width - 1;
 
@@ -247,10 +247,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = input_scale_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
       ac_int<32, false> c_bound = (C2 * C1 + Width - 1) / Width - 1;
 
@@ -294,10 +294,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = fetch_weight_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       ac_int<32, false> C = C2 * C1;
       ac_int<32, false> c_bound = (C + Width - 1) / Width - 1;
       ac_int<32, false> k_bound = K2 * K1 - 1;
@@ -340,10 +340,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = process_weight_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       ac_int<32, false> k_bound = K2 * K1 - 1;
       ac_int<32, false> c_bound = (C2 * C1 + Width - 1) / Width - 1;
 
@@ -409,10 +409,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = weight_scale_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       loop_t c_bound = (C2 * C1 + Width - 1) / Width;
       ac_int<32, false> loop_bound = K2 * K1 * c_bound - 1;
 
@@ -449,8 +449,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       const MatrixParams params = fetch_bias_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
       ac_int<32, false> k_bound =
           (K2 * K1 + VectorUnitWidth - 1) / VectorUnitWidth - 1;
 
@@ -499,10 +499,10 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
       start_signal.SyncPush();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
-      loop_t C2 = params.loops[0][params.reductionLoopIndex[0]];
-      loop_t C1 = params.loops[1][params.reductionLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
+      loop_t C2 = params.loops[0][params.reduction_loop_idx[0]];
+      loop_t C1 = params.loops[1][params.reduction_loop_idx[1]];
       ac_int<32, false> C = C2 * C1;
       loop_t c_bound = (C + Width - 1) / Width - 1;
       ac_int<32, false> k_bound = K2 * K1 - 1;
@@ -597,8 +597,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     while (true) {
       MatrixParams params = send_outputs_param.Pop();
 
-      loop_t K2 = params.loops[0][params.weightLoopIndex[0]];
-      loop_t K1 = params.loops[1][params.weightLoopIndex[1]];
+      loop_t K2 = params.loops[0][params.weight_loop_idx[0]];
+      loop_t K1 = params.loops[1][params.weight_loop_idx[1]];
       ac_int<32, false> k_bound =
           (K2 * K1 + VectorUnitWidth - 1) / VectorUnitWidth - 1;
 

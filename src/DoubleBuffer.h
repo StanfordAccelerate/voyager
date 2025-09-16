@@ -26,7 +26,7 @@ SC_MODULE(DoubleBuffer) {
   Connections::Out<ac_int<Width, false>> CCS_INIT_S1(output);
 
 #ifndef __SYNTHESIS__
-  AccessCounter *accessCounter;
+  AccessCounter *access_counter;
 #endif
 
   SC_CTOR(DoubleBuffer) {
@@ -43,7 +43,7 @@ SC_MODULE(DoubleBuffer) {
     async_reset_signal_is(rstn, false);
 
 #ifndef __SYNTHESIS__
-    accessCounter = new AccessCounter();
+    access_counter = new AccessCounter();
 #endif
   }
 
@@ -92,7 +92,7 @@ SC_MODULE(DoubleBuffer) {
         }
 
 #ifndef __SYNTHESIS__
-        accessCounter->increment(name(), Width);
+        access_counter->increment(name(), Width);
 #endif
 
         BufferReadResponse<ac_int<Width, false>> response;

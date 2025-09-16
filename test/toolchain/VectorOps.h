@@ -1,7 +1,5 @@
 #pragma once
 
-#include "ApproximationConstants.h"
-#include "ArchitectureParams.h"
 #include "test/common/Tiling.h"
 #include "test/toolchain/ApproximationConstants.h"
 #include "test/toolchain/Common.h"
@@ -336,30 +334,30 @@ void MapVectorOperations(const codegen::Operation &param,
 
     tiling = {
         .loops = {{Y1, X1, K1, 1, 1, 1}, {1, 1, 1, 1, 1, X0}},
-        .x_loop_index = {1, 5},
-        .y_loop_index = {0, 4},
-        .weight_loop_index = {2, 1},
+        .x_loop_idx = {1, 5},
+        .y_loop_idx = {0, 4},
+        .weight_loop_idx = {2, 1},
     };
 
     for (int i = 0; i < 3; i++) {
       vector_params->vector_fetch_0_loops[0][i] = tiling.loops[0][i];
     }
-    vector_params->vector_fetch_0_y_loop_idx[0] = tiling.y_loop_index[0];
-    vector_params->vector_fetch_0_x_loop_idx[0] = tiling.x_loop_index[0];
-    vector_params->vector_fetch_0_k_loop_idx[0] = tiling.weight_loop_index[0];
+    vector_params->vector_fetch_0_y_loop_idx[0] = tiling.y_loop_idx[0];
+    vector_params->vector_fetch_0_x_loop_idx[0] = tiling.x_loop_idx[0];
+    vector_params->vector_fetch_0_k_loop_idx[0] = tiling.weight_loop_idx[0];
 
     int loop_index = 0;
     for (int i = 0; i < 6; i++) {
       // ignore the loops not present in outputs (reduction, fx, fy)
-      if (i == tiling.y_loop_index[1]) {
+      if (i == tiling.y_loop_idx[1]) {
         vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
         vector_params->vector_fetch_0_y_loop_idx[1] = loop_index++;
       }
-      if (i == tiling.x_loop_index[1]) {
+      if (i == tiling.x_loop_idx[1]) {
         vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
         vector_params->vector_fetch_0_x_loop_idx[1] = loop_index++;
       }
-      if (i == tiling.weight_loop_index[1]) {
+      if (i == tiling.weight_loop_idx[1]) {
         vector_params->vector_fetch_0_loops[1][loop_index] = tiling.loops[1][i];
         vector_params->vector_fetch_0_k_loop_idx[1] = loop_index++;
       }
@@ -414,22 +412,22 @@ void MapVectorOperations(const codegen::Operation &param,
     for (int i = 0; i < 3; i++) {
       vector_params->output_loops[0][i] = tiling.loops[0][i];
     }
-    vector_params->output_y_loop_idx[0] = tiling.y_loop_index[0];
-    vector_params->output_x_loop_idx[0] = tiling.x_loop_index[0];
-    vector_params->output_k_loop_idx[0] = tiling.weight_loop_index[0];
+    vector_params->output_y_loop_idx[0] = tiling.y_loop_idx[0];
+    vector_params->output_x_loop_idx[0] = tiling.x_loop_idx[0];
+    vector_params->output_k_loop_idx[0] = tiling.weight_loop_idx[0];
 
     // Set inner loops
     int loop_index = 0;
     for (int i = 0; i < 6; i++) {
-      if (i == tiling.y_loop_index[1]) {
+      if (i == tiling.y_loop_idx[1]) {
         vector_params->output_loops[1][loop_index] = tiling.loops[1][i];
         vector_params->output_y_loop_idx[1] = loop_index++;
       }
-      if (i == tiling.x_loop_index[1]) {
+      if (i == tiling.x_loop_idx[1]) {
         vector_params->output_loops[1][loop_index] = tiling.loops[1][i];
         vector_params->output_x_loop_idx[1] = loop_index++;
       }
-      if (i == tiling.weight_loop_index[1]) {
+      if (i == tiling.weight_loop_idx[1]) {
         vector_params->output_loops[1][loop_index] = tiling.loops[1][i];
         vector_params->output_k_loop_idx[1] = loop_index++;
       }
@@ -883,8 +881,8 @@ void MapVectorOperations(const codegen::Operation &param,
 
   // total output count
   vector_instruction_config->inst[0] = inst;
-  vector_instruction_config->instLen = 1;
-  vector_instruction_config->instLoopCount = 1;
+  vector_instruction_config->num_inst = 1;
+  vector_instruction_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vector_instruction_config);

@@ -163,8 +163,8 @@ void MapMatrixVectorMultiply(const codegen::Operation &param,
     vector_instruction_config->inst[2] = vinst2;
   }
 
-  vector_instruction_config->instLen = has_bias ? 3 : 2;
-  vector_instruction_config->instLoopCount = output_dim / OC_DIMENSION;
+  vector_instruction_config->num_inst = has_bias ? 3 : 2;
+  vector_instruction_config->repeat_count = output_dim / OC_DIMENSION;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vector_instruction_config);

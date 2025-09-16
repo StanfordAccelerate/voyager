@@ -231,7 +231,8 @@ SC_MODULE(OutputController) {
       ac_int<16, false> loop_bound_0 = params.output_loops[0][1] * loop_bound_1;
 
 #if SUPPORT_DWC
-      if (params.addr_from_dwc) {
+      // TODO: remove this and handle using vector params
+      if (params.is_dwc) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         while (true) {
@@ -255,101 +256,103 @@ SC_MODULE(OutputController) {
           }
 #endif
         }
-      }
+      } else
 #endif
-
+      {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
-        for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
-          for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-            for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
-              for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
-                  ac_int<32, false> address;
-                  if (params.output_mode == 1) {
-                    ac_int<LOOP_WIDTH, false> x0 =
-                        loop_counters[1][params.output_x_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> x1 =
-                        loop_counters[0][params.output_x_loop_idx[0]];
-                    ac_int<LOOP_WIDTH, false> y0 =
-                        loop_counters[1][params.output_y_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> y1 =
-                        loop_counters[0][params.output_y_loop_idx[0]];
-                    ac_int<LOOP_WIDTH, false> k1 =
-                        loop_counters[1][params.output_k_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> k2 =
-                        loop_counters[0][params.output_k_loop_idx[0]];
+        for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
+              for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                    ac_int<32, false> address;
+                    if (params.output_mode == 1) {
+                      ac_int<LOOP_WIDTH, false> x0 =
+                          loop_counters[1][params.output_x_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> x1 =
+                          loop_counters[0][params.output_x_loop_idx[0]];
+                      ac_int<LOOP_WIDTH, false> y0 =
+                          loop_counters[1][params.output_y_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> y1 =
+                          loop_counters[0][params.output_y_loop_idx[0]];
+                      ac_int<LOOP_WIDTH, false> k1 =
+                          loop_counters[1][params.output_k_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> k2 =
+                          loop_counters[0][params.output_k_loop_idx[0]];
 
-                    ac_int<32, false> y = y1 * Y0 + y0;
-                    ac_int<32, false> x = x1 * X0 + x0;
-                    ac_int<32, false> k = k2 * K1 + k1 * Width;
+                      ac_int<32, false> y = y1 * Y0 + y0;
+                      ac_int<32, false> x = x1 * X0 + x0;
+                      ac_int<32, false> k = k2 * K1 + k1 * Width;
 
-                    ac_int<8, false> head_size = params.head_size_power_of_two;
-                    ac_int<16, false> mask = (1 << head_size) - 1;
+                      ac_int<8, false> head_size =
+                          params.head_size_power_of_two;
+                      ac_int<16, false> mask = (1 << head_size) - 1;
 
-                    if (params.has_attn_head_permute) {
-                      // k / head_size * (X * head_size) + x * head_size
-                      // + k % head_size
-                      address = (((k >> head_size) * X) << head_size) +
-                                (x << head_size) + (k & mask);
-                    } else {
-                      address = y * X * K + x * K + k;
+                      if (params.has_attn_head_permute) {
+                        // k / head_size * (X * head_size) + x * head_size
+                        // + k % head_size
+                        address = (((k >> head_size) * X) << head_size) +
+                                  (x << head_size) + (k & mask);
+                      } else {
+                        address = y * X * K + x * K + k;
+                      }
+                    } else if (params.output_mode == 2) {
+                      address = (loop_counters[0][0] * loop_bound_0 +
+                                 loop_counters[0][1] * loop_bound_1 +
+                                 loop_counters[0][2] * loop_bound_2 +
+                                 loop_counters[1][0] * loop_bound_3 +
+                                 loop_counters[1][1] * loop_bound_4 +
+                                 loop_counters[1][2]) *
+                                Width;
                     }
-                  } else if (params.output_mode == 2) {
-                    address = (loop_counters[0][0] * loop_bound_0 +
-                               loop_counters[0][1] * loop_bound_1 +
-                               loop_counters[0][2] * loop_bound_2 +
-                               loop_counters[1][0] * loop_bound_3 +
-                               loop_counters[1][1] * loop_bound_4 +
-                               loop_counters[1][2]) *
-                              Width;
-                  }
 
 #if SUPPORT_MX
-                  if (params.quantize_output_mx) {
-                    scale_address_out.Push(params.mx_scale_offset +
-                                           address / Width * ScaleType::width /
-                                               8);
-                  }
+                    if (params.quantize_output_mx) {
+                      scale_address_out.Push(params.mx_scale_offset +
+                                             address / Width *
+                                                 ScaleType::width / 8);
+                    }
 #endif
 
-                  bool found =
-                      (send_output_address<OutputTypes, Width, OC_PORT_WIDTH,
-                                           OutputTypes...>(
-                           params.output_dtype, params.vector_output_offset,
-                           address, vector_address_out) ||
-                       ...);
+                    bool found =
+                        (send_output_address<OutputTypes, Width, OC_PORT_WIDTH,
+                                             OutputTypes...>(
+                             params.output_dtype, params.vector_output_offset,
+                             address, vector_address_out) ||
+                         ...);
 
 #ifndef __SYNTHESIS__
-                  if (!found) {
-                    std::cerr << "Error: output type '" << params.output_dtype
-                              << "' is not valid.\n";
-                  }
+                    if (!found) {
+                      std::cerr << "Error: output type '" << params.output_dtype
+                                << "' is not valid.\n";
+                    }
 #endif
 
-                  if (loop_counters[1][2] == loop_bounds[1][2]) {
+                    if (loop_counters[1][2] == loop_bounds[1][2]) {
+                      break;
+                    }
+                  }
+                  if (loop_counters[1][1] == loop_bounds[1][1]) {
                     break;
                   }
                 }
-                if (loop_counters[1][1] == loop_bounds[1][1]) {
+                if (loop_counters[1][0] == loop_bounds[1][0]) {
                   break;
                 }
               }
-              if (loop_counters[1][0] == loop_bounds[1][0]) {
+              if (loop_counters[0][2] == loop_bounds[0][2]) {
                 break;
               }
             }
-            if (loop_counters[0][2] == loop_bounds[0][2]) {
+            if (loop_counters[0][1] == loop_bounds[0][1]) {
               break;
             }
           }
-          if (loop_counters[0][1] == loop_bounds[0][1]) {
+          if (loop_counters[0][0] == loop_bounds[0][0]) {
             break;
           }
-        }
-        if (loop_counters[0][0] == loop_bounds[0][0]) {
-          break;
         }
       }
     }

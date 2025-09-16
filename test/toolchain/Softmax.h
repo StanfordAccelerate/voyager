@@ -1,7 +1,5 @@
 #pragma once
 
-#include "ApproximationConstants.h"
-#include "ArchitectureParams.h"
 #include "test/toolchain/Common.h"
 
 void MapSoftmax(const codegen::Operation &param,
@@ -104,8 +102,8 @@ void MapSoftmax(const codegen::Operation &param,
   vinst1.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst1;
 
-  vector_instruction_config->instLen = 2;
-  vector_instruction_config->instLoopCount = 1;
+  vector_instruction_config->num_inst = 2;
+  vector_instruction_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vector_instruction_config);
@@ -193,8 +191,8 @@ void MapSoftmax(const codegen::Operation &param,
   vinst3.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst3;
 
-  vector_instruction_config->instLen = 2;
-  vector_instruction_config->instLoopCount = 1;
+  vector_instruction_config->num_inst = 2;
+  vector_instruction_config->repeat_count = 1;
 
   // Copy coefficients from ApproximationConstants.h
   for (int i = 0; i < NUM_MAXES; i++) {
@@ -302,8 +300,8 @@ void MapSoftmax(const codegen::Operation &param,
 
   vector_instruction_config->inst[0] = inst4;
 
-  vector_instruction_config->instLen = 1;
-  vector_instruction_config->instLoopCount = 1;
+  vector_instruction_config->num_inst = 1;
+  vector_instruction_config->repeat_count = 1;
 
   // Copy coefficients from ApproximationConstants.h
   for (int i = 0; i < NUM_MAXES; i++) {

@@ -139,7 +139,7 @@ SC_MODULE(MatrixUnit) {
     params_deserializer.rstn(rstn);
     params_deserializer.serial_params_in(serial_params_in);
     for (int i = 0; i < PARAMS_MODULE_COUNT; i++) {
-      params_deserializer.paramsOut[i](matrix_params[i]);
+      params_deserializer.params_out[i](matrix_params[i]);
     }
 
     input_controller.clk(clk);

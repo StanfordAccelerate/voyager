@@ -8,13 +8,13 @@
 
 struct Tiling {
   int loops[2][6];
-  int x_loop_index[2];
-  int y_loop_index[2];
-  int reduction_loop_index[2];
-  int weight_loop_index[2];
-  int fx_index;
-  int fy_index[2];
-  int weight_reuse_index[2];
+  int x_loop_idx[2];
+  int y_loop_idx[2];
+  int reduction_loop_idx[2];
+  int weight_loop_idx[2];
+  int fx_loop_idx;
+  int fy_loop_idx[2];
+  int weight_reuse_idx[2];
   int stride;
   int padding;
   bool resnet_replication;

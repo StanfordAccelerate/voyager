@@ -49,6 +49,14 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.matrix_unit_weight_resp(matrix_unit_weight_resp);
   accelerator.matrix_unit_bias_req(matrix_unit_bias_req);
   accelerator.matrix_unit_bias_resp(matrix_unit_bias_resp);
+#if SUPPORT_MX
+  accelerator.matrix_unit_input_scale_req(matrix_unit_input_scale_req);
+  accelerator.matrix_unit_input_scale_resp(matrix_unit_input_scale_resp);
+  accelerator.matrix_unit_weight_scale_req(matrix_unit_weight_scale_req);
+  accelerator.matrix_unit_weight_scale_resp(matrix_unit_weight_scale_resp);
+#endif
+  accelerator.matrix_unit_start_signal(matrix_unit_start_signal);
+  accelerator.matrix_unit_done_signal(matrix_unit_done_signal);
 #if SUPPORT_MVM
   accelerator.serial_matrix_vector_params_in(serial_matrix_vector_params_in);
   accelerator.matrix_vector_unit_input_req(matrix_vector_unit_input_req);
@@ -70,6 +78,23 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.matrix_vector_unit_start_signal(matrix_vector_unit_start_signal);
   accelerator.matrix_vector_unit_done_signal(matrix_vector_unit_done_signal);
 #endif
+#if SUPPORT_DWC
+  accelerator.serial_dwc_params_in(serial_dwc_params_in);
+  accelerator.dwc_input_req(dwc_input_req);
+  accelerator.dwc_input_resp(dwc_input_data_resp);
+  accelerator.dwc_weight_req(dwc_weight_req);
+  accelerator.dwc_weight_resp(dwc_weight_data_resp);
+  accelerator.dwc_bias_req(dwc_bias_req);
+  accelerator.dwc_bias_resp(dwc_bias_resp);
+#if SUPPORT_MX
+  accelerator.dwc_input_scale_req(dwc_input_scale_req);
+  accelerator.dwc_input_scale_resp(dwc_input_scale_resp);
+  accelerator.dwc_weight_scale_req(dwc_weight_scale_req);
+  accelerator.dwc_weight_scale_resp(dwc_weight_scale_resp);
+#endif
+  accelerator.dwc_start_signal(dwc_start_signal);
+  accelerator.dwc_done_signal(dwc_done_signal);
+#endif
   accelerator.serial_vector_params_in(serial_vector_params_in);
   accelerator.vector_fetch_0_req(vector_fetch_0_req);
   accelerator.vector_fetch_0_resp(vector_fetch_0_resp);
@@ -81,38 +106,8 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.vector_output_address(vector_output_address);
   accelerator.scalar_output(scalar_output);
   accelerator.scalar_output_address(scalar_output_address);
-
-  accelerator.matrix_unit_start_signal(matrix_unit_start_signal);
-  accelerator.matrix_unit_done_signal(matrix_unit_done_signal);
   accelerator.vector_unit_start_signal(vector_unit_start_signal);
   accelerator.vector_unit_done_signal(vector_unit_done_signal);
-
-#if SUPPORT_MX
-  accelerator.matrix_unit_input_scale_req(matrix_unit_input_scale_req);
-  accelerator.matrix_unit_input_scale_resp(matrix_unit_input_scale_resp);
-  accelerator.matrix_unit_weight_scale_req(matrix_unit_weight_scale_req);
-  accelerator.matrix_unit_weight_scale_resp(matrix_unit_weight_scale_resp);
-#endif
-
-#if SUPPORT_DWC
-  accelerator.serial_dwc_params_in(serial_dwc_params_in);
-  accelerator.dwc_input_req(dwc_input_req);
-  accelerator.dwc_input_resp(dwc_input_data_resp);
-  accelerator.dwc_weight_req(dwc_weight_req);
-  accelerator.dwc_weight_resp(dwc_weight_data_resp);
-  accelerator.dwc_bias_req(dwc_bias_req);
-  accelerator.dwc_bias_resp(dwc_bias_resp);
-
-#if SUPPORT_MX
-  accelerator.dwc_input_scale_req(dwc_input_scale_req);
-  accelerator.dwc_input_scale_resp(dwc_input_scale_resp);
-  accelerator.dwc_weight_scale_req(dwc_weight_scale_req);
-  accelerator.dwc_weight_scale_resp(dwc_weight_scale_resp);
-#endif
-
-  accelerator.dwc_start_signal(dwc_start_signal);
-  accelerator.dwc_done_signal(dwc_done_signal);
-#endif
 
   SC_CTHREAD(reset, clk);
 
@@ -289,11 +284,11 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   sensitive << clk.posedge_event();
   async_reset_signal_is(rstn, false);
 
-  accessCounter = new AccessCounter();
+  access_counter = new AccessCounter();
 // do not set access counters for an RTL simulation
 #ifndef CCS_DUT_RTL
-  accelerator.matrix_unit.input_buffer.accessCounter = accessCounter;
-  accelerator.matrix_unit.weight_buffer.accessCounter = accessCounter;
+  accelerator.matrix_unit.input_buffer.access_counter = access_counter;
+  accelerator.matrix_unit.weight_buffer.access_counter = access_counter;
 #endif
 }
 
@@ -318,7 +313,7 @@ void Harness::process_read_request(
     int total_bytes = request.burst_size;
     int num_words = (total_bytes + num_bytes - 1) / num_bytes;
 
-    accessCounter->increment(std::string(name()), total_bytes);
+    access_counter->increment(std::string(name()), total_bytes);
 
     ac_int<Width, false> bits;
 
@@ -368,7 +363,7 @@ void Harness::process_write_request(
     auto data = data_out->Pop();
     DLOG("write address: " << address << " data: " << data);
 
-    accessCounter->increment(std::string(name()) + "_" + "outputs", num_bytes);
+    access_counter->increment(std::string(name()) + "_" + "outputs", num_bytes);
 
     for (int i = 0; i < num_bytes; i++) {
       memory[address + i] = data.template slc<8>(i * 8);
@@ -566,12 +561,11 @@ void send_serialized_params(
   vector_to_type(TypeToBits<T>(params), false, &serialized_params);
 
   // round up to the nearest multiple of width
-  ac_int<((T::width + width - 1) / width) * width, false>
-      serialized_params_padded = serialized_params;
+  ac_int<((T::width + width - 1) / width) * width, false> padded_params =
+      serialized_params;
 
-  for (int i = 0; i < serialized_params_padded.width / width; i++) {
-    serial_params_in->Push(
-        serialized_params_padded.template slc<width>(i * width));
+  for (int i = 0; i < padded_params.width / width; i++) {
+    serial_params_in->Push(padded_params.template slc<width>(i * width));
   }
 }
 
@@ -770,7 +764,7 @@ void Harness::record_done(const std::deque<BaseParams *> &params,
                                       start.to_default_time_units());
 
     std::cout << "Runtime: " << runtime << " ns" << std::endl;
-    accessCounter->print_summary(operation.tiling, operation.has_valid_tiling);
+    access_counter->print_summary(operation.tiling, operation.has_valid_tiling);
 
     if (idx != params.size() - 1) {
       operation_done.SyncPush();

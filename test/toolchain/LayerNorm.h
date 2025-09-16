@@ -108,8 +108,8 @@ void MapLayerNorm(const codegen::Operation &param,
   inst0_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = inst0_1;
 
-  vinstr_config->instLen = 2;
-  vinstr_config->instLoopCount = 1;
+  vinstr_config->num_inst = 2;
+  vinstr_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vinstr_config);
@@ -201,8 +201,8 @@ void MapLayerNorm(const codegen::Operation &param,
   inst1_1.vdest = VectorInstructions::to_reduce;
   vinstr_config->inst[1] = inst1_1;
 
-  vinstr_config->instLen = 2;
-  vinstr_config->instLoopCount = 1;
+  vinstr_config->num_inst = 2;
+  vinstr_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vinstr_config);
@@ -297,8 +297,8 @@ void MapLayerNorm(const codegen::Operation &param,
   inst2.vdest = VectorInstructions::to_output;
   vinstr_config->inst[0] = inst2;
 
-  vinstr_config->instLen = 1;
-  vinstr_config->instLoopCount = 1;
+  vinstr_config->num_inst = 1;
+  vinstr_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vinstr_config);
@@ -415,8 +415,8 @@ void MapLayerNorm(const codegen::Operation &param,
 
   vinstr_config->inst[0] = inst3;
 
-  vinstr_config->instLen = 1;
-  vinstr_config->instLoopCount = 1;
+  vinstr_config->num_inst = 1;
+  vinstr_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vinstr_config);

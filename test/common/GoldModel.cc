@@ -100,96 +100,86 @@ std::vector<std::any> run_operation(const Operation &operation,
       bias_ptr = kwargs[bias.node()];
     }
 
-    if ((first_op.target() == "conv2d" || first_op.target() == "conv2d_mx") &&
-        first_op.kwargs().at("groups").int_value() > 1) {
-      // Fetch microscaling scales
-      std::any input_scale_ptr = static_cast<Scale *>(nullptr);
-      std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
+    bool is_dwc = first_op.target().find("conv2d") != std::string::npos &&
+                  first_op.kwargs().at("groups").int_value() > 1;
 
-      bool is_mx_op = first_op.target().find("mx") != std::string::npos;
-      if (is_mx_op) {
-        const auto input_scale = first_op.kwargs().at("input_scale").tensor();
-        input_scale_ptr = kwargs[input_scale.node()];
+    const auto input_shape = get_shape(input);
+    int input_dim = get_size(input_shape) / input_shape.back();
+    bool is_fc = input_dim == 1;
 
-        const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
-        weight_scale_ptr = kwargs[weight_scale.node()];
+#if !SUPPORT_MVM
+    if (!is_dwc && !is_fc)
+#endif
+    {
+      float *input_code = nullptr;
+      if (first_op.kwargs().contains("input_code")) {
+        const auto code = first_op.kwargs().at("input_code").tensor();
+        input_code = read_constant_param(code);
       }
 
+      float *weight_code = nullptr;
+      if (first_op.kwargs().contains("weight_code")) {
+        const auto code = first_op.kwargs().at("weight_code").tensor();
+        weight_code = read_constant_param(code);
+      }
+
+      // Cast input and weight to systolic array compute types
+      cast_input<SaInput, SUPPORTED_TYPES>(input_ptr, input_code, input);
+      cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight_code, weight);
+
+      if (input_code != nullptr) {
+        delete[] input_code;
+      }
+
+      if (weight_code != nullptr) {
+        delete[] weight_code;
+      }
+
+      // Perform reshape if necessary
+      if (input.has_reshape()) {
+        input_ptr = reshape_if_needed<SaInput>(input_ptr, input.reshape());
+      }
+
+      if (weight.has_reshape()) {
+        weight_ptr = reshape_if_needed<SaWeight>(weight_ptr, weight.reshape());
+      }
+    }
+
+    // Fetch microscaling scales
+    std::any input_scale_ptr = static_cast<Scale *>(nullptr);
+    std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
+
+    bool is_mx_op = first_op.target().find("mx") != std::string::npos;
+    if (is_mx_op) {
+      const auto input_scale = first_op.kwargs().at("input_scale").tensor();
+      input_scale_ptr = kwargs[input_scale.node()];
+
+      const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
+      weight_scale_ptr = kwargs[weight_scale.node()];
+    }
+
+    if (is_dwc) {
+#if SUPPORT_DWC
       output_ptr = DwC<DWC_DATATYPE, DWC_PSUM, ACCUM_BUFFER_DATATYPE, Scale>(
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
           operation);
-    } else {
-      const auto input_shape = get_shape(input);
-      int input_dim = get_size(input_shape) / input_shape.back();
-      bool is_fc = input_dim == 1;
-
-#if !SUPPORT_MVM
-      if (!is_fc)
-#endif
-      {
-        float *input_code = nullptr;
-        if (first_op.kwargs().contains("input_code")) {
-          const auto code = first_op.kwargs().at("input_code").tensor();
-          input_code = read_constant_param(code);
-        }
-
-        float *weight_code = nullptr;
-        if (first_op.kwargs().contains("weight_code")) {
-          const auto code = first_op.kwargs().at("weight_code").tensor();
-          weight_code = read_constant_param(code);
-        }
-
-        // Cast input and weight to systolic array compute types
-        cast_input<SaInput, SUPPORTED_TYPES>(input_ptr, input_code, input);
-        cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight_code, weight);
-
-        if (input_code != nullptr) {
-          delete[] input_code;
-        }
-
-        if (weight_code != nullptr) {
-          delete[] weight_code;
-        }
-
-        // Perform reshape if necessary
-        if (input.has_reshape()) {
-          input_ptr = reshape_if_needed<SaInput>(input_ptr, input.reshape());
-        }
-
-        if (weight.has_reshape()) {
-          weight_ptr =
-              reshape_if_needed<SaWeight>(weight_ptr, weight.reshape());
-        }
-      }
-
-      // Fetch microscaling scales
-      std::any input_scale_ptr = static_cast<Scale *>(nullptr);
-      std::any weight_scale_ptr = static_cast<Scale *>(nullptr);
-
-      bool is_mx_op = first_op.target().find("mx") != std::string::npos;
-      if (is_mx_op) {
-        const auto input_scale = first_op.kwargs().at("input_scale").tensor();
-        input_scale_ptr = kwargs[input_scale.node()];
-
-        const auto weight_scale = first_op.kwargs().at("weight_scale").tensor();
-        weight_scale_ptr = kwargs[weight_scale.node()];
-      }
-
-      if (is_fc) {
-#if SUPPORT_MVM
-        output_ptr =
-            gemv<SaInput, SaWeight, Psum, AccumBuffer, Scale, MV_UNIT_WIDTH>(
-                input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr,
-                bias_ptr, operation);
 #else
-        output_ptr = matrix_vector_multiply<Vector>(
-            input_ptr, weight_ptr, bias_ptr, get_shape(weight));
+      throw std::runtime_error("DWC not supported in this build");
 #endif
-      } else {
-        output_ptr = gemm<SaInput, SaWeight, Psum, AccumBuffer, Scale>(
-            input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
-            operation);
-      }
+    } else if (is_fc) {
+#if SUPPORT_MVM
+      output_ptr =
+          gemv<SaInput, SaWeight, Psum, AccumBuffer, Scale, MV_UNIT_WIDTH>(
+              input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr,
+              bias_ptr, operation);
+#else
+      output_ptr = matrix_vector_multiply<Vector>(input_ptr, weight_ptr,
+                                                  bias_ptr, get_shape(weight));
+#endif
+    } else {
+      output_ptr = gemm<SaInput, SaWeight, Psum, AccumBuffer, Scale>(
+          input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
+          operation);
     }
   }
 

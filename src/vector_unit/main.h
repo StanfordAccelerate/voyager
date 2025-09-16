@@ -131,8 +131,8 @@ SC_MODULE(VectorUnit) {
     param_deserializer.clk(clk);
     param_deserializer.rstn(rstn);
     param_deserializer.serial_params_in(serial_params_in);
-    param_deserializer.vectorParamsOut(vector_params);
-    param_deserializer.vectorInstructionsOut(vector_instruction);
+    param_deserializer.vector_params_out(vector_params);
+    param_deserializer.vector_instructions_out(vector_instruction);
 
     // Vector fetcher
     fetcher.clk(clk);
@@ -264,9 +264,9 @@ SC_MODULE(VectorUnit) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (decltype(instruction_config.instLoopCount) loop = 0;; loop++) {
-        for (decltype(instruction_config.instLen) i = 0;; i++) {
-          VectorInstructions inst = instruction_config.inst[i];
+      for (decltype(instruction_config.repeat_count) i = 0;; i++) {
+        for (decltype(instruction_config.num_inst) j = 0;; j++) {
+          VectorInstructions inst = instruction_config.inst[j];
 
           if (inst.op_type == VectorInstructions::vector) {
             pipeline_instr.Push(inst);
@@ -277,11 +277,11 @@ SC_MODULE(VectorUnit) {
             reducer_instr.Push(inst);
           }
 
-          if (i == instruction_config.instLen - 1) {
+          if (j == instruction_config.num_inst - 1) {
             break;
           }
         }
-        if (loop == instruction_config.instLoopCount - 1) {
+        if (i == instruction_config.repeat_count - 1) {
           break;
         }
       }
@@ -337,7 +337,7 @@ SC_MODULE(VectorUnit) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      for (decltype(instruction_config.instLen) i = 0;; i++) {
+      for (decltype(instruction_config.num_inst) i = 0;; i++) {
         VectorInstructions inst = instruction_config.inst[i];
 
         if (inst.vdest == VectorInstructions::to_output ||
@@ -372,7 +372,7 @@ SC_MODULE(VectorUnit) {
           }
           break;
         }
-        if (i == instruction_config.instLen - 1) {
+        if (i == instruction_config.num_inst - 1) {
           break;
         }
       }

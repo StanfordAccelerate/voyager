@@ -101,7 +101,7 @@ SC_MODULE(DwCUnit) {
     param_deserializer.clk(clk);
     param_deserializer.rstn(rstn);
     param_deserializer.serial_params_in(serial_params_in);
-    param_deserializer.dwcParamsOut(paramsIn);
+    param_deserializer.dwc_params_out(paramsIn);
 
     MulAddTree<Input, Weight, Psum, Output> *mulAddTree_ptr[UNROLLFACTOR];
 
@@ -259,7 +259,7 @@ SC_MODULE(DwCUnit) {
                           input_bounds[2] +
                       C_g;
                   MemoryRequest request = {
-                      params.INPUT_OFFSET + address * Input::width / 8,
+                      params.input_offset + address * Input::width / 8,
                       UNROLLFACTOR * Input::width / 8};
                   input_req.Push(request);
 #if SUPPORT_MX
@@ -269,7 +269,7 @@ SC_MODULE(DwCUnit) {
                             block_num +
                         (C_g >> block_size);
                     MemoryRequest request_scale = {
-                        params.INPUT_SCALE_OFFSET +
+                        params.input_scale_offset +
                             address_scale * SCALE_DATATYPE::width / 8,
                         SCALE_DATATYPE::width / 8};
                     input_scale_req.Push(request_scale);
@@ -335,20 +335,20 @@ SC_MODULE(DwCUnit) {
           ac_int<32, false> C =
               loop_counters[0][2] * loop_bounds[1][2] + loop_counters[1][2];
           MemoryRequest weight_request = {
-              params.WEIGHT_OFFSET + C * DWC_KERNEL_SIZE * Weight::width / 8,
+              params.weight_offset + C * DWC_KERNEL_SIZE * Weight::width / 8,
               DWC_KERNEL_SIZE * Weight::width / 8};
           weight_req.Push(weight_request);
 #if SUPPORT_MX
           if (use_mx) {
             MemoryRequest weight_scale_request = {
-                params.WEIGHT_SCALE_OFFSET +
+                params.weight_scale_offset +
                     C * DWC_KERNEL_SIZE * SCALE_DATATYPE::width / 8,
                 DWC_KERNEL_SIZE * SCALE_DATATYPE::width / 8};
             weight_scale_req.Push(weight_scale_request);
           }
 #endif
           MemoryRequest bias_request = {
-              params.BIAS_OFFSET + C * Output::width / 8, Output::width / 8};
+              params.bias_offset + C * Output::width / 8, Output::width / 8};
           bias_req.Push(bias_request);
 
           if (loop_counters[1][2] >= loop_bounds[1][2] - 1) {
@@ -948,7 +948,7 @@ SC_MODULE(DwCUnit) {
           padding[i][j] = params.padding[i][j];
         }
       }
-      stride = params.STRIDE;
+      stride = params.stride;
       ac_int<LOOP_WIDTH, false> y_read_waiting;
       ac_int<2, false> y_exe_delay;
       if (padding[0][0] > DWC_KERNEL_DIM - 1) {

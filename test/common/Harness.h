@@ -23,12 +23,20 @@ SC_MODULE(Harness) {
 
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
       serial_matrix_params_in);
-  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serial_vector_params_in);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_unit_input_req);
   sc_fifo<IC_PORT_TYPE> matrix_unit_input_resp_fifo;
   Connections::Combinational<IC_PORT_TYPE> CCS_INIT_S1(matrix_unit_input_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_unit_weight_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> matrix_unit_weight_resp_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_unit_weight_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_unit_bias_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> matrix_unit_bias_resp_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_unit_bias_resp);
 
 #if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
@@ -37,14 +45,6 @@ SC_MODULE(Harness) {
       matrix_unit_input_scale_resp_fifo;
   Connections::Combinational<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
       matrix_unit_input_scale_resp);
-#endif
-
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_unit_weight_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> matrix_unit_weight_resp_fifo;
-  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      matrix_unit_weight_resp);
-
-#if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
       matrix_unit_weight_scale_req);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> matrix_unit_weight_scale_resp_fifo;
@@ -52,10 +52,8 @@ SC_MODULE(Harness) {
       matrix_unit_weight_scale_resp);
 #endif
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_unit_bias_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> matrix_unit_bias_resp_fifo;
-  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      matrix_unit_bias_resp);
+  Connections::SyncChannel CCS_INIT_S1(matrix_unit_start_signal);
+  Connections::SyncChannel CCS_INIT_S1(matrix_unit_done_signal);
 
 #if SUPPORT_MVM
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
@@ -137,6 +135,9 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(dwc_done_signal);
 #endif
 
+  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
+      serial_vector_params_in);
+
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vector_fetch_0_resp_fifo;
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
@@ -159,8 +160,6 @@ SC_MODULE(Harness) {
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       scalar_output_address);
 
-  Connections::SyncChannel CCS_INIT_S1(matrix_unit_start_signal);
-  Connections::SyncChannel CCS_INIT_S1(matrix_unit_done_signal);
   Connections::SyncChannel CCS_INIT_S1(vector_unit_start_signal);
   Connections::SyncChannel CCS_INIT_S1(vector_unit_done_signal);
 
@@ -176,7 +175,7 @@ SC_MODULE(Harness) {
  private:
   std::vector<Operation> operations;
   DataLoader *dataloader;
-  AccessCounter *accessCounter;
+  AccessCounter *access_counter;
 
 #ifdef SIM_Accelerator
   CCS_DESIGN(Accelerator) CCS_INIT_S1(accelerator);

@@ -99,37 +99,30 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
         for (int j = 0; j < 5; j++) {
-          loop_bounds[i][j] = params.weightAddressGenLoops[i][j] - 1;
+          loop_bounds[i][j] = params.weight_addr_loops[i][j] - 1;
         }
       }
 
       ac_int<LOOP_WIDTH, false> K2 =
-          params
-              .weightAddressGenLoops[0]
-                                    [params.weightAddressGenWeightLoopIndex[0]];
+          params.weight_addr_loops[0][params.weight_addr_weight_loop_idx[0]];
       ac_int<LOOP_WIDTH, false> C2 =
-          params.weightAddressGenLoops
-              [0][params.weightAddressGenReductionLoopIndex[0]];
+          params.weight_addr_loops[0][params.weight_addr_reduction_loop_idx[0]];
       ac_int<LOOP_WIDTH, false> C1 =
-          params.weightAddressGenLoops
-              [1][params.weightAddressGenReductionLoopIndex[1]];
+          params.weight_addr_loops[1][params.weight_addr_reduction_loop_idx[1]];
       ac_int<LOOP_WIDTH, false> C0 =
-          params.weightAddressGenLoops
-              [1][params.weightAddressGenReductionLoopIndex[2]];
+          params.weight_addr_loops[1][params.weight_addr_reduction_loop_idx[2]];
       ac_int<LOOP_WIDTH, false> FX =
-          params.weightAddressGenLoops[1][params.weightAddressGenFxIndex];
+          params.weight_addr_loops[1][params.weight_addr_fx_idx];
       ac_int<LOOP_WIDTH, false> FY0 =
-          params.weightAddressGenLoops[1][params.weightAddressGenFyIndex[1]];
+          params.weight_addr_loops[1][params.weight_addr_fy_idx[1]];
       ac_int<LOOP_WIDTH, false> FY1 =
-          params.weightAddressGenLoops[0][params.weightAddressGenFyIndex[0]];
+          params.weight_addr_loops[0][params.weight_addr_fy_idx[0]];
       ac_int<LOOP_WIDTH, false> K1 =
-          params
-              .weightAddressGenLoops[1]
-                                    [params.weightAddressGenWeightLoopIndex[1]];
+          params.weight_addr_loops[1][params.weight_addr_weight_loop_idx[1]];
 
       // reduce the number of iterations by packing factor
       K1 = K1 >> params.weight_packing_factor_power;
-      loop_bounds[1][params.weightAddressGenWeightLoopIndex[1]] = K1 - 1;
+      loop_bounds[1][params.weight_addr_weight_loop_idx[1]] = K1 - 1;
 
       ac_int<16, false> k_stride = NCols << params.weight_packing_factor_power;
       ac_int<24, false> c_stride = K2 * K1 * k_stride;
@@ -150,23 +143,21 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                       for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
                         for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
                           ac_int<LOOP_WIDTH, false> k2 = loop_counters
-                              [0][params.weightAddressGenWeightLoopIndex[0]];
+                              [0][params.weight_addr_weight_loop_idx[0]];
                           ac_int<LOOP_WIDTH, false> c2 = loop_counters
-                              [0][params.weightAddressGenReductionLoopIndex[0]];
+                              [0][params.weight_addr_reduction_loop_idx[0]];
                           ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                              [1][params.weightAddressGenReductionLoopIndex[1]];
+                              [1][params.weight_addr_reduction_loop_idx[1]];
                           ac_int<LOOP_WIDTH, false> c0 = loop_counters
-                              [1][params.weightAddressGenReductionLoopIndex[2]];
+                              [1][params.weight_addr_reduction_loop_idx[2]];
                           ac_int<LOOP_WIDTH, false> fx =
-                              loop_counters[1][params.weightAddressGenFxIndex];
+                              loop_counters[1][params.weight_addr_fx_idx];
                           ac_int<LOOP_WIDTH, false> fy0 =
-                              loop_counters[1]
-                                           [params.weightAddressGenFyIndex[1]];
+                              loop_counters[1][params.weight_addr_fy_idx[1]];
                           ac_int<LOOP_WIDTH, false> fy1 =
-                              loop_counters[0]
-                                           [params.weightAddressGenFyIndex[0]];
+                              loop_counters[0][params.weight_addr_fy_idx[0]];
                           ac_int<LOOP_WIDTH, false> k1 = loop_counters
-                              [1][params.weightAddressGenWeightLoopIndex[1]];
+                              [1][params.weight_addr_weight_loop_idx[1]];
 
                           ac_int<16, false> k = (k2 * K1 + k1) * k_stride;
                           ac_int<16, false> c = (c2 * C1 + c1) * C0 + c0;
@@ -253,32 +244,26 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
         for (int j = 0; j < 5; j++) {
-          loop_bounds[i][j] = params.weightAddressGenLoops[i][j] - 1;
+          loop_bounds[i][j] = params.weight_addr_loops[i][j] - 1;
         }
       }
 
       ac_int<LOOP_WIDTH, false> K2 =
-          params
-              .weightAddressGenLoops[0]
-                                    [params.weightAddressGenWeightLoopIndex[0]];
+          params.weight_addr_loops[0][params.weight_addr_weight_loop_idx[0]];
       ac_int<LOOP_WIDTH, false> C1 =
-          params.weightAddressGenLoops
-              [1][params.weightAddressGenReductionLoopIndex[1]];
+          params.weight_addr_loops[1][params.weight_addr_reduction_loop_idx[1]];
       ac_int<LOOP_WIDTH, false> C0 =
-          params.weightAddressGenLoops
-              [1][params.weightAddressGenReductionLoopIndex[2]];
+          params.weight_addr_loops[1][params.weight_addr_reduction_loop_idx[2]];
       ac_int<LOOP_WIDTH, false> FX =
-          params.weightAddressGenLoops[1][params.weightAddressGenFxIndex];
+          params.weight_addr_loops[1][params.weight_addr_fx_idx];
       ac_int<LOOP_WIDTH, false> FY0 =
-          params.weightAddressGenLoops[1][params.weightAddressGenFyIndex[1]];
+          params.weight_addr_loops[1][params.weight_addr_fy_idx[1]];
       ac_int<LOOP_WIDTH, false> K1 =
-          params
-              .weightAddressGenLoops[1]
-                                    [params.weightAddressGenWeightLoopIndex[1]];
+          params.weight_addr_loops[1][params.weight_addr_weight_loop_idx[1]];
 
       // reduce the number of iterations by packing factor
       K1 = K1 >> params.weight_packing_factor_power;
-      loop_bounds[1][params.weightAddressGenWeightLoopIndex[1]] = K1 - 1;
+      loop_bounds[1][params.weight_addr_weight_loop_idx[1]] = K1 - 1;
       ac_int<4, false> num_packs =
           (1 << params.weight_packing_factor_power) - 1;
 
@@ -299,20 +284,17 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                         for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
                           for (ac_int<4, false> pack = 0;; pack++) {
                             ac_int<LOOP_WIDTH, false> k2 = loop_counters
-                                [0][params.weightAddressGenWeightLoopIndex[0]];
+                                [0][params.weight_addr_weight_loop_idx[0]];
                             ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                                [1]
-                                [params.weightAddressGenReductionLoopIndex[1]];
+                                [1][params.weight_addr_reduction_loop_idx[1]];
                             ac_int<LOOP_WIDTH, false> c0 = loop_counters
-                                [1]
-                                [params.weightAddressGenReductionLoopIndex[2]];
+                                [1][params.weight_addr_reduction_loop_idx[2]];
                             ac_int<LOOP_WIDTH, false> fx =
-                                loop_counters[1]
-                                             [params.weightAddressGenFxIndex];
-                            ac_int<LOOP_WIDTH, false> fy0 = loop_counters
-                                [1][params.weightAddressGenFyIndex[1]];
+                                loop_counters[1][params.weight_addr_fx_idx];
+                            ac_int<LOOP_WIDTH, false> fy0 =
+                                loop_counters[1][params.weight_addr_fy_idx[1]];
                             ac_int<LOOP_WIDTH, false> k1 = loop_counters
-                                [1][params.weightAddressGenWeightLoopIndex[1]];
+                                [1][params.weight_addr_weight_loop_idx[1]];
 
                             ac_int<BufferWidth, false> data =
                                 transpose_out.Pop();
@@ -409,17 +391,17 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       }
 
       // set irrelevant loop bounds to 1
-      loop_bounds[1][params.weightReuseIndex[0]] = 1;
-      loop_bounds[1][params.weightReuseIndex[1]] = 1;
+      loop_bounds[1][params.weight_reuse_idx[0]] = 1;
+      loop_bounds[1][params.weight_reuse_idx[1]] = 1;
 
       // extra loop to control reuse which only occurs during transpose and
       // when NCols > NRows
       int rep_bound = 1;
 
       if (params.has_weight_transpose && NCols > NRows) {
-        if (loop_bounds[0][params.reductionLoopIndex[0]] >= (NCols / NRows)) {
+        if (loop_bounds[0][params.reduction_loop_idx[0]] >= (NCols / NRows)) {
           // we are able to reuse the weights already in the buffer
-          loop_bounds[0][params.reductionLoopIndex[0]] /= (NCols / NRows);
+          loop_bounds[0][params.reduction_loop_idx[0]] /= (NCols / NRows);
           rep_bound = (NCols / NRows);
         }
       }
@@ -428,25 +410,25 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       // this loop is used when OX and OY are the innermost L2 loops. when
       // this occurs, we can move OX and/or OY into the buffer reuse L1 loop
       int buffer_reuse = 1;
-      if (params.loops[0][params.reductionLoopIndex[0]] == 1) {
+      if (params.loops[0][params.reduction_loop_idx[0]] == 1) {
         // OX loop can be absorbed
-        if (params.weightLoopIndex[0] < params.inputXLoopIndex[0]) {
-          buffer_reuse *= loop_bounds[0][params.inputXLoopIndex[0]];
-          loop_bounds[0][params.inputXLoopIndex[0]] = 1;
+        if (params.weight_loop_idx[0] < params.x_loop_idx[0]) {
+          buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+          loop_bounds[0][params.x_loop_idx[0]] = 1;
         }
         // OY loop can be absorbed
-        if (params.weightLoopIndex[0] < params.inputYLoopIndex[0]) {
-          buffer_reuse *= loop_bounds[0][params.inputYLoopIndex[0]];
-          loop_bounds[0][params.inputYLoopIndex[0]] = 1;
+        if (params.weight_loop_idx[0] < params.y_loop_idx[0]) {
+          buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+          loop_bounds[0][params.y_loop_idx[0]] = 1;
         }
       }
 
-      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weightLoopIndex[0]];
+      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
       ac_int<LOOP_WIDTH, false> C1 =
-          params.loops[1][params.reductionLoopIndex[1]];
-      ac_int<LOOP_WIDTH, false> FX = params.loops[1][params.fxIndex];
-      ac_int<LOOP_WIDTH, false> FY0 = params.loops[1][params.fyIndex[1]];
-      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weightLoopIndex[1]];
+          params.loops[1][params.reduction_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> FX = params.loops[1][params.fx_loop_idx];
+      ac_int<LOOP_WIDTH, false> FY0 = params.loops[1][params.fy_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -482,7 +464,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                     numPadding = NRows - 3;
                                     replicationBound = 1;
                                   } else if (NRows == 8) {
-                                    if (loop_counters[1][params.fxIndex] ==
+                                    if (loop_counters[1][params.fx_loop_idx] ==
                                         3) {  // last iteration only unrolls 1
                                               // fx
                                       numPadding = NRows - 3;
@@ -492,7 +474,8 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                       replicationBound = 2;
                                     }
                                   } else if (NRows == 16) {
-                                    if (loop_counters[1][params.fxIndex] == 0) {
+                                    if (loop_counters[1][params.fx_loop_idx] ==
+                                        0) {
                                       numPadding = NRows - 12;
                                       replicationBound = 4;
                                     } else {
@@ -515,16 +498,16 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                 for (int row = 0; row < NRows; row++) {
                                   ac_int<LOOP_WIDTH, false> k2 =
                                       loop_counters[0]
-                                                   [params.weightLoopIndex[0]];
+                                                   [params.weight_loop_idx[0]];
                                   ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                                      [1][params.reductionLoopIndex[1]];
+                                      [1][params.reduction_loop_idx[1]];
                                   ac_int<LOOP_WIDTH, false> fy0 =
-                                      loop_counters[1][params.fyIndex[1]];
+                                      loop_counters[1][params.fy_loop_idx[1]];
                                   ac_int<LOOP_WIDTH, false> fx =
-                                      loop_counters[1][params.fxIndex];
+                                      loop_counters[1][params.fx_loop_idx];
                                   ac_int<LOOP_WIDTH, false> k1 =
                                       loop_counters[1]
-                                                   [params.weightLoopIndex[1]];
+                                                   [params.weight_loop_idx[1]];
 
                                   ac_int<16, false> k =
                                       k2 * K1 * NCols + k1 * NCols;
@@ -538,13 +521,16 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                       C = 3;
                                       C0 = 3;
                                       if (NRows == 4) {
-                                        fx = loop_counters[1][params.fxIndex];
+                                        fx = loop_counters[1]
+                                                          [params.fx_loop_idx];
                                       } else if (NRows == 8) {
-                                        fx = loop_counters[1][params.fxIndex] *
+                                        fx = loop_counters[1]
+                                                          [params.fx_loop_idx] *
                                                  2 +
                                              fx_repl;
                                       } else if (NRows == 16) {
-                                        fx = loop_counters[1][params.fxIndex] *
+                                        fx = loop_counters[1]
+                                                          [params.fx_loop_idx] *
                                                  4 +
                                              fx_repl;
                                       } else if (NRows == 32 || NRows == 64) {
@@ -554,10 +540,11 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                     } else {
                                       C = params.num_channels;
                                       C0 = params.num_channels;
-                                      fx = loop_counters[1][params.fxIndex] *
-                                               replicationBound +
-                                           fx_repl;
-                                      FX = loop_bounds[1][params.fxIndex] *
+                                      fx =
+                                          loop_counters[1][params.fx_loop_idx] *
+                                              replicationBound +
+                                          fx_repl;
+                                      FX = loop_bounds[1][params.fx_loop_idx] *
                                            replicationBound;
                                     }
                                     if (fx_repl < replicationBound) {
@@ -753,7 +740,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
         for (int j = 0; j < 5; j++) {
-          loop_bounds[i][j] = params.weightAddressGenLoops[i][j];
+          loop_bounds[i][j] = params.weight_addr_loops[i][j];
         }
       }
 
@@ -871,14 +858,14 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       }
 
       // set irrelevant loop bounds to 1
-      loop_bounds[1][params.weightReuseIndex[0]] = 0;
-      loop_bounds[1][params.weightReuseIndex[1]] = 0;
-      loop_bounds[1][params.fxIndex] = 0;
-      loop_bounds[1][params.fyIndex[1]] = 0;
-      loop_bounds[1][params.reductionLoopIndex[1]] = 0;
+      loop_bounds[1][params.weight_reuse_idx[0]] = 0;
+      loop_bounds[1][params.weight_reuse_idx[1]] = 0;
+      loop_bounds[1][params.fx_loop_idx] = 0;
+      loop_bounds[1][params.fy_loop_idx[1]] = 0;
+      loop_bounds[1][params.reduction_loop_idx[1]] = 0;
 
-      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weightLoopIndex[0]];
-      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weightLoopIndex[1]];
+      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -892,9 +879,9 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                     for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
                       for (loop_counters[1][5] = 0;; loop_counters[1][5]++) {
                         ac_int<LOOP_WIDTH, false> k2 =
-                            loop_counters[0][params.weightLoopIndex[0]];
+                            loop_counters[0][params.weight_loop_idx[0]];
                         ac_int<LOOP_WIDTH, false> k1 =
-                            loop_counters[1][params.weightLoopIndex[1]];
+                            loop_counters[1][params.weight_loop_idx[1]];
 
                         ac_int<16, false> address =
                             k2 * K1 * NCols + k1 * NCols;
@@ -966,11 +953,11 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
       }
 
       // set irrelevant loop bounds to 1
-      loop_bounds[1][params.weightReuseIndex[0]] = 0;
-      loop_bounds[1][params.weightReuseIndex[1]] = 0;
-      loop_bounds[1][params.fxIndex] = 0;
-      loop_bounds[1][params.fyIndex[1]] = 0;
-      loop_bounds[1][params.reductionLoopIndex[1]] = 0;
+      loop_bounds[1][params.weight_reuse_idx[0]] = 0;
+      loop_bounds[1][params.weight_reuse_idx[1]] = 0;
+      loop_bounds[1][params.fx_loop_idx] = 0;
+      loop_bounds[1][params.fy_loop_idx[1]] = 0;
+      loop_bounds[1][params.reduction_loop_idx[1]] = 0;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush

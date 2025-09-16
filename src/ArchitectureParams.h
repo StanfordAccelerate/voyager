@@ -19,17 +19,12 @@ constexpr int NUM_COEFFS = 3;
 #define SA_INPUT_TYPE INPUT_DATATYPE::decoded
 #define SA_WEIGHT_TYPE WEIGHT_DATATYPE::decoded
 
-#define DWC_DATATYPE DataTypes::posit8
-#define DWC_PSUM DataTypes::bfloat16
-
 #elif defined(E4M3)
 
 #define INPUT_DATATYPE DataTypes::e4m3
 #define WEIGHT_DATATYPE DataTypes::e4m3
 #define ACCUM_DATATYPE DataTypes::bfloat16
 #define VECTOR_DATATYPE DataTypes::bfloat16
-#define DWC_DATATYPE DataTypes::e4m3
-#define DWC_PSUM DataTypes::bfloat16
 
 #elif defined(E4M3_NS)
 
@@ -86,8 +81,6 @@ using F9 = StdFloat<3, 5>;
 #define WEIGHT_DATATYPE DataTypes::bfloat16
 #define ACCUM_DATATYPE DataTypes::bfloat16
 #define VECTOR_DATATYPE DataTypes::bfloat16
-#define DWC_DATATYPE DataTypes::bfloat16
-#define DWC_PSUM DataTypes::bfloat16
 
 #elif defined(FP32)
 
@@ -95,8 +88,6 @@ using F9 = StdFloat<3, 5>;
 #define WEIGHT_DATATYPE DataTypes::float32
 #define ACCUM_DATATYPE DataTypes::float32
 #define VECTOR_DATATYPE DataTypes::float32
-#define DWC_DATATYPE DataTypes::float32
-#define DWC_PSUM DataTypes::float32
 
 #elif defined(INT8)
 
@@ -104,8 +95,6 @@ using F9 = StdFloat<3, 5>;
 #define WEIGHT_DATATYPE DataTypes::int8
 #define ACCUM_DATATYPE DataTypes::int24
 #define VECTOR_DATATYPE DataTypes::bfloat16
-#define DWC_DATATYPE DataTypes::int8
-#define DWC_PSUM DataTypes::int24
 
 #elif defined(INT8_32)
 
@@ -122,8 +111,6 @@ using F9 = StdFloat<3, 5>;
 #define ACCUM_BUFFER_DATATYPE DataTypes::bfloat16
 #define VECTOR_DATATYPE DataTypes::bfloat16
 #define SCALE_DATATYPE DataTypes::fp8_e8m0
-#define DWC_DATATYPE DataTypes::int8
-#define DWC_PSUM DataTypes::int32
 
 #define SUPPORT_MX true
 
@@ -154,16 +141,12 @@ using F9 = StdFloat<3, 5>;
 #define SUPPORT_MX true
 #define SUPPORT_CODEBOOK_QUANT true
 
-#define DWC_DATATYPE SA_INPUT_TYPE
-
 #elif defined(CFLOAT)
 
 #define INPUT_DATATYPE CFloat
 #define WEIGHT_DATATYPE CFloat
 #define ACCUM_DATATYPE CFloat
 #define VECTOR_DATATYPE CFloat
-#define DWC_DATATYPE CFloat
-#define DWC_PSUM CFloat
 
 #else
 #error "No datatype specified!"
@@ -228,9 +211,9 @@ using F9 = StdFloat<3, 5>;
 
 #ifndef VU_INPUT_TYPES
 #if SUPPORT_MX
-#define VU_INPUT_TYPES VECTOR_DATATYPE, SCALE_DATATYPE, INPUT_DATATYPE
+#define VU_INPUT_TYPES VECTOR_DATATYPE, SCALE_DATATYPE
 #else
-#define VU_INPUT_TYPES INPUT_DATATYPE, VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE
+#define VU_INPUT_TYPES INPUT_DATATYPE, VECTOR_DATATYPE
 #endif
 #endif
 

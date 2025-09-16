@@ -4,12 +4,12 @@
 #include "src/ArchitectureParams.h"
 
 int validateMapping(Tiling tiling) {
-  int x0 = tiling.loops[1][tiling.x_loop_index[1]];
-  int y0 = tiling.loops[1][tiling.y_loop_index[1]];
-  int c0 = tiling.loops[1][tiling.reduction_loop_index[1]];
-  int k0 = tiling.loops[1][tiling.weight_loop_index[1]];
-  int fx = tiling.loops[1][tiling.fx_index];
-  int fy = tiling.loops[1][tiling.fy_index[1]];
+  int x0 = tiling.loops[1][tiling.x_loop_idx[1]];
+  int y0 = tiling.loops[1][tiling.y_loop_idx[1]];
+  int c0 = tiling.loops[1][tiling.reduction_loop_idx[1]];
+  int k0 = tiling.loops[1][tiling.weight_loop_idx[1]];
+  int fx = tiling.loops[1][tiling.fx_loop_idx];
+  int fy = tiling.loops[1][tiling.fy_loop_idx[1]];
   int stride = tiling.stride;
 
   // TODO(fpedd): Fix and re-enable these checks
@@ -53,26 +53,26 @@ int validateMapping(Tiling tiling) {
   }
 
   int x_check =
-      tiling.x_loop_index[1] >= 4 ? tiling.loops[1][tiling.x_loop_index[1]] : 1;
+      tiling.x_loop_idx[1] >= 4 ? tiling.loops[1][tiling.x_loop_idx[1]] : 1;
   int y_check =
-      tiling.y_loop_index[1] >= 4 ? tiling.loops[1][tiling.y_loop_index[1]] : 1;
+      tiling.y_loop_idx[1] >= 4 ? tiling.loops[1][tiling.y_loop_idx[1]] : 1;
   if (x_check * y_check < 32) {
     std::ostringstream oss;
     oss << "ERROR: Innermost X*Y must be >= 32." << std::endl
-        << "X -> tiling.loops[1][" << tiling.x_loop_index[1]
-        << "] = " << tiling.loops[1][tiling.x_loop_index[1]] << std::endl
-        << "Y -> tiling.loops[1][" << tiling.y_loop_index[1]
-        << "] = " << tiling.loops[1][tiling.y_loop_index[1]] << std::endl
+        << "X -> tiling.loops[1][" << tiling.x_loop_idx[1]
+        << "] = " << tiling.loops[1][tiling.x_loop_idx[1]] << std::endl
+        << "Y -> tiling.loops[1][" << tiling.y_loop_idx[1]
+        << "] = " << tiling.loops[1][tiling.y_loop_idx[1]] << std::endl
         << "X*Y (with index >= 4) is " << x_check * y_check << std::endl;
     spdlog::error(oss.str());
     return -1;
   }
 
-  if (tiling.reduction_loop_index[1] != 0) {
+  if (tiling.reduction_loop_idx[1] != 0) {
     spdlog::error(
         "ERROR: Input channel needs to be outermost loop of buffer "
         "level. But is {} \n",
-        tiling.reduction_loop_index[1]);
+        tiling.reduction_loop_idx[1]);
     return -1;
   }
 

@@ -39,11 +39,11 @@ void MapPoolingOperation(const codegen::Operation &param,
 
   for (int i = 0; i < 2; i++) {
     vector_params->vector_fetch_0_loops[i][0] =
-        tiling.loops[i][tiling.weight_loop_index[i]];
+        tiling.loops[i][tiling.weight_loop_idx[i]];
     vector_params->vector_fetch_0_loops[i][1] =
-        tiling.loops[i][tiling.y_loop_index[i]];
+        tiling.loops[i][tiling.y_loop_idx[i]];
     vector_params->vector_fetch_0_loops[i][2] =
-        tiling.loops[i][tiling.x_loop_index[i]];
+        tiling.loops[i][tiling.x_loop_idx[i]];
 
     vector_params->vector_fetch_0_x_loop_idx[i] = 2;
     vector_params->vector_fetch_0_y_loop_idx[i] = 1;
@@ -64,8 +64,8 @@ void MapPoolingOperation(const codegen::Operation &param,
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
   }
-  vector_params->output_loops[1][0] = tiling.loops[0][tiling.y_loop_index[0]];
-  vector_params->output_loops[1][1] = tiling.loops[0][tiling.x_loop_index[0]];
+  vector_params->output_loops[1][0] = tiling.loops[0][tiling.y_loop_idx[0]];
+  vector_params->output_loops[1][1] = tiling.loops[0][tiling.x_loop_idx[0]];
   vector_params->output_loops[1][2] = output_dim / OC_DIMENSION;
 
   for (int i = 0; i < 2; i++) {
@@ -77,11 +77,11 @@ void MapPoolingOperation(const codegen::Operation &param,
   vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
 
-  const int reduce_count = tiling.loops[1][tiling.y_loop_index[1]] *
-                           tiling.loops[1][tiling.x_loop_index[1]];
+  const int reduce_count = tiling.loops[1][tiling.y_loop_idx[1]] *
+                           tiling.loops[1][tiling.x_loop_idx[1]];
 
-  const int inst_count = tiling.loops[0][tiling.y_loop_index[0]] *
-                         tiling.loops[0][tiling.x_loop_index[0]] *
+  const int inst_count = tiling.loops[0][tiling.y_loop_idx[0]] *
+                         tiling.loops[0][tiling.x_loop_idx[0]] *
                          (output_dim / OC_DIMENSION);
 
   bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
@@ -107,15 +107,15 @@ void MapPoolingOperation(const codegen::Operation &param,
   if (!is_max_pool) {
     vinst1.vector_op2 = VectorInstructions::vmult;
     vinst1.vector_op2_src1 = VectorInstructions::from_immediate_1;
-    int kernel_size = tiling.loops[1][tiling.x_loop_index[1]];
+    int kernel_size = tiling.loops[1][tiling.x_loop_idx[1]];
     VECTOR_DATATYPE scale = 1.0 / (kernel_size * kernel_size);
     vinst1.immediate1 = scale.bits_rep();
   }
 
   vector_instruction_config->inst[1] = vinst1;
 
-  vector_instruction_config->instLen = 2;
-  vector_instruction_config->instLoopCount = 1;
+  vector_instruction_config->num_inst = 2;
+  vector_instruction_config->repeat_count = 1;
 
   mappedParams.push_back(vector_params);
   mappedParams.push_back(vector_instruction_config);

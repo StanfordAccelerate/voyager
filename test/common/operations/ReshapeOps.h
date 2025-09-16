@@ -8,10 +8,11 @@ inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
   for (int i = 0; i < pad_list.size(); i++) {
     spdlog::debug("Padding tensor with amount: {}\n", pad_list[i]);
   }
+
   T* inputs = std::any_cast<T*>(input_ptr);
 
   std::vector<int> output_shape(input_shape);
-  int pad_dim = pad_list.size()/2;
+  int pad_dim = pad_list.size() / 2;
   std::vector<int> output_start(pad_dim, 0);
   std::vector<int> output_end(pad_dim, 0);
   assert(pad_dim <= output_shape.size());
@@ -19,7 +20,8 @@ inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
   for (int i = 0; i < pad_dim; i++) {
     output_start[i] = pad_list[i * 2];
     output_end[i] = pad_list[i * 2 + 1];
-    output_shape[output_shape.size() - i - 1] += output_start[i] + output_end[i];
+    output_shape[output_shape.size() - i - 1] +=
+        output_start[i] + output_end[i];
   }
 
   T* outputs = new T[get_size(output_shape)];

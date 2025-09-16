@@ -29,24 +29,24 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
 
   Buffer *biases = std::any_cast<Buffer *>(bias_ptr);
 
-  int X = tiling.loops[0][tiling.x_loop_index[0]] *
-          tiling.loops[1][tiling.x_loop_index[1]];
-  int Y = tiling.loops[0][tiling.y_loop_index[0]] *
-          tiling.loops[1][tiling.y_loop_index[1]];
-  int C = tiling.loops[0][tiling.reduction_loop_index[0]] *
-          tiling.loops[1][tiling.reduction_loop_index[1]] * IC_DIMENSION;
-  int K = tiling.loops[0][tiling.weight_loop_index[0]] *
-          tiling.loops[1][tiling.weight_loop_index[1]] * OC_DIMENSION;
-  int FX = tiling.loops[1][tiling.fx_index];
-  int FY =
-      tiling.loops[0][tiling.fy_index[0]] * tiling.loops[1][tiling.fy_index[1]];
+  int X = tiling.loops[0][tiling.x_loop_idx[0]] *
+          tiling.loops[1][tiling.x_loop_idx[1]];
+  int Y = tiling.loops[0][tiling.y_loop_idx[0]] *
+          tiling.loops[1][tiling.y_loop_idx[1]];
+  int C = tiling.loops[0][tiling.reduction_loop_idx[0]] *
+          tiling.loops[1][tiling.reduction_loop_idx[1]] * IC_DIMENSION;
+  int K = tiling.loops[0][tiling.weight_loop_idx[0]] *
+          tiling.loops[1][tiling.weight_loop_idx[1]] * OC_DIMENSION;
+  int FX = tiling.loops[1][tiling.fx_loop_idx];
+  int FY = tiling.loops[0][tiling.fy_loop_idx[0]] *
+           tiling.loops[1][tiling.fy_loop_idx[1]];
   int STRIDE = tiling.stride;
 
-  int X0 = tiling.loops[1][tiling.x_loop_index[1]];
-  int Y0 = tiling.loops[1][tiling.y_loop_index[1]];
-  int K0 = tiling.loops[1][tiling.weight_loop_index[1]];
-  int FY0 = tiling.loops[1][tiling.fy_index[1]];
-  int C1 = tiling.loops[1][tiling.reduction_loop_index[1]];
+  int X0 = tiling.loops[1][tiling.x_loop_idx[1]];
+  int Y0 = tiling.loops[1][tiling.y_loop_idx[1]];
+  int K0 = tiling.loops[1][tiling.weight_loop_idx[1]];
+  int FY0 = tiling.loops[1][tiling.fy_loop_idx[1]];
+  int C1 = tiling.loops[1][tiling.reduction_loop_idx[1]];
   int IC_UNROLL = IC_DIMENSION;
   int FX_UNROLL = 1;
 
@@ -54,7 +54,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
     C = tiling.num_channels;
     FX_UNROLL = tiling.fx_unrolling;
     FX = FX * FX_UNROLL;
-    tiling.loops[1][tiling.fx_index] = FX;
+    tiling.loops[1][tiling.fx_loop_idx] = FX;
   }
 
   if (C < IC_DIMENSION) {
@@ -75,7 +75,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
     } else if (IC_DIMENSION == 32 || IC_DIMENSION == 64) {
       FX_UNROLL = 7;
     }
-    tiling.loops[1][tiling.fx_index] = FX;
+    tiling.loops[1][tiling.fx_loop_idx] = FX;
   }
 
   spdlog::debug("Performing GEMM: {}x{}x{} * {}x{}x{}x{} -> {}x{}x{}\n", Y, X,
@@ -119,11 +119,11 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
              counters[0][3]++) {
           for (counters[0][4] = 0; counters[0][4] < tiling.loops[0][4];
                counters[0][4]++) {
-            int x1 = counters[0][tiling.x_loop_index[0]];
-            int y1 = counters[0][tiling.y_loop_index[0]];
-            int k1 = counters[0][tiling.weight_loop_index[0]];
-            int c2 = counters[0][tiling.reduction_loop_index[0]];
-            int fy1 = counters[0][tiling.fy_index[0]];
+            int x1 = counters[0][tiling.x_loop_idx[0]];
+            int y1 = counters[0][tiling.y_loop_idx[0]];
+            int k1 = counters[0][tiling.weight_loop_idx[0]];
+            int c2 = counters[0][tiling.reduction_loop_idx[0]];
+            int fy1 = counters[0][tiling.fy_loop_idx[0]];
             for (counters[1][0] = 0; counters[1][0] < tiling.loops[1][0];
                  counters[1][0]++) {
               for (counters[1][1] = 0; counters[1][1] < tiling.loops[1][1];
@@ -138,13 +138,14 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                       for (counters[1][5] = 0;
                            counters[1][5] < tiling.loops[1][5];
                            counters[1][5]++) {
-                        int x0 = counters[1][tiling.x_loop_index[1]];
-                        int y0 = counters[1][tiling.y_loop_index[1]];
-                        int c1 = counters[1][tiling.reduction_loop_index[1]];
-                        int k0 = counters[1][tiling.weight_loop_index[1]];
-                        int fy0 = counters[1][tiling.fy_index[1]];
+                        int x0 = counters[1][tiling.x_loop_idx[1]];
+                        int y0 = counters[1][tiling.y_loop_idx[1]];
+                        int c1 = counters[1][tiling.reduction_loop_idx[1]];
+                        int k0 = counters[1][tiling.weight_loop_idx[1]];
+                        int fy0 = counters[1][tiling.fy_loop_idx[1]];
 
-                        int fx = counters[1][tiling.fx_index] - tiling.padding;
+                        int fx =
+                            counters[1][tiling.fx_loop_idx] - tiling.padding;
                         int fy = fy1 * FY0 + fy0 - tiling.padding;
 
                         int x = x1 * X0 + x0;
@@ -178,11 +179,11 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                               int pe_num = ic0 * OC_DIMENSION + oc0;
                               if (tiling.resnet_replication ||
                                   tiling.generic_replication) {
-                                pe_num =
-                                    ic0 * OC_DIMENSION +
-                                    (counters[1][tiling.fx_index] % FX_UNROLL) *
-                                        IC_UNROLL * OC_DIMENSION +
-                                    oc0;
+                                pe_num = ic0 * OC_DIMENSION +
+                                         (counters[1][tiling.fx_loop_idx] %
+                                          FX_UNROLL) *
+                                             IC_UNROLL * OC_DIMENSION +
+                                         oc0;
                               }
                               pe_checker.add_reference(pe_num, input, weight,
                                                        psum);
@@ -193,11 +194,11 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                               int pe_num = ic0 * OC_DIMENSION + oc0;
                               if (tiling.resnet_replication ||
                                   tiling.generic_replication) {
-                                pe_num =
-                                    ic0 * OC_DIMENSION +
-                                    (counters[1][tiling.fx_index] % FX_UNROLL) *
-                                        IC_UNROLL * OC_DIMENSION +
-                                    oc0;
+                                pe_num = ic0 * OC_DIMENSION +
+                                         (counters[1][tiling.fx_loop_idx] %
+                                          FX_UNROLL) *
+                                             IC_UNROLL * OC_DIMENSION +
+                                         oc0;
                               }
                               Weight weight = weights[weight_addr];
                               pe_checker.add_reference(pe_num, Input::zero(),
@@ -234,7 +235,6 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                               outputs[output_addr] +=
                                   static_cast<Buffer>(psum) * scale;
                             }
-
                           } else {
                             if (tiling.resnet_replication) {
                               accumulations[output_addr] += psum;
@@ -244,18 +244,18 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                 outputs[output_addr] += scaled_psum;
                                 accumulations[output_addr] = Psum(0.0);
                               } else if (IC_DIMENSION == 8) {
-                                if (counters[1][tiling.fx_index] == 1 ||
-                                    counters[1][tiling.fx_index] == 3 ||
-                                    counters[1][tiling.fx_index] == 5 ||
-                                    counters[1][tiling.fx_index] == 6) {
+                                if (counters[1][tiling.fx_loop_idx] == 1 ||
+                                    counters[1][tiling.fx_loop_idx] == 3 ||
+                                    counters[1][tiling.fx_loop_idx] == 5 ||
+                                    counters[1][tiling.fx_loop_idx] == 6) {
                                   Buffer scaled_psum = static_cast<Buffer>(
                                       accumulations[output_addr]);
                                   outputs[output_addr] += scaled_psum;
                                   accumulations[output_addr] = Psum(0.0);
                                 }
                               } else if (IC_DIMENSION == 16) {
-                                if (counters[1][tiling.fx_index] == 3 ||
-                                    counters[1][tiling.fx_index] == 6) {
+                                if (counters[1][tiling.fx_loop_idx] == 3 ||
+                                    counters[1][tiling.fx_loop_idx] == 6) {
                                   Buffer scaled_psum = static_cast<Buffer>(
                                       accumulations[output_addr]);
                                   outputs[output_addr] += scaled_psum;
@@ -263,7 +263,7 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                 }
                               } else if (IC_DIMENSION == 32 ||
                                          IC_DIMENSION == 64) {
-                                if (counters[1][tiling.fx_index] == 6) {
+                                if (counters[1][tiling.fx_loop_idx] == 6) {
                                   Buffer scaled_psum = static_cast<Buffer>(
                                       accumulations[output_addr]);
                                   outputs[output_addr] += scaled_psum;
@@ -273,8 +273,8 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                             } else if (tiling.generic_replication) {
                               accumulations[output_addr] += psum;
                               if (tiling.fx_unrolling == 1 ||
-                                  ((counters[1][tiling.fx_index] > 0) &&
-                                   (counters[1][tiling.fx_index] %
+                                  ((counters[1][tiling.fx_loop_idx] > 0) &&
+                                   (counters[1][tiling.fx_loop_idx] %
                                         tiling.fx_unrolling ==
                                     tiling.fx_unrolling - 1))) {
                                 Buffer scaled_psum = static_cast<Buffer>(
@@ -290,7 +290,6 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                             }
                           }
 #else
-
                           if (tiling.resnet_replication) {
                             accumulations[output_addr] = psum;
                             if (IC_DIMENSION == 4) {
@@ -298,24 +297,24 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                                   accumulations[output_addr]);
                               accumulations[output_addr] = Psum(0.0);
                             } else if (IC_DIMENSION == 8) {
-                              if (counters[1][tiling.fx_index] == 1 ||
-                                  counters[1][tiling.fx_index] == 3 ||
-                                  counters[1][tiling.fx_index] == 5 ||
-                                  counters[1][tiling.fx_index] == 6) {
+                              if (counters[1][tiling.fx_loop_idx] == 1 ||
+                                  counters[1][tiling.fx_loop_idx] == 3 ||
+                                  counters[1][tiling.fx_loop_idx] == 5 ||
+                                  counters[1][tiling.fx_loop_idx] == 6) {
                                 outputs[output_addr] += static_cast<Buffer>(
                                     accumulations[output_addr]);
                                 accumulations[output_addr] = Psum(0.0);
                               }
                             } else if (IC_DIMENSION == 16) {
-                              if (counters[1][tiling.fx_index] == 3 ||
-                                  counters[1][tiling.fx_index] == 6) {
+                              if (counters[1][tiling.fx_loop_idx] == 3 ||
+                                  counters[1][tiling.fx_loop_idx] == 6) {
                                 outputs[output_addr] += static_cast<Buffer>(
                                     accumulations[output_addr]);
                                 accumulations[output_addr] = Psum(0.0);
                               }
                             } else if (IC_DIMENSION == 32 ||
                                        IC_DIMENSION == 64) {
-                              if (counters[1][tiling.fx_index] == 6) {
+                              if (counters[1][tiling.fx_loop_idx] == 6) {
                                 outputs[output_addr] += static_cast<Buffer>(
                                     accumulations[output_addr]);
                                 accumulations[output_addr] = Psum(0.0);
@@ -324,8 +323,8 @@ inline Buffer *gemm(std::any input_ptr, std::any input_scale_ptr,
                           } else if (tiling.generic_replication) {
                             accumulations[output_addr] = psum;
                             if (tiling.fx_unrolling == 1 ||
-                                ((counters[1][tiling.fx_index] > 0) &&
-                                 (counters[1][tiling.fx_index] %
+                                ((counters[1][tiling.fx_loop_idx] > 0) &&
+                                 (counters[1][tiling.fx_loop_idx] %
                                       tiling.fx_unrolling ==
                                   tiling.fx_unrolling - 1))) {
                               outputs[output_addr] += static_cast<Buffer>(
@@ -695,11 +694,11 @@ inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
   int OY0 = BUFFER_DIM[2];
 
 #if SUPPORT_MX
-  Buffer Partial_Sum[7];
-  Buffer Mul_Result[kernel_size * kernel_size];
+  Buffer psums[7];
+  Buffer products[kernel_size * kernel_size];
 #else
-  Psum Partial_Sum[7];
-  Psum Mul_Result[kernel_size * kernel_size];
+  Psum psums[7];
+  Psum products[kernel_size * kernel_size];
 #endif
 
   int counter[2][3] = {0};
@@ -747,7 +746,7 @@ inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
 
 #if SUPPORT_MX
                     if (block_size == 0) {
-                      Mul_Result[ky * kernel_size + kx] =
+                      products[ky * kernel_size + kx] =
                           static_cast<Buffer>(input) *
                           static_cast<Buffer>(weight);
                     } else {
@@ -760,13 +759,13 @@ inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
                       Scale weight_scale = weight_scales[weight_scale_addr];
                       Buffer scale = static_cast<Buffer>(input_scale) *
                                      static_cast<Buffer>(weight_scale);
-                      Mul_Result[ky * kernel_size + kx] =
+                      products[ky * kernel_size + kx] =
                           static_cast<Buffer>(static_cast<Psum>(input) *
                                               static_cast<Psum>(weight)) *
                           scale;
                     }
 #else
-                    Mul_Result[ky * kernel_size + kx] =
+                    products[ky * kernel_size + kx] =
                         static_cast<Psum>(input) * static_cast<Psum>(weight);
 #endif
                     // outputs[output_addr] +=
@@ -774,22 +773,22 @@ inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
                     //     static_cast<Buffer>(weight) * scale;
                   } else {
 #if SUPPORT_MX
-                    Mul_Result[ky * kernel_size + kx] = Buffer(0.0);
+                    products[ky * kernel_size + kx] = Buffer(0.0);
 #else
-                    Mul_Result[ky * kernel_size + kx] = Psum(0.0);
+                    products[ky * kernel_size + kx] = Psum(0.0);
 #endif
                   }
                 }
               }
-              Partial_Sum[0] = Mul_Result[0] + Mul_Result[1];
-              Partial_Sum[1] = Mul_Result[2] + Mul_Result[3];
-              Partial_Sum[2] = Mul_Result[4] + Mul_Result[5];
-              Partial_Sum[3] = Mul_Result[6] + Mul_Result[7];
-              Partial_Sum[4] = Partial_Sum[0] + Partial_Sum[1];
-              Partial_Sum[5] = Partial_Sum[2] + Partial_Sum[3];
-              Partial_Sum[6] = Partial_Sum[4] + Partial_Sum[5] + Mul_Result[8];
+              psums[0] = products[0] + products[1];
+              psums[1] = products[2] + products[3];
+              psums[2] = products[4] + products[5];
+              psums[3] = products[6] + products[7];
+              psums[4] = psums[0] + psums[1];
+              psums[5] = psums[2] + psums[3];
+              psums[6] = psums[4] + psums[5] + products[8];
               outputs[output_addr] =
-                  biases[ic_g] + static_cast<Buffer>(Partial_Sum[6]);
+                  biases[ic_g] + static_cast<Buffer>(psums[6]);
             }
           }
         }
@@ -807,6 +806,6 @@ inline Buffer *DwC(std::any input_ptr, std::any input_scale_ptr,
   }
   delete[] biases;
 
-  spdlog::debug("Done with DwC\n");
+  spdlog::debug("DwC done\n");
   return outputs;
 }

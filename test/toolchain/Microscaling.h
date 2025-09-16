@@ -112,8 +112,8 @@ void MapMicroscaling(const codegen::Operation &param,
   vinst1.vdest = VectorInstructions::to_accumulate;
   vector_instruction_config->inst[1] = vinst1;
 
-  vector_instruction_config->instLen = 2;
-  vector_instruction_config->instLoopCount = 1;
+  vector_instruction_config->num_inst = 2;
+  vector_instruction_config->repeat_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);

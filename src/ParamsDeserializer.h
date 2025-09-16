@@ -12,19 +12,17 @@
 
 #include <ac_blackbox.h>
 
-template <typename T, unsigned int interfaceWidth>
-ac_int<T::width, false> getSerializedParams(
+template <typename T, unsigned int width>
+ac_int<T::width, false> get_serialized_params(
     Connections::In<ac_int<64, false>> &serial_params_in) {
-  ac_int<((T::width + interfaceWidth - 1) / interfaceWidth) * interfaceWidth,
-         false>
-      serializedParamsPadded;
-  for (int i = 0; i < serializedParamsPadded.width / interfaceWidth; i++) {
-    ac_int<interfaceWidth, false> val = serial_params_in.Pop();
-    serializedParamsPadded.set_slc(i * interfaceWidth, val);
+  ac_int<((T::width + width - 1) / width) * width, false> padded_params;
+  for (int i = 0; i < padded_params.width / width; i++) {
+    ac_int<width, false> bits = serial_params_in.Pop();
+    padded_params.set_slc(i * width, bits);
   }
-  ac_int<T::width, false> serializedParams =
-      serializedParamsPadded.template slc<T::width>(0);
-  return serializedParams;
+  ac_int<T::width, false> serialized_params =
+      padded_params.template slc<T::width>(0);
+  return serialized_params;
 }
 
 /*
@@ -36,8 +34,8 @@ SC_MODULE(TypeConverter) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<ac_int<T::width, false>> CCS_INIT_S1(bitsIn);
-  Connections::Out<T> CCS_INIT_S1(typeOut);
+  Connections::In<ac_int<T::width, false>> CCS_INIT_S1(bits_in);
+  Connections::Out<T> CCS_INIT_S1(type_out);
 
   SC_CTOR(TypeConverter) {
     SC_THREAD(run);
@@ -52,17 +50,17 @@ SC_MODULE(TypeConverter) {
   }
 
   void run() {
-    bitsIn.Reset();
-    typeOut.Reset();
+    bits_in.Reset();
+    type_out.Reset();
 
     wait();
 
     while (true) {
-      ac_int<T::width, false> bits = bitsIn.Pop();
-      sc_lv<T::width> bitsLV;
-      type_to_vector(bits, T::width, bitsLV);
-      T out = BitsToType<T>(bitsLV);
-      typeOut.Push(out);
+      ac_int<T::width, false> bits = bits_in.Pop();
+      sc_lv<T::width> bits_lv;
+      type_to_vector(bits, T::width, bits_lv);
+      T out = BitsToType<T>(bits_lv);
+      type_out.Push(out);
     }
   }
 };
@@ -73,39 +71,39 @@ SC_MODULE(MatrixParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
-  Connections::Out<MatrixParams> paramsOut[MODULE_COUNT];
+  Connections::Out<MatrixParams> params_out[MODULE_COUNT];
 
-  Connections::Combinational<ac_int<MatrixParams::width, false>> paramsBits;
-  Connections::Combinational<MatrixParams> convertedParams;
-  TypeConverter<MatrixParams> CCS_INIT_S1(typeConverter);
+  Connections::Combinational<ac_int<MatrixParams::width, false>> params_bits;
+  Connections::Combinational<MatrixParams> converted_params;
+  TypeConverter<MatrixParams> CCS_INIT_S1(converter);
 
   SC_CTOR(MatrixParamsDeserializer) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    typeConverter.clk(clk);
-    typeConverter.rstn(rstn);
-    typeConverter.bitsIn(paramsBits);
-    typeConverter.typeOut(convertedParams);
+    converter.clk(clk);
+    converter.rstn(rstn);
+    converter.bits_in(params_bits);
+    converter.type_out(converted_params);
   }
 
   void run() {
     serial_params_in.Reset();
-    paramsBits.ResetWrite();
-    convertedParams.ResetRead();
+    params_bits.ResetWrite();
+    converted_params.ResetRead();
 
     for (int i = 0; i < MODULE_COUNT; i++) {
-      paramsOut[i].Reset();
+      params_out[i].Reset();
     }
 
     wait();
 
     while (true) {
       ac_int<MatrixParams::width, false> bits =
-          getSerializedParams<MatrixParams, 64>(serial_params_in);
-      paramsBits.Push(bits);
-      MatrixParams params = convertedParams.Pop();
+          get_serialized_params<MatrixParams, 64>(serial_params_in);
+      params_bits.Push(bits);
+      MatrixParams params = converted_params.Pop();
 
 #ifndef __SYNTHESIS__
       std::ostringstream oss;
@@ -114,7 +112,7 @@ SC_MODULE(MatrixParamsDeserializer) {
 #endif
 
       for (int i = 0; i < MODULE_COUNT; i++) {
-        paramsOut[i].Push(params);
+        params_out[i].Push(params);
       }
     }
   }
@@ -125,76 +123,79 @@ SC_MODULE(VectorParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
-  Connections::Out<VectorParams> CCS_INIT_S1(vectorParamsOut);
-  Connections::Out<VectorInstructionConfig> CCS_INIT_S1(vectorInstructionsOut);
+  Connections::Out<VectorParams> CCS_INIT_S1(vector_params_out);
+  Connections::Out<VectorInstructionConfig> CCS_INIT_S1(
+      vector_instructions_out);
 
   Connections::Combinational<ac_int<VectorParams::width, false>>
-      vectorParamsBits;
-  Connections::Combinational<VectorParams> convertedVectorParams;
-  TypeConverter<VectorParams> CCS_INIT_S1(vectorParamsConverter);
+      vector_params_bits;
+  Connections::Combinational<VectorParams> converted_vector_params;
+  TypeConverter<VectorParams> CCS_INIT_S1(vector_params_converter);
 
   Connections::Combinational<ac_int<VectorInstructionConfig::width, false>>
-      vectorInstructionsBits;
+      vector_instructions_bit;
   Connections::Combinational<VectorInstructionConfig>
-      convertedVectorInstructions;
+      converted_vector_instructions;
   TypeConverter<VectorInstructionConfig> CCS_INIT_S1(
-      vectorInstructionsConverter);
+      vector_instructions_converter);
 
   SC_CTOR(VectorParamsDeserializer) {
     SC_THREAD(run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    vectorParamsConverter.clk(clk);
-    vectorParamsConverter.rstn(rstn);
-    vectorParamsConverter.bitsIn(vectorParamsBits);
-    vectorParamsConverter.typeOut(convertedVectorParams);
+    vector_params_converter.clk(clk);
+    vector_params_converter.rstn(rstn);
+    vector_params_converter.bits_in(vector_params_bits);
+    vector_params_converter.type_out(converted_vector_params);
 
-    vectorInstructionsConverter.clk(clk);
-    vectorInstructionsConverter.rstn(rstn);
-    vectorInstructionsConverter.bitsIn(vectorInstructionsBits);
-    vectorInstructionsConverter.typeOut(convertedVectorInstructions);
+    vector_instructions_converter.clk(clk);
+    vector_instructions_converter.rstn(rstn);
+    vector_instructions_converter.bits_in(vector_instructions_bit);
+    vector_instructions_converter.type_out(converted_vector_instructions);
   }
 
   void run() {
     serial_params_in.Reset();
-    vectorInstructionsOut.Reset();
-    vectorParamsOut.Reset();
-    vectorParamsBits.ResetWrite();
-    vectorInstructionsBits.ResetWrite();
-    convertedVectorParams.ResetRead();
-    convertedVectorInstructions.ResetRead();
+    vector_instructions_out.Reset();
+    vector_params_out.Reset();
+    vector_params_bits.ResetWrite();
+    vector_instructions_bit.ResetWrite();
+    converted_vector_params.ResetRead();
+    converted_vector_instructions.ResetRead();
 
     wait();
 
     while (true) {
-      ac_int<VectorParams::width, false> vectorParamsBitsVal =
-          getSerializedParams<VectorParams, 64>(serial_params_in);
-      vectorParamsBits.Push(vectorParamsBitsVal);
-      VectorParams vectorParams = convertedVectorParams.Pop();
+      ac_int<VectorParams::width, false> vector_params_serialized =
+          get_serialized_params<VectorParams, 64>(serial_params_in);
+      vector_params_bits.Push(vector_params_serialized);
+      VectorParams vector_params = converted_vector_params.Pop();
 
 #ifndef __SYNTHESIS__
       std::ostringstream oss;
-      oss << "Vector Params: " << std::endl << vectorParams << std::endl;
+      oss << "Vector Params: " << std::endl << vector_params << std::endl;
       spdlog::debug(oss.str());
       oss.clear();
 #endif
 
-      vectorParamsOut.Push(vectorParams);
+      vector_params_out.Push(vector_params);
 
-      ac_int<VectorInstructionConfig::width, false> vectorInstructionsBitsVal =
-          getSerializedParams<VectorInstructionConfig, 64>(serial_params_in);
-      vectorInstructionsBits.Push(vectorInstructionsBitsVal);
-      VectorInstructionConfig vectorInstructionConfig =
-          convertedVectorInstructions.Pop();
+      ac_int<VectorInstructionConfig::width, false>
+          vector_instructions_serialized =
+              get_serialized_params<VectorInstructionConfig, 64>(
+                  serial_params_in);
+      vector_instructions_bit.Push(vector_instructions_serialized);
+      VectorInstructionConfig vector_instruction_config =
+          converted_vector_instructions.Pop();
 
 #ifndef __SYNTHESIS__
       oss << "Vector Instructions: " << std::endl
-          << vectorInstructionConfig << std::endl;
+          << vector_instruction_config << std::endl;
       spdlog::debug(oss.str());
 #endif
 
-      vectorInstructionsOut.Push(vectorInstructionConfig);
+      vector_instructions_out.Push(vector_instruction_config);
     }
   }
 };
@@ -204,18 +205,18 @@ SC_MODULE(DwCParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
-  Connections::Out<DwCParams> CCS_INIT_S1(dwcParamsOut);
+  Connections::Out<DwCParams> CCS_INIT_S1(dwc_params_out);
 
   Connections::Combinational<ac_int<DwCParams::width, false>> CCS_INIT_S1(
-    deserializedParams);
-  Connections::Combinational<DwCParams> convertedParams;
-  TypeConverter<DwCParams> CCS_INIT_S1(paramsConverter);
+      deserialized_params);
+  Connections::Combinational<DwCParams> converted_params;
+  TypeConverter<DwCParams> CCS_INIT_S1(converter);
 
   SC_CTOR(DwCParamsDeserializer) {
-    paramsConverter.clk(clk);
-    paramsConverter.rstn(rstn);
-    paramsConverter.bitsIn(deserializedParams);
-    paramsConverter.typeOut(convertedParams);
+    converter.clk(clk);
+    converter.rstn(rstn);
+    converter.bits_in(deserialized_params);
+    converter.type_out(converted_params);
 
     SC_THREAD(run);
     sensitive << clk.pos();
@@ -224,17 +225,17 @@ SC_MODULE(DwCParamsDeserializer) {
 
   void run() {
     serial_params_in.Reset();
-    deserializedParams.ResetWrite();
-    convertedParams.ResetRead();
-    dwcParamsOut.Reset();
+    deserialized_params.ResetWrite();
+    converted_params.ResetRead();
+    dwc_params_out.Reset();
 
     wait();
 
     while (true) {
-      ac_int<DwCParams::width, false> dwcParams = 
-          getSerializedParams<DwCParams, 64>(serial_params_in);
-      deserializedParams.Push(dwcParams);
-      DwCParams params = convertedParams.Pop();
+      ac_int<DwCParams::width, false> dwcParams =
+          get_serialized_params<DwCParams, 64>(serial_params_in);
+      deserialized_params.Push(dwcParams);
+      DwCParams params = converted_params.Pop();
 
 #ifndef __SYNTHESIS__
       std::ostringstream oss;
@@ -243,7 +244,7 @@ SC_MODULE(DwCParamsDeserializer) {
       oss.clear();
 #endif
 
-      dwcParamsOut.Push(params);
+      dwc_params_out.Push(params);
     }
   }
 };
