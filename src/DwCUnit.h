@@ -36,8 +36,9 @@ SC_MODULE(DwCUnit) {
       CCS_INIT_S1(weight_scale_resp);
 #endif
 
-  Connections::Out<Pack1D<Output, OutputWidth>> CCS_INIT_S1(output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(output_address);
+  Connections::Out<Pack1D<Output, OutputWidth>> CCS_INIT_S1(dwc_output);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      dwc_output_address);
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
@@ -796,7 +797,7 @@ SC_MODULE(DwCUnit) {
 
   void out_addr_gen()  // Buffer read & write addr gen, output addr gen
   {
-    output_address.Reset();
+    dwc_output_address.Reset();
     output_params.ResetRead();
 
     done.Reset();
@@ -857,7 +858,7 @@ SC_MODULE(DwCUnit) {
               ac_int<32, false> address =
                   (Y1 * X_g_T + X_g) * input_bounds[2] + C_g;
               ac_int<ADDRESS_WIDTH, false> output_address = address;
-              output_address.Push(output_address);
+              dwc_output_address.Push(output_address);
 
               if (loop_counters[1][1] == X0_T - 1 || X_g == X_g_T - 1) {
                 break;
@@ -881,7 +882,7 @@ SC_MODULE(DwCUnit) {
   }
 
   void get_output() {
-    output.Reset();
+    dwc_output.Reset();
     for (int i = 0; i < UNROLLFACTOR; i++) {
       mat_output[i].ResetRead();
     }
@@ -900,7 +901,7 @@ SC_MODULE(DwCUnit) {
           output[i] = Output::zero();
         }
       }
-      output.Push(output);
+      dwc_output.Push(output);
     }
   }
 
