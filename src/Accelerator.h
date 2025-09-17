@@ -254,8 +254,8 @@ SC_MODULE(Accelerator) {
     dwc_unit.weight_resp(dwc_weight_resp);
     dwc_unit.bias_req(dwc_bias_req);
     dwc_unit.bias_resp(dwc_bias_resp);
-    dwc_unit.dwc_output_address(dwc_output_address);
-    dwc_unit.dwc_output(dwc_output);
+    dwc_unit.output_address(dwc_output_address);
+    dwc_unit.output(dwc_output);
     dwc_unit.start(dwc_start_signal);
     dwc_unit.done(dwc_done_signal);
 #if SUPPORT_MX

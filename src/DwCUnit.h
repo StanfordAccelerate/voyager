@@ -36,42 +36,41 @@ SC_MODULE(DwCUnit) {
       CCS_INIT_S1(weight_scale_resp);
 #endif
 
-  Connections::Out<Pack1D<Output, OutputWidth>> CCS_INIT_S1(dwc_output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      dwc_output_address);
+  Connections::Out<Pack1D<Output, OutputWidth>> CCS_INIT_S1(output);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(output_address);
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
 
-  Connections::Combinational<DwCParams> CCS_INIT_S1(paramsIn);
-  Connections::Combinational<DwCParams> CCS_INIT_S1(Input_params);
-  Connections::Combinational<DwCParams> CCS_INIT_S1(Output_params);
-  Connections::Combinational<DwCParams> CCS_INIT_S1(Weight_params);
-  Connections::Combinational<DwCParams> CCS_INIT_S1(Input_B_params);
-  Connections::Combinational<DwCParams> CCS_INIT_S1(Execution_params);
+  Connections::Combinational<DwCParams> CCS_INIT_S1(params_in);
+  Connections::Combinational<DwCParams> CCS_INIT_S1(input_params);
+  Connections::Combinational<DwCParams> CCS_INIT_S1(output_params);
+  Connections::Combinational<DwCParams> CCS_INIT_S1(weight_params);
+  Connections::Combinational<DwCParams> CCS_INIT_S1(input_buffer_params);
+  Connections::Combinational<DwCParams> CCS_INIT_S1(execution_params);
 
-  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(DwC_kernel_exe);
-  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(DwC_kernel_exe_run);
-  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(DwC_update_weight);
+  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(dwc_kernel_exe);
+  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(dwc_kernel_exe_run);
+  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(dwc_update_weight);
   Connections::Combinational<Pack1D<ac_int<1, false>, DWC_KERNEL_SIZE>>
-      CCS_INIT_S1(DwC_elem_valid_out);
+      CCS_INIT_S1(dwc_elem_valid_out);
 
   Connections::Combinational<Pack1D<Input, DWC_KERNEL_SIZE>>
-      MAT_input[UNROLLFACTOR];
+      mat_input[UNROLLFACTOR];
   Connections::Combinational<Pack1D<Weight, DWC_KERNEL_SIZE>>
-      MAT_weight[UNROLLFACTOR];
+      mat_weight[UNROLLFACTOR];
 #if SUPPORT_MX
   Connections::Combinational<Pack1D<SCALE_DATATYPE, DWC_KERNEL_SIZE>>
-      MAT_input_scale[UNROLLFACTOR];
+      mat_input_scale[UNROLLFACTOR];
   Connections::Combinational<Pack1D<SCALE_DATATYPE, DWC_KERNEL_SIZE>>
-      MAT_weight_scale[UNROLLFACTOR];
-  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(DwC_use_mx);
+      mat_weight_scale[UNROLLFACTOR];
+  Connections::Combinational<ac_int<1, false>> CCS_INIT_S1(dwc_use_mx);
 #endif
-  Connections::Combinational<Output> MAT_bias[UNROLLFACTOR];
-  Connections::Combinational<ac_int<1, false>> MAT_update_weight[UNROLLFACTOR];
+  Connections::Combinational<Output> mat_bias[UNROLLFACTOR];
+  Connections::Combinational<ac_int<1, false>> mat_update_weight[UNROLLFACTOR];
   Connections::Combinational<Pack1D<ac_int<1, false>, DWC_KERNEL_SIZE>>
-      MAT_weight_mask[UNROLLFACTOR];
-  Connections::Combinational<Output> MAT_output[UNROLLFACTOR];
+      mat_weight_mask[UNROLLFACTOR];
+  Connections::Combinational<Output> mat_output[UNROLLFACTOR];
 
   ac_int<UNROLLFACTOR * Input::width, false> input_buffer[DWC_WIDTH]
                                                          [DWC_KERNEL_DIM - 1];
@@ -101,29 +100,29 @@ SC_MODULE(DwCUnit) {
     param_deserializer.clk(clk);
     param_deserializer.rstn(rstn);
     param_deserializer.serial_params_in(serial_params_in);
-    param_deserializer.dwc_params_out(paramsIn);
+    param_deserializer.dwc_params_out(params_in);
 
-    MulAddTree<Input, Weight, Psum, Output> *mulAddTree_ptr[UNROLLFACTOR];
+    MulAddTree<Input, Weight, Psum, Output> *mul_add_tree_ptr[UNROLLFACTOR];
 
     for (int i = 0; i < UNROLLFACTOR; i++) {
 #ifdef __SYNTHESIS__
-      mulAddTree_ptr[i] = &mulAddTree[i];
+      mul_add_tree_ptr[i] = &mulAddTree[i];
 #else
-      mulAddTree_ptr[i] = new MulAddTree<Input, Weight, Psum, Output>(
+      mul_add_tree_ptr[i] = new MulAddTree<Input, Weight, Psum, Output>(
           sc_gen_unique_name("MulAddTree"));
 #endif
-      mulAddTree_ptr[i]->clk(clk);
-      mulAddTree_ptr[i]->rstn(rstn);
-      mulAddTree_ptr[i]->weight_in(MAT_weight[i]);
-      mulAddTree_ptr[i]->input_in(MAT_input[i]);
+      mul_add_tree_ptr[i]->clk(clk);
+      mul_add_tree_ptr[i]->rstn(rstn);
+      mul_add_tree_ptr[i]->weight_in(mat_weight[i]);
+      mul_add_tree_ptr[i]->input_in(mat_input[i]);
 #if SUPPORT_MX
-      mulAddTree_ptr[i]->weight_scale_in(MAT_weight_scale[i]);
-      mulAddTree_ptr[i]->input_scale_in(MAT_input_scale[i]);
+      mul_add_tree_ptr[i]->weight_scale_in(mat_weight_scale[i]);
+      mul_add_tree_ptr[i]->input_scale_in(mat_input_scale[i]);
 #endif
-      mulAddTree_ptr[i]->update_weight(MAT_update_weight[i]);
-      mulAddTree_ptr[i]->weight_mask(MAT_weight_mask[i]);
-      mulAddTree_ptr[i]->bias_in(MAT_bias[i]);
-      mulAddTree_ptr[i]->adder_out(MAT_output[i]);
+      mul_add_tree_ptr[i]->update_weight(mat_update_weight[i]);
+      mul_add_tree_ptr[i]->weight_mask(mat_weight_mask[i]);
+      mul_add_tree_ptr[i]->bias_in(mat_bias[i]);
+      mul_add_tree_ptr[i]->adder_out(mat_output[i]);
     }
 
     SC_THREAD(read_params);
@@ -160,33 +159,33 @@ SC_MODULE(DwCUnit) {
   }
 
   void read_params() {
-    paramsIn.ResetRead();
-    Input_params.ResetWrite();
-    Output_params.ResetWrite();
-    Weight_params.ResetWrite();
-    Input_B_params.ResetWrite();
-    Execution_params.ResetWrite();
+    params_in.ResetRead();
+    input_params.ResetWrite();
+    output_params.ResetWrite();
+    weight_params.ResetWrite();
+    input_buffer_params.ResetWrite();
+    execution_params.ResetWrite();
 
     start.Reset();
 
     wait();
 
     while (true) {
-      const DwCParams params = paramsIn.Pop();
+      const DwCParams params = params_in.Pop();
 
       start.SyncPush();
 
-      Input_params.Push(params);
-      Output_params.Push(params);
-      Weight_params.Push(params);
-      Input_B_params.Push(params);
-      Execution_params.Push(params);
+      input_params.Push(params);
+      output_params.Push(params);
+      weight_params.Push(params);
+      input_buffer_params.Push(params);
+      execution_params.Push(params);
     }
   }
 
   void input_addr_gen() {  // input addr gen
     input_req.Reset();
-    Input_params.ResetRead();
+    input_params.ResetRead();
 #if SUPPORT_MX
     input_scale_req.Reset();
 #endif
@@ -194,7 +193,7 @@ SC_MODULE(DwCUnit) {
     wait();
 
     while (true) {
-      const DwCParams params = Input_params.Pop();
+      const DwCParams params = input_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -301,7 +300,7 @@ SC_MODULE(DwCUnit) {
   void weight_bias_addr_gen() {
     weight_req.Reset();
     bias_req.Reset();
-    Weight_params.ResetRead();
+    weight_params.ResetRead();
 #if SUPPORT_MX
     weight_scale_req.Reset();
 #endif
@@ -309,7 +308,7 @@ SC_MODULE(DwCUnit) {
     wait();
 
     while (true) {
-      const DwCParams params = Weight_params.Pop();
+      const DwCParams params = weight_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -365,19 +364,19 @@ SC_MODULE(DwCUnit) {
   void fill_weight_bias() {
     weight_resp.Reset();
     bias_resp.Reset();
-    DwC_update_weight.ResetRead();
-    DwC_kernel_exe.ResetRead();
+    dwc_update_weight.ResetRead();
+    dwc_kernel_exe.ResetRead();
 #if SUPPORT_MX
     weight_scale_resp.Reset();
-    DwC_use_mx.ResetRead();
+    dwc_use_mx.ResetRead();
 #endif
 
     for (int i = 0; i < UNROLLFACTOR; i++) {
-      MAT_weight[i].ResetWrite();
-      MAT_bias[i].ResetWrite();
-      MAT_update_weight[i].ResetWrite();
+      mat_weight[i].ResetWrite();
+      mat_bias[i].ResetWrite();
+      mat_update_weight[i].ResetWrite();
 #if SUPPORT_MX
-      MAT_weight_scale[i].ResetWrite();
+      mat_weight_scale[i].ResetWrite();
 #endif
     }
 
@@ -407,10 +406,10 @@ SC_MODULE(DwCUnit) {
 #pragma hls_pipeline_stall_mode flush
     while (true) {
       if (fill_weight_bias_counter >= UNROLLFACTOR) {  // Execution
-        update_weight = DwC_update_weight.Pop();
-        kernel_exe = DwC_kernel_exe.Pop();
+        update_weight = dwc_update_weight.Pop();
+        kernel_exe = dwc_kernel_exe.Pop();
 #if SUPPORT_MX
-        use_mx = DwC_use_mx.Pop();
+        use_mx = dwc_use_mx.Pop();
 #endif
 
         if (update_weight) {
@@ -424,17 +423,17 @@ SC_MODULE(DwCUnit) {
           if (kernel_exe_first == 1) {
 #pragma hls_unroll yes
             for (int i = 0; i < UNROLLFACTOR; i++) {
-              MAT_update_weight[i].Push(1);
+              mat_update_weight[i].Push(1);
             }
             kernel_exe_first = 0;
           } else {
 #pragma hls_unroll yes
             for (int i = 0; i < UNROLLFACTOR; i++) {
-              MAT_weight[i].Push(weight_zero);
-              MAT_bias[i].Push(Output::zero());
-              MAT_update_weight[i].Push(0);
+              mat_weight[i].Push(weight_zero);
+              mat_bias[i].Push(Output::zero());
+              mat_update_weight[i].Push(0);
 #if SUPPORT_MX
-              MAT_weight_scale[i].Push(weight_scale_one);
+              mat_weight_scale[i].Push(weight_scale_one);
 #endif
             }
           }
@@ -467,10 +466,10 @@ SC_MODULE(DwCUnit) {
           }
 #endif
         }
-        MAT_weight[fill_weight_bias_counter].Push(weight_tmp);
-        MAT_bias[fill_weight_bias_counter].Push(bias);
+        mat_weight[fill_weight_bias_counter].Push(weight_tmp);
+        mat_bias[fill_weight_bias_counter].Push(bias);
 #if SUPPORT_MX
-        MAT_weight_scale[fill_weight_bias_counter].Push(weight_scale_tmp);
+        mat_weight_scale[fill_weight_bias_counter].Push(weight_scale_tmp);
 #endif
         fill_weight_bias_counter++;
       }
@@ -479,19 +478,19 @@ SC_MODULE(DwCUnit) {
 
   void input_buffer_write_addr_gen()  // the dwc execution
   {
-    Input_B_params.ResetRead();
+    input_buffer_params.ResetRead();
     input_resp.Reset();
-    DwC_elem_valid_out.ResetRead();
-    DwC_kernel_exe_run.ResetRead();
+    dwc_elem_valid_out.ResetRead();
+    dwc_kernel_exe_run.ResetRead();
 #if SUPPORT_MX
     input_scale_resp.Reset();
 #endif
 
     for (int i = 0; i < UNROLLFACTOR; i++) {
-      MAT_input[i].ResetWrite();
-      MAT_weight_mask[i].ResetWrite();
+      mat_input[i].ResetWrite();
+      mat_weight_mask[i].ResetWrite();
 #if SUPPORT_MX
-      MAT_input_scale[i].ResetWrite();
+      mat_input_scale[i].ResetWrite();
 #endif
     }
 
@@ -504,7 +503,7 @@ SC_MODULE(DwCUnit) {
     wait();
 
     while (true) {
-      const DwCParams params = Input_B_params.Pop();
+      const DwCParams params = input_buffer_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -577,9 +576,9 @@ SC_MODULE(DwCUnit) {
               ac_int<16, false> C_g = C1 * loop_bounds[1][2];
               ac_int<16, false> X_g = X0 + X1 * loop_bounds[1][1];
 
-              ac_int<1, false> kernel_exe = DwC_kernel_exe_run.Pop();
+              ac_int<1, false> kernel_exe = dwc_kernel_exe_run.Pop();
               Pack1D<ac_int<1, false>, DWC_KERNEL_SIZE> elem_valid =
-                  DwC_elem_valid_out.Pop();
+                  dwc_elem_valid_out.Pop();
 
               if ((Y1 < loop_bounds[0][0] + y_start_waiting) &&
                   (Y1 >= y_start_waiting) &&
@@ -660,8 +659,8 @@ SC_MODULE(DwCUnit) {
                     }
                   }
 
-                  MAT_input[i].Push(input_per_kernel);
-                  MAT_weight_mask[i].Push(elem_valid);
+                  mat_input[i].Push(input_per_kernel);
+                  mat_weight_mask[i].Push(elem_valid);
                 }
 #if SUPPORT_MX
 #pragma hls_unroll yes
@@ -706,7 +705,7 @@ SC_MODULE(DwCUnit) {
                 }
 #pragma hls_unroll yes
                 for (int i = 0; i < UNROLLFACTOR; i++) {
-                  MAT_input_scale[i].Push(input_scale_per_kernel);
+                  mat_input_scale[i].Push(input_scale_per_kernel);
                 }
 #endif
               }
@@ -797,15 +796,15 @@ SC_MODULE(DwCUnit) {
 
   void out_addr_gen()  // Buffer read & write addr gen, output addr gen
   {
-    dwc_output_address.Reset();
-    Output_params.ResetRead();
+    output_address.Reset();
+    output_params.ResetRead();
 
     done.Reset();
 
     wait();
 
     while (true) {
-      const DwCParams params = Output_params.Pop();
+      const DwCParams params = output_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -858,7 +857,7 @@ SC_MODULE(DwCUnit) {
               ac_int<32, false> address =
                   (Y1 * X_g_T + X_g) * input_bounds[2] + C_g;
               ac_int<ADDRESS_WIDTH, false> output_address = address;
-              dwc_output_address.Push(output_address);
+              output_address.Push(output_address);
 
               if (loop_counters[1][1] == X0_T - 1 || X_g == X_g_T - 1) {
                 break;
@@ -882,9 +881,9 @@ SC_MODULE(DwCUnit) {
   }
 
   void get_output() {
-    dwc_output.Reset();
+    output.Reset();
     for (int i = 0; i < UNROLLFACTOR; i++) {
-      MAT_output[i].ResetRead();
+      mat_output[i].ResetRead();
     }
 
     wait();
@@ -896,30 +895,30 @@ SC_MODULE(DwCUnit) {
 #pragma hls_unroll yes
       for (int i = 0; i < OutputWidth; i++) {
         if (i < UNROLLFACTOR) {
-          output[i] = MAT_output[i].Pop();
+          output[i] = mat_output[i].Pop();
         } else {
           output[i] = Output::zero();
         }
       }
-      dwc_output.Push(output);
+      output.Push(output);
     }
   }
 
   void kernel_execution_ctrl()  // Buffer read & write addr gen, output addr gen
   {
-    Execution_params.ResetRead();
-    DwC_update_weight.ResetWrite();
-    DwC_kernel_exe.ResetWrite();
-    DwC_kernel_exe_run.ResetWrite();
-    DwC_elem_valid_out.ResetWrite();
+    execution_params.ResetRead();
+    dwc_update_weight.ResetWrite();
+    dwc_kernel_exe.ResetWrite();
+    dwc_kernel_exe_run.ResetWrite();
+    dwc_elem_valid_out.ResetWrite();
 #if SUPPORT_MX
-    DwC_use_mx.ResetWrite();
+    dwc_use_mx.ResetWrite();
 #endif
 
     wait();
 
     while (true) {
-      const DwCParams params = Execution_params.Pop();
+      const DwCParams params = execution_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -997,24 +996,24 @@ SC_MODULE(DwCUnit) {
 
               if (Y1 == 0 && X0 == 0 && X1 == 0) {
                 update_weight = 1;
-                DwC_update_weight.Push(update_weight);
+                dwc_update_weight.Push(update_weight);
               } else {
                 update_weight = 0;
-                DwC_update_weight.Push(update_weight);
+                dwc_update_weight.Push(update_weight);
               }
 
               if ((Y1 < y_exe_delay || X0 <= 1) ||
                   (stride_x != 0 || stride_y != 0)) {
                 kernel_exe = 0;
-                DwC_kernel_exe.Push(kernel_exe);
-                DwC_kernel_exe_run.Push(kernel_exe);
+                dwc_kernel_exe.Push(kernel_exe);
+                dwc_kernel_exe_run.Push(kernel_exe);
               } else {
                 kernel_exe = 1;
-                DwC_kernel_exe.Push(kernel_exe);
-                DwC_kernel_exe_run.Push(kernel_exe);
+                dwc_kernel_exe.Push(kernel_exe);
+                dwc_kernel_exe_run.Push(kernel_exe);
               }
 #if SUPPORT_MX
-              DwC_use_mx.Push(params.use_mx);
+              dwc_use_mx.Push(params.use_mx);
 #endif
 
               // spdlog::debug(
@@ -1043,9 +1042,9 @@ SC_MODULE(DwCUnit) {
                     }
                   }
                 }
-                DwC_elem_valid_out.Push(elem_valid);
+                dwc_elem_valid_out.Push(elem_valid);
               } else {
-                DwC_elem_valid_out.Push(elem_valid_zero);
+                dwc_elem_valid_out.Push(elem_valid_zero);
               }
 
               if (X0 > 1 && stride != 1) {
