@@ -229,7 +229,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     write_request[0].Reset();
     write_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -314,7 +314,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                 loop_counters[1][1] == loop_bounds[1][1] &&
                                 loop_counters[1][0] == loop_bounds[1][0] &&
                                 pack == num_packs;
-                            write_request[bankSel].Push(req);
+                            write_request[bank_sel].Push(req);
 
                             if (pack == num_packs) {
                               break;
@@ -340,7 +340,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] == loop_bounds[0][4]) {
                   break;
                 }
@@ -370,7 +370,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
     read_request[0].Reset();
     read_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -451,44 +451,42 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                  * pad the unused rows For 7x7 filter, we
                                  * split it into 4 filters and 3 filters
                                  */
-                                ac_int<8, false> numPadding = 0;
-                                ac_int<4, false> replicationBound = 1;
-                                ac_int<8, false> startingC = NRows - 1;
-                                ac_int<8, false> endingC = NRows;
+                                ac_int<8, false> padding = 0;
+                                ac_int<4, false> replication_bound = 1;
+                                ac_int<8, false> c_end = NRows;
                                 if (params.is_resnet_replication) {
-                                  startingC = 3 - 1;
-                                  endingC = 3;
+                                  c_end = 3;
                                   if (NRows == 4) {
-                                    numPadding = NRows - 3;
-                                    replicationBound = 1;
+                                    padding = NRows - 3;
+                                    replication_bound = 1;
                                   } else if (NRows == 8) {
                                     if (loop_counters[1][params.fx_loop_idx] ==
                                         3) {  // last iteration only unrolls 1
                                               // fx
-                                      numPadding = NRows - 3;
-                                      replicationBound = 1;
+                                      padding = NRows - 3;
+                                      replication_bound = 1;
                                     } else {
-                                      numPadding = NRows - 6;
-                                      replicationBound = 2;
+                                      padding = NRows - 6;
+                                      replication_bound = 2;
                                     }
                                   } else if (NRows == 16) {
                                     if (loop_counters[1][params.fx_loop_idx] ==
                                         0) {
-                                      numPadding = NRows - 12;
-                                      replicationBound = 4;
+                                      padding = NRows - 12;
+                                      replication_bound = 4;
                                     } else {
-                                      numPadding = NRows - 9;
-                                      replicationBound = 3;
+                                      padding = NRows - 9;
+                                      replication_bound = 3;
                                     }
                                   } else if (NRows == 32 || NRows == 64) {
-                                    replicationBound = 7;
-                                    numPadding = NRows - replicationBound * 3;
+                                    replication_bound = 7;
+                                    padding = NRows - replication_bound * 3;
                                   }
                                 } else if (params.is_generic_replication) {
-                                  endingC = params.num_channels;
-                                  replicationBound = 1
-                                                     << params.fx_unrolling_lg2;
-                                  numPadding = NRows - replicationBound;
+                                  c_end = params.num_channels;
+                                  replication_bound =
+                                      1 << params.fx_unrolling_lg2;
+                                  padding = NRows - replication_bound;
                                 }
 
                                 ac_int<LOOP_WIDTH, false> fx_repl = 0;
@@ -540,12 +538,12 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                       C0 = params.num_channels;
                                       fx =
                                           loop_counters[1][params.fx_loop_idx] *
-                                              replicationBound +
+                                              replication_bound +
                                           fx_repl;
                                       FX = loop_bounds[1][params.fx_loop_idx] *
-                                           replicationBound;
+                                           replication_bound;
                                     }
-                                    if (fx_repl < replicationBound) {
+                                    if (fx_repl < replication_bound) {
                                       ac_int<16, false> address =
                                           fy0 * FX * C * K1 + fx * C * K1 +
                                           c * K1 + k1;
@@ -567,7 +565,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                                  reuse == buffer_reuse - 1 &&
                                                  rep == rep_bound - 1;
 
-                                      read_request[bankSel].Push(req);
+                                      read_request[bank_sel].Push(req);
                                     } else {
                                       BufferReadRequest req;
                                       req.address = 0xFFFF;
@@ -587,11 +585,11 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                                  reuse == buffer_reuse - 1 &&
                                                  rep == rep_bound - 1;
 
-                                      read_request[bankSel].Push(req);
+                                      read_request[bank_sel].Push(req);
                                     }
 
                                     // keep track of which C and FX we are on
-                                    if (c < endingC - 1) {
+                                    if (c < c_end - 1) {
                                       c++;
                                     } else {
                                       c = 0;
@@ -633,7 +631,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                                reuse == buffer_reuse - 1 &&
                                                rep == rep_bound - 1;
 
-                                    read_request[bankSel].Push(req);
+                                    read_request[bank_sel].Push(req);
                                   }
                                 }
 
@@ -671,7 +669,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
                   break;
                 }

@@ -307,7 +307,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     write_request[0].Reset();
     write_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -457,7 +457,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                               req.address = address;
                               req.data = data;
                               req.last = is_last;
-                              write_request[bankSel].Push(req);
+                              write_request[bank_sel].Push(req);
 
                               if (pack == num_packs) {
                                 break;
@@ -487,7 +487,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
                   break;
                 }
@@ -517,7 +517,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
     read_request[0].Reset();
     read_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -627,7 +627,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                 .address = address,
                                 .last = is_last,
                             };
-                            read_request[bankSel].Push(req);
+                            read_request[bank_sel].Push(req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
@@ -653,7 +653,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
                   break;
                 }

@@ -259,7 +259,7 @@ SC_MODULE(InputScaleController) {
     write_request[0].Reset();
     write_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -383,7 +383,7 @@ SC_MODULE(InputScaleController) {
                             scale_req.address = address;
                             scale_req.data = scale;
                             scale_req.last = is_last;
-                            write_request[bankSel].Push(scale_req);
+                            write_request[bank_sel].Push(scale_req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
@@ -409,7 +409,7 @@ SC_MODULE(InputScaleController) {
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
                   break;
                 }
@@ -439,7 +439,7 @@ SC_MODULE(InputScaleController) {
     read_request[0].Reset();
     read_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -539,7 +539,7 @@ SC_MODULE(InputScaleController) {
                                 .address = address,
                                 .last = is_last,
                             };
-                            read_request[bankSel].Push(req);
+                            read_request[bank_sel].Push(req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
@@ -565,7 +565,7 @@ SC_MODULE(InputScaleController) {
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] >= loop_bounds[0][4] - 1) {
                   break;
                 }

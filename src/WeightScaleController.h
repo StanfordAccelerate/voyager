@@ -178,7 +178,7 @@ SC_MODULE(WeightScaleController) {
     write_request[0].Reset();
     write_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -266,7 +266,7 @@ SC_MODULE(WeightScaleController) {
                             req.address = address;
                             req.data = data;
                             req.last = num_writes == num_total_writes - 1;
-                            write_request[bankSel].Push(req);
+                            write_request[bank_sel].Push(req);
                             num_writes++;
                           }
 
@@ -290,7 +290,7 @@ SC_MODULE(WeightScaleController) {
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] == loop_bounds[0][4]) {
                   break;
                 }
@@ -320,7 +320,7 @@ SC_MODULE(WeightScaleController) {
     read_request[0].Reset();
     read_request[1].Reset();
 
-    bool bankSel = 0;
+    bool bank_sel = 0;
 
     wait();
 
@@ -436,7 +436,7 @@ SC_MODULE(WeightScaleController) {
                                            rep == rep_bound - 1 &&
                                            reuse == buffer_reuse - 1;
 
-                                read_request[bankSel].Push(req);
+                                read_request[bank_sel].Push(req);
 
                                 if (loop_counters[1][5] ==
                                     loop_bounds[1][5] - 1) {
@@ -472,7 +472,7 @@ SC_MODULE(WeightScaleController) {
                     break;
                   }
                 }
-                bankSel = !bankSel;
+                bank_sel = !bank_sel;
                 if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
                   break;
                 }

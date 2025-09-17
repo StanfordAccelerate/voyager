@@ -83,24 +83,24 @@ proc pre_architect {} {
   set double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$INPUT_BUFFER_WIDTH>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0 -WORD_WIDTH $INPUT_BUFFER_WIDTH
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1 -WORD_WIDTH $INPUT_BUFFER_WIDTH
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0_run/mem0_run/mem0 -WORD_WIDTH $INPUT_BUFFER_WIDTH
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1_run/mem1_run/mem1 -WORD_WIDTH $INPUT_BUFFER_WIDTH
 
   if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $INPUT_BUFFER_WIDTH]
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $INPUT_BUFFER_WIDTH]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0_run/mem0_run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $INPUT_BUFFER_WIDTH]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1_run/mem1_run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $INPUT_BUFFER_WIDTH]
   }
 
   # Weight double buffer
   set double_buffer "DoubleBuffer<$WEIGHT_BUFFER_SIZE,$WEIGHT_BUFFER_WIDTH>"
   set double_buffer_stripped [string map {" " ""} $double_buffer]
 
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
-  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0_run/mem0_run/mem0 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
+  directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1_run/mem1_run/mem1 -WORD_WIDTH $WEIGHT_BUFFER_WIDTH
 
   if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
-    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem0_run/mem0_run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
+    directive set /Accelerator/$double_buffer_stripped/$double_buffer_stripped:mem1_run/mem1_run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $WEIGHT_BUFFER_SIZE $WEIGHT_BUFFER_WIDTH]
   }
 
   if {$SUPPORT_MX == true} {
@@ -108,16 +108,16 @@ proc pre_architect {} {
 
     if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
       set input_scale_double_buffer "DoubleBuffer<$INPUT_BUFFER_SIZE,$SCALE_DATATYPE_WIDTH>"
-      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem0Run/mem0Run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
-      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem1Run/mem1Run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem0_run/mem0_run/mem0:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
+      directive set /Accelerator/$input_scale_double_buffer/$input_scale_double_buffer:mem1_run/mem1_run/mem1:rsc -MAP_TO_MODULE [get_memory_name 1 $INPUT_BUFFER_SIZE $SCALE_DATATYPE_WIDTH]
     }
 
     set weight_scale_buffer_size [expr {$WEIGHT_BUFFER_SIZE / $IC_DIMENSION}]
     set weight_scale_buffer_width [expr $SCALE_DATATYPE_WIDTH * $OC_DIMENSION]
     set weight_scale_double_buffer "DoubleBuffer<$weight_scale_buffer_size,$weight_scale_buffer_width>"
 
-    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem0Run/mem0Run/mem0 -WORD_WIDTH $weight_scale_buffer_width
-    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1Run/mem1Run/mem1 -WORD_WIDTH $weight_scale_buffer_width
+    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem0_run/mem0_run/mem0 -WORD_WIDTH $weight_scale_buffer_width
+    directive set /Accelerator/$weight_scale_double_buffer/$weight_scale_double_buffer:mem1_run/mem1_run/mem1 -WORD_WIDTH $weight_scale_buffer_width
   }
 
   # Accumulation buffer
