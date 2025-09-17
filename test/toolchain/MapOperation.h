@@ -6,5 +6,5 @@
 #include "test/common/VerificationTypes.h"
 
 void MapOperation(const Operation &operation,
-                  std::deque<BaseParams *> &mappedParams,
-                  std::deque<AcceleratorMemoryMap> &opMemoryMaps);
+                  std::deque<BaseParams *> &mapped_params,
+                  std::deque<AcceleratorMemoryMap> &memory_maps);

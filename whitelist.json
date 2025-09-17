@@ -97,21 +97,5 @@
             "slice_3",
             "slice_4_fused"
         ]
-    },
-    {
-        "datatype": "MXINT8",
-        "model": [
-            "mobilenet_v2"
-        ],
-        "sim_type": [
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": "*",
-        "layers": [
-            "pad_default",
-            "slice_tensor_fused"
-        ]
     }
 ]

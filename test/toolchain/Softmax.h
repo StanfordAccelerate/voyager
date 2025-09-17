@@ -3,8 +3,8 @@
 #include "test/toolchain/Common.h"
 
 void MapSoftmax(const codegen::Operation &param,
-                std::deque<BaseParams *> &mappedParams,
-                std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+                std::deque<BaseParams *> &mapped_params,
+                std::deque<AcceleratorMemoryMap> &memory_maps) {
   const auto op_list = get_op_list(param);
   const auto softmax_op = op_list[0];
 
@@ -105,9 +105,9 @@ void MapSoftmax(const codegen::Operation &param,
   vector_instruction_config->num_inst = 2;
   vector_instruction_config->repeat_count = 1;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vector_instruction_config);
-  opMemoryMaps.push_back(accelerator_memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vector_instruction_config);
+  memory_maps.push_back(accelerator_memory_map);
 
   // ---------------------------------------------------------------------------
   // Pass 2: Find the normalization constant.
@@ -206,9 +206,9 @@ void MapSoftmax(const codegen::Operation &param,
   vector_instruction_config->approx.clamp_min = EXP_CLAMP_MIN;
   vector_instruction_config->approx.clamp_max = EXP_CLAMP_MAX;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vector_instruction_config);
-  opMemoryMaps.push_back(accelerator_memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vector_instruction_config);
+  memory_maps.push_back(accelerator_memory_map);
 
   // ---------------------------------------------------------------------------
   // Pass 3: Divide by the normalization constant and apply exp.
@@ -315,7 +315,7 @@ void MapSoftmax(const codegen::Operation &param,
   vector_instruction_config->approx.clamp_min = EXP_CLAMP_MIN;
   vector_instruction_config->approx.clamp_max = EXP_CLAMP_MAX;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vector_instruction_config);
-  opMemoryMaps.push_back(accelerator_memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vector_instruction_config);
+  memory_maps.push_back(accelerator_memory_map);
 }

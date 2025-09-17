@@ -135,7 +135,7 @@ void Simulation::print_ideal_runtime(const Operation operation) {
     // the total number of operations is X * Y * C * FX * FY * K.
     long num_macs = get_size(output) * get_size(weight) * num_tiles;
 
-    if (is_fc(first_op)) {
+    if (is_fc_layer(first_op)) {
       int K = weight_shape[0];
 #if SUPPORT_MVM
       cycles = num_macs / K / MV_UNIT_WIDTH;

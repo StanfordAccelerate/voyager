@@ -4,8 +4,8 @@
 #include "test/toolchain/Common.h"
 
 void MapPoolingOperation(const codegen::Operation &param,
-                         std::deque<BaseParams *> &mappedParams,
-                         std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+                         std::deque<BaseParams *> &mapped_params,
+                         std::deque<AcceleratorMemoryMap> &memory_maps) {
   VectorParams *vector_params = new VectorParams;
   VectorInstructionConfig *vector_instruction_config =
       new VectorInstructionConfig;
@@ -117,7 +117,7 @@ void MapPoolingOperation(const codegen::Operation &param,
   vector_instruction_config->num_inst = 2;
   vector_instruction_config->repeat_count = 1;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vector_instruction_config);
-  opMemoryMaps.push_back(accelerator_memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vector_instruction_config);
+  memory_maps.push_back(accelerator_memory_map);
 }

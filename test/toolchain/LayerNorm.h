@@ -3,8 +3,8 @@
 #include "test/toolchain/Common.h"
 
 void MapLayerNorm(const codegen::Operation &param,
-                  std::deque<BaseParams *> &mappedParams,
-                  std::deque<AcceleratorMemoryMap> &opMemoryMaps) {
+                  std::deque<BaseParams *> &mapped_params,
+                  std::deque<AcceleratorMemoryMap> &memory_maps) {
   const auto op_list = get_op_list(param);
   const auto layer_norm_op = op_list[0];
 
@@ -111,9 +111,9 @@ void MapLayerNorm(const codegen::Operation &param,
   vinstr_config->num_inst = 2;
   vinstr_config->repeat_count = 1;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vinstr_config);
-  opMemoryMaps.push_back(memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vinstr_config);
+  memory_maps.push_back(memory_map);
 
   // ======================================================================
   // Pass 2: compute variance
@@ -204,9 +204,9 @@ void MapLayerNorm(const codegen::Operation &param,
   vinstr_config->num_inst = 2;
   vinstr_config->repeat_count = 1;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vinstr_config);
-  opMemoryMaps.push_back(memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vinstr_config);
+  memory_maps.push_back(memory_map);
 
   // ======================================================================
   // Pass 3: subtract mean and divide by variance
@@ -300,9 +300,9 @@ void MapLayerNorm(const codegen::Operation &param,
   vinstr_config->num_inst = 1;
   vinstr_config->repeat_count = 1;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vinstr_config);
-  opMemoryMaps.push_back(memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vinstr_config);
+  memory_maps.push_back(memory_map);
 
   // ======================================================================
   // Pass 4: perform affine transformation
@@ -418,7 +418,7 @@ void MapLayerNorm(const codegen::Operation &param,
   vinstr_config->num_inst = 1;
   vinstr_config->repeat_count = 1;
 
-  mappedParams.push_back(vector_params);
-  mappedParams.push_back(vinstr_config);
-  opMemoryMaps.push_back(memory_map);
+  mapped_params.push_back(vector_params);
+  mapped_params.push_back(vinstr_config);
+  memory_maps.push_back(memory_map);
 }

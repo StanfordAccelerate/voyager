@@ -131,7 +131,7 @@ inline std::vector<codegen::Tensor> get_op_outputs(
   return outputs;
 }
 
-inline bool is_fc(const codegen::OpOverload& op) {
+inline bool is_fc_layer(const codegen::OpOverload& op) {
   const auto input = op.kwargs().at("input").tensor();
 
   int dim = 1;

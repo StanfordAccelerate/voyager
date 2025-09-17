@@ -183,37 +183,6 @@ std::vector<std::any> run_operation(const Operation &operation,
     }
   }
 
-  if (first_op.target() == "pad") {
-    const auto input = first_op.kwargs().at("input").tensor();
-    std::any input_ptr_s = kwargs[input.node()];
-
-    if (input.dtype() != DataTypes::TypeName<VECTOR_DATATYPE>::name()) {
-      const int size = get_size(input);
-      Vector *outputs = new Vector[size];
-
-      if (input.dtype() == DataTypes::TypeName<SCALE_DATATYPE>::name()) {
-        SCALE_DATATYPE *inputs = std::any_cast<SCALE_DATATYPE *>(input_ptr_s);
-        for (int i = 0; i < size; i++) {
-          outputs[i] = static_cast<Vector>(inputs[i]);  // check
-        }
-        delete[] inputs;
-        input_ptr_s = outputs;
-      } else if (input.dtype() == DataTypes::TypeName<SA_INPUT_TYPE>::name()) {
-        SA_INPUT_TYPE *inputs = std::any_cast<SA_INPUT_TYPE *>(input_ptr_s);
-        for (int i = 0; i < size; i++) {
-          outputs[i] = static_cast<Vector>(inputs[i]);
-        }
-        delete[] inputs;
-        input_ptr_s = outputs;
-      } else {
-        spdlog::error("The datatype is not inside VU_INPUT_TYPES\n");
-        std::abort();
-      }
-    }
-
-    output_ptr = pad_tensor<Vector>(input_ptr_s, first_op);
-  }
-
   if (first_op.target() == "layer_norm") {
     output_ptr = layer_norm<Vector>(kwargs, first_op);
   }
@@ -249,60 +218,23 @@ std::vector<std::any> run_operation(const Operation &operation,
 
   if (first_op.target() == "permute") {
     const auto input = first_op.kwargs().at("input").tensor();
-    std::any input_ptr_s = kwargs[input.node()];
-    if (input.dtype() != DataTypes::TypeName<VECTOR_DATATYPE>::name()) {
-      const int size = get_size(input);
-      Vector *outputs = new Vector[size];
-
-      if (input.dtype() == DataTypes::TypeName<SCALE_DATATYPE>::name()) {
-        SCALE_DATATYPE *inputs = std::any_cast<SCALE_DATATYPE *>(input_ptr_s);
-        for (int i = 0; i < size; i++) {
-          outputs[i] = static_cast<Vector>(inputs[i]);
-        }
-        delete[] inputs;
-        input_ptr_s = outputs;
-      } else if (input.dtype() == DataTypes::TypeName<SA_INPUT_TYPE>::name()) {
-        SA_INPUT_TYPE *inputs = std::any_cast<SA_INPUT_TYPE *>(input_ptr_s);
-        for (int i = 0; i < size; i++) {
-          outputs[i] = static_cast<Vector>(inputs[i]);
-        }
-        delete[] inputs;
-        input_ptr_s = outputs;
-      } else {
-        spdlog::error("The datatype is not inside VU_INPUT_TYPES\n");
-        std::abort();
-      }
-    }
-    output_ptr = permute<Vector>(input_ptr_s, first_op);
+    std::any input_ptr = kwargs[input.node()];
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    output_ptr = permute<Vector>(input_ptr, first_op);
   }
 
   if (first_op.target() == "slice") {
     const auto input = first_op.kwargs().at("input").tensor();
-    std::any input_ptr_s = kwargs[input.node()];
-    if (input.dtype() != DataTypes::TypeName<VECTOR_DATATYPE>::name()) {
-      const int size = get_size(input);
-      Vector *outputs = new Vector[size];
+    std::any input_ptr = kwargs[input.node()];
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    output_ptr = slice<Vector>(input_ptr, first_op);
+  }
 
-      if (input.dtype() == DataTypes::TypeName<SCALE_DATATYPE>::name()) {
-        SCALE_DATATYPE *inputs = std::any_cast<SCALE_DATATYPE *>(input_ptr_s);
-        for (int i = 0; i < size; i++) {
-          outputs[i] = static_cast<Vector>(inputs[i]);  // check
-        }
-        delete[] inputs;
-        input_ptr_s = outputs;
-      } else if (input.dtype() == DataTypes::TypeName<SA_INPUT_TYPE>::name()) {
-        SA_INPUT_TYPE *inputs = std::any_cast<SA_INPUT_TYPE *>(input_ptr_s);
-        for (int i = 0; i < size; i++) {
-          outputs[i] = static_cast<Vector>(inputs[i]);
-        }
-        delete[] inputs;
-        input_ptr_s = outputs;
-      } else {
-        spdlog::error("The datatype is not inside VU_INPUT_TYPES\n");
-        std::abort();
-      }
-    }
-    output_ptr = slice<Vector>(input_ptr_s, first_op);
+  if (first_op.target() == "pad") {
+    const auto input = first_op.kwargs().at("input").tensor();
+    std::any input_ptr = kwargs[input.node()];
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    output_ptr = pad_tensor<Vector>(input_ptr, first_op);
   }
 
   if (output_ptr.has_value()) {
@@ -314,30 +246,10 @@ std::vector<std::any> run_operation(const Operation &operation,
 
     if (input.has_reshape()) {
       const auto reshape_op = input.reshape();
-      if (input.dtype() == DataTypes::TypeName<VECTOR_DATATYPE>::name()) {
-        output_ptr = permute<VECTOR_DATATYPE>(output_ptr, reshape_op);
-        output_ptr = slice<VECTOR_DATATYPE>(output_ptr, reshape_op);
-      } else if (input.dtype() == DataTypes::TypeName<SCALE_DATATYPE>::name()) {
-        output_ptr = permute<SCALE_DATATYPE>(output_ptr, reshape_op);
-        output_ptr = slice<SCALE_DATATYPE>(output_ptr, reshape_op);
-      } else if (input.dtype() == DataTypes::TypeName<SA_INPUT_TYPE>::name()) {
-        output_ptr = permute<SA_INPUT_TYPE>(output_ptr, reshape_op);
-        output_ptr = slice<SA_INPUT_TYPE>(output_ptr, reshape_op);
-      } else if (input.dtype() ==
-                 DataTypes::TypeName<ACCUM_BUFFER_DATATYPE>::name()) {
-        output_ptr = permute<ACCUM_BUFFER_DATATYPE>(output_ptr, reshape_op);
-        output_ptr = slice<ACCUM_BUFFER_DATATYPE>(output_ptr, reshape_op);
-      } else {
-        spdlog::error("The datatype is not inside VU_INPUT_TYPES\n");
-        std::abort();
-      }
-    } else {
-      if (input.dtype() == DataTypes::TypeName<SA_INPUT_TYPE>::name()) {
-        Vector *scale_tmp = new Vector[1];
-        scale_tmp[0] = input.scale() != 0 ? input.scale() : 1.0;
-        output_ptr =
-            dequantize_tensor<Vector>(kwargs[input.node()], scale_tmp, input);
-      }
+      cast_input<Vector, SUPPORTED_TYPES>(output_ptr, nullptr, input);
+      output_ptr = permute<Vector>(output_ptr, reshape_op);
+      output_ptr = slice<Vector>(output_ptr, reshape_op);
+      cast_output<Vector, SUPPORTED_TYPES>(output_ptr, nullptr, input);
     }
   }
 

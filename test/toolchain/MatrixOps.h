@@ -217,7 +217,7 @@ void MapMatrixOperation(const Operation &operation,
   const auto weight = matrix_op.kwargs().at(weight_key).tensor();
 
   bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
-
+  bool is_fc = is_fc_layer(matrix_op);
   bool is_dwc = false;
 
   if (matrix_op.target().find("conv2d") != std::string::npos &&
@@ -316,10 +316,9 @@ void MapMatrixOperation(const Operation &operation,
     };
   } else {
     matrix_params = new MatrixParams;
-    matrix_params->is_fc = is_fc(matrix_op);
 
-    if (matrix_params->is_fc) {
-      bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
+    if (is_fc) {
+      matrix_params->is_fc = true;
 
       auto weight_shape = get_shape(weight);
       int K = is_matmul ? weight_shape[1] : weight_shape[0];
@@ -352,7 +351,6 @@ void MapMatrixOperation(const Operation &operation,
     oss << tiling;
     spdlog::info("Using tiling: \n{}\n", oss.str());
 
-    const auto input_memory = input.memory();
     matrix_params->input_offset = get_address(input);
     matrix_params->input_dtype =
         get_index_from_type_name<INPUT_DATATYPE>(input.dtype());
@@ -372,7 +370,6 @@ void MapMatrixOperation(const Operation &operation,
       delete[] input_code;
     }
 
-    const auto weight_memory = weight.memory();
     matrix_params->weight_offset = get_address(weight);
     matrix_params->weight_dtype =
         get_index_from_type_name<WEIGHT_DATATYPE>(weight.dtype());
@@ -392,10 +389,9 @@ void MapMatrixOperation(const Operation &operation,
       delete[] weight_code;
     }
 
-    matrix_params->is_mx_op =
-        matrix_op.target().find("mx") != std::string::npos;
+    matrix_params->is_mx_op = is_mx_op;
 
-    if (matrix_params->is_mx_op) {
+    if (is_mx_op) {
       const int block_size = matrix_op.kwargs().at("block_size").int_value();
       assert(block_size == std::max(IC_DIMENSION, OC_DIMENSION));
 
@@ -484,7 +480,6 @@ void MapMatrixOperation(const Operation &operation,
         }
       }
       matrix_params->weight_addr_reduction_loop_idx[1] = 0;
-
     } else {  // if not transpose, then we have freedom to pick any loop order
       // K1 loop
       matrix_params->weight_addr_loops[1][4] =
@@ -609,11 +604,11 @@ void MapMatrixOperation(const Operation &operation,
   VectorParams *vector_params = new VectorParams;
 
   // Rescale tiling for vector instructions
-  if (matrix_params->is_fc) {
+  if (is_fc) {
     tiling.loops[1][1] /= OC_DIMENSION;
   }
 
-  if (!is_dwc && !matrix_params->is_fc) {
+  if (!is_dwc && !is_fc) {
     vector_params->vector_fetch_0_mode = 3;  // read from accumulation buffer
     // Set outer loops
     for (int i = 0; i < 3; i++) {
@@ -645,7 +640,6 @@ void MapMatrixOperation(const Operation &operation,
   }
 
   const auto output = get_op_outputs(param).back();
-  const auto output_memory = output.memory();
   vector_params->vector_output_offset = get_address(output);
 
   // Set outer loops
@@ -708,7 +702,7 @@ void MapMatrixOperation(const Operation &operation,
     inst.inst_count =
         tiling.loops[0][0] * tiling.loops[0][1] * tiling.loops[0][2];
     inst.vector_op0_src0 = VectorInstructions::from_dwc_unit;
-  } else if (matrix_params->is_fc) {
+  } else if (is_fc) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_vector_unit;
   } else {
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
