@@ -153,11 +153,11 @@ SC_MODULE(MatrixUnit) {
     input_buffer.clk(clk);
     input_buffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      input_controller.input_write_request[i](input_buffer_write_req[i]);
-      input_controller.input_read_address[i](input_buffer_read_req[i]);
+      input_controller.write_request[i](input_buffer_write_req[i]);
+      input_controller.read_request[i](input_buffer_read_req[i]);
 
-      input_buffer.writeRequest[i](input_buffer_write_req[i]);
-      input_buffer.readAddress[i](input_buffer_read_req[i]);
+      input_buffer.write_request[i](input_buffer_write_req[i]);
+      input_buffer.read_request[i](input_buffer_read_req[i]);
     }
     input_buffer.output(window_buffer_in);
 
@@ -171,11 +171,11 @@ SC_MODULE(MatrixUnit) {
     input_scale_buffer.clk(clk);
     input_scale_buffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
-      input_scale_controller.scale_write_request[i](input_scale_write_req[i]);
-      input_scale_controller.scale_read_address[i](input_scale_read_req[i]);
+      input_scale_controller.write_request[i](input_scale_write_req[i]);
+      input_scale_controller.read_request[i](input_scale_read_req[i]);
 
-      input_scale_buffer.writeRequest[i](input_scale_write_req[i]);
-      input_scale_buffer.readAddress[i](input_scale_read_req[i]);
+      input_scale_buffer.write_request[i](input_scale_write_req[i]);
+      input_scale_buffer.read_request[i](input_scale_read_req[i]);
     }
     input_scale_buffer.output(input_scale_read_resp);
 #endif
@@ -195,8 +195,8 @@ SC_MODULE(MatrixUnit) {
       weight_controller.write_request[i](weight_buffer_write_req[i]);
       weight_controller.read_request[i](weight_buffer_read_req[i]);
 
-      weight_buffer.writeRequest[i](weight_buffer_write_req[i]);
-      weight_buffer.readAddress[i](weight_buffer_read_req[i]);
+      weight_buffer.write_request[i](weight_buffer_write_req[i]);
+      weight_buffer.read_request[i](weight_buffer_read_req[i]);
     }
     weight_buffer.output(weight_buffer_read_resp);
 
@@ -213,8 +213,8 @@ SC_MODULE(MatrixUnit) {
       weight_scale_controller.write_request[i](weight_scale_write_req[i]);
       weight_scale_controller.read_request[i](weight_scale_read_req[i]);
 
-      weight_scale_buffer.writeRequest[i](weight_scale_write_req[i]);
-      weight_scale_buffer.readAddress[i](weight_scale_read_req[i]);
+      weight_scale_buffer.write_request[i](weight_scale_write_req[i]);
+      weight_scale_buffer.read_request[i](weight_scale_read_req[i]);
     }
     weight_scale_buffer.output(weight_scale_read_resp);
 #endif

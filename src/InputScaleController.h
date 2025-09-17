@@ -14,8 +14,8 @@ SC_MODULE(InputScaleController) {
   Connections::In<ac_int<Scale::width, false>> CCS_INIT_S1(scale_resp);
 
   Connections::Out<BufferWriteRequest<ac_int<Scale::width, false>>>
-      scale_write_request[2];
-  Connections::Out<BufferReadRequest> scale_read_address[2];
+      write_request[2];
+  Connections::Out<BufferReadRequest> read_request[2];
 
   Connections::In<MatrixParams> CCS_INIT_S1(params_in);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetcher_params);
@@ -256,8 +256,8 @@ SC_MODULE(InputScaleController) {
     writer_params.ResetRead();
 
     scale_resp.Reset();
-    scale_write_request[0].Reset();
-    scale_write_request[1].Reset();
+    write_request[0].Reset();
+    write_request[1].Reset();
 
     bool bankSel = 0;
 
@@ -383,7 +383,7 @@ SC_MODULE(InputScaleController) {
                             scale_req.address = address;
                             scale_req.data = scale;
                             scale_req.last = is_last;
-                            scale_write_request[bankSel].Push(scale_req);
+                            write_request[bankSel].Push(scale_req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
@@ -436,8 +436,8 @@ SC_MODULE(InputScaleController) {
   void reader() {
     reader_params.ResetRead();
 
-    scale_read_address[0].Reset();
-    scale_read_address[1].Reset();
+    read_request[0].Reset();
+    read_request[1].Reset();
 
     bool bankSel = 0;
 
@@ -539,7 +539,7 @@ SC_MODULE(InputScaleController) {
                                 .address = address,
                                 .last = is_last,
                             };
-                            scale_read_address[bankSel].Push(req);
+                            read_request[bankSel].Push(req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;

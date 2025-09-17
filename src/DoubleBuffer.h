@@ -19,10 +19,10 @@ SC_MODULE(DoubleBuffer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  Connections::In<BufferWriteRequest<ac_int<Width, false>>> writeRequest[2];
-  Connections::In<BufferReadRequest> readAddress[2];
+  Connections::In<BufferWriteRequest<ac_int<Width, false>>> write_request[2];
+  Connections::In<BufferReadRequest> read_request[2];
   Connections::Combinational<BufferReadResponse<ac_int<Width, false>>>
-      readData[2];
+      read_data[2];
   Connections::Out<ac_int<Width, false>> CCS_INIT_S1(output);
 
 #ifndef __SYNTHESIS__
@@ -30,15 +30,15 @@ SC_MODULE(DoubleBuffer) {
 #endif
 
   SC_CTOR(DoubleBuffer) {
-    SC_THREAD(mem0Run);
+    SC_THREAD(mem0_run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(mem1Run);
+    SC_THREAD(mem1_run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(outputData);
+    SC_THREAD(output_data);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
@@ -49,9 +49,9 @@ SC_MODULE(DoubleBuffer) {
 
   template <int port>
   void mem_run() {
-    writeRequest[port].Reset();
-    readData[port].ResetWrite();
-    readAddress[port].Reset();
+    write_request[port].Reset();
+    read_data[port].ResetWrite();
+    read_request[port].Reset();
 
     wait();
 
@@ -60,7 +60,8 @@ SC_MODULE(DoubleBuffer) {
     while (true) {
       bool done = false;
       while (!done) {
-        BufferWriteRequest<ac_int<Width, false>> req = writeRequest[port].Pop();
+        BufferWriteRequest<ac_int<Width, false>> req =
+            write_request[port].Pop();
         if (req.last) {
           done = true;
         }
@@ -85,7 +86,7 @@ SC_MODULE(DoubleBuffer) {
 
       done = false;
       while (!done) {
-        BufferReadRequest req = readAddress[port].Pop();
+        BufferReadRequest req = read_request[port].Pop();
         ac_int<16, false> address = req.address;
         if (req.last) {
           done = true;
@@ -107,21 +108,21 @@ SC_MODULE(DoubleBuffer) {
         } else {
           response.data = 0;
         }
-        readData[port].Push(response);
+        read_data[port].Push(response);
       }
     }
   }
 
-  void mem0Run() { mem_run<0>(); }
+  void mem0_run() { mem_run<0>(); }
 
-  void mem1Run() { mem_run<1>(); }
+  void mem1_run() { mem_run<1>(); }
 
-  void outputData() {
-    bool bankSel = 0;
+  void output_data() {
+    bool bank_sel = 0;
     output.Reset();
 
-    readData[0].ResetRead();
-    readData[1].ResetRead();
+    read_data[0].ResetRead();
+    read_data[1].ResetRead();
 
     wait();
 
@@ -131,13 +132,13 @@ SC_MODULE(DoubleBuffer) {
       bool done = false;
       while (!done) {
         BufferReadResponse<ac_int<Width, false>> response =
-            readData[bankSel].Pop();
+            read_data[bank_sel].Pop();
         if (response.last) {
           done = true;
         }
         output.Push(response.data);
       }
-      bankSel = !bankSel;
+      bank_sel = !bank_sel;
     }
   }
 };

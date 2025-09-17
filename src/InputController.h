@@ -44,8 +44,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   sc_fifo<bool> fetcher_done_2;
 
   Connections::Out<BufferWriteRequest<ac_int<BufferWidth, false>>>
-      input_write_request[2];
-  Connections::Out<BufferReadRequest> input_read_address[2];
+      write_request[2];
+  Connections::Out<BufferReadRequest> read_request[2];
 
   Connections::In<ac_int<BufferWidth, false>> CCS_INIT_S1(window_buffer_in);
   Connections::Out<ac_int<BufferWidth, false>> CCS_INIT_S1(window_buffer_out);
@@ -304,8 +304,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   void writer() {
     writer_params.ResetRead();
     transpose_out.ResetRead();
-    input_write_request[0].Reset();
-    input_write_request[1].Reset();
+    write_request[0].Reset();
+    write_request[1].Reset();
 
     bool bankSel = 0;
 
@@ -457,7 +457,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                               req.address = address;
                               req.data = data;
                               req.last = is_last;
-                              input_write_request[bankSel].Push(req);
+                              write_request[bankSel].Push(req);
 
                               if (pack == num_packs) {
                                 break;
@@ -514,8 +514,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
   void reader() {
     reader_params.ResetRead();
 
-    input_read_address[0].Reset();
-    input_read_address[1].Reset();
+    read_request[0].Reset();
+    read_request[1].Reset();
 
     bool bankSel = 0;
 
@@ -627,7 +627,7 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                                 .address = address,
                                 .last = is_last,
                             };
-                            input_read_address[bankSel].Push(req);
+                            read_request[bankSel].Push(req);
 
                             if (loop_counters[1][5] >= loop_bounds[1][5] - 1) {
                               break;
