@@ -714,6 +714,8 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
 
       if (params.is_resnet_replication &&
           (NRows == 16 || NRows == 32 || NRows == 64)) {
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
         for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
           for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
             for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
@@ -725,86 +727,87 @@ struct InputController<std::tuple<InputTypes...>, NRows, PortWidth, BufferWidth>
                       for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
                         for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
                           ac_int<BufferWidth, false> data;
+                          ac_int<BufferWidth, false> buffer;
 
-                          ac_int<BufferWidth, false> buffer =
-                              window_buffer_in.Pop();
-#pragma hls_unroll yes
-                          for (int x = 0; x < 3; x++) {
-#pragma hls_unroll yes
-                            for (int dim = 0; dim < 3; dim++) {
-                              int dst_idx = x * 3 + dim;
-                              int src_idx = (packing_factor - 3 + x) * 3 + dim;
-
-                              auto bits = buffer.template slc<DATA_WIDTH>(
-                                  src_idx * DATA_WIDTH);
-                              data.set_slc(dst_idx * DATA_WIDTH, bits);
-                            }
-                          }
-
-                          buffer = window_buffer_in.Pop();
-#pragma hls_unroll yes
-                          for (int x = 3; x < unroll + additional; x++) {
-#pragma hls_unroll yes
-                            for (int dim = 0; dim < 3; dim++) {
-                              int dst_idx = x * 3 + dim;
-                              int src_idx = (x - 3) * 3 + dim;
-
-                              auto bits = buffer.template slc<DATA_WIDTH>(
-                                  src_idx * DATA_WIDTH);
-                              data.set_slc(dst_idx * DATA_WIDTH, bits);
-                            }
-                          }
-
-                          window_buffer_out.Push(data);
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
                           for (loop_counters[1][5] = 0;;
-                               loop_counters[1][5] += 2) {
-                            // shift two pixels over
+                               loop_counters[1][5]++) {
+                            int buffer_pos;
+                            if (loop_counters[1][5] == 1) {
 #pragma hls_unroll yes
-                            for (int x = 0; x < packing_factor + additional - 2;
-                                 x++) {
+                              for (int x = 0; x < 3; x++) {
 #pragma hls_unroll yes
-                              for (int dim = 0; dim < 3; dim++) {
-                                int dst_idx = x * 3 + dim;
-                                int src_idx = (x + 2) * 3 + dim;
+                                for (int dim = 0; dim < 3; dim++) {
+                                  int dst_idx = x * 3 + dim;
+                                  int src_idx =
+                                      (packing_factor - 3 + x) * 3 + dim;
 
-                                auto bits = data.template slc<DATA_WIDTH>(
-                                    src_idx * DATA_WIDTH);
-                                data.set_slc(dst_idx * DATA_WIDTH, bits);
+                                  auto bits = buffer.template slc<DATA_WIDTH>(
+                                      src_idx * DATA_WIDTH);
+                                  data.set_slc(dst_idx * DATA_WIDTH, bits);
+                                }
+                              }
+                            } else if (loop_counters[1][5] == 2) {
+#pragma hls_unroll yes
+                              for (int x = 3; x < unroll + additional; x++) {
+#pragma hls_unroll yes
+                                for (int dim = 0; dim < 3; dim++) {
+                                  int dst_idx = x * 3 + dim;
+                                  int src_idx = (x - 3) * 3 + dim;
+
+                                  auto bits = buffer.template slc<DATA_WIDTH>(
+                                      src_idx * DATA_WIDTH);
+                                  data.set_slc(dst_idx * DATA_WIDTH, bits);
+                                }
+                              }
+                            } else if (loop_counters[1][5] > 2) {
+                              // shift two pixels over
+#pragma hls_unroll yes
+                              for (int x = 0;
+                                   x < packing_factor + additional - 2; x++) {
+#pragma hls_unroll yes
+                                for (int dim = 0; dim < 3; dim++) {
+                                  int dst_idx = x * 3 + dim;
+                                  int src_idx = (x + 2) * 3 + dim;
+
+                                  auto bits = data.template slc<DATA_WIDTH>(
+                                      src_idx * DATA_WIDTH);
+                                  data.set_slc(dst_idx * DATA_WIDTH, bits);
+                                }
+                              }
+
+                              // grab 2 new pixels from buffer
+                              buffer_pos = ((loop_counters[1][5] - 3) * 2 +
+                                            unroll + additional - 3) %
+                                           packing_factor;
+#pragma hls_unroll yes
+                              for (int x = unroll + additional - 2;
+                                   x < unroll + additional; x++) {
+#pragma hls_unroll yes
+                                for (int dim = 0; dim < 3; dim++) {
+                                  int dst_idx = x * 3 + dim;
+                                  int src_idx = (buffer_pos + x -
+                                                 (unroll + additional - 2)) *
+                                                    3 +
+                                                dim;
+
+                                  auto bits = buffer.template slc<DATA_WIDTH>(
+                                      src_idx * DATA_WIDTH);
+                                  data.set_slc(dst_idx * DATA_WIDTH, bits);
+                                }
                               }
                             }
 
-                            // grab 2 new pixels from buffer
-                            int buffer_pos = (loop_counters[1][5] + unroll +
-                                              additional - 3) %
-                                             packing_factor;
-#pragma hls_unroll yes
-                            for (int x = unroll + additional - 2;
-                                 x < unroll + additional; x++) {
-#pragma hls_unroll yes
-                              for (int dim = 0; dim < 3; dim++) {
-                                int dst_idx = x * 3 + dim;
-                                int src_idx = (buffer_pos + x -
-                                               (unroll + additional - 2)) *
-                                                  3 +
-                                              dim;
-
-                                auto bits = buffer.template slc<DATA_WIDTH>(
-                                    src_idx * DATA_WIDTH);
-                                data.set_slc(dst_idx * DATA_WIDTH, bits);
-                              }
+                            if (loop_counters[1][5] > 1) {
+                              window_buffer_out.Push(data);
                             }
 
-                            window_buffer_out.Push(data);
-
-                            if (buffer_pos == packing_factor - 2) {
+                            if (loop_counters[1][5] < 2 ||
+                                (loop_counters[1][5] > 2 &&
+                                 buffer_pos == packing_factor - 2)) {
                               buffer = window_buffer_in.Pop();
                             }
 
-                            if (loop_counters[1][5] >=
-                                loop_bounds[1][5] * 2 - 4) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] + 1) {
                               break;
                             }
                           }

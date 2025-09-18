@@ -451,42 +451,34 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, NRows, NCols,
                                  * pad the unused rows For 7x7 filter, we
                                  * split it into 4 filters and 3 filters
                                  */
-                                ac_int<8, false> padding = 0;
                                 ac_int<4, false> replication_bound = 1;
                                 ac_int<8, false> c_end = NRows;
                                 if (params.is_resnet_replication) {
                                   c_end = 3;
                                   if (NRows == 4) {
-                                    padding = NRows - 3;
                                     replication_bound = 1;
                                   } else if (NRows == 8) {
+                                    // last iteration only unrolls 1 fx
                                     if (loop_counters[1][params.fx_loop_idx] ==
-                                        3) {  // last iteration only unrolls 1
-                                              // fx
-                                      padding = NRows - 3;
+                                        3) {
                                       replication_bound = 1;
                                     } else {
-                                      padding = NRows - 6;
                                       replication_bound = 2;
                                     }
                                   } else if (NRows == 16) {
                                     if (loop_counters[1][params.fx_loop_idx] ==
                                         0) {
-                                      padding = NRows - 12;
                                       replication_bound = 4;
                                     } else {
-                                      padding = NRows - 9;
                                       replication_bound = 3;
                                     }
                                   } else if (NRows == 32 || NRows == 64) {
                                     replication_bound = 7;
-                                    padding = NRows - replication_bound * 3;
                                   }
                                 } else if (params.is_generic_replication) {
                                   c_end = params.num_channels;
                                   replication_bound =
                                       1 << params.fx_unrolling_lg2;
-                                  padding = NRows - replication_bound;
                                 }
 
                                 ac_int<LOOP_WIDTH, false> fx_repl = 0;
