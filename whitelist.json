@@ -27,10 +27,7 @@
         ],
         "block_size": 32,
         "layers": [
-            "slice_tensor",
-            "slice_tensor_1",
-            "slice_tensor_2",
-            "slice_tensor_3"
+            "^slice_tensor(_[0-3])?$"
         ]
     },
     {
@@ -69,10 +66,7 @@
             "slice_2_fused",
             "slice_3",
             "slice_4_fused",
-            "slice_tensor",
-            "slice_tensor_1",
-            "slice_tensor_2",
-            "slice_tensor_3"
+            "^slice_tensor(_[0-3])?$"
         ]
     },
     {

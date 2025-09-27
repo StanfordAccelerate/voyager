@@ -3,6 +3,7 @@ import datetime
 import json
 import math
 import multiprocessing as mp
+import numpy as np
 import os
 import subprocess
 import pandas as pd
@@ -80,10 +81,21 @@ def get_build_folder(env_vars):
     )
 
 
+def utilization(df, weight_col="Count", tiles=None):
+    weight = df[weight_col]
+    if tiles is not None:
+        weight = weight * np.maximum(df["L2 Tiles"], tiles)
+    return (df["Ideal"] * weight).sum() / (df["Runtime"] * weight).sum()
+
+
 def print_test_results(test_results, layers, output_folder):
-    columns = ["Model", "Layer", "Status", "Runtime", "Ideal", "RuntimeType", "Count"]
+    columns = [
+        "Model", "Layer", "Status", "Runtime", "Ideal", "RuntimeType", "Count", "L2 Tiles"
+    ]
     if len(test_results[0]) == 3:
         columns = columns[:3]
+
+    l2_tiles = int(os.environ.get("MAX_TILES", "1"))
 
     # convert list of tuples to DataFrame
     df = pd.DataFrame(test_results, columns=columns)
@@ -109,39 +121,25 @@ def print_test_results(test_results, layers, output_folder):
         failed = model_df[model_df["Status"] == False]
 
         print("Passed:")
-        print(
-            passed["Layer"].to_string(index=False) if not passed.empty else "None",
-            flush=True,
-        )
+        print(passed["Layer"].to_string(index=False) if not passed.empty else "None")
         print("Failed:")
-        print(
-            failed["Layer"].to_string(index=False) if not failed.empty else "None",
-            flush=True,
-        )
+        print(failed["Layer"].to_string(index=False) if not failed.empty else "None")
 
         # if runtime column exists, print runtime of each layer
         if "Runtime" in model_df.columns:
             print("Runtime:")
             print(
-                model_df[
-                    ["Layer", "Runtime", "Ideal", "RuntimeType", "Count"]
-                ].to_string(index=False),
+                model_df[["Layer", "Runtime", "Ideal", "RuntimeType", "Count", "L2 Tiles"]]
+                .to_string(index=False),
                 flush=True,
             )
-            utilization = (model_df["Ideal"] * model_df["Count"]).sum() / (
-                model_df["Runtime"] * model_df["Count"]
-            ).sum()
-            matrix_runtime = (
-                model_df[model_df["RuntimeType"] == "matrix"]["Runtime"]
-                * model_df[model_df["RuntimeType"] == "matrix"]["Count"]
-            ).sum()
-            matrix_ideal = (
-                model_df[model_df["RuntimeType"] == "matrix"]["Ideal"]
-                * model_df[model_df["RuntimeType"] == "matrix"]["Count"]
-            ).sum()
-            matrix_utilization = matrix_ideal / matrix_runtime
-            print(f"Utilization: {utilization:.3f}")
-            print(f"Matrix Utilization: {matrix_utilization:.3f}")
+
+            utilization_all    = utilization(model_df)
+            utilization_matrix = utilization(model_df[model_df["RuntimeType"] == "matrix"], 
+                                            tiles=l2_tiles)
+
+            print(f"Utilization: {utilization_all:.3f}")
+            print(f"Matrix Utilization: {utilization_matrix:.3f}")
 
     # concatentate all sorted model DataFrames into a single DataFrame and save to pickle
     pd.concat(sorted_df).to_pickle(f"{output_folder}/test_results.pkl")
@@ -307,7 +305,7 @@ def run_systemc_tests(layers, condensed_models, num_processes, results_folder, f
     return print_test_results(test_results, layers, results_folder)
 
 
-def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation):
+def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, scale_down_operation):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
@@ -377,12 +375,13 @@ def run_rtl_test(model, layer, layer_count, output_folder, scale_down_operation)
             runtime_type = match.group(1).lower()
             ideal_runtime = int(match.group(2))
 
-    return (model, layer, success, total_runtime, ideal_runtime, runtime_type, layer_count)
+    return (model, layer, success, total_runtime, ideal_runtime, runtime_type, layer_count, num_tiles)
 
 
 def run_rtl_tests(
     layers,
     layer_counts,
+    tile_counts,
     condensed_models,
     num_processes,
     results_folder,
@@ -447,6 +446,7 @@ def run_rtl_tests(
                     model,
                     test,
                     layer_counts[model][test],
+                    tile_counts[model][test],
                     results_folder,
                     model in condensed_models if condensed_models else False,
                 ),
@@ -692,11 +692,14 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     return abs(final_accuracy - gold_accuracy) < 1
 
 
-def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
+def add_layers(network, layers, layer_counts, tile_counts, uniquify, whitelist_layers=None):
     all_layers = []
 
     layers[network] = []
     layer_counts[network] = {}
+    tile_counts[network] = {}
+
+    compiled_whitelist = [re.compile(p) for p in whitelist_layers] if whitelist_layers else []
 
     if not uniquify:
         with open(
@@ -706,7 +709,8 @@ def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
             all_layers = f.read().splitlines()
             # Filter out layers that should be skipped
             layers[network] = [
-                layer for layer in all_layers if layer not in whitelist_layers
+                layer for layer in all_layers
+                if not any(p.match(layer) for p in compiled_whitelist)
             ]
             layer_counts[network] = {layer: 1 for layer in layers[network]}
     else:
@@ -742,7 +746,7 @@ def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
             name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
 
             # Skip layers that are in the skip list
-            if name in whitelist_layers:
+            if any(p.match(name) for p in compiled_whitelist):
                 continue
 
             # remove the name, memory, and node fields from the op
@@ -763,14 +767,15 @@ def add_layers(network, layers, layer_counts, uniquify, whitelist_layers=None):
             is_unique_layer = True
             for op_name, op_val in unique_layers.items():
                 if not DeepDiff(op, op_val, ignore_order=True):
-                    layer_counts[network][op_name] += l2_count
+                    layer_counts[network][op_name] += 1
                     is_unique_layer = False
                     break
 
             if is_unique_layer:
                 unique_layers[name] = op
                 layers[network].append(name)
-                layer_counts[network][name] = l2_count
+                layer_counts[network][name] = 1
+                tile_counts[network][name] = l2_count
 
 
 def matches(value, rule_value):
@@ -859,6 +864,7 @@ def main():
 
     layers = {}
     layer_counts = {}
+    tile_counts = {}
 
     whitelist = []
     if args.whitelist:
@@ -890,6 +896,7 @@ def main():
                     network,
                     layers,
                     layer_counts,
+                    tile_counts,
                     args.uniquify_layers,
                     whitelist_layers,
                 )
@@ -912,6 +919,7 @@ def main():
         success = run_rtl_tests(
             layers,
             layer_counts,
+            tile_counts,
             args.condensed_models,
             args.num_processes,
             results_folder,

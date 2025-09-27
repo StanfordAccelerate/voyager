@@ -9,7 +9,7 @@ BLOCK_SIZE := $(shell [ $(IC_DIMENSION) -gt $(OC_DIMENSION) ] && echo $(IC_DIMEN
 MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE) --weight int8,qs=microscaling,bs=$(BLOCK_SIZE) --force_scale_power_of_two --bf16
 MXNF4_FLAGS := --activation nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16
 COMMON_FLAGS := --transpose_weight --hardware_unrolling $(IC_DIMENSION),$(OC_DIMENSION)
-LLM_FLAGS := --context_length 512 --remove_duplicate
+LLM_FLAGS := --context_length 1024 --remove_duplicate
 EXTRA_COMPILER_FLAGS ?=
 
 # Set default values if not already defined in the environment

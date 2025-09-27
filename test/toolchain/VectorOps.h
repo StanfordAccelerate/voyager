@@ -222,10 +222,10 @@ void MapVectorOperations(const codegen::Operation &param,
   if (reshape_op.target() == "slice") {
     vector_params->has_slicing = true;
 
-    uint64_t start = reshape_kwargs.at("start").int_value();
-    uint64_t end = reshape_kwargs.at("end").int_value();
-    uint64_t step = reshape_kwargs.at("step").int_value();
-    uint64_t dim = reshape_kwargs.at("dim").int_value();
+    auto start = reshape_kwargs.at("start").int_value();
+    auto end = reshape_kwargs.at("end").int_value();
+    auto step = reshape_kwargs.at("step").int_value();
+    auto dim = reshape_kwargs.at("dim").int_value();
 
     auto shape = get_shape(input, false);
 

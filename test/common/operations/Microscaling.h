@@ -61,7 +61,7 @@ Vector* calculate_mx_qparam(std::map<std::string, std::any>& kwargs,
   const auto input_shape = get_shape(input);
   const float quant_max = op.kwargs().at("quant_max").float_value();
   const int block_size = op.kwargs().at("block_size").int_value();
-  const int axis = op.kwargs().at("axis").int_value();
+  const int axis = op.kwargs().at("axes").int_list().values()[0];
   const bool force_scale_power_of_two =
       op.kwargs().at("force_scale_power_of_two").int_value();
   return calculate_mx_qparam<Vector, Scale>(input_ptr, input_shape, quant_max,
