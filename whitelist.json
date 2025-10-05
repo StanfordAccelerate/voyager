@@ -2,6 +2,24 @@
     {
         "datatype": "*",
         "model": [
+            "bert",
+            "resnet18",
+            "resnet50",
+            "mobilebert_encoder"
+        ],
+        "sim_type": [
+            "systemc",
+            "fast-systemc",
+            "rtl"
+        ],
+        "block_size": "*",
+        "layers": [
+            "^slice_tensor(_[0-9]+)?$"
+        ]
+    },
+    {
+        "datatype": "*",
+        "model": [
             "vit"
         ],
         "sim_type": [
@@ -11,7 +29,8 @@
         ],
         "block_size": "*",
         "layers": [
-            "pad_default"
+            "pad_default",
+            "^slice_tensor(_[0-9]+)?$"
         ]
     },
     {
