@@ -5,7 +5,8 @@
             "bert",
             "resnet18",
             "resnet50",
-            "mobilebert_encoder"
+            "mobilebert_encoder",
+            "mobilenet_v2"
         ],
         "sim_type": [
             "systemc",
