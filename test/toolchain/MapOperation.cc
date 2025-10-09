@@ -19,12 +19,14 @@ void MapOperation(const Operation &operation,
   const auto first_op = op_list[0];
 
   if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
+    auto input = first_op.kwargs().at("input").tensor();
+    if (is_fc_layer(first_op) && input.dtype() == "bfloat16") {
 #if !SUPPORT_MVM
-    if (is_fc_layer(first_op)) {
-      MapMatrixVectorMultiply(param, mapped_params, memory_maps);
-    } else
+      throw std::runtime_error(
+          "Matrix-vector multiply not supported in this build.");
 #endif
-    {
+      MapMatrixVectorMultiply(param, mapped_params, memory_maps);
+    } else {
       MapMatrixOperation(operation, mapped_params, memory_maps);
     }
   } else if (first_op.target() == "layer_norm") {

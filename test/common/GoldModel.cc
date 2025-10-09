@@ -107,10 +107,7 @@ std::vector<std::any> run_operation(const Operation &operation,
     int input_dim = get_size(input_shape) / input_shape.back();
     bool is_fc = input_dim == 1;
 
-#if !SUPPORT_MVM
-    if (!is_dwc && !is_fc)
-#endif
-    {
+    if (!is_dwc && input.dtype() != "bfloat16") {
       float *input_code = nullptr;
       if (first_op.kwargs().contains("input_code")) {
         const auto code = first_op.kwargs().at("input_code").tensor();
@@ -167,15 +164,19 @@ std::vector<std::any> run_operation(const Operation &operation,
       throw std::runtime_error("DWC not supported in this build");
 #endif
     } else if (is_fc) {
-#if SUPPORT_MVM
-      output_ptr =
-          gemv<SaInput, SaWeight, Psum, AccumBuffer, Scale, MV_UNIT_WIDTH>(
-              input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr,
-              bias_ptr, operation);
-#else
-      output_ptr = matrix_vector_multiply<Vector>(input_ptr, weight_ptr,
-                                                  bias_ptr, get_shape(weight));
+      if (input.dtype() == "bfloat16") {
+        output_ptr = gemv_bfloat16<Vector>(input_ptr, weight_ptr, bias_ptr,
+                                           get_shape(weight));
+      } else {
+#if !SUPPORT_MVM
+        throw std::runtime_error(
+            "Matrix-vector multiply not supported in this build.");
 #endif
+        output_ptr = gemv_quantized<SaInput, SaWeight, Psum, AccumBuffer, Scale,
+                                    MV_UNIT_WIDTH>(input_ptr, input_scale_ptr,
+                                                   weight_ptr, weight_scale_ptr,
+                                                   bias_ptr, operation);
+      }
     } else {
       output_ptr = gemm<SaInput, SaWeight, Psum, AccumBuffer, Scale>(
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
