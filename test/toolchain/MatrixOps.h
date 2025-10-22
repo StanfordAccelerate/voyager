@@ -320,6 +320,10 @@ void MapMatrixOperation(const Operation& operation,
     matrix_params = new MatrixParams;
 
     if (is_fc) {
+#if !SUPPORT_MVM
+      throw std::runtime_error(
+          "Matrix-vector multiply not supported in this build.");
+#endif
       matrix_params->is_fc = true;
 
       auto weight_shape = get_shape(weight);

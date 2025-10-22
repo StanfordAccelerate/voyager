@@ -138,8 +138,8 @@ if { $DATATYPE == "P8_1" } {
   set ACCUM_DATATYPE_WIDTH 16
   set SCALE_DATATYPE_WIDTH 8
 } elseif {$DATATYPE == "MXNF4"} {
-  set INPUT_DATATYPE "DataTypes::int2, DataTypes::int4, DataTypes::int6"
-  set WEIGHT_DATATYPE "DataTypes::int2, DataTypes::int4, DataTypes::int6"
+  set INPUT_DATATYPE "DataTypes::uint2, DataTypes::int4, DataTypes::int6"
+  set WEIGHT_DATATYPE "DataTypes::uint2, DataTypes::int4, DataTypes::int6"
   set ACCUM_DATATYPE "DataTypes::int18"
   set ACCUM_BUFFER_DATATYPE "DataTypes::bfloat16"
   set VECTOR_DATATYPE "DataTypes::bfloat16"

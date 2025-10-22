@@ -21,10 +21,6 @@ void MapOperation(const Operation& operation,
   if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
     auto input = first_op.kwargs().at("input").tensor();
     if (is_fc_layer(first_op) && input.dtype() == "bfloat16") {
-#if !SUPPORT_MVM
-      throw std::runtime_error(
-          "Matrix-vector multiply not supported in this build.");
-#endif
       MapMatrixVectorMultiply(param, mapped_params, memory_maps);
     } else {
       MapMatrixOperation(operation, mapped_params, memory_maps);
