@@ -89,9 +89,9 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 #if SUPPORT_DWC
   accelerator.serial_dwc_params_in(serial_dwc_params_in);
   accelerator.dwc_input_req(dwc_input_req);
-  accelerator.dwc_input_resp(dwc_input_data_resp);
+  accelerator.dwc_input_resp(dwc_input_resp);
   accelerator.dwc_weight_req(dwc_weight_req);
-  accelerator.dwc_weight_resp(dwc_weight_data_resp);
+  accelerator.dwc_weight_resp(dwc_weight_resp);
   accelerator.dwc_bias_req(dwc_bias_req);
   accelerator.dwc_bias_resp(dwc_bias_resp);
 #if SUPPORT_MX

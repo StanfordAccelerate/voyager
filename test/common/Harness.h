@@ -129,13 +129,13 @@ SC_MODULE(Harness) {
   sc_fifo<ac_int<UNROLLFACTOR * DWC_DATATYPE::width, false>>
       dwc_input_resp_fifo;
   Connections::Combinational<ac_int<UNROLLFACTOR * DWC_DATATYPE::width, false>>
-      CCS_INIT_S1(dwc_input_data_resp);
+      CCS_INIT_S1(dwc_input_resp);
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_weight_req);
   sc_fifo<ac_int<DWC_KERNEL_SIZE * DWC_DATATYPE::width, false>>
       dwc_weight_resp_fifo;
   Connections::Combinational<
       ac_int<DWC_KERNEL_SIZE * DWC_DATATYPE::width, false>>
-      CCS_INIT_S1(dwc_weight_data_resp);
+      CCS_INIT_S1(dwc_weight_resp);
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_bias_req);
   sc_fifo<ac_int<ACCUM_BUFFER_DATATYPE::width, false>> dwc_bias_resp_fifo;
   Connections::Combinational<ac_int<ACCUM_BUFFER_DATATYPE::width, false>>
