@@ -226,18 +226,18 @@ SC_MODULE(Harness) {
       Connections::Combinational<ac_int<width, false>> * data_out,
       Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> * address_out);
 
-  void read_input_request();
-  void send_input_response();
-  void read_weight_request();
-  void send_weight_response();
-  void read_bias_request();
-  void send_bias_response();
+  void read_matrix_unit_input_request();
+  void send_matrix_unit_input_response();
+  void read_matrix_unit_weight_request();
+  void send_matrix_unit_weight_response();
+  void read_matrix_unit_bias_request();
+  void send_matrix_unit_bias_response();
 
 #if SUPPORT_MX
-  void read_input_scale_request();
-  void send_input_scale_response();
-  void read_weight_scale_request();
-  void send_weight_scale_response();
+  void read_matrix_unit_input_scale_request();
+  void send_matrix_unit_input_scale_response();
+  void read_matrix_unit_weight_scale_request();
+  void send_matrix_unit_weight_scale_response();
 #endif
 
   void read_matrix_vector_unit_input_request();

@@ -159,7 +159,7 @@ if { $DATATYPE == "P8_1" } {
 
   set IC_PORT_WIDTH [expr {$IC_DIMENSION * 4}]
   set OC_PORT_WIDTH [expr {$OC_DIMENSION * 4}]
-  set VECTOR_UNIT_WIDTH 16
+  set VECTOR_UNIT_WIDTH [expr {$OC_DIMENSION / 2}]
   set MV_UNIT_WIDTH [expr {$OC_DIMENSION * 2}]
 } else {
   puts "Invalid DATATYPE"
