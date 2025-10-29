@@ -268,6 +268,19 @@ void update_tensor_shape(codegen::Tensor& tensor,
   }
 }
 
+void set_dequantize_scale(const codegen::Tensor& tensor,
+                          VectorParams* vector_params) {
+  if (tensor.has_dequant()) {
+    const auto& dequant_op = tensor.dequant();
+    const auto scale = dequant_op.kwargs().at("scale").tensor();
+    assert(get_size(scale) == 1);
+
+    float* array = read_constant_param(scale);
+    VECTOR_DATATYPE immediate = array[0];
+    vector_params->vector_fetch_0_dq_scale = immediate.bits_rep();
+  }
+}
+
 void set_quantize_params(const codegen::Operation& param,
                          VectorParams* vector_params,
                          VectorInstructions& inst) {

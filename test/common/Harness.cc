@@ -204,8 +204,6 @@ void Harness::process_read_request(
     for (int i = 0; i < num_words; i++) {
       for (int j = 0; j < num_bytes; j++) {
         uint64_t address = base_address + i * num_bytes + j;
-        DLOG("read addr: " << address << " data: " << memory[address]
-                           << std::endl);
         bits.set_slc(j * 8, static_cast<ac_int<8, false>>(memory[address]));
       }
 
@@ -245,7 +243,6 @@ void Harness::process_write_request(
   while (true) {
     uint64_t address = address_out->Pop();
     auto data = data_out->Pop();
-    DLOG("write address: " << address << " data: " << data);
 
     access_counter->increment(std::string(name()) + "_" + "outputs", num_bytes);
 

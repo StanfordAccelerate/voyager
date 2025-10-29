@@ -12,7 +12,7 @@ COMMON_FLAGS := --transpose_weight --hardware_unrolling $(IC_DIMENSION),$(OC_DIM
 EXTRA_COMPILER_FLAGS ?=
 
 CONTEXT ?= 1024
-LLM_FLAGS := --context_length $(CONTEXT) --remove_duplicate
+LLM_FLAGS := --context_length $(CONTEXT) --remove_duplicate --binary_mask
 
 # Set default values if not already defined in the environment
 CACHE_SIZE ?= 8388608

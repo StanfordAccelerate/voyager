@@ -208,6 +208,25 @@ std::vector<std::any> run_operation(const Operation& operation,
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
           operation);
     }
+  } else {
+    const auto input = first_op.kwargs().at("input").tensor();
+    std::any input_ptr = kwargs[input.node()];
+
+    if (input.has_dequant()) {
+      if constexpr (std::is_same<Vector, CFloat>::value) {
+        spdlog::error(
+            "No quantization operations should be emitted for CFloat\n");
+        std::abort();
+      } else {
+        const auto dequant_op = input.dequant();
+        const auto scale = dequant_op.kwargs().at("scale").tensor();
+        float* param = read_constant_param(scale);
+        Vector* scale_ptr = new Vector[1];
+        scale_ptr[0] = param[0];
+        kwargs[input.node()] =
+            dequantize_tensor<Vector>(input_ptr, scale_ptr, input);
+      }
+    }
   }
 
   if (first_op.target() == "layer_norm") {

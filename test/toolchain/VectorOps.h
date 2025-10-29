@@ -52,10 +52,7 @@ inline std::vector<int> broadcast_shape(std::vector<int>& shape1,
 
 void set_vector_fetch_1(const codegen::Tensor& tensor,
                         std::vector<int> output_shape,
-                        AcceleratorMemoryMap& accelerator_memory_map,
                         VectorParams* vector_params) {
-  const auto memory = tensor.memory();
-  accelerator_memory_map["vector1"] = get_partition(memory.partition());
   vector_params->vector_fetch_1_offset = get_address(tensor);
   vector_params->vector_fetch_1_mode = true;
 
@@ -93,17 +90,13 @@ void set_vector_fetch_1(const codegen::Tensor& tensor,
     vector_params->vector_fetch_1_k_loop_idx[i] = 2;
   }
 
-  float scale_val = get_tensor_scalar_scale(tensor);
-  DataTypes::bfloat16 scale = scale_val != 0 ? scale_val : 1.0;
+  VECTOR_DATATYPE scale = get_tensor_scalar_scale(tensor);
   vector_params->vector_fetch_1_dq_scale = scale.bits_rep();
 }
 
 void set_vector_fetch_2(const codegen::Tensor& tensor,
                         std::vector<int> output_shape,
-                        AcceleratorMemoryMap& accelerator_memory_map,
                         VectorParams* vector_params) {
-  const auto memory = tensor.memory();
-  accelerator_memory_map["vector2"] = get_partition(memory.partition());
   vector_params->vector_fetch_2_offset = get_address(tensor);
   vector_params->vector_fetch_2_mode = true;
 
@@ -140,8 +133,7 @@ void set_vector_fetch_2(const codegen::Tensor& tensor,
     vector_params->vector_fetch_2_k_loop_idx[i] = 2;
   }
 
-  float scale_val = get_tensor_scalar_scale(tensor);
-  DataTypes::bfloat16 scale = scale_val != 0 ? scale_val : 1.0;
+  VECTOR_DATATYPE scale = get_tensor_scalar_scale(tensor);
   vector_params->vector_fetch_2_dq_scale = scale.bits_rep();
 }
 
@@ -169,7 +161,6 @@ void MapVectorOperations(const codegen::Operation& param,
                          std::deque<BaseParams*>& mapped_params,
                          std::deque<AcceleratorMemoryMap>& memory_maps) {
   VectorParams* vector_params = new VectorParams;
-  AcceleratorMemoryMap accelerator_memory_map;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
 
@@ -180,8 +171,6 @@ void MapVectorOperations(const codegen::Operation& param,
   auto op_list = get_op_list(param);
 
   const auto input = op_list[0].kwargs().at("input").tensor();
-  const auto input_memory = input.memory();
-  accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->vector_fetch_0_offset = get_address(input);
   vector_params->vector_fetch_0_mode = 2;
   vector_params->vector_fetch_0_dtype =
@@ -373,7 +362,7 @@ void MapVectorOperations(const codegen::Operation& param,
   }
 
   int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
-  int numel = packing_factor * VECTOR_UNIT_WIDTH;
+  int numel = OC_DIMENSION;
 
   if (vector_params->has_transpose) {
     packing_factor = 1;
@@ -386,12 +375,10 @@ void MapVectorOperations(const codegen::Operation& param,
   vector_params->vector_fetch_0_num_beats = fetch_width / OC_PORT_WIDTH;
   vector_params->vector_fetch_0_packing_factor = packing_factor;
 
-  VECTOR_DATATYPE scale = 1.0;
+  VECTOR_DATATYPE scale = get_tensor_scalar_scale(input);
   vector_params->vector_fetch_0_dq_scale = scale.bits_rep();
 
   const auto output = get_op_outputs(param).back();
-  const auto output_memory = output.memory();
-  accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
 
@@ -473,18 +460,14 @@ void MapVectorOperations(const codegen::Operation& param,
 
     // Dequantization doesn't take a stage in the pipeline
     if (opcode == "dequantize") {
-      inst.vdequantize = true;
-
       const auto other = op.kwargs().at("scale").tensor();
-
       assert(get_size(other) == 1);
 
       float* array = read_constant_param(other);
       VECTOR_DATATYPE immediate = array[0];
-      inst.vector_dq_scale = immediate.bits_rep();
+      vector_params->vector_fetch_0_dq_scale = immediate.bits_rep();
 
       delete[] array;
-
       continue;
     }
 
@@ -842,18 +825,15 @@ void MapVectorOperations(const codegen::Operation& param,
 
         if (stage == 0) {
           inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
-          set_vector_fetch_1(tensor_to_load, output_shape,
-                             accelerator_memory_map, vector_params);
+          set_vector_fetch_1(tensor_to_load, output_shape, vector_params);
         } else if (stage == 2) {
           inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_fetch_2(tensor_to_load, output_shape,
-                             accelerator_memory_map, vector_params);
+          set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
         } else {
           assert(inst.vector_op2_src1 !=
                  VectorInstructions::from_vector_fetch_2);
           inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_fetch_2(tensor_to_load, output_shape,
-                             accelerator_memory_map, vector_params);
+          set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
         }
       }
     }
@@ -883,5 +863,4 @@ void MapVectorOperations(const codegen::Operation& param,
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
-  memory_maps.push_back(accelerator_memory_map);
 }

@@ -21,13 +21,10 @@ void MapSoftmax(const codegen::Operation& param,
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
-  AcceleratorMemoryMap accelerator_memory_map;
 
   const auto input_shape = squeeze_shape(get_shape(input));
   const int input_size = get_size(input);
   const int reduction_dim = input_shape.back();
-
-  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   std::vector<int> non_reduction_loops;
   for (int i = 0; i < input_shape.size() - 1; i++) {
@@ -38,27 +35,30 @@ void MapSoftmax(const codegen::Operation& param,
   pad_shape_to_ndim(non_reduction_loops, 2);
   const int reduced_size = get_size(non_reduction_loops);
 
-  const auto output_memory = output.memory();
+  const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
-  const int max_scratch_memory = get_address(input) + 2 * input_size;
+  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  int input_type_width = get_type_width<VU_INPUT_TYPES>(input_dtype);
+
+  int vector_dtype = get_type_index<VECTOR_DATATYPE, VU_INPUT_TYPES>();
+  int vector_type_width = get_type_width<VU_INPUT_TYPES>(vector_dtype);
+
+  const int max_scratch_memory =
+      get_address(input) + input_size * input_type_width / 8;
   const int sum_scratch_memory =
-      max_scratch_memory + reduced_size * OC_DIMENSION * 2;
+      max_scratch_memory + reduced_size * OC_DIMENSION * vector_type_width / 8;
 
   // ----------------------------------------------------------------------------
   // Pass 1: Calculate max and subtract max from tensor
   // ----------------------------------------------------------------------------
 
   // Address generator 0: Input tensor.
-  const auto input_memory = input.memory();
-  accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->vector_fetch_0_offset = get_address(input);
   vector_params->vector_fetch_0_mode = 2;
-  vector_params->vector_fetch_0_dtype =
-      get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  vector_params->vector_fetch_0_dtype = input_dtype;
+  set_dequantize_scale(input, vector_params);
 
-  int vector_fetch_0_input_width =
-      OC_DIMENSION *
-      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_0_dtype);
+  int vector_fetch_0_input_width = OC_DIMENSION * input_type_width;
   vector_params->vector_fetch_0_burst_size = vector_fetch_0_input_width / 8;
   vector_params->vector_fetch_0_num_beats =
       vector_fetch_0_input_width / OC_PORT_WIDTH;
@@ -72,17 +72,17 @@ void MapSoftmax(const codegen::Operation& param,
   vector_params->vector_fetch_0_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Output: Scratch memory for max.
-  accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->vector_output_offset = max_scratch_memory;
   vector_params->output_mode = 2;
+  vector_params->output_dtype =
+      get_type_index<VECTOR_DATATYPE, OUTPUT_DATATYPES>();
+
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
   }
   vector_params->output_loops[1][0] = 1;
   vector_params->output_loops[1][1] = 1;
   vector_params->output_loops[1][2] = reduced_size;
-  vector_params->output_dtype =
-      get_type_index<VECTOR_DATATYPE, OUTPUT_DATATYPES>();
 
   // Instruction 0 - start reduction engine to calculate max
   VectorInstructions vinst0;
@@ -107,7 +107,6 @@ void MapSoftmax(const codegen::Operation& param,
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
-  memory_maps.push_back(accelerator_memory_map);
 
   // ---------------------------------------------------------------------------
   // Pass 2: Find the normalization constant.
@@ -117,11 +116,11 @@ void MapSoftmax(const codegen::Operation& param,
   vector_instruction_config = new VectorInstructionConfig;
 
   // Address generator 0: Input tensor.
-  accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->vector_fetch_0_offset = get_address(input);
   vector_params->vector_fetch_0_mode = 2;
-  vector_params->vector_fetch_0_dtype =
-      get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  vector_params->vector_fetch_0_dtype = input_dtype;
+  set_dequantize_scale(input, vector_params);
+
   vector_params->vector_fetch_0_burst_size = vector_fetch_0_input_width / 8;
   vector_params->vector_fetch_0_num_beats =
       vector_fetch_0_input_width / OC_PORT_WIDTH;
@@ -137,12 +136,9 @@ void MapSoftmax(const codegen::Operation& param,
   // Address generator 1: Scratch max.
   vector_params->vector_fetch_1_offset = max_scratch_memory;
   vector_params->vector_fetch_1_mode = 1;
-  vector_params->vector_fetch_1_dtype =
-      get_type_index<VECTOR_DATATYPE, VU_INPUT_TYPES>();
+  vector_params->vector_fetch_1_dtype = vector_dtype;
 
-  int vector_fetch_1_input_width =
-      get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_1_dtype) *
-      OC_DIMENSION;
+  int vector_fetch_1_input_width = OC_DIMENSION * vector_type_width;
   vector_params->vector_fetch_1_burst_size = vector_fetch_1_input_width / 8;
   vector_params->vector_fetch_1_num_beats =
       vector_fetch_1_input_width / OC_PORT_WIDTH;
@@ -157,11 +153,11 @@ void MapSoftmax(const codegen::Operation& param,
   vector_params->vector_fetch_1_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Output: Scratch memory for sum.
-  accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->vector_output_offset = sum_scratch_memory;
   vector_params->output_mode = 2;
   vector_params->output_dtype =
       get_type_index<VECTOR_DATATYPE, OUTPUT_DATATYPES>();
+
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
   }
@@ -208,7 +204,6 @@ void MapSoftmax(const codegen::Operation& param,
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
-  memory_maps.push_back(accelerator_memory_map);
 
   // ---------------------------------------------------------------------------
   // Pass 3: Divide by the normalization constant and apply exp.
@@ -218,11 +213,11 @@ void MapSoftmax(const codegen::Operation& param,
   vector_instruction_config = new VectorInstructionConfig;
 
   // Address generator 0: Input tensor.
-  accelerator_memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->vector_fetch_0_offset = get_address(input);
   vector_params->vector_fetch_0_mode = 2;
-  vector_params->vector_fetch_0_dtype =
-      get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  vector_params->vector_fetch_0_dtype = input_dtype;
+  set_dequantize_scale(input, vector_params);
+
   vector_params->vector_fetch_0_burst_size = vector_fetch_0_input_width / 8;
   vector_params->vector_fetch_0_num_beats =
       vector_fetch_0_input_width / OC_PORT_WIDTH;
@@ -238,8 +233,7 @@ void MapSoftmax(const codegen::Operation& param,
   // Address generator 1: Scratch max.
   vector_params->vector_fetch_1_offset = max_scratch_memory;
   vector_params->vector_fetch_1_mode = 1;
-  vector_params->vector_fetch_1_dtype =
-      get_type_index<VECTOR_DATATYPE, VU_INPUT_TYPES>();
+  vector_params->vector_fetch_1_dtype = vector_dtype;
   vector_params->vector_fetch_1_burst_size = vector_fetch_1_input_width / 8;
   vector_params->vector_fetch_1_num_beats =
       vector_fetch_1_input_width / OC_PORT_WIDTH;
@@ -256,8 +250,7 @@ void MapSoftmax(const codegen::Operation& param,
   // Address generator 2: Scratch max.
   vector_params->vector_fetch_2_offset = sum_scratch_memory;
   vector_params->vector_fetch_2_mode = 1;
-  vector_params->vector_fetch_2_dtype =
-      get_type_index<VECTOR_DATATYPE, VU_INPUT_TYPES>();
+  vector_params->vector_fetch_2_dtype = vector_dtype;
   vector_params->vector_fetch_2_burst_size = vector_fetch_1_input_width / 8;
   vector_params->vector_fetch_2_num_beats =
       vector_fetch_1_input_width / OC_PORT_WIDTH;
@@ -272,11 +265,11 @@ void MapSoftmax(const codegen::Operation& param,
   vector_params->vector_fetch_2_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Output
-  accelerator_memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
   vector_params->output_dtype =
       get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
   }
@@ -317,5 +310,4 @@ void MapSoftmax(const codegen::Operation& param,
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
-  memory_maps.push_back(accelerator_memory_map);
 }

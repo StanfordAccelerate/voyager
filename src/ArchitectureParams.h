@@ -122,6 +122,9 @@ using F9 = StdFloat<3, 5>;
 #define ACCUM_BUFFER_DATATYPE DataTypes::bfloat16
 #define VECTOR_DATATYPE DataTypes::bfloat16
 #define SCALE_DATATYPE DataTypes::fp8_e5m3
+#define VU_INPUT_TYPES \
+  VECTOR_DATATYPE, SCALE_DATATYPE, DataTypes::e4m3, DataTypes::int1
+#define OUTPUT_DATATYPES INPUT_DATATYPE, VU_INPUT_TYPES
 
 #define SA_INPUT_TYPE DataTypes::int6
 #define SA_WEIGHT_TYPE DataTypes::int6

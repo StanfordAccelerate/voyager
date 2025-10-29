@@ -733,12 +733,6 @@ struct VectorParams : BaseParams {
     }
     output_dtype = 0;
 
-    output_pad_dimension = false;
-    output_pad_dim_size = 0;
-    for (int i = 0; i < 2; i++) {
-      output_pad_dim_idx[i] = 0;
-    }
-
     vector_fetch_0_broadcast = 0;
     vector_fetch_1_broadcast = 0;
     vector_fetch_2_broadcast = 0;
@@ -831,11 +825,6 @@ struct VectorParams : BaseParams {
   ac_int<3, false> output_k_loop_idx[2];
   ac_int<4, false> output_dtype;
 
-  // support for shapes that need to be padded up
-  bool output_pad_dimension;
-  ac_int<11, false> output_pad_dim_size;
-  ac_int<3, false> output_pad_dim_idx[2];
-
   ac_int<6, false> vector_fetch_0_broadcast;
   ac_int<3, false> vector_fetch_1_broadcast;
   ac_int<3, false> vector_fetch_2_broadcast;
@@ -876,15 +865,15 @@ struct VectorParams : BaseParams {
       2 + ADDRESS_WIDTH + 6 * LOOP_WIDTH + 6 * 3 + 16 + 4 + 18;
 
   static const unsigned int codebook_params_width =
-      1 + (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
+      (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
 
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
-  // slicing params + 32-bit pooling param + 18-bit reshape params + 17-bit
-  // padded transpose params + 4-bit head size + 7 boolean flags + 64-bit scale
-  // offset + 1-bit is_dwc flag
+  // slicing params + 32-bit pooling param + 18-bit reshape params + 4-bit head
+  // size + 8 boolean flags + 64-bit scale offset - output dequantize scale and
+  // packing params + cookbook params
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
-                                    17 + 4 + 7 + ADDRESS_WIDTH - 16 - 18 +
-                                    codebook_params_width + 1;
+                                    4 + 8 + ADDRESS_WIDTH - 16 - 18 +
+                                    codebook_params_width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -976,11 +965,6 @@ struct VectorParams : BaseParams {
       m& output_k_loop_idx[i];
     }
     m & output_dtype;
-    m & output_pad_dimension;
-    m & output_pad_dim_size;
-    for (int i = 0; i < 2; i++) {
-      m& output_pad_dim_idx[i];
-    }
 
     m & vector_fetch_0_broadcast;
     m & vector_fetch_1_broadcast;
@@ -1152,13 +1136,6 @@ struct VectorParams : BaseParams {
     }
     os << "output_dtype: " << params.output_dtype << std::endl;
 
-    os << "output_pad_dimension: " << params.output_pad_dimension << std::endl;
-    os << "output_pad_dim_size: " << params.output_pad_dim_size << std::endl;
-    for (int i = 0; i < 2; i++) {
-      os << "output_pad_dim_idx[" << i << "]: " << params.output_pad_dim_idx[i]
-         << std::endl;
-    }
-
     os << "has_slicing: " << params.has_slicing << std::endl;
     os << "vector_fetch_0_slice_dim: " << params.vector_fetch_0_slice_dim
        << std::endl;
@@ -1298,12 +1275,6 @@ struct VectorParams : BaseParams {
       if (lhs.output_k_loop_idx[i] != rhs.output_k_loop_idx[i]) return false;
     }
     if (lhs.output_dtype != rhs.output_dtype) return false;
-
-    if (lhs.output_pad_dimension != rhs.output_pad_dimension) return false;
-    if (lhs.output_pad_dim_size != rhs.output_pad_dim_size) return false;
-    for (int i = 0; i < 2; i++) {
-      if (lhs.output_pad_dim_idx[i] != rhs.output_pad_dim_idx[i]) return false;
-    }
 
     if (lhs.vector_fetch_0_broadcast != rhs.vector_fetch_0_broadcast)
       return false;

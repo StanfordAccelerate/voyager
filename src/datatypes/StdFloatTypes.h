@@ -175,10 +175,11 @@ template <int mantissa, int exp, bool use_dw_impl, bool ieee_compliance,
           ac_q_mode Q>
 StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>::StdFloat(
     const float val) {
-  if (val == FLT_MAX) {
-    float_val = float_val.inf();
-  } else if (val == -FLT_MAX) {
-    float_val = -float_val.inf();
+  float max_float = ac_float_rep::max().to_float();
+  if (val > max_float) {
+    float_val = ac_float_rep::max();
+  } else if (val < -max_float) {
+    float_val = -ac_float_rep::max();
   } else {
     float_val = ac_float_rep(val);
   }

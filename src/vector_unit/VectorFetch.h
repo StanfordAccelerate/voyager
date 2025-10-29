@@ -233,7 +233,6 @@ SC_MODULE(VectorFetchUnit) {
                 for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
                   ac_int<32, false> address;
                   bool in_bound = true;
-                  bool switch_accumulation_buffer_bank = false;
 
                   ac_int<11, false> y1 =
                       loop_counters[0][params.vector_fetch_0_y_loop_idx[0]];
@@ -611,14 +610,10 @@ SC_MODULE(VectorFetchUnit) {
 #endif
             }
 
-#if !SUPPORT_MX
             Pack1D<VectorType, width> dequantized;
             vdequantize<VectorType, VectorType, width>(
                 outputs, dequantized, params.vector_fetch_0_dq_scale);
             vector_fetch_0_data.Push(dequantized);
-#else
-            vector_fetch_0_data.Push(outputs);
-#endif
 
             if (i == params.vector_fetch_0_packing_factor - 1) {
               break;
@@ -806,14 +801,10 @@ SC_MODULE(VectorFetchUnit) {
           }
 #endif
 
-#if !SUPPORT_MX
           Pack1D<VectorType, width> dequantized;
           vdequantize<VectorType, VectorType, width>(
               outputs, dequantized, params.vector_fetch_1_dq_scale);
           vector_fetch_1_data.Push(dequantized);
-#else
-          vector_fetch_1_data.Push(outputs);
-#endif
 
           if (i == params.vector_fetch_1_packing_factor - 1) {
             break;
@@ -998,14 +989,10 @@ SC_MODULE(VectorFetchUnit) {
           }
 #endif
 
-#if !SUPPORT_MX
           Pack1D<VectorType, width> dequantized;
           vdequantize<VectorType, VectorType, width>(
               outputs, dequantized, params.vector_fetch_2_dq_scale);
           vector_fetch_2_data.Push(dequantized);
-#else
-          vector_fetch_2_data.Push(outputs);
-#endif
 
           if (i == params.vector_fetch_2_packing_factor - 1) {
             break;
