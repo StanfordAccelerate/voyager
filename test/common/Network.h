@@ -3,10 +3,6 @@
 #include "test/compiler/proto/param.pb.h"
 #include "test/compiler/proto/tiling.pb.h"
 
-bool is_shrinkable_operation(const codegen::Operation& operation,
-                             const voyager::Tiling& tiling);
-int shrink_operation(codegen::Operation& operation, voyager::Tiling& tiling);
-
 class Operation {
  public:
   Operation() {}

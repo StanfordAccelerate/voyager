@@ -332,13 +332,14 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
     abs_diff_buckets[3] += abs_diff < 1.0f;
     abs_diff_buckets[4] += abs_diff >= 1.0f && !is_nan;
 
-    // Relative difference buckets
+    // Does not fully protect against overflow, but lets not over engineer
     if ((a == 0 && b == 0) || is_nan) {
       rel_diff_buckets[0]++;
       rel_diff_buckets[1]++;
       rel_diff_buckets[2]++;
       rel_diff_buckets[3]++;
     } else {
+      // See https://en.wikipedia.org/wiki/Relative_change_and_difference
       float rel_diff = abs_diff / ((std::abs(a) + std::abs(b)) / 2.0f);
       rel_diff_buckets[0] += rel_diff < 0.001f;
       rel_diff_buckets[1] += rel_diff < 0.01f;
