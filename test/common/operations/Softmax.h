@@ -18,7 +18,12 @@ inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
 
   for (int i = 0; i < num_rows; i++) {
     int offset = i * num_cols;
-    T max = T::min();
+    T max;
+    if constexpr (std::is_same<T, CFloat>::value) {
+      max = -1e30f;
+    } else {
+      max = T::min();
+    }
     for (int j = 0; j < num_cols; j++) {
       max = inputs[offset + j] > max ? inputs[offset + j] : max;
     }
