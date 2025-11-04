@@ -58,10 +58,10 @@ SC_MODULE(VectorPipeline) {
   Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_input;
 
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
-  Connections::Fifo<Pack1D<StageInput, 2>, mu_width / vu_width + 8>
+  Connections::Fifo<Pack1D<VectorPack, 2>, mu_width / vu_width + 8>
       stage_3_input_fifo;
-  Connections::Combinational<Pack1D<StageInput, 2>> stage_3_input_fifo_in;
-  Connections::Combinational<Pack1D<StageInput, 2>> stage_3_input_fifo_out;
+  Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_input_fifo_in;
+  Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_input_fifo_out;
 
   Connections::Combinational<VectorPack> calculate_qparam_inputs;
   Connections::Combinational<VectorType> stage_3_amax;
@@ -468,6 +468,7 @@ SC_MODULE(VectorPipeline) {
         } else if (vdest == VectorInstructions::to_accumulate) {
           accumulator_input.Push(res2);
         }
+        if (i == inst.inst_count - 1) break;
       }
     }
   }
