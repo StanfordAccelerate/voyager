@@ -418,6 +418,7 @@ SC_MODULE(VectorPipeline) {
     reducer_input.Reset();
     accumulator_input.Reset();
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
+    calculate_qparam_inputs.ResetWrite();
     stage_3_input_fifo_in.ResetWrite();
 #else
     stage_3_input.ResetWrite();
@@ -513,15 +514,11 @@ SC_MODULE(VectorPipeline) {
 #else
     stage_3_input.ResetRead();
 #endif
+    stage_3_inst.ResetRead();
     mx_scale.Reset();
     vector_unit_output.Reset();
 
     wait();
-
-#if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
-    ac_int<4, false> count = 0;
-    ScaleType scale;
-#endif
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -529,6 +526,15 @@ SC_MODULE(VectorPipeline) {
       auto inst = stage_3_inst.Pop();
       auto op3 = inst.vector_op3;
       auto qparam = inst.immediate2;
+
+      if (inst.vdest != VectorInstructions::to_output) {
+        continue;
+      }
+
+#if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
+      ac_int<4, false> count = 0;
+      ScaleType scale;
+#endif
 
       for (decltype(inst.inst_count) i = 0;; i++) {
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
@@ -545,7 +551,7 @@ SC_MODULE(VectorPipeline) {
 #if VECTOR_UNIT_WIDTH != OC_DIMENSION
           if (count == 0) {
             VectorType amax = stage_3_amax.Pop();
-            ScaleType scale =
+            scale =
                 compute_scale<VectorType, ScaleType, vu_width>(amax, qparam);
             mx_scale.Push(scale);
           }
