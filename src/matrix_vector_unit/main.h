@@ -226,7 +226,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
         for (loop_t c = 0;; c++) {
-          ac_int<buffer_width, false> bits;
+          ac_int<buffer_width, false> bits = 0;
           if (k == 0) {
             bool success = (process_matrix_input<InputTypes, width, port_width,
                                                  buffer_width, InputTypes...>(
@@ -251,10 +251,12 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             } else
 #endif
             {
+              Input value = Input::zero();
               bool success =
                   (decode_type<InputTypes, Input, Input::width, InputTypes...>(
-                       params.input_dtype, data, inputs[i]) ||
+                       params.input_dtype, data, value) ||
                    ...);
+              inputs[i] = value;
 #ifndef __SYNTHESIS__
               if (!success) {
                 std::cerr << "Error: matrix input dtype '" << params.input_dtype
@@ -566,10 +568,12 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
               } else
 #endif
               {
+                Weight value = Weight::zero();
                 bool success = (decode_type<WeightTypes, Weight, Weight::width,
                                             WeightTypes...>(params.weight_dtype,
-                                                            data, weights[i]) ||
+                                                            data, value) ||
                                 ...);
+                weights[i] = value;
 #ifndef __SYNTHESIS__
                 if (!success) {
                   std::cerr << "Error: matrix weight dtype '"
@@ -583,7 +587,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             if (params.weight_dequant) {
 #pragma hls_unroll yes
               for (int i = 0; i < width; i++) {
-                weights[i] = dequantize<Input, Scale, Output>(
+                weights[i] = fused_dequantize_quantize<Weight, Scale, Output>(
                     weights[i], dq_scales[i], dq_zero_points[i]);
               }
             }

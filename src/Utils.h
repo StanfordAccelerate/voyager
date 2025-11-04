@@ -148,6 +148,7 @@ Buffer dequantize_mx_op(const Psum psum, const Scale input_scale,
 
 #pragma hls_design ccore
 template <typename Input, typename Scale, typename Output>
-Output dequantize(Input input, Scale scale, Scale zero_point) {
+Input fused_dequantize_quantize(const Input input, const Scale scale,
+                                const Scale zero_point) {
   return ((Output)input - (Output)zero_point) * (Output)scale;
 }
