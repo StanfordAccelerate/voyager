@@ -13,19 +13,23 @@ SC_MODULE(OutputController) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(send_data_params);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(quantizer_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(
+      quantize_codebook_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(write_address_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(
+      write_scale_address_params);
+  Connections::Combinational<ac_int<32, false>> CCS_INIT_S1(write_scale_params);
 
   Connections::In<Pack1D<VectorType, width>> CCS_INIT_S1(vector_in);
-  Connections::Combinational<Pack1D<VectorType, width>> CCS_INIT_S1(
-      quantized_data);
-
-  Connections::Fifo<ScaleType, 16> CCS_INIT_S1(scale_fifo);
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
-  Connections::Combinational<ScaleType> CCS_INIT_S1(scale_deq);
+
+  Connections::Combinational<Pack1D<VectorType, width>> CCS_INIT_S1(
+      quantize_output);
 
 #if SUPPORT_DWC
   Connections::In<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(dwc_address_in);
+  Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      dwc_scale_address);
 #endif
 
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_out);
@@ -39,40 +43,44 @@ SC_MODULE(OutputController) {
   static constexpr int LOOP_WIDTH = 16;
 
   SC_CTOR(OutputController) {
-    scale_fifo.clk(clk);
-    scale_fifo.rst(rstn);
-    scale_fifo.enq(scale_in);
-    scale_fifo.deq(scale_deq);
-
-    SC_THREAD(send_address);
+    SC_THREAD(quantize_codebook);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(send_data);
+    SC_THREAD(write_data);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 
-    SC_THREAD(quantizer);
+    SC_THREAD(write_address);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+
+#if SUPPORT_MX
+    SC_THREAD(write_mx_scale);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    SC_THREAD(write_scale_address);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+#endif
   }
 
-  void quantizer() {
+  void quantize_codebook() {
     vector_in.Reset();
-    quantizer_params.ResetRead();
-    quantized_data.ResetWrite();
+    quantize_codebook_params.ResetRead();
+    quantize_output.ResetWrite();
 
     wait();
 
     while (true) {
-      VectorParams params = quantizer_params.Pop();
+      VectorParams params = quantize_codebook_params.Pop();
 
       ac_int<32, false> num_outputs =
           params.output_loops[0][0] * params.output_loops[0][1] *
-          params.output_loops[0][2] * params.output_loops[1][0] *
-          params.output_loops[1][1] * params.output_loops[1][2];
-
-      ac_int<32, false> counter = 0;
+              params.output_loops[0][2] * params.output_loops[1][0] *
+              params.output_loops[1][1] * params.output_loops[1][2] -
+          1;
 
 #if SUPPORT_CODEBOOK_QUANT
       if (params.use_output_codebook) {
@@ -89,7 +97,7 @@ SC_MODULE(OutputController) {
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        while (counter++ < num_outputs) {
+        for (ac_int<32, false> i = 0;; i++) {
           Pack1D<VectorType, width> outputs = vector_in.Pop();
 
           Pack1D<ac_float_t, width> ac_float_outputs;
@@ -114,88 +122,88 @@ SC_MODULE(OutputController) {
           for (int i = 0; i < width; i++) {
             quantized_outputs[i].set_bits(indices[i]);
           }
-          quantized_data.Push(quantized_outputs);
+          quantize_output.Push(quantized_outputs);
+
+          if (i == num_outputs) break;
         }
       } else
 #endif
       {
+        // Pass through
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-        while (counter++ < num_outputs) {
-          // Pass through
-          Pack1D<VectorType, width> outputs = vector_in.Pop();
-          quantized_data.Push(outputs);
+        for (ac_int<32, false> i = 0;; i++) {
+          auto outputs = vector_in.Pop();
+          quantize_output.Push(outputs);
+          if (i == num_outputs) break;
         }
       }
     }
   }
 
-  void send_data() {
-    send_data_params.ResetRead();
-    scale_deq.ResetRead();
-    scale_out.Reset();
-    quantized_data.ResetRead();
+  void write_data() {
+    params_in.Reset();
+    quantize_codebook_params.ResetWrite();
+    write_address_params.ResetWrite();
+    write_scale_params.ResetWrite();
+    write_scale_address_params.ResetWrite();
+    quantize_output.ResetRead();
     vector_out.Reset();
     done.Reset();
 
     wait();
 
     while (true) {
-      VectorParams params = send_data_params.Pop();
+      VectorParams params = params_in.Pop();
+      quantize_codebook_params.Push(params);
+      write_address_params.Push(params);
 
       ac_int<32, false> num_outputs =
           params.output_loops[0][0] * params.output_loops[0][1] *
-          params.output_loops[0][2] * params.output_loops[1][0] *
-          params.output_loops[1][1] * params.output_loops[1][2];
+              params.output_loops[0][2] * params.output_loops[1][0] *
+              params.output_loops[1][1] * params.output_loops[1][2] -
+          1;
 
-      ac_int<32, false> counter = 0;
+      if (params.quantize_output_mx) {
+        write_scale_params.Push(num_outputs);
+        write_scale_address_params.Push(params);
+      }
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      while (counter++ < num_outputs) {
-#if SUPPORT_MX
-        if (params.quantize_output_mx) {
-          ScaleType scale = scale_deq.Pop();
-          scale_out.Push(scale.bits_rep());
-        }
-#endif
-
-        Pack1D<VectorType, width> outputs = quantized_data.Pop();
+      for (ac_int<32, false> i = 0;; i++) {
+        Pack1D<VectorType, width> outputs = quantize_output.Pop();
 
         bool found = (send_output_data<OutputTypes, width, VectorType,
                                        OC_PORT_WIDTH, OutputTypes...>(
                           params.output_dtype, params.use_output_codebook,
                           outputs, vector_out) ||
                       ...);
-
 #ifndef __SYNTHESIS__
         if (!found) {
           std::cerr << "Error: output type '" << params.output_dtype
                     << "' is not valid.\n";
         }
 #endif
+        if (i == num_outputs) break;
       }
 
       done.SyncPush();
     }
   }
 
-  void send_address() {
-    params_in.Reset();
-    send_data_params.ResetWrite();
-    quantizer_params.ResetWrite();
+  void write_address() {
+    write_address_params.ResetRead();
     vector_address_out.Reset();
-    scale_address_out.Reset();
 #if SUPPORT_DWC
     dwc_address_in.Reset();
+    dwc_scale_address.ResetWrite();
 #endif
 
     wait();
 
     while (true) {
-      VectorParams params = params_in.Pop();
-      send_data_params.Push(params);
-      quantizer_params.Push(params);
+      VectorParams params = write_address_params.Pop();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
@@ -231,7 +239,7 @@ SC_MODULE(OutputController) {
       ac_int<16, false> loop_bound_0 = params.output_loops[0][1] * loop_bound_1;
 
 #if SUPPORT_DWC
-      // TODO: remove this and handle using vector params
+      // TODO: remove this and handle properly using vector params
       if (params.is_dwc) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -251,7 +259,7 @@ SC_MODULE(OutputController) {
 #endif
 #if SUPPORT_MX
           if (params.quantize_output_mx) {
-            scale_address_out.Push(params.mx_scale_offset +
+            dwc_scale_address.Push(params.mx_scale_offset +
                                    address / width * ScaleType::width / 8);
           }
 #endif
@@ -269,18 +277,18 @@ SC_MODULE(OutputController) {
                   for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
                     ac_int<32, false> address;
                     if (params.output_mode == 1) {
-                      ac_int<LOOP_WIDTH, false> x0 =
-                          loop_counters[1][params.output_x_loop_idx[1]];
-                      ac_int<LOOP_WIDTH, false> x1 =
-                          loop_counters[0][params.output_x_loop_idx[0]];
-                      ac_int<LOOP_WIDTH, false> y0 =
-                          loop_counters[1][params.output_y_loop_idx[1]];
                       ac_int<LOOP_WIDTH, false> y1 =
                           loop_counters[0][params.output_y_loop_idx[0]];
-                      ac_int<LOOP_WIDTH, false> k1 =
-                          loop_counters[1][params.output_k_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> x1 =
+                          loop_counters[0][params.output_x_loop_idx[0]];
                       ac_int<LOOP_WIDTH, false> k2 =
                           loop_counters[0][params.output_k_loop_idx[0]];
+                      ac_int<LOOP_WIDTH, false> y0 =
+                          loop_counters[1][params.output_y_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> x0 =
+                          loop_counters[1][params.output_x_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> k1 =
+                          loop_counters[1][params.output_k_loop_idx[1]];
 
                       ac_int<32, false> y = y1 * Y0 + y0;
                       ac_int<32, false> x = x1 * X0 + x0;
@@ -307,14 +315,6 @@ SC_MODULE(OutputController) {
                                 width;
                     }
 
-#if SUPPORT_MX
-                    if (params.quantize_output_mx) {
-                      scale_address_out.Push(params.mx_scale_offset +
-                                             address / width *
-                                                 ScaleType::width / 8);
-                    }
-#endif
-
                     bool found =
                         (send_output_address<OutputTypes, width, OC_PORT_WIDTH,
                                              OutputTypes...>(
@@ -328,30 +328,149 @@ SC_MODULE(OutputController) {
                                 << "' is not valid.\n";
                     }
 #endif
+                    if (loop_counters[1][2] == loop_bounds[1][2]) break;
+                  }
+                  if (loop_counters[1][1] == loop_bounds[1][1]) break;
+                }
+                if (loop_counters[1][0] == loop_bounds[1][0]) break;
+              }
+              if (loop_counters[0][2] == loop_bounds[0][2]) break;
+            }
+            if (loop_counters[0][1] == loop_bounds[0][1]) break;
+          }
+          if (loop_counters[0][0] == loop_bounds[0][0]) break;
+        }
+      }
+    }
+  }
 
-                    if (loop_counters[1][2] == loop_bounds[1][2]) {
-                      break;
+  void write_mx_scale() {
+    write_scale_params.ResetRead();
+    scale_in.Reset();
+    scale_out.Reset();
+
+    wait();
+
+    while (true) {
+      ac_int<32, false> num_outputs = write_scale_params.Pop();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+      for (ac_int<32, false> i = 0;; i++) {
+        ScaleType scale = scale_in.Pop();
+        scale_out.Push(scale.bits_rep());
+        if (i == num_outputs) break;
+      }
+    }
+  }
+
+  void write_scale_address() {
+    write_scale_address_params.ResetRead();
+    scale_address_out.Reset();
+#if SUPPORT_DWC
+    dwc_scale_address.ResetRead();
+#endif
+
+    wait();
+
+    while (true) {
+      VectorParams params = write_scale_address_params.Pop();
+
+      ac_int<LOOP_WIDTH, false> loop_counters[2][3];
+      ac_int<LOOP_WIDTH, false> loop_bounds[2][3];
+
+#pragma hls_unroll yes
+      for (int i = 0; i < 2; i++) {
+#pragma hls_unroll yes
+        for (int j = 0; j < 3; j++) {
+          loop_bounds[i][j] = params.output_loops[i][j] - 1;
+        }
+      }
+
+      ac_int<LOOP_WIDTH, false> Y1 =
+          params.output_loops[0][params.output_y_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> X1 =
+          params.output_loops[0][params.output_x_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> K2 =
+          params.output_loops[0][params.output_k_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> Y0 =
+          params.output_loops[1][params.output_y_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> X0 =
+          params.output_loops[1][params.output_x_loop_idx[1]];
+      ac_int<16, false> K1 =
+          params.output_loops[1][params.output_k_loop_idx[1]];
+
+      ac_int<16, false> X = X0 * X1;
+      ac_int<16, false> K = K2 * K1;
+
+      ac_int<16, false> loop_bound_4 = params.output_loops[1][2];
+      ac_int<16, false> loop_bound_3 = params.output_loops[1][1] * loop_bound_4;
+      ac_int<16, false> loop_bound_2 = params.output_loops[1][0] * loop_bound_3;
+      ac_int<16, false> loop_bound_1 = params.output_loops[0][2] * loop_bound_2;
+      ac_int<16, false> loop_bound_0 = params.output_loops[0][1] * loop_bound_1;
+
+#if SUPPORT_DWC
+      // TODO: remove this and handle properly using vector params
+      if (params.is_dwc) {
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        while (true) {
+          ac_int<ADDRESS_WIDTH, false> address = dwc_scale_address.Pop();
+          scale_address_out.Push(address);
+        }
+      } else
+#endif
+      {
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+        for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
+          for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
+            for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
+              for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                  for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                    ac_int<32, false> address;
+                    if (params.output_mode == 1) {
+                      ac_int<LOOP_WIDTH, false> y1 =
+                          loop_counters[0][params.output_y_loop_idx[0]];
+                      ac_int<LOOP_WIDTH, false> x1 =
+                          loop_counters[0][params.output_x_loop_idx[0]];
+                      ac_int<LOOP_WIDTH, false> k2 =
+                          loop_counters[0][params.output_k_loop_idx[0]];
+                      ac_int<LOOP_WIDTH, false> y0 =
+                          loop_counters[1][params.output_y_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> x0 =
+                          loop_counters[1][params.output_x_loop_idx[1]];
+                      ac_int<LOOP_WIDTH, false> k1 =
+                          loop_counters[1][params.output_k_loop_idx[1]];
+
+                      ac_int<32, false> y = y1 * Y0 + y0;
+                      ac_int<32, false> x = x1 * X0 + x0;
+                      ac_int<32, false> k = k2 * K1 + k1;
+                      address = y * X * K + x * K + k;
+                    } else if (params.output_mode == 2) {
+                      address = loop_counters[0][0] * loop_bound_0 +
+                                loop_counters[0][1] * loop_bound_1 +
+                                loop_counters[0][2] * loop_bound_2 +
+                                loop_counters[1][0] * loop_bound_3 +
+                                loop_counters[1][1] * loop_bound_4 +
+                                loop_counters[1][2];
                     }
+
+                    scale_address_out.Push(params.mx_scale_offset +
+                                           address * ScaleType::width / 8);
+
+                    if (loop_counters[1][2] == loop_bounds[1][2]) break;
                   }
-                  if (loop_counters[1][1] == loop_bounds[1][1]) {
-                    break;
-                  }
+                  if (loop_counters[1][1] == loop_bounds[1][1]) break;
                 }
-                if (loop_counters[1][0] == loop_bounds[1][0]) {
-                  break;
-                }
+                if (loop_counters[1][0] == loop_bounds[1][0]) break;
               }
-              if (loop_counters[0][2] == loop_bounds[0][2]) {
-                break;
-              }
+              if (loop_counters[0][2] == loop_bounds[0][2]) break;
             }
-            if (loop_counters[0][1] == loop_bounds[0][1]) {
-              break;
-            }
+            if (loop_counters[0][1] == loop_bounds[0][1]) break;
           }
-          if (loop_counters[0][0] == loop_bounds[0][0]) {
-            break;
-          }
+          if (loop_counters[0][0] == loop_bounds[0][0]) break;
         }
       }
     }

@@ -354,17 +354,17 @@ bool send_output_data(
   constexpr int num_words = (T::width * N + port_width - 1) / port_width;
 
   Pack1D<T, N> outputs;
-
 #pragma hls_unroll yes
-  for (unsigned i = 0; i < N; i++) {
+  for (int i = 0; i < N; i++) {
     outputs[i] = cast_output<VectorType, T>(inputs[i], is_codebook_quant);
   }
 
   ac_int<T::width * N, false> bits;
   bits = BitsToType<decltype(bits)>(TypeToBits(outputs));
 
-  for (unsigned i = 0; i < num_words; i++) {
+  for (ac_int<4, false> i = 0;; i++) {
     output_channel.Push(bits.template slc<port_width>(i * port_width));
+    if (i == num_words - 1) break;
   }
 
   return true;
@@ -381,8 +381,9 @@ bool send_output_address(
 
   constexpr int num_words = (T::width * N + port_width - 1) / port_width;
 
-  for (int i = 0; i < num_words; i++) {
+  for (ac_int<4, false> i = 0;; i++) {
     address_channel.Push(offset + address * T::width / 8 + i * port_width / 8);
+    if (i == num_words - 1) break;
   }
 
   return true;
