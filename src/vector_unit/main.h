@@ -275,13 +275,9 @@ SC_MODULE(VectorUnit) {
             reducer_instr.Push(inst);
           }
 
-          if (j == instruction_config.num_inst - 1) {
-            break;
-          }
+          if (j == instruction_config.num_inst - 1) break;
         }
-        if (i == instruction_config.repeat_count - 1) {
-          break;
-        }
+        if (i == instruction_config.repeat_count - 1) break;
       }
     }
   }
@@ -300,13 +296,14 @@ SC_MODULE(VectorUnit) {
       if constexpr (mu_width == width) {
         matrix_unit_output_unpacked.Push(full_response);
       } else {
-        for (int i = 0; i < mu_width / width; i++) {
+        for (ac_int<4, false> i = 0;; i++) {
           Pack1D<BufferType, width> unpacked_data;
 #pragma hls_unroll yes
           for (int j = 0; j < width; j++) {
             unpacked_data[j] = full_response[i * width + j];
           }
           matrix_unit_output_unpacked.Push(unpacked_data);
+          if (i == mu_width / width - 1) break;
         }
       }
     }
@@ -358,21 +355,15 @@ SC_MODULE(VectorUnit) {
                 packed_outputs[pack * width + i] = outputs[i];
               }
 
-              if (pack == packing_factor - 1) {
-                break;
-              }
+              if (pack == packing_factor - 1) break;
             }
-            vector_unit_output.Push(packed_outputs);
 
-            if (count == num_outputs - 1) {
-              break;
-            }
+            vector_unit_output.Push(packed_outputs);
+            if (count == num_outputs - 1) break;
           }
           break;
         }
-        if (i == instruction_config.num_inst - 1) {
-          break;
-        }
+        if (i == instruction_config.num_inst - 1) break;
       }
     }
   }

@@ -126,6 +126,13 @@ class Pack1D {
   Pack1D() {}
   Pack1D(const int a) {}
 
+  Pack1D(std::initializer_list<T> init) {
+    size_t i = 0;
+    for (auto& elem : init) {
+      if (i < pack_width) value[i++] = elem;
+    }
+  }
+
   operator int() const { return Pack1D<T, pack_width>(); }
 
   T& operator[](unsigned int i) { return this->value[i]; }
@@ -693,86 +700,6 @@ class Pack1D<UFloat<W, E>, pack_width> {
 
   inline friend bool operator==(const Pack1D& lhs, const Pack1D& rhs) {
     for (unsigned int i = 0; i < pack_width; i++) {
-      if (!(lhs.value[i] == rhs.value[i])) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-};
-
-template <typename T, size_t payload_size>
-class Transaction {
- public:
-  ac_int<3, false> op;
-  ac_int<16, false> immediate;
-  Pack1D<T, payload_size> payload;
-
-  static const unsigned int width = 3 + 16 + Pack1D<T, payload_size>::width;
-
-  template <unsigned int Size>
-  void Marshall(Marshaller<Size>& m) {
-    m& this->op;
-    m& this->immediate;
-    for (unsigned i = 0; i < payload_size; i++) {
-      m& this->payload[i].float_val.d;
-    }
-  }
-
-  inline friend void sc_trace(sc_trace_file* tf, const Transaction& params,
-                              const std::string& name) {
-    sc_trace(tf, params.op, name + ".op");
-  }
-
-  inline friend std::ostream& operator<<(std::ostream& os,
-                                         const Transaction& route) {
-    os << "op: " << route.op << std::endl;
-    return os;
-  }
-
-  inline friend bool operator==(const Transaction& lhs,
-                                const Transaction& rhs) {
-    return (lhs.op == rhs.op && lhs.immediate == rhs.immediate &&
-            lhs.payload == rhs.payload);
-  }
-};
-
-template <size_t pack_width, int mantissa, int exp, size_t payload_size>
-class Pack1D<Transaction<StdFloat<mantissa, exp>, payload_size>, pack_width> {
- public:
-  Transaction<StdFloat<mantissa, exp>, payload_size> value[pack_width];
-  static const unsigned int width =
-      Transaction<StdFloat<mantissa, exp>, payload_size>::width * pack_width;
-
-  Pack1D() {}
-  Pack1D(const int a) {}
-
-  Transaction<StdFloat<mantissa, exp>, payload_size>& operator[](size_t i) {
-    return value[i];
-  }
-  const Transaction<StdFloat<mantissa, exp>, payload_size>& operator[](
-      size_t i) const {
-    return value[i];
-  }
-
-  template <unsigned int Size>
-  void Marshall(Marshaller<Size>& m) {
-    for (unsigned i = 0; i < pack_width; i++) {
-      m& value[i].op;
-    }
-    for (unsigned i = 0; i < pack_width; i++) {
-      m& value[i].immediate;
-    }
-    for (unsigned i = 0; i < pack_width; i++) {
-      for (unsigned j = 0; j < payload_size; j++) {
-        m& value[i].payload[j].float_val.d;
-      }
-    }
-  }
-
-  inline friend bool operator==(const Pack1D& lhs, const Pack1D& rhs) {
-    for (unsigned i = 0; i < pack_width; i++) {
       if (!(lhs.value[i] == rhs.value[i])) {
         return false;
       }
