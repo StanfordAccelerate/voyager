@@ -319,8 +319,8 @@ SC_MODULE(VectorPipeline) {
           }
         }
 
-        Pack1D<VectorPack, 4> payloads = {op0_src0, op0_src1, op2_src1,
-                                          op3_src1};
+        auto payloads = Pack1D<VectorPack, 4>::Create(
+            {op0_src0, op0_src1, op2_src1, op3_src1});
         stage_0_input.Push(payloads);
 
         if (i == inst.inst_count - 1) break;
@@ -363,7 +363,8 @@ SC_MODULE(VectorPipeline) {
           res0 = op0_src0;
         }
 
-        Pack1D<VectorPack, 3> payloads_next = {res0, payloads[2], payloads[3]};
+        auto payloads_next =
+            Pack1D<VectorPack, 3>::Create({res0, payloads[2], payloads[3]});
         stage_1_input.Push(payloads_next);
 
         if (i == inst.inst_count - 1) break;
@@ -404,7 +405,8 @@ SC_MODULE(VectorPipeline) {
           res1 = op1_src0;
         }
 
-        Pack1D<VectorPack, 3> payloads_next = {res1, payloads[1], payloads[2]};
+        auto payloads_next =
+            Pack1D<VectorPack, 3>::Create({res1, payloads[1], payloads[2]});
         stage_2_input.Push(payloads_next);
 
         if (i == inst.inst_count - 1) break;
@@ -455,7 +457,8 @@ SC_MODULE(VectorPipeline) {
 
         // Write outputs
         if (vdest == VectorInstructions::to_output) {
-          Pack1D<VectorPack, 2> payloads_next = {res2, payloads[2]};
+          auto payloads_next =
+              Pack1D<VectorPack, 2>::Create({res2, payloads[2]});
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
           if (op3 == VectorInstructions::vquantize_mx) {
             calculate_qparam_inputs.Push(res2);

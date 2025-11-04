@@ -126,11 +126,13 @@ class Pack1D {
   Pack1D() {}
   Pack1D(const int a) {}
 
-  Pack1D(std::initializer_list<T> init) {
-    size_t i = 0;
-    for (auto& elem : init) {
-      if (i < pack_width) value[i++] = elem;
+  static Pack1D Create(const T (&arr)[pack_width]) {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (unsigned i = 0; i < pack_width; ++i) {
+      p.value[i] = arr[i];
     }
+    return p;
   }
 
   operator int() const { return Pack1D<T, pack_width>(); }
