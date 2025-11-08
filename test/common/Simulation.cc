@@ -67,8 +67,6 @@ Simulation::Simulation() {
   for (const std::string& s : sims) spdlog::info("{} ", s);
   spdlog::info("\n> Tolerance: {}", tolerance);
   spdlog::info("\n> Output dir: {}", out_dir);
-  spdlog::info("\n> DRAM: {} KB", DRAM_SIZE_MB / 1024);
-  spdlog::info("\n> SRAM: {} KB\n", SRAM_SIZE_MB / 1024);
 }
 
 Simulation::~Simulation() {
@@ -82,8 +80,30 @@ Simulation::~Simulation() {
 }
 
 void Simulation::load_data() {
-  std::vector<uint64_t> memory_sizes{DRAM_SIZE_MB, SRAM_SIZE_MB,
-                                     REFERENCE_MEMORY_SIZE};
+  // Calculate dynamic memory sizes based on network parameters
+  uint64_t dram_size = network->get_max_dram_address();
+  uint64_t sram_size = 16 * 1024 * 1024;
+  uint64_t output_size = network->get_max_output_size();
+
+  spdlog::info("Computed memory requirements:\n");
+  spdlog::info("  Max DRAM address: {} bytes ({} MB)\n", dram_size,
+               dram_size / (1024 * 1024));
+  spdlog::info("  Max output size: {} bytes ({} MB)\n", output_size,
+               output_size / (1024 * 1024));
+
+  // Add some padding to ensure we don't run out of memory (10% extra)
+  dram_size = static_cast<uint64_t>(dram_size * 1.1);
+  output_size = static_cast<uint64_t>(output_size * 1.1);
+
+  spdlog::info("Memory sizes with 10%% padding:\n");
+  spdlog::info("  DRAM: {} bytes ({} MB)\n", dram_size,
+               dram_size / (1024 * 1024));
+  spdlog::info("  SRAM: {} bytes ({} MB)\n", sram_size,
+               sram_size / (1024 * 1024));
+  spdlog::info("  Reference: {} bytes ({} MB)\n", output_size,
+               output_size / (1024 * 1024));
+
+  std::vector<uint64_t> memory_sizes{dram_size, sram_size, output_size};
 
   if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
     memories["gold"] = new ArrayMemory(memory_sizes);
@@ -114,7 +134,8 @@ void Simulation::load_data() {
 void Simulation::print_ideal_runtime(const Operation operation) {
   const auto param = operation.param;
   const auto op_list = get_op_list(param);
-  const auto first_op = op_list.front();
+  const auto& first_op = op_list.front();
+  const auto& kwargs = first_op.kwargs();
   const auto output = get_op_outputs(param).back();
 
   long cycles;
@@ -164,6 +185,17 @@ void Simulation::print_ideal_runtime(const Operation operation) {
     } else if (first_op.target() == "calculate_mx_qparam") {
       const int block_size = first_op.kwargs().at("block_size").int_value();
       cycles *= block_size;
+    } else if (first_op.target() == "max_pool2d") {
+      const auto kernel_size = kwargs.at("kernel_size").int_list().values();
+      for (const auto& k : kernel_size) {
+        cycles *= k;
+      }
+    } else if (first_op.target() == "adaptive_avg_pool2d") {
+      const auto input_shape = get_shape(kwargs.at("input").tensor());
+      const auto output_shape = get_shape(kwargs.at("output").tensor());
+      int kernel_y = input_shape[1] / output_shape[1];
+      int kernel_x = input_shape[2] / output_shape[2];
+      cycles *= (kernel_y * kernel_x);
     }
 
     spdlog::info("{}, vector unit ideal runtime: {} ns\n", get_op_name(param),
@@ -178,6 +210,9 @@ void Simulation::run() {
       const auto param = operation.param;
       print_ideal_runtime(operation);
 
+      const auto tensors = get_op_outputs(param);
+      const auto memory = (ArrayMemory*)(memories["gold"]);
+
       if (is_soc_sim()) {
         const auto l2_tiling = get_l2_tiling(param);
         const int num_tiles = get_num_tiles(l2_tiling);
@@ -187,10 +222,8 @@ void Simulation::run() {
         for (int i = 0; i < num_tiles; i++) {
           dataloaders["gold"]->load_scratchpad(param, i);
 
-          const auto memory = (ArrayMemory*)(memories["gold"]);
           const auto kwargs = memory->get_args(param);
           const auto outputs = run_gold_model(operation, kwargs);
-          const auto tensors = get_op_outputs(param);
 
           assert(outputs.size() == tensors.size());
 
@@ -201,10 +234,8 @@ void Simulation::run() {
           dataloaders["gold"]->store_scratchpad(param, i);
         }
       } else {
-        const auto memory = (ArrayMemory*)(memories["gold"]);
         const auto kwargs = memory->get_args(param);
         const auto outputs = run_gold_model(operation, kwargs);
-        const auto tensors = get_op_outputs(param);
 
         assert(outputs.size() == tensors.size());
 
@@ -269,7 +300,7 @@ int Simulation::check_outputs() {
 
   std::string filename;
   std::vector<std::any> outputs1, outputs2;
-  std::string output_names[2];
+  std::string name1, name2;
 
   bool has_valid_comp = false;
 
@@ -278,10 +309,10 @@ int Simulation::check_outputs() {
     spdlog::info("(reveals issues in data loading or mapping)\n");
     filename = prefix + "gold_vs_pytorch";
 
-    output_names[0] = "gold_model";
+    name1 = "gold_model";
     outputs1 = gold_memory->get_outputs(param);
 
-    output_names[1] = "pytorch";
+    name2 = "pytorch";
     outputs2 = gold_memory->get_reference_outputs(param);
 
     has_valid_comp = true;
@@ -292,10 +323,10 @@ int Simulation::check_outputs() {
     spdlog::info("(reveals bugs in accelerator or memory placement)\n");
     filename = prefix + "accelerator_vs_pytorch";
 
-    output_names[0] = "accelerator";
+    name1 = "accelerator";
     outputs1 = accel_memory->get_outputs(param);
 
-    output_names[1] = "pytorch";
+    name2 = "pytorch";
     outputs2 = accel_memory->get_reference_outputs(param);
 
     has_valid_comp = true;
@@ -306,10 +337,10 @@ int Simulation::check_outputs() {
     spdlog::info("(reveals bugs in accelerator or memory placement)\n");
     filename = prefix + "accelerator_vs_gold";
 
-    output_names[0] = "accelerator";
+    name1 = "accelerator";
     outputs1 = accel_memory->get_outputs(param);
 
-    output_names[1] = "gold_model";
+    name2 = "gold_model";
     outputs2 = gold_memory->get_outputs(param);
 
     has_valid_comp = true;
@@ -330,8 +361,8 @@ int Simulation::check_outputs() {
     }
 
     rel_err += compare_arrays_helper<SUPPORTED_TYPES>(
-        output_tensors[i], outputs1[i], output_names[0], outputs2[i],
-        output_names[1], filename + suffix);
+        output_tensors[i], outputs1[i], name1, outputs2[i], name2,
+        filename + suffix);
   }
 
   int error_count = 0;
