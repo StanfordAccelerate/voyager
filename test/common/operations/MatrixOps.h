@@ -560,8 +560,8 @@ inline Buffer* DwC(std::any input_ptr, std::any input_scale_ptr,
 
   int obatch = 1;
   int oc = ic;
-  int oy = floor((ix + 2 * x_pad - kernel_size) / stride_x) + 1;
-  int ox = floor((iy + 2 * y_pad - kernel_size) / stride_y) + 1;
+  int ox = floor((ix + 2 * x_pad - kernel_size) / stride_x) + 1;
+  int oy = floor((iy + 2 * y_pad - kernel_size) / stride_y) + 1;
 
   Buffer* outputs = new Buffer[obatch * oc * ox * oy];
   Input* inputs = std::any_cast<Input*>(input_ptr);
