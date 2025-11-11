@@ -150,8 +150,10 @@ def print_test_results(test_results, layers, output_folder):
             print(f"Utilization: {utilization_all:.3f}")
             print(f"Matrix Utilization: {utilization_matrix:.3f}")
 
-    # concatentate all sorted model DataFrames into a single DataFrame and save to pickle
-    pd.concat(sorted_df).to_pickle(f"{output_folder}/test_results.pkl")
+    # concatentate all DataFrames into a single DataFrame and save to pickle and excel
+    combined_df = pd.concat(sorted_df)
+    combined_df.to_pickle(f"{output_folder}/test_results.pkl")
+    combined_df.to_excel(f"{output_folder}/test_results.xlsx", index=False)
 
     # return True if all tests passed
     return len(df[df["Status"] == False]) == 0
@@ -323,13 +325,16 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, scale_down
     if scale_down_operation:
         env_vars["SCALE_DOWN_OPERATION"] = "1"
 
-    # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++, and the tools hardcode the linker libraries in such an
-    # order that their libs are used over the user specified ones. We need the newer version in order to run dependencies installed from conda.
+    # Workaround: vcs/catapult don't support GLIBCXX_3.4.30 in their libstdc++,
+    # and the tools hardcode the linker libraries in such an order that their
+    # libs are used over the user specified ones. We need the newer version in
+    # order to run dependencies installed from conda.
     env_vars["LD_PRELOAD"] = env_vars["CONDA_PREFIX"] + "/lib/libstdc++.so.6"
     set_default_env_vars(env_vars)
     build_folder = get_build_folder(env_vars)
 
-    # we occasionally see the test fail due to filesystem issues ("no rule to make target", but the target exists), so we retry up to 3 times
+    # we occasionally see the test fail due to filesystem issues ("no rule to
+    # make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
         with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
             try:
@@ -704,14 +709,12 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     return abs(final_accuracy - gold_accuracy) < 1
 
 
-def add_layers(network, layers, layer_counts, tile_counts, uniquify, whitelist_layers=None):
-    all_layers = []
-
+def add_layers(network, layers, layer_counts, tile_counts, uniquify, skip_layers=None):
     layers[network] = []
     layer_counts[network] = {}
     tile_counts[network] = {}
 
-    compiled_whitelist = [re.compile(p) for p in whitelist_layers] if whitelist_layers else []
+    skip_layers = [re.compile(p) for p in skip_layers] if skip_layers else []
 
     if not uniquify:
         with open(
@@ -722,7 +725,7 @@ def add_layers(network, layers, layer_counts, tile_counts, uniquify, whitelist_l
             # Filter out layers that should be skipped
             layers[network] = [
                 layer for layer in all_layers
-                if not any(p.match(layer) for p in compiled_whitelist)
+                if not any(p.match(layer) for p in skip_layers)
             ]
             layer_counts[network] = {layer: 1 for layer in layers[network]}
     else:
@@ -758,7 +761,7 @@ def add_layers(network, layers, layer_counts, tile_counts, uniquify, whitelist_l
             name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
 
             # Skip layers that are in the skip list
-            if any(p.match(name) for p in compiled_whitelist):
+            if any(p.match(name) for p in skip_layers):
                 continue
 
             # remove the name, memory, and node fields from the op
@@ -800,8 +803,8 @@ def matches(value, rule_value):
             return value == rule_value
 
 
-def get_whitelist_layers(whitelist_rules, model, datatype, sim_type, block_size):
-    for rule in whitelist_rules:
+def get_skip_layers(skip_rules, model, datatype, sim_type, block_size):
+    for rule in skip_rules:
         if (
             matches(model, rule["model"])
             and matches(datatype, rule["datatype"])
@@ -827,7 +830,12 @@ def main():
     parser.add_argument(
         "--uniquify_layers",
         action="store_true",
-        help="Remove duplicated layers in the model",
+        help="Whether to remove duplicated layers in the model",
+    )
+    parser.add_argument(
+        "--skip_layers",
+        action="store_true",
+        help="Whether to skip layers specified in the skip_rules.json",
     )
     parser.add_argument(
         "--dataset",
@@ -858,11 +866,6 @@ def main():
         help="Keep the generated rtl and use it to run rtl tests",
     )
     parser.add_argument(
-        "--whitelist",
-        required=False,
-        help="Path to JSON file containing whitelist layers to skip",
-    )
-    parser.add_argument(
         "--scverify_test",
         default=None,
         help="(Internal use) Name of scverify test to run",
@@ -887,11 +890,11 @@ def main():
     layers = {}
     layer_counts = {}
     tile_counts = {}
+    skip_rules = []
 
-    whitelist = []
-    if args.whitelist:
-        with open(args.whitelist, "r") as f:
-            whitelist = json.load(f)
+    if args.skip_layers:
+        with open("ci_skip_rules.json", "r") as f:
+            skip_rules = json.load(f)
 
     # Add codegen layers
     if args.tests is None:
@@ -910,17 +913,16 @@ def main():
                 block_size = max(
                     int(os.environ["OC_DIMENSION"]), int(os.environ["IC_DIMENSION"])
                 )
-                whitelist_layers = get_whitelist_layers(
-                    whitelist, network, datatype, args.sims, block_size
+                skip_layers = get_skip_layers(
+                    skip_rules, network, datatype, args.sims, block_size
                 )
-
                 add_layers(
                     network,
                     layers,
                     layer_counts,
                     tile_counts,
                     args.uniquify_layers,
-                    whitelist_layers,
+                    skip_layers,
                 )
     else:
         assert (

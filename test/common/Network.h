@@ -45,6 +45,12 @@ class Network {
   std::vector<Operation> get_operations(const std::vector<std::string>& names,
                                         bool filter_nop = true);
 
+  // Get the maximum DRAM address used across all tensors in the network
+  uint64_t get_max_dram_address() const;
+
+  // Get the maximum output size across all operations in the network
+  uint64_t get_max_output_size() const;
+
   std::string project_root;
   std::vector<Operation> operations;
   codegen::Model model;

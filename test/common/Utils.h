@@ -6,6 +6,7 @@
 #include <any>
 #include <iostream>
 #include <map>
+#include <sstream>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -15,10 +16,6 @@
 #include "src/datatypes/DataTypes.h"
 #include "test/compiler/proto/param.pb.h"
 // IWYU pragma: end_exports
-
-#define DRAM_SIZE_MB (2 * 1024 * 1024LL * 1024LL)
-#define SRAM_SIZE_MB (16 * 1024 * 1024)
-#define REFERENCE_MEMORY_SIZE (8 * 1024 * 1024)
 
 static const std::unordered_set<std::string> GEMM_OPS = {
     "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx",
@@ -290,17 +287,12 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
   spdlog::info("Comparing {} and {} (size: {}) -> output: {}\n", name_a, name_b,
                size, filename);
 
-  constexpr size_t max_write_size = pow(2, 26);  // 64 MB
-  bool write_to_file = size <= max_write_size;
-
   std::ofstream diff_file;
-  if (write_to_file) {
-    diff_file.open(filename);
-    diff_file << name_a << " vs. " << name_b << '\n';
-  } else {
-    spdlog::warn("Skipping diff file output (size={} exceeds {})\n", size,
-                 max_write_size);
-  }
+  diff_file.open(filename);
+
+  std::ostringstream buffer;
+  buffer << name_a << " vs. " << name_b << '\n';
+  constexpr size_t flush_interval = 10000;  // Flush every 10k lines
 
   int abs_diff_buckets[5] = {0};
   int rel_diff_buckets[5] = {0};
@@ -309,18 +301,51 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
   T1* matrix_a_ptr = std::any_cast<T1*>(matrix_a);
   T2* matrix_b_ptr = std::any_cast<T2*>(matrix_b);
 
+  // For compressing repeated identical lines in output file
+  std::string prev_line = "";
+  size_t repeat_start_index = 0;
+  size_t repeat_count = 0;
+  size_t lines_written = 0;
+
   for (size_t i = 0; i < size; ++i) {
     float a = static_cast<float>(matrix_a_ptr[i]);
     float b = static_cast<float>(matrix_b_ptr[i]);
     sum_abs += std::abs(a) + std::abs(b);
     float abs_diff = std::abs(a - b);
 
-    if (write_to_file) {
-      diff_file << a << " vs. " << b << " ";
-      for (float j = 0.001f; j < abs_diff; j *= 10.0f) {
-        diff_file << '*';
+    // Build the current line content
+    std::ostringstream line_stream;
+    line_stream << a << " vs. " << b << " ";
+    for (float j = 0.001f; j < abs_diff; j *= 10.0f) {
+      line_stream << '*';
+    }
+    std::string current_line = line_stream.str();
+
+    if (current_line == prev_line && a == 0 && b == 0) {
+      repeat_count++;
+    } else {
+      if (repeat_count > 0) {
+        if (repeat_count == 1) {
+          buffer << "[" << repeat_start_index << "] " << prev_line << '\n';
+        } else {
+          buffer << "[" << repeat_start_index << "-"
+                 << (repeat_start_index + repeat_count - 1) << "] ("
+                 << repeat_count << "x) " << prev_line << '\n';
+        }
+        lines_written++;
+
+        // Periodically flush buffer to disk to avoid memory issues
+        if (lines_written % flush_interval == 0) {
+          diff_file << buffer.str();
+          buffer.str("");
+          buffer.clear();
+        }
       }
-      diff_file << '\n';
+
+      // Start tracking the new line
+      prev_line = current_line;
+      repeat_start_index = i;
+      repeat_count = 1;
     }
 
     bool is_nan = std::isinf(abs_diff) || std::isnan(abs_diff);
@@ -348,6 +373,21 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
       rel_diff_buckets[4] += rel_diff >= 1.0f;
     }
   }
+
+  // Write out the final line(s) after the loop
+  if (repeat_count > 0) {
+    if (repeat_count == 1) {
+      buffer << "[" << repeat_start_index << "] " << prev_line << '\n';
+    } else {
+      buffer << "[" << repeat_start_index << "-"
+             << (repeat_start_index + repeat_count - 1) << "] (" << repeat_count
+             << "x) " << prev_line << '\n';
+    }
+  }
+
+  // Final flush of remaining buffered content
+  diff_file << buffer.str();
+  diff_file.close();
 
   spdlog::info("-------------------------------\n");
   log_diff_buckets("Absolute Difference Count", abs_diff_buckets, size);

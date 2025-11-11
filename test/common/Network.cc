@@ -129,3 +129,62 @@ std::vector<Operation> Network::get_operations(
 
   return filtered_ops;
 }
+
+uint64_t get_max_address(const codegen::Tensor& tensor) {
+  if (!tensor.has_memory()) {
+    return 0;
+  }
+
+  uint64_t addr = tensor.memory().address();
+  uint64_t size = get_size(tensor, false, false);  // untiled and unreshaped
+
+  int index = get_index_from_type_name<SUPPORTED_TYPES>(tensor.dtype());
+  size_t width = get_type_width<SUPPORTED_TYPES>(index);
+
+  uint64_t end_addr = addr + (size * width / 8);
+  return end_addr;
+}
+
+uint64_t Network::get_max_dram_address() const {
+  uint64_t max_address = 0;
+
+  // Check all input tensors
+  for (const auto& input : model.inputs()) {
+    max_address = std::max(max_address, get_max_address(input));
+  }
+
+  // Check all parameter tensors
+  for (const auto& param : model.parameters()) {
+    max_address = std::max(max_address, get_max_address(param));
+  }
+
+  // Check all operation outputs
+  for (const auto& op : model.ops()) {
+    const auto outputs = get_op_outputs(op);
+    for (const auto& output : outputs) {
+      max_address = std::max(max_address, get_max_address(output));
+    }
+  }
+
+  return max_address;
+}
+
+uint64_t Network::get_max_output_size() const {
+  uint64_t max_size = 0;
+
+  for (const auto& op : model.ops()) {
+    const auto outputs = get_op_outputs(op);
+
+    uint64_t num_bytes = 0;
+    for (const auto& output : outputs) {
+      auto size = get_size(output, false, false);
+      auto index = get_index_from_type_name<SUPPORTED_TYPES>(output.dtype());
+      auto width = get_type_width<SUPPORTED_TYPES>(index);
+      num_bytes += size * width / 8;
+    }
+
+    max_size = std::max(max_size, num_bytes);
+  }
+
+  return max_size;
+}

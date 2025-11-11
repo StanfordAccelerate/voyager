@@ -571,6 +571,9 @@ void Harness::param_sender() {
 #if SUPPORT_MVM
   serial_matrix_vector_params_in.ResetWrite();
 #endif
+#if SUPPORT_DWC
+  serial_dwc_params_in.ResetWrite();
+#endif
   operation_done.ResetRead();
   tile_done.ResetRead();
 
