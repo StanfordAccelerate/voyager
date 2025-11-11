@@ -11,30 +11,29 @@
 #include "test/toolchain/Softmax.h"
 #include "test/toolchain/VectorOps.h"
 
-void MapOperation(const Operation& operation,
-                  std::deque<BaseParams*>& mapped_params,
-                  std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_operation(const Operation& operation,
+                   std::deque<BaseParams*>& mapped_params) {
   const auto param = operation.param;
   const auto op_list = get_op_list(param);
   const auto first_op = op_list[0];
 
-  if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
+  if (is_gemm_op(first_op.target())) {
     auto input = first_op.kwargs().at("input").tensor();
     if (is_fc_layer(first_op) && input.dtype() == "bfloat16") {
-      MapMatrixVectorMultiply(param, mapped_params, memory_maps);
+      map_matrix_vector_multiply(param, mapped_params);
     } else {
-      MapMatrixOperation(operation, mapped_params, memory_maps);
+      map_matrix_operation(operation, mapped_params);
     }
   } else if (first_op.target() == "layer_norm") {
-    MapLayerNorm(param, mapped_params, memory_maps);
+    map_layer_norm(param, mapped_params);
   } else if (first_op.target() == "softmax") {
-    MapSoftmax(param, mapped_params, memory_maps);
+    map_softmax(param, mapped_params);
   } else if (first_op.target() == "max_pool2d" ||
              first_op.target() == "adaptive_avg_pool2d") {
-    MapPoolingOperation(param, mapped_params, memory_maps);
+    map_pool2d(param, mapped_params);
   } else if (first_op.target() == "calculate_mx_qparam") {
-    MapMicroscaling(param, mapped_params, memory_maps);
+    map_microscaling(param, mapped_params);
   } else {
-    MapVectorOperations(param, mapped_params, memory_maps);
+    map_vector_operations(param, mapped_params);
   }
 }

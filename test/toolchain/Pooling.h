@@ -3,9 +3,8 @@
 #include "test/common/Tiling.h"
 #include "test/toolchain/Common.h"
 
-void MapPoolingOperation(const codegen::Operation& param,
-                         std::deque<BaseParams*>& mapped_params,
-                         std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_pool2d(const codegen::Operation& param,
+                std::deque<BaseParams*>& mapped_params) {
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;

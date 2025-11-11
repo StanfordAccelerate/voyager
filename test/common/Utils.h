@@ -17,28 +17,36 @@
 #include "test/compiler/proto/param.pb.h"
 // IWYU pragma: end_exports
 
-static const std::unordered_set<std::string> GEMM_OPS = {
-    "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx",
-};
-
-static const std::unordered_set<std::string> MEMORY_OPS = {
-    "slice",
-    "permute",
-    "transpose",
-};
-
-enum MemorySource { SRAM, RRAM };
-
-inline std::ostream& operator<<(std::ostream& os, MemorySource& memory) {
-  os << (memory == SRAM ? "SRAM" : "RRAM");
-  return os;
+inline bool is_gemm_op(const std::string& op_target) {
+  static const std::unordered_set<std::string> GEMM_OPS = {
+      "conv2d", "linear", "matmul", "conv2d_mx", "linear_mx", "matmul_mx",
+  };
+  return GEMM_OPS.find(op_target) != GEMM_OPS.end();
 }
 
-// The accelerator has several interfaces for accessing memory, but
-// these interfaces aren't always standard. For example, for some layers,
-// an interface may access the residual, but for other layers, access weights.
-// This data structure maps the accelerator interface to the MemorySource.
-typedef std::map<std::string, MemorySource> AcceleratorMemoryMap;
+inline bool is_fc_layer(const codegen::OpOverload& op) {
+  if (!is_gemm_op(op.target())) {
+    return false;
+  }
+
+  const auto input = op.kwargs().at("input").tensor();
+
+  int dim = 1;
+  for (int i = 0; i < input.shape_size() - 1; i++) {
+    dim *= input.shape(i);
+  }
+
+  return dim == 1;
+}
+
+inline bool is_dma_op(const std::string& op_target) {
+  static const std::unordered_set<std::string> DMA_OPS = {
+      "slice",
+      "permute",
+      "transpose",
+  };
+  return DMA_OPS.find(op_target) != DMA_OPS.end();
+}
 
 inline bool is_soc_sim() {
   const char* env = std::getenv("SOC_SIM");
@@ -125,17 +133,6 @@ inline std::vector<codegen::Tensor> get_op_outputs(
     }
   }
   return outputs;
-}
-
-inline bool is_fc_layer(const codegen::OpOverload& op) {
-  const auto input = op.kwargs().at("input").tensor();
-
-  int dim = 1;
-  for (int i = 0; i < input.shape_size() - 1; i++) {
-    dim *= input.shape(i);
-  }
-
-  return dim == 1;
 }
 
 inline float* read_constant_param(const codegen::Tensor& tensor) {

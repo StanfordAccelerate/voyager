@@ -29,13 +29,13 @@ void swap_(T& a, T& b) {
   b = tmp;
 }
 
-template <int srcWidth, int dstWidth>
-void copy_(ac_int<srcWidth, false> src, ac_int<dstWidth, false>& dst) {
-  if (dstWidth > srcWidth) {
+template <int src_width, int dst_width>
+void copy_(ac_int<src_width, false> src, ac_int<dst_width, false>& dst) {
+  if (dst_width > src_width) {
     dst = src;
-    dst <<= dstWidth - srcWidth;
+    dst <<= dst_width - src_width;
   } else {
-    dst = src.template slc<srcWidth>(srcWidth - dstWidth);
+    dst = src.template slc<src_width>(src_width - dst_width);
   }
 }
 
@@ -97,17 +97,17 @@ void decode(ac_int<nbits, false> bits, bool& sign, int& scale,
   if (sign) twos_complement(bits);  // convert to positive value
   bits <<= 1;                       // remove sign bit
 
-  bool leadingBit = bits[nbits - 1];
+  bool leading_bit = bits[nbits - 1];
   int run =
-      leadingBit ? bits.bit_complement().leading_sign() : bits.leading_sign();
-  scale = (leadingBit ? run - 1 : -run) * (1 << es);
+      leading_bit ? bits.bit_complement().leading_sign() : bits.leading_sign();
+  scale = (leading_bit ? run - 1 : -run) * (1 << es);
 
-  int nrBits = nbits - run - 1;
+  int nr_bits = nbits - run - 1;
   if (es > 0) {
-    if (nrBits >= es) {
-      scale += bits.template slc<es>(nrBits - es);
-    } else if (nrBits >= 0) {
-      scale += bits & ((1 << nrBits) - 1);
+    if (nr_bits >= es) {
+      scale += bits.template slc<es>(nr_bits - es);
+    } else if (nr_bits >= 0) {
+      scale += bits & ((1 << nr_bits) - 1);
     }
   }
 

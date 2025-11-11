@@ -2,9 +2,8 @@
 
 #include "test/toolchain/Common.h"
 
-void MapLayerNorm(const codegen::Operation& param,
-                  std::deque<BaseParams*>& mapped_params,
-                  std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_layer_norm(const codegen::Operation& param,
+                    std::deque<BaseParams*>& mapped_params) {
   const auto op_list = get_op_list(param);
   const auto layer_norm_op = op_list[0];
 

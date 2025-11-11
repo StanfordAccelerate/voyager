@@ -63,13 +63,13 @@ SC_MODULE(ProcessingElement) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode bubble
     while (true) {
-      PEWeight<Weight> weightStruct = weight_in.Pop();
+      PEWeight<Weight> weight = weight_in.Pop();
 
-      if (weightStruct.tag == 0) {
-        new_weight_fifo.Push(weightStruct.data);
+      if (weight.tag == 0) {
+        new_weight_fifo.Push(weight.data);
       } else {
-        weightStruct.tag--;
-        weight_out.Push(weightStruct);
+        weight.tag--;
+        weight_out.Push(weight);
       }
     }
   }

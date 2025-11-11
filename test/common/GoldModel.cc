@@ -110,7 +110,7 @@ std::vector<std::any> run_operation(const Operation& operation,
   const auto first_op = op_list.front();
   spdlog::debug("Running operation: {}\n", first_op.target());
 
-  if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
+  if (is_gemm_op(first_op.target())) {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];
 

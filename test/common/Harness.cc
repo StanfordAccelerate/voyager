@@ -583,9 +583,8 @@ void Harness::param_sender() {
     const auto operation = operations.at(i);
     const auto param = operation.param;
 
-    std::deque<AcceleratorMemoryMap> memory_maps;
     std::deque<BaseParams*> accelerator_params;
-    MapOperation(operation, accelerator_params, memory_maps);
+    map_operation(operation, accelerator_params);
 
     if (is_soc_sim()) {
       const auto l2_tiling = get_l2_tiling(param);
@@ -634,9 +633,8 @@ void Harness::start_monitor() {
     const auto operation = operations.at(i);
     const auto param = operation.param;
 
-    std::deque<AcceleratorMemoryMap> memory_maps;
     std::deque<BaseParams*> accelerator_params;
-    MapOperation(operation, accelerator_params, memory_maps);
+    map_operation(operation, accelerator_params);
 
     if (is_soc_sim()) {
       const auto l2_tiling = get_l2_tiling(param);
@@ -672,9 +670,8 @@ void Harness::done_monitor() {
     const auto operation = operations.at(i);
     const auto param = operation.param;
 
-    std::deque<AcceleratorMemoryMap> memory_maps;
     std::deque<BaseParams*> accelerator_params;
-    MapOperation(operation, accelerator_params, memory_maps);
+    map_operation(operation, accelerator_params);
 
     int runtime_scale = 1;
     if (operation.has_shrunk_tiling) {

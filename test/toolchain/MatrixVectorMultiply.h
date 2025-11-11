@@ -2,9 +2,8 @@
 
 #include "test/toolchain/Common.h"
 
-void MapMatrixVectorMultiply(const codegen::Operation& param,
-                             std::deque<BaseParams*>& mapped_params,
-                             std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_matrix_vector_multiply(const codegen::Operation& param,
+                                std::deque<BaseParams*>& mapped_params) {
   const auto op_list = get_op_list(param);
   const auto matrix_op = op_list[0];
 

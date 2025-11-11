@@ -83,10 +83,6 @@ std::map<std::string, unsigned int> get_vector_instruction_mapping() {
   return mapping;
 }
 
-inline MemorySource get_partition(const int& partition) {
-  return partition == 0 ? SRAM : RRAM;
-}
-
 inline std::vector<int> squeeze_shape(const std::vector<int>& input) {
   std::vector<int> result;
   for (int value : input) {

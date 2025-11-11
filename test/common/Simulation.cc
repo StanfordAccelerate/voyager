@@ -148,7 +148,7 @@ void Simulation::print_ideal_runtime(const Operation operation) {
   const auto l2_tiling = get_l2_tiling(param);
   const int num_tiles = is_soc_sim() ? get_num_tiles(l2_tiling) : 1;
 
-  if (GEMM_OPS.find(first_op.target()) != GEMM_OPS.end()) {
+  if (is_gemm_op(first_op.target())) {
     bool is_matmul = first_op.target().find("matmul") != std::string::npos;
     std::string weight_key = is_matmul ? "other" : "weight";
     const auto weight = first_op.kwargs().at(weight_key).tensor();

@@ -2,9 +2,8 @@
 
 #include "test/toolchain/Common.h"
 
-void MapMicroscaling(const codegen::Operation& param,
-                     std::deque<BaseParams*>& mapped_params,
-                     std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_microscaling(const codegen::Operation& param,
+                      std::deque<BaseParams*>& mapped_params) {
   const auto op_list = get_op_list(param);
   const auto quantize_mx_op = op_list[0];
 
@@ -33,10 +32,7 @@ void MapMicroscaling(const codegen::Operation& param,
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
-  AcceleratorMemoryMap memory_map;
 
-  const auto input_memory = input.memory();
-  memory_map["vector0"] = get_partition(input_memory.partition());
   vector_params->vector_fetch_0_offset = get_address(input);
   vector_params->vector_fetch_0_mode = 1;
   vector_params->vector_fetch_0_dtype =
@@ -67,8 +63,6 @@ void MapMicroscaling(const codegen::Operation& param,
     vector_params->vector_fetch_0_k_loop_idx[i] = 2;
   }
 
-  const auto output_memory = output.memory();
-  memory_map["outputs"] = get_partition(output_memory.partition());
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 1;
 
@@ -117,5 +111,4 @@ void MapMicroscaling(const codegen::Operation& param,
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
-  memory_maps.push_back(memory_map);
 }

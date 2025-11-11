@@ -267,7 +267,7 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
 
       int curr_tile_index = tile_index;
 
-      if (GEMM_OPS.find(op.target()) != GEMM_OPS.end()) {
+      if (is_gemm_op(op.target())) {
         if (key == "input" || key == "input_scale") {
           curr_tile_index = tile_index / k_tile;
         } else if (key == "weight" || key == "other" || key == "weight_scale") {

@@ -201,12 +201,10 @@ static bool should_use_direct_path(const VectorParams* vector_params) {
   return should_use_direct_path;
 }
 
-void MapMatrixOperation(const Operation& operation,
-                        std::deque<BaseParams*>& mapped_params,
-                        std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_matrix_operation(const Operation& operation,
+                          std::deque<BaseParams*>& mapped_params) {
   MatrixParams* matrix_params;
   DwCParams* dwc_params;
-  AcceleratorMemoryMap accelerator_memory_map;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
 
@@ -1187,5 +1185,4 @@ void MapMatrixOperation(const Operation& operation,
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
-  memory_maps.push_back(accelerator_memory_map);
 }

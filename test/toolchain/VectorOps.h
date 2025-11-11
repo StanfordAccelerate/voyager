@@ -159,9 +159,8 @@ void set_vector_immediate(const float scalar, const int stage,
   }
 }
 
-void MapVectorOperations(const codegen::Operation& param,
-                         std::deque<BaseParams*>& mapped_params,
-                         std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_vector_operations(const codegen::Operation& param,
+                           std::deque<BaseParams*>& mapped_params) {
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
@@ -182,8 +181,7 @@ void MapVectorOperations(const codegen::Operation& param,
   auto input_shape = get_shape(input, false);
   const int input_ndim = input_shape.size();
 
-  if (input.has_reshape() ||
-      MEMORY_OPS.find(op_list[0].target()) != MEMORY_OPS.end()) {
+  if (input.has_reshape() || is_dma_op(op_list[0].target())) {
     for (const auto dim : input_shape) {
       if (dim > MAX_LOOP_VALUE) {
         spdlog::error("ERROR: input shape dimension is greater than {}: ",
@@ -210,7 +208,7 @@ void MapVectorOperations(const codegen::Operation& param,
   codegen::OpOverload reshape_op;
   if (input.has_reshape()) {
     reshape_op = input.reshape();
-  } else if (MEMORY_OPS.find(op_list[0].target()) != MEMORY_OPS.end()) {
+  } else if (is_dma_op(op_list[0].target())) {
     reshape_op = op_list[0];
     op_list.erase(op_list.begin());
   }

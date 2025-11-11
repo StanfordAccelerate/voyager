@@ -2,9 +2,8 @@
 
 #include "test/toolchain/Common.h"
 
-void MapSoftmax(const codegen::Operation& param,
-                std::deque<BaseParams*>& mapped_params,
-                std::deque<AcceleratorMemoryMap>& memory_maps) {
+void map_softmax(const codegen::Operation& param,
+                 std::deque<BaseParams*>& mapped_params) {
   const auto op_list = get_op_list(param);
   const auto softmax_op = op_list[0];
 

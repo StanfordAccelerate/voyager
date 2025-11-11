@@ -309,16 +309,14 @@ StdFloat<mantissa2, exp2, use_dw_impl2, ieee_compliance2, Q2>
 StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>::fma(
     StdFloat<mantissa, exp, use_dw_impl, ieee_compliance, Q>& b,
     StdFloat<mantissa2, exp2, use_dw_impl2, ieee_compliance2, Q2>& c) {
-  StdFloat<mantissa2, exp2, use_dw_impl2, ieee_compliance2, Q2>
-      a_higherprecision(*this);
-  StdFloat<mantissa2, exp2, use_dw_impl2, ieee_compliance2, Q2>
-      b_higherprecision(b);
+  StdFloat<mantissa2, exp2, use_dw_impl2, ieee_compliance2, Q2> a_upcast(*this);
+  StdFloat<mantissa2, exp2, use_dw_impl2, ieee_compliance2, Q2> b_upcast(b);
 
   if (use_dw_impl) {
     return fp_mac<Q, ieee_compliance, mantissa2 + exp2 + 1, exp2>(
-        a_higherprecision.float_val, b_higherprecision.float_val, c.float_val);
+        a_upcast.float_val, b_upcast.float_val, c.float_val);
   } else {
-    return a_higherprecision.float_val.template fma<Q, !ieee_compliance>(
-        b_higherprecision.float_val, c.float_val);
+    return a_upcast.float_val.template fma<Q, !ieee_compliance>(
+        b_upcast.float_val, c.float_val);
   }
 }

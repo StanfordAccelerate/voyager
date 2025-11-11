@@ -5,6 +5,5 @@
 #include "test/common/Network.h"
 #include "test/common/Utils.h"
 
-void MapOperation(const Operation& operation,
-                  std::deque<BaseParams*>& mapped_params,
-                  std::deque<AcceleratorMemoryMap>& memory_maps);
+void map_operation(const Operation& operation,
+                   std::deque<BaseParams*>& mapped_params);
