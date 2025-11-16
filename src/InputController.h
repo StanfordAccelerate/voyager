@@ -152,8 +152,8 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
       C1 = C1 >> params.input_pack_factor_lg2;
       loop_bounds[1][params.reduction_loop_idx[1]] = C1;
 
-      ac_int<16, false> Y = params.padded_input_y;
-      ac_int<16, false> X = params.padded_input_x;
+      ac_int<16, false> Y = params.input_y;
+      ac_int<16, false> X = params.input_x;
       ac_int<16, false> c_stride = rows << params.input_pack_factor_lg2;
       ac_int<16, false> C = C2 * C1 * c_stride;
 
@@ -363,8 +363,8 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
       loop_bounds[1][params.reduction_loop_idx[1]] = C1;
       ac_int<4, false> num_packs = (1 << params.input_pack_factor_lg2) - 1;
 
-      ac_int<16, false> Y = params.padded_input_y;
-      ac_int<16, false> X = params.padded_input_x;
+      ac_int<16, false> Y = params.input_y;
+      ac_int<16, false> X = params.input_x;
       ac_int<16, false> y_stride = loop_bounds[1][params.x_loop_idx[1]] * C1;
 
 #pragma hls_pipeline_init_interval 1

@@ -31,8 +31,8 @@ std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   os << "Generic Replication: " << tiling.generic_replication << std::endl;
   os << "Num Channels: " << tiling.num_channels << std::endl;
   os << "FX Unrolling: " << tiling.fx_unrolling << std::endl;
-  os << "Padded Input X: " << tiling.padded_input_x << std ::endl;
-  os << "Padded Input Y: " << tiling.padded_input_y << std::endl;
+  os << "Padded Input X: " << tiling.input_x << std ::endl;
+  os << "Padded Input Y: " << tiling.input_y << std::endl;
   return os;
 }
 
@@ -75,11 +75,11 @@ Tiling get_tiling(const Operation& operation) {
   const auto input_shape = get_shape(input);
 
   if (first_op.target() == "conv2d" || first_op.target() == "conv2d_mx") {
-    tiling.padded_input_y = input_shape[1];
-    tiling.padded_input_x = input_shape[2];
+    tiling.input_y = input_shape[1];
+    tiling.input_x = input_shape[2];
   } else {
-    tiling.padded_input_y = 1;
-    tiling.padded_input_x = get_size(input_shape) / input_shape.back();
+    tiling.input_y = 1;
+    tiling.input_x = get_size(input_shape) / input_shape.back();
   }
 
   return tiling;
@@ -278,9 +278,7 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
   int padding = paddings[0];
 
   // conv2d (vit)
-  if (input_shape[3] == 3 && input_shape[1] == 224 && input_shape[2] == 224 &&
-      weight_shape[3] == 768 && weight_shape[0] == 16 &&
-      weight_shape[1] == 16) {
+  if (input_shape[3] == 3 && weight_shape[0] == 16 && weight_shape[1] == 16) {
     int fx_unrolling;
     if (IC_DIMENSION == 4) {
       fx_unrolling = 1;

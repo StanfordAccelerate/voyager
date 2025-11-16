@@ -41,8 +41,8 @@ inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
   int FY = tiling.loops[0][tiling.fy_loop_idx[0]] *
            tiling.loops[1][tiling.fy_loop_idx[1]];
   int STRIDE = tiling.stride;
-  int IY = tiling.padded_input_y;
-  int IX = tiling.padded_input_x;
+  int IY = tiling.input_y;
+  int IX = tiling.input_x;
 
   int X0 = tiling.loops[1][tiling.x_loop_idx[1]];
   int Y0 = tiling.loops[1][tiling.y_loop_idx[1]];

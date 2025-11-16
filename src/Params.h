@@ -81,8 +81,8 @@ struct MatrixParams : BaseParams {
     num_channels = 0;
     fx_unrolling_lg2 = 0;
 
-    padded_input_y = 0;
-    padded_input_x = 0;
+    input_y = 0;
+    input_x = 0;
 
     has_bias = false;
     is_mx_op = false;
@@ -149,8 +149,8 @@ struct MatrixParams : BaseParams {
   ac_int<2, false> num_channels;
   ac_int<3, false> fx_unrolling_lg2;
 
-  ac_int<16, false> padded_input_y;
-  ac_int<16, false> padded_input_x;
+  ac_int<16, false> input_y;
+  ac_int<16, false> input_x;
 
   bool has_bias;
   bool is_mx_op;
@@ -258,8 +258,8 @@ struct MatrixParams : BaseParams {
     m & num_channels;
     m & fx_unrolling_lg2;
 
-    m & padded_input_y;
-    m & padded_input_x;
+    m & input_y;
+    m & input_x;
 
     m & has_bias;
     m & is_mx_op;
@@ -371,8 +371,8 @@ struct MatrixParams : BaseParams {
     os << "num_channels: " << params.num_channels << std::endl;
     os << "fx_unrolling_lg2: " << params.fx_unrolling_lg2 << std::endl;
 
-    os << "padded_input_y: " << params.padded_input_y << std::endl;
-    os << "padded_input_x: " << params.padded_input_x << std::endl;
+    os << "input_y: " << params.input_y << std::endl;
+    os << "input_x: " << params.input_x << std::endl;
 
     os << "has_bias: " << params.has_bias << std::endl;
     os << "is_mx_op: " << params.is_mx_op << std::endl;
@@ -456,8 +456,8 @@ struct MatrixParams : BaseParams {
     if (lhs.num_channels != rhs.num_channels) return false;
     if (lhs.fx_unrolling_lg2 != rhs.fx_unrolling_lg2) return false;
 
-    if (lhs.padded_input_y != rhs.padded_input_y) return false;
-    if (lhs.padded_input_x != rhs.padded_input_x) return false;
+    if (lhs.input_y != rhs.input_y) return false;
+    if (lhs.input_x != rhs.input_x) return false;
 
     if (lhs.has_bias != rhs.has_bias || lhs.bias_offset != rhs.bias_offset)
       return false;

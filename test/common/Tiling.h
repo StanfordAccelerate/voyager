@@ -21,8 +21,8 @@ struct Tiling {
   bool generic_replication;
   int num_channels;
   int fx_unrolling;
-  int padded_input_x;
-  int padded_input_y;
+  int input_x;
+  int input_y;
 };
 
 std::ostream& operator<<(std::ostream& os, const Tiling& tiling);

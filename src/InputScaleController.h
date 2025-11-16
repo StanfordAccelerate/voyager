@@ -105,8 +105,8 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.y_loop_idx[1]] = y_bound + FY0 - 1;
       loop_bounds[1][params.x_loop_idx[1]] = x_bound + FX - 1;
 
-      ac_int<16, false> Y = params.padded_input_y;
-      ac_int<16, false> X = params.padded_input_x;
+      ac_int<16, false> Y = params.input_y;
+      ac_int<16, false> X = params.input_x;
       ac_int<16, false> C = C2 * C1;
 
 #pragma hls_pipeline_init_interval 1
@@ -271,8 +271,8 @@ SC_MODULE(InputScaleController) {
       loop_bounds[1][params.y_loop_idx[1]] = IY0 + FY0 - 1;
       loop_bounds[1][params.x_loop_idx[1]] = IX0 + FX - 1;
 
-      ac_int<16, false> Y = params.padded_input_y;
-      ac_int<16, false> X = params.padded_input_x;
+      ac_int<16, false> Y = params.input_y;
+      ac_int<16, false> X = params.input_x;
       ac_int<16, false> y_stride = loop_bounds[1][params.x_loop_idx[1]] * C1;
 
 #pragma hls_pipeline_init_interval 1
