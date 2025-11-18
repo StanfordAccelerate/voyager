@@ -22,9 +22,9 @@ message LevelTiling {
 };
 
 message LevelAccessCount {
-  int32 input_access_count = 1;
-  int32 output_access_count = 2;
-  int32 weight_access_count = 3;
+  uint64 input_access_count = 1;
+  uint64 output_access_count = 2;
+  uint64 weight_access_count = 3;
 };
 
 message Tiling {

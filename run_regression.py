@@ -554,7 +554,9 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid dataset")
 
-    block_size = max(int(os.environ["OC_DIMENSION"]), int(os.environ["IC_DIMENSION"]))
+    ic_unroll = int(os.environ["IC_DIMENSION"])
+    oc_unroll = int(os.environ["OC_DIMENSION"])
+    block_size = max(ic_unroll, oc_unroll)
 
     if env_vars["DATATYPE"] == "E4M3":
         quantization_args = [
@@ -602,12 +604,6 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid datatype")
 
-    if "mobilenet" in model:
-        quantization_args.extend([
-            "--hardware_unrolling",
-            str(os.environ["IC_DIMENSION"])+","+str(os.environ["OC_DIMENSION"]),
-        ])
-
     subprocess.run(
         [
             "mkdir",
@@ -625,6 +621,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--model_name_or_path",
                 model_path,
                 "--transpose_weight",
+                "--hardware_unrolling",
+                f"{ic_unroll},{oc_unroll}",
                 *quantization_args,
                 "--model_output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],

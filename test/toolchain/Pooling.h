@@ -11,12 +11,21 @@ void map_pool2d(const codegen::Operation& param,
 
   const auto op_list = get_op_list(param);
   const auto pooling_op = op_list.front();
-  const auto tiling = get_pool2d_tiling(pooling_op);
 
   const auto input = pooling_op.kwargs().at("input").tensor();
 
-  const auto output = param.output();
-  const int output_dim = output.shape(3);
+  codegen::Tensor output;
+  if (param.has_output()) {
+    output = param.output();
+  } else {
+    assert(op_list.back().target() == "quantize_mx");
+    output = param.outputs().tensors(1);
+  }
+
+  const auto output_shape = get_shape(output);
+  const int output_dim = output_shape[3];
+
+  const auto tiling = get_pool2d_tiling(pooling_op);
 
   // input
   vector_params->vector_fetch_0_offset = get_address(input);
@@ -75,8 +84,8 @@ void map_pool2d(const codegen::Operation& param,
                            tiling.loops[1][tiling.x_loop_idx[1]];
 
   const int inst_count = tiling.loops[0][tiling.y_loop_idx[0]] *
-                         tiling.loops[0][tiling.x_loop_idx[0]] *
-                         (output_dim / OC_DIMENSION);
+                         tiling.loops[0][tiling.x_loop_idx[0]] * output_dim /
+                         OC_DIMENSION;
 
   bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
   vector_params->is_maxpool = is_max_pool;

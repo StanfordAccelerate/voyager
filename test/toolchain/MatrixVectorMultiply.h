@@ -9,13 +9,21 @@ void map_matrix_vector_multiply(const codegen::Operation& param,
 
   const auto input = matrix_op.kwargs().at("input").tensor();
   bool is_matmul = matrix_op.target().find("matmul") != std::string::npos;
-  std::string weight_key = is_matmul ? "other" : "weight";
-  const auto weight = matrix_op.kwargs().at(weight_key).tensor();
-  const auto output = param.output();
+  std::string key = is_matmul ? "other" : "weight";
+  const auto weight = matrix_op.kwargs().at(key).tensor();
   bool has_bias = matrix_op.kwargs().contains("bias");
 
-  int output_dim = weight.shape(0);
-  int reduction_dim = weight.shape(1);
+  codegen::Tensor output;
+  if (param.has_output()) {
+    output = param.output();
+  } else {
+    assert(op_list.back().target() == "quantize_mx");
+    output = param.outputs().tensors(1);
+  }
+
+  const auto weight_shape = get_shape(weight);
+  int output_dim = weight_shape[0];
+  int reduction_dim = weight_shape[1];
 
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
