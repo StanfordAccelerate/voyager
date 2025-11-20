@@ -404,6 +404,19 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
         }
       }
 
+      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> FY1 = params.loops[0][params.fy_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> C2 =
+          params.loops[0][params.reduction_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> FY0 = params.loops[1][params.fy_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> FX = params.loops[1][params.fx_loop_idx];
+      ac_int<LOOP_WIDTH, false> C1 =
+          params.loops[1][params.reduction_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
+
+      bool reuse_weights =
+          FY1 == 1 && C2 == 1 && FY0 == 1 && FX == 1 && C1 == 1 && K1 == 1;
+
       // extra loop for exploiting L1 buffer reuse.
       // this loop is used when OX and OY are the innermost L2 loops. when
       // this occurs, we can move OX and/or OY into the buffer reuse L1 loop
@@ -411,22 +424,24 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
       if (params.loops[0][params.reduction_loop_idx[0]] == 1) {
         // OX loop can be absorbed
         if (params.weight_loop_idx[0] < params.x_loop_idx[0]) {
-          buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+          if (!reuse_weights) {
+            buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+          }
           loop_bounds[0][params.x_loop_idx[0]] = 1;
         }
         // OY loop can be absorbed
         if (params.weight_loop_idx[0] < params.y_loop_idx[0]) {
-          buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+          if (!reuse_weights) {
+            buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+          }
           loop_bounds[0][params.y_loop_idx[0]] = 1;
         }
       }
 
-      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
-      ac_int<LOOP_WIDTH, false> C1 =
-          params.loops[1][params.reduction_loop_idx[1]];
-      ac_int<LOOP_WIDTH, false> FX = params.loops[1][params.fx_loop_idx];
-      ac_int<LOOP_WIDTH, false> FY0 = params.loops[1][params.fy_loop_idx[1]];
-      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
+      ac_int<16, false> fx_stride = rows * C1 * K1;
+      ac_int<16, false> fy_stride = FX * fx_stride;
+      ac_int<16, false> fx_stride_with_repl = fx_stride * rep_bound;
+      ac_int<16, false> fy_stride_with_repl = fy_stride * rep_bound;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -446,6 +461,16 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                  loop_counters[1][4]++) {
                               for (loop_counters[1][5] = 0;;
                                    loop_counters[1][5]++) {
+                                ac_int<LOOP_WIDTH, false> c1 =
+                                    loop_counters[1]
+                                                 [params.reduction_loop_idx[1]];
+                                ac_int<LOOP_WIDTH, false> fy0 =
+                                    loop_counters[1][params.fy_loop_idx[1]];
+                                ac_int<LOOP_WIDTH, false> fx =
+                                    loop_counters[1][params.fx_loop_idx];
+                                ac_int<LOOP_WIDTH, false> k1 =
+                                    loop_counters[1][params.weight_loop_idx[1]];
+
                                 /*
                                  * If we have replication, then need to zero
                                  * pad the unused rows For 7x7 filter, we
@@ -459,19 +484,9 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                     replication_bound = 1;
                                   } else if (rows == 8) {
                                     // last iteration only unrolls 1 fx
-                                    if (loop_counters[1][params.fx_loop_idx] ==
-                                        3) {
-                                      replication_bound = 1;
-                                    } else {
-                                      replication_bound = 2;
-                                    }
+                                    replication_bound = fx == 3 ? 1 : 2;
                                   } else if (rows == 16) {
-                                    if (loop_counters[1][params.fx_loop_idx] ==
-                                        0) {
-                                      replication_bound = 4;
-                                    } else {
-                                      replication_bound = 3;
-                                    }
+                                    replication_bound = fx == 0 ? 4 : 3;
                                   } else if (rows == 32 || rows == 64) {
                                     replication_bound = 7;
                                   }
@@ -484,100 +499,39 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                 ac_int<LOOP_WIDTH, false> fx_repl = 0;
                                 ac_int<LOOP_WIDTH, false> c = 0;
                                 for (int row = 0; row < rows; row++) {
-                                  ac_int<LOOP_WIDTH, false> k2 =
-                                      loop_counters[0]
-                                                   [params.weight_loop_idx[0]];
-                                  ac_int<LOOP_WIDTH, false> c1 = loop_counters
-                                      [1][params.reduction_loop_idx[1]];
-                                  ac_int<LOOP_WIDTH, false> fy0 =
-                                      loop_counters[1][params.fy_loop_idx[1]];
-                                  ac_int<LOOP_WIDTH, false> fx =
-                                      loop_counters[1][params.fx_loop_idx];
-                                  ac_int<LOOP_WIDTH, false> k1 =
-                                      loop_counters[1]
-                                                   [params.weight_loop_idx[1]];
-
-                                  ac_int<16, false> k =
-                                      k2 * K1 * cols + k1 * cols;
-
                                   ac_int<LOOP_WIDTH, false> C = rows * C1;
                                   ac_int<LOOP_WIDTH, false> C0 = rows;
+                                  ac_int<16, false> address;
 
                                   if (params.is_resnet_replication ||
                                       params.is_generic_replication) {
+                                    ac_int<LOOP_WIDTH, false> cur_fx = fx;
                                     if (params.is_resnet_replication) {
                                       C = 3;
                                       C0 = 3;
-                                      if (rows == 4) {
-                                        fx = loop_counters[1]
-                                                          [params.fx_loop_idx];
-                                      } else if (rows == 8) {
-                                        fx = loop_counters[1]
-                                                          [params.fx_loop_idx] *
-                                                 2 +
-                                             fx_repl;
-                                      } else if (rows == 16) {
-                                        fx = loop_counters[1]
-                                                          [params.fx_loop_idx] *
-                                                 4 +
-                                             fx_repl;
-                                      } else if (rows == 32 || rows == 64) {
-                                        fx = fx_repl;
-                                      }
                                       FX = 7;
+                                      if (rows == 4) {
+                                        cur_fx = fx;
+                                      } else if (rows == 8) {
+                                        cur_fx = fx * 2 + fx_repl;
+                                      } else if (rows == 16) {
+                                        cur_fx = fx * 4 + fx_repl;
+                                      } else if (rows == 32 || rows == 64) {
+                                        cur_fx = fx_repl;
+                                      }
                                     } else {
                                       C = params.num_channels;
                                       C0 = params.num_channels;
-                                      fx =
-                                          loop_counters[1][params.fx_loop_idx] *
-                                              replication_bound +
-                                          fx_repl;
-                                      FX = loop_bounds[1][params.fx_loop_idx] *
+                                      FX = params.loops[1][params.fx_loop_idx] *
                                            replication_bound;
+                                      cur_fx = fx * replication_bound + fx_repl;
                                     }
+
                                     if (fx_repl < replication_bound) {
-                                      ac_int<16, false> address =
-                                          fy0 * FX * C * K1 + fx * C * K1 +
-                                          c * K1 + k1;
-                                      BufferReadRequest req;
-                                      req.address = address;
-                                      req.last = row == rows - 1 &&
-                                                 loop_counters[1][5] ==
-                                                     loop_bounds[1][5] - 1 &&
-                                                 loop_counters[1][4] ==
-                                                     loop_bounds[1][4] - 1 &&
-                                                 loop_counters[1][3] ==
-                                                     loop_bounds[1][3] - 1 &&
-                                                 loop_counters[1][2] ==
-                                                     loop_bounds[1][2] - 1 &&
-                                                 loop_counters[1][1] ==
-                                                     loop_bounds[1][1] - 1 &&
-                                                 loop_counters[1][0] ==
-                                                     loop_bounds[1][0] - 1 &&
-                                                 reuse == buffer_reuse - 1 &&
-                                                 rep == rep_bound - 1;
-
-                                      read_request[bank_sel].Push(req);
+                                      address = fy0 * FX * C * K1 +
+                                                cur_fx * C * K1 + c * K1 + k1;
                                     } else {
-                                      BufferReadRequest req;
-                                      req.address = 0xFFFF;
-                                      req.last = row == rows - 1 &&
-                                                 loop_counters[1][5] ==
-                                                     loop_bounds[1][5] - 1 &&
-                                                 loop_counters[1][4] ==
-                                                     loop_bounds[1][4] - 1 &&
-                                                 loop_counters[1][3] ==
-                                                     loop_bounds[1][3] - 1 &&
-                                                 loop_counters[1][2] ==
-                                                     loop_bounds[1][2] - 1 &&
-                                                 loop_counters[1][1] ==
-                                                     loop_bounds[1][1] - 1 &&
-                                                 loop_counters[1][0] ==
-                                                     loop_bounds[1][0] - 1 &&
-                                                 reuse == buffer_reuse - 1 &&
-                                                 rep == rep_bound - 1;
-
-                                      read_request[bank_sel].Push(req);
+                                      address = 0xFFFF;
                                     }
 
                                     // keep track of which C and FX we are on
@@ -589,42 +543,39 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                     }
                                   } else {
                                     c = row;
-
-                                    ac_int<16, false> address =
-                                        (fy0 * FX * C * K1) + (fx * C * K1) +
-                                        ((c + c1 * C0) * K1) + k1;
-
                                     if (params.weight_transpose &&
                                         cols > rows) {
-                                      address =
-                                          (fy0 * FX * C * rep_bound * K1) +
-                                          (fx * C * rep_bound * K1) +
-                                          ((c + rep * rows) +
-                                           c1 * C0 * rep_bound) *
-                                              K1 +
-                                          k1;
+                                      address = fy0 * fy_stride_with_repl +
+                                                fx * fx_stride_with_repl +
+                                                ((c + rep * rows) +
+                                                 c1 * C0 * rep_bound) *
+                                                    K1 +
+                                                k1;
+                                    } else {
+                                      address = fy0 * fy_stride +
+                                                fx * fx_stride +
+                                                (c + c1 * C0) * K1 + k1;
                                     }
-
-                                    BufferReadRequest req;
-                                    req.address = address;
-                                    req.last = row == rows - 1 &&
-                                               loop_counters[1][5] ==
-                                                   loop_bounds[1][5] - 1 &&
-                                               loop_counters[1][4] ==
-                                                   loop_bounds[1][4] - 1 &&
-                                               loop_counters[1][3] ==
-                                                   loop_bounds[1][3] - 1 &&
-                                               loop_counters[1][2] ==
-                                                   loop_bounds[1][2] - 1 &&
-                                               loop_counters[1][1] ==
-                                                   loop_bounds[1][1] - 1 &&
-                                               loop_counters[1][0] ==
-                                                   loop_bounds[1][0] - 1 &&
-                                               reuse == buffer_reuse - 1 &&
-                                               rep == rep_bound - 1;
-
-                                    read_request[bank_sel].Push(req);
                                   }
+
+                                  BufferReadRequest req;
+                                  req.address = address;
+                                  req.last = row == rows - 1 &&
+                                             loop_counters[1][5] ==
+                                                 loop_bounds[1][5] - 1 &&
+                                             loop_counters[1][4] ==
+                                                 loop_bounds[1][4] - 1 &&
+                                             loop_counters[1][3] ==
+                                                 loop_bounds[1][3] - 1 &&
+                                             loop_counters[1][2] ==
+                                                 loop_bounds[1][2] - 1 &&
+                                             loop_counters[1][1] ==
+                                                 loop_bounds[1][1] - 1 &&
+                                             loop_counters[1][0] ==
+                                                 loop_bounds[1][0] - 1 &&
+                                             reuse == buffer_reuse - 1 &&
+                                             rep == rep_bound - 1;
+                                  read_request[bank_sel].Push(req);
                                 }
 
                                 if (loop_counters[1][5] ==

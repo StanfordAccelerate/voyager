@@ -95,16 +95,14 @@ SC_MODULE(OutputController) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (ac_int<32, false> i = 0;; i++) {
-          Pack1D<VectorType, width> outputs = vector_in.Pop();
-
+          auto outputs = vector_in.Pop();
           Pack1D<VectorType, width> indices;
 #pragma hls_unroll yes
-          for (int i = 0; i < width; i++) {
-            auto index = quantize16_iter(outputs[i], midpoints);
-            indices[i].set_bits(index);
+          for (int j = 0; j < width; j++) {
+            auto index = quantize16_iter(outputs[j], midpoints);
+            indices[j].set_bits(index);
           }
           quantize_output.Push(indices);
-
           if (i == loop_bound) break;
         }
       } else
@@ -114,8 +112,7 @@ SC_MODULE(OutputController) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         for (ac_int<32, false> i = 0;; i++) {
-          auto outputs = vector_in.Pop();
-          quantize_output.Push(outputs);
+          quantize_output.Push(vector_in.Pop());
           if (i == loop_bound) break;
         }
       }

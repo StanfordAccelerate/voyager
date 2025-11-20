@@ -247,7 +247,6 @@ SC_MODULE(WeightScaleController) {
                           ac_int<LOOP_WIDTH, false> k1 = loop_counters
                               [1][params.weight_addr_weight_loop_idx[1]];
 
-                          ac_int<16, false> k = (k2 * K1 + k1) * cols;
                           ac_int<16, false> c = c1 * C0 + c0;
 
                           if (c % BLOCK_SIZE == 0) {
@@ -354,6 +353,19 @@ SC_MODULE(WeightScaleController) {
         }
       }
 
+      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> FY1 = params.loops[0][params.fy_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> C2 =
+          params.loops[0][params.reduction_loop_idx[0]];
+      ac_int<LOOP_WIDTH, false> FY0 = params.loops[1][params.fy_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> FX = params.loops[1][params.fx_loop_idx];
+      ac_int<LOOP_WIDTH, false> C1 =
+          params.loops[1][params.reduction_loop_idx[1]];
+      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
+
+      bool reuse_weights =
+          FY1 == 1 && C2 == 1 && FY0 == 1 && FX == 1 && C1 == 1 && K1 == 1;
+
       // extra loop for exploiting L1 buffer reuse.
       // this loop is used when OX and OY are the innermost L2 loops. when
       // this occurs, we can move OX and/or OY into the buffer reuse L1 loop
@@ -361,23 +373,19 @@ SC_MODULE(WeightScaleController) {
       if (params.loops[0][params.reduction_loop_idx[0]] == 1) {
         // OX loop can be absorbed
         if (params.weight_loop_idx[0] < params.x_loop_idx[0]) {
-          buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+          if (!reuse_weights) {
+            buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+          }
           loop_bounds[0][params.x_loop_idx[0]] = 1;
         }
         // OY loop can be absorbed
         if (params.weight_loop_idx[0] < params.y_loop_idx[0]) {
-          buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+          if (!reuse_weights) {
+            buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+          }
           loop_bounds[0][params.y_loop_idx[0]] = 1;
         }
       }
-
-      ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
-      ac_int<LOOP_WIDTH, false> C1 =
-          params.loops[1][params.reduction_loop_idx[1]];
-      ac_int<LOOP_WIDTH, false> FX = params.loops[1][params.fx_loop_idx];
-      ac_int<LOOP_WIDTH, false> FY0 = params.loops[1][params.fy_loop_idx[1]];
-      ac_int<LOOP_WIDTH, false> FY1 = loop_bounds[0][params.fy_loop_idx[0]];
-      ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
 
       ac_int<16, false> fx_stride = C1 * K1;
       ac_int<16, false> fy_stride = FX * fx_stride;
@@ -400,8 +408,6 @@ SC_MODULE(WeightScaleController) {
                                  loop_counters[1][4]++) {
                               for (loop_counters[1][5] = 0;;
                                    loop_counters[1][5]++) {
-                                ac_int<LOOP_WIDTH, false> k2 =
-                                    loop_counters[0][params.weight_loop_idx[0]];
                                 ac_int<LOOP_WIDTH, false> c1 =
                                     loop_counters[1]
                                                  [params.reduction_loop_idx[1]];
@@ -411,9 +417,6 @@ SC_MODULE(WeightScaleController) {
                                     loop_counters[1][params.fy_loop_idx[1]];
                                 ac_int<LOOP_WIDTH, false> k1 =
                                     loop_counters[1][params.weight_loop_idx[1]];
-
-                                ac_int<16, false> k =
-                                    k2 * K1 * cols + k1 * cols;
 
                                 ac_int<16, false> address = fy0 * fy_stride +
                                                             fx * fx_stride +

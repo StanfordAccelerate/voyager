@@ -587,7 +587,7 @@ SC_MODULE(VectorFetchUnit) {
             bits = vector_fetch_0_packed_bits.Pop();
           }
 
-          for (ac_int<4, false> i = 0;; i++) {
+          for (ac_int<4, false> pack = 0;; pack++) {
             Pack1D<VectorType, width> outputs;
 #pragma hls_unroll yes
             for (int i = 0; i < width; i++) {
@@ -599,7 +599,7 @@ SC_MODULE(VectorFetchUnit) {
               bool found =
                   (unpack_vector_data<InputTypes, VectorType, width,
                                       MAX_RESPONSE_WIDTH, InputTypes...>(
-                       params.vector_fetch_0_dtype, bits, outputs, i) ||
+                       params.vector_fetch_0_dtype, bits, outputs, pack) ||
                    ...);
 
 #ifndef __SYNTHESIS__
@@ -615,7 +615,7 @@ SC_MODULE(VectorFetchUnit) {
                 outputs, dequantized, params.vector_fetch_0_dq_scale);
             vector_fetch_0_data.Push(dequantized);
 
-            if (i == params.vector_fetch_0_packing_factor - 1) {
+            if (pack == params.vector_fetch_0_packing_factor - 1) {
               break;
             }
           }
