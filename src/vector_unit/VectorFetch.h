@@ -439,7 +439,7 @@ SC_MODULE(VectorFetchUnit) {
       TRANSPOSE_OUTER:
         while (counter++ < total_values) {
         TRANSPOSE_READ:
-          for (ac_int<10, false> col = 0;; col++) {
+          for (ac_int<10, false> col = 0; col < mu_width; col++) {
             auto bits = vector_fetch_0_packed_bits.Pop();
 
             Pack1D<VectorType, BUFSIZE> outputs;
@@ -463,12 +463,10 @@ SC_MODULE(VectorFetchUnit) {
             for (int row = 0; row < BUFSIZE; row++) {
               buffer[row][col] = dequantized[row];
             }
-
-            if (col == mu_width - 1) break;
           }
 
         TRANSPOSE_WRITE:
-          for (ac_int<10, false> row = 0;; row++) {
+          for (ac_int<10, false> row = 0; row < BUFSIZE; row++) {
             Pack1D<VectorType, mu_width> transposed;
 #pragma hls_unroll yes
             for (int col = 0; col < mu_width; col++) {
@@ -478,19 +476,15 @@ SC_MODULE(VectorFetchUnit) {
             if constexpr (mu_width == width) {
               vector_fetch_0_data.Push(transposed);
             } else {
-              for (ac_int<4, false> pack = 0;; pack++) {
+              for (ac_int<4, false> pack = 0; pack < mu_width / width; pack++) {
                 Pack1D<VectorType, width> unpacked;
 #pragma hls_unroll yes
                 for (int i = 0; i < width; i++) {
                   unpacked[i] = transposed[pack * width + i];
                 }
                 vector_fetch_0_data.Push(unpacked);
-
-                if (pack == mu_width / width - 1) break;
               }
             }
-
-            if (row == BUFSIZE - 1) break;
           }
         }
       }

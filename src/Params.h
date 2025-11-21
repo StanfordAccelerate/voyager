@@ -1428,12 +1428,12 @@ struct VectorInstructionConfig : BaseParams {
 #endif
 
   VectorInstructions inst[8];
-  ac_int<3, false> num_inst;
+  ac_int<4, false> num_inst;
   ac_int<16, false> repeat_count;
   ApproxUnitConfig approx;
 
   static const unsigned int width =
-      VectorInstructions::width * 8 + 3 + 16 + ApproxUnitConfig::width;
+      VectorInstructions::width * 8 + 4 + 16 + ApproxUnitConfig::width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>

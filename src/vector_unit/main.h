@@ -271,7 +271,7 @@ SC_MODULE(VectorUnit) {
             approx_unit_config.Push(instruction_config.approx);
           } else if (inst.op_type == VectorInstructions::accumulation) {
             accumulator_instr.Push(inst);
-          } else {
+          } else if (inst.op_type == VectorInstructions::reduction) {
             reducer_instr.Push(inst);
           }
 
@@ -296,14 +296,13 @@ SC_MODULE(VectorUnit) {
       if constexpr (mu_width == width) {
         matrix_unit_output_unpacked.Push(full_response);
       } else {
-        for (ac_int<4, false> i = 0;; i++) {
+        for (ac_int<4, false> i = 0; i < mu_width / width; i++) {
           Pack1D<BufferType, width> unpacked_data;
 #pragma hls_unroll yes
           for (int j = 0; j < width; j++) {
             unpacked_data[j] = full_response[i * width + j];
           }
           matrix_unit_output_unpacked.Push(unpacked_data);
-          if (i == mu_width / width - 1) break;
         }
       }
     }
@@ -323,47 +322,51 @@ SC_MODULE(VectorUnit) {
       VectorParams params = send_output_params.Pop();
       VectorInstructionConfig instruction_config = output_instruction.Pop();
 
-      constexpr int packing_factor = mu_width / width;
-
       ac_int<32, false> num_outputs =
           params.output_loops[0][0] * params.output_loops[0][1] *
           params.output_loops[0][2] * params.output_loops[1][0] *
           params.output_loops[1][1] * params.output_loops[1][2];
 
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-      for (decltype(instruction_config.num_inst) i = 0;; i++) {
+      ac_int<2, false> op_type = 0;
+#pragma hls_unroll yes
+      for (ac_int<4, false> i = 0; i < 8; i++) {
         VectorInstructions inst = instruction_config.inst[i];
-
         if (inst.vdest == VectorInstructions::to_output ||
             inst.rdest == VectorInstructions::to_memory) {
-          for (ac_int<32, false> count = 0;; count++) {
-            Pack1D<VectorType, mu_width> packed_outputs;
+          op_type = inst.op_type;
+        }
+      }
 
-            for (ac_int<4, false> pack = 0;; pack++) {
-              Pack1D<VectorType, width> outputs;
-              if (inst.op_type == VectorInstructions::vector) {
-                outputs = pipeline_to_memory.Pop();
-              } else if (inst.op_type == VectorInstructions::accumulation) {
-                outputs = accumulator_to_memory.Pop();
-              } else if (inst.op_type == VectorInstructions::reduction) {
-                outputs = reducer_to_memory.Pop();
-              }
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode bubble
+      for (ac_int<32, false> count = 0;; count++) {
+        Pack1D<VectorType, mu_width> packed_outputs;
+
+        for (ac_int<4, false> pack = 0; pack < mu_width / width; pack++) {
+          Pack1D<VectorType, width> outputs;
+          // Initialize with 0 to avoid inferring latches
+#pragma hls_unroll yes
+          for (int i = 0; i < width; i++) {
+            outputs[i] = VectorType::zero();
+          }
+
+          if (op_type == VectorInstructions::vector) {
+            outputs = pipeline_to_memory.Pop();
+          } else if (op_type == VectorInstructions::accumulation) {
+            outputs = accumulator_to_memory.Pop();
+          } else if (op_type == VectorInstructions::reduction) {
+            outputs = reducer_to_memory.Pop();
+          }
 
 #pragma hls_unroll yes
-              for (int i = 0; i < width; i++) {
-                packed_outputs[pack * width + i] = outputs[i];
-              }
-
-              if (pack == packing_factor - 1) break;
-            }
-
-            vector_unit_output.Push(packed_outputs);
-            if (count == num_outputs - 1) break;
+          for (int i = 0; i < width; i++) {
+            packed_outputs[pack * width + i] = outputs[i];
           }
-          break;
         }
-        if (i == instruction_config.num_inst - 1) break;
+
+        vector_unit_output.Push(packed_outputs);
+
+        if (count == num_outputs - 1) break;
       }
     }
   }
