@@ -662,25 +662,46 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       loop_t c_bound = (C2 * C1 + width - 1) / width - 1;
       loop_t k_bound = (K2 * K1 + bs - 1) / bs - 1;
 
+      constexpr int DELAY = 4;
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k1 = 0;; k1++) {
         Pack1D<Output, bs> outputs;
+#pragma hls_unroll yes
+        for (int i = 0; i < bs; i++) {
+          outputs[i] = Output::zero();
+        }
+
         if (params.has_bias) {
           outputs = bias_data.Pop();
-        } else {
+        }
+
+        Output outputs_old[DELAY];
+
 #pragma hls_unroll yes
-          for (int i = 0; i < bs; i++) {
-            outputs[i] = Output::zero();
-          }
+        for (int i = 0; i < DELAY; i++) {
+          int k0 = bs - DELAY + i;
+          outputs_old[i] = outputs[k0];
         }
 
         for (loop_t c = 0;; c++) {
-          for (loop_t k0 = 0;; k0++) {
-            outputs[k0] += psum_out.Pop();
-            if (k0 == bs - 1) break;
+          for (loop_t k0 = 0; k0 < bs; k0++) {
+            int k0_delayed = (k0 + bs - DELAY) % bs;
+            outputs[k0_delayed] = outputs_old[0];
+#pragma hls_unroll yes
+            for (int i = 0; i < DELAY - 1; i++) {
+              outputs_old[i] = outputs_old[i + 1];
+            }
+            outputs_old[DELAY - 1] = outputs[k0] + psum_out.Pop();
           }
           if (c == c_bound) break;
+        }
+
+#pragma hls_unroll yes
+        for (int i = 0; i < DELAY; i++) {
+          int k0 = bs - DELAY + i;
+          outputs[k0] = outputs_old[i];
         }
 
         accumulation_out.Push(outputs);
