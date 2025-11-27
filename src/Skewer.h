@@ -176,7 +176,7 @@ SC_MODULE(DeserializedSkewer) {
   Connections::Out<Pack1D<T, size>> CCS_INIT_S1(dout);
 
 #define DECL_FIFO(z, i, data)                                        \
-  Connections::Fifo<T, OC_DIMENSION - i + 1> GEN_NAMED_VAR(fifo, i); \
+  Connections::Fifo<T, OC_DIMENSION - i + 2> GEN_NAMED_VAR(fifo, i); \
   Connections::Combinational<T> GEN_NAMED_VAR(fifo_din, i);          \
   Connections::Combinational<T> GEN_NAMED_VAR(fifo_dout, i);
   REPEAT_OC(DECL_FIFO)
