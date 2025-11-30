@@ -136,8 +136,8 @@ SC_MODULE(Harness) {
       spmm_input_indices_resp);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_data_req);
-  sc_fifo<ac_int<VECTOR_DATATYPE::width, false>> spmm_input_data_resp_fifo;
-  Connections::Combinational<ac_int<VECTOR_DATATYPE::width, false>> CCS_INIT_S1(
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_input_data_resp_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       spmm_input_data_resp);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_req);

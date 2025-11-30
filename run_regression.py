@@ -68,6 +68,7 @@ def set_default_env_vars(env_vars):
     env_vars.setdefault("ACCUM_BUFFER_SIZE", "1024")
     env_vars.setdefault("DOUBLE_BUFFERED_ACCUM_BUFFER", "false")
     env_vars.setdefault("SUPPORT_MVM", "false")
+    env_vars.setdefault("SUPPORT_SPMM", "false")
 
 
 def get_build_folder(env_vars):
@@ -77,7 +78,8 @@ def get_build_folder(env_vars):
         f"{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_"
         f"{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_"
         f"{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}_"
-        f"{env_vars['SUPPORT_MVM']}"
+        f"{env_vars['SUPPORT_MVM']}_"
+        f"{env_vars['SUPPORT_SPMM']}"
     )
 
 

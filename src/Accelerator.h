@@ -118,7 +118,7 @@ SC_MODULE(Accelerator) {
       spmm_input_indptr_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       spmm_input_indices_resp);
-  Connections::In<ac_int<VECTOR_DATATYPE::width, false>> CCS_INIT_S1(
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       spmm_input_data_resp);
   Connections::In<ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
       CCS_INIT_S1(spmm_weight_resp);
@@ -128,7 +128,7 @@ SC_MODULE(Accelerator) {
   Connections::In<ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
       CCS_INIT_S1(spmm_weight_scale_resp);
 #endif
-  Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>>(
+  Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>> CCS_INIT_S1(
       spmm_output);
   Connections::SyncOut CCS_INIT_S1(spmm_unit_start_signal);
   Connections::SyncOut CCS_INIT_S1(spmm_unit_done_signal);
