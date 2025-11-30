@@ -13,6 +13,7 @@
 #include "test/common/operations/ReshapeOps.h"
 #include "test/common/operations/SlicingOp.h"
 #include "test/common/operations/Softmax.h"
+#include "test/common/operations/SpMM.h"
 #include "test/common/operations/VectorOps.h"
 
 template <typename T, typename U, bool is_input>
@@ -208,6 +209,36 @@ std::vector<std::any> run_operation(const Operation& operation,
           input_ptr, input_scale_ptr, weight_ptr, weight_scale_ptr, bias_ptr,
           operation);
     }
+  } else if (first_op.target() == "spmm_csr") {
+#if !SUPPORT_SPMM
+    throw std::runtime_error("SpMM not supported in this build.");
+#endif
+    const auto weight = first_op.kwargs().at("B").tensor();
+    std::any weight_ptr = kwargs[weight.node()];
+    const auto weight_scale = first_op.kwargs().at("B_scale").tensor();
+    std::any weight_scale_ptr = kwargs[weight_scale.node()];
+    const auto input_data = first_op.kwargs().at("data").tensor();
+    std::any input_data_ptr = kwargs[input_data.node()];
+    const auto input_indices = first_op.kwargs().at("indices").tensor();
+    std::any input_indices_ptr = kwargs[input_indices.node()];
+    const auto input_indptr = first_op.kwargs().at("indptr").tensor();
+    std::any input_indptr_ptr = kwargs[input_indptr.node()];
+
+    float* weight_code = nullptr;
+    if (first_op.kwargs().contains("B_code")) {
+      const auto code = first_op.kwargs().at("B_code").tensor();
+      weight_code = read_constant_param(code);
+    }
+
+    cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight_code, weight);
+
+    if (weight_code != nullptr) {
+      delete[] weight_code;
+    }
+
+    output_ptr = spmm_csr<Vector, SaWeight, Vector, Scale>(
+        input_data_ptr, input_indices_ptr, input_indptr_ptr, weight_ptr,
+        weight_scale_ptr, first_op);
   } else {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];

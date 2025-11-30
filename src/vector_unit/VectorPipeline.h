@@ -25,9 +25,11 @@ SC_MODULE(VectorPipeline) {
 #endif
 
 #if SUPPORT_MVM
-  Connections::In<VectorPack> matrix_vector_unit_data;
+  Connections::In<VectorPack> matrix_vector_unit_output;
 #endif
-
+#if SUPPORT_SPMM
+  Connections::In<VectorPack> spmm_unit_output;
+#endif
 #if SUPPORT_DWC
   Connections::In<Pack1D<BufferType, vu_width>> dwc_unit_in;
 #endif
@@ -112,7 +114,7 @@ SC_MODULE(VectorPipeline) {
     accumulation_buffer_output.Reset();
 #endif
 #if SUPPORT_MVM
-    matrix_vector_unit_data.Reset();
+    matrix_vector_unit_output.Reset();
 #endif
 #if SUPPORT_DWC
     dwc_unit_in.Reset();
@@ -135,7 +137,6 @@ SC_MODULE(VectorPipeline) {
       stage_3_inst.Push(inst);
 
       for (decltype(inst.inst_count) i = 0;; i++) {
-        // Vector unit inputs
         VectorPack op0_src0;
         VectorPack op0_src1;
         VectorPack op2_src1;
@@ -189,13 +190,12 @@ SC_MODULE(VectorPipeline) {
           }
         }
 #endif
-
 #if SUPPORT_MVM
         if (inst.vector_op0_src0 ==
                 VectorInstructions::from_matrix_vector_unit ||
             inst.vector_op0_src1 ==
                 VectorInstructions::from_matrix_vector_unit) {
-          VectorPack temp = matrix_vector_unit_data.Pop();
+          VectorPack temp = matrix_vector_unit_output.Pop();
           if (inst.vector_op0_src0 ==
               VectorInstructions::from_matrix_vector_unit) {
             op0_src0 = temp;
@@ -204,7 +204,17 @@ SC_MODULE(VectorPipeline) {
           }
         }
 #endif
-
+#if SUPPORT_SPMM
+        if (inst.vector_op0_src0 == VectorInstructions::from_spmm_unit ||
+            inst.vector_op0_src1 == VectorInstructions::from_spmm_unit) {
+          VectorPack temp = spmm_unit_output.Pop();
+          if (inst.vector_op0_src0 == VectorInstructions::from_spmm_unit) {
+            op0_src0 = temp;
+          } else {
+            op0_src1 = temp;
+          }
+        }
+#endif
 #if SUPPORT_DWC
         if (inst.vector_op0_src0 == VectorInstructions::from_dwc_unit ||
             inst.vector_op0_src1 == VectorInstructions::from_dwc_unit) {

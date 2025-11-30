@@ -9,6 +9,7 @@
 #include "test/toolchain/Microscaling.h"
 #include "test/toolchain/Pooling.h"
 #include "test/toolchain/Softmax.h"
+#include "test/toolchain/SpMM.h"
 #include "test/toolchain/VectorOps.h"
 
 void map_operation(const Operation& operation,
@@ -33,6 +34,8 @@ void map_operation(const Operation& operation,
     map_pool2d(param, mapped_params);
   } else if (first_op.target() == "calculate_mx_qparam") {
     map_microscaling(param, mapped_params);
+  } else if (first_op.target() == "spmm_csr") {
+    map_spmm(param, mapped_params);
   } else {
     map_vector_operations(param, mapped_params);
   }

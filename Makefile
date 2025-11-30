@@ -78,6 +78,12 @@ else
 	override BASE_FLAGS += -DSUPPORT_MVM=$(SUPPORT_MVM)
 endif
 
+ifndef SUPPORT_SPMM
+	export SUPPORT_SPMM = false
+else
+	override BASE_FLAGS += -DSUPPORT_SPMM=$(SUPPORT_SPMM)
+endif
+
 ifndef SUPPORT_DWC
 	export SUPPORT_DWC = false
 else
@@ -105,7 +111,7 @@ LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 ###########################################################
 # Build Directories
 ###########################################################
-BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)
+BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)_$(SUPPORT_SPMM)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 # Create build dirs automatically

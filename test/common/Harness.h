@@ -118,6 +118,50 @@ SC_MODULE(Harness) {
 #endif
 
   //----------------------------------------------------------
+  // SPMM UNIT CONNECTIONS
+  //----------------------------------------------------------
+
+#if SUPPORT_SPMM
+  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
+      serial_spmm_unit_params_in);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_indptr_req);
+  sc_fifo<ac_int<SPMM_META_DATATYPE::width, false>> spmm_input_indptr_resp_fifo;
+  Connections::Combinational<ac_int<SPMM_META_DATATYPE::width, false>>
+      CCS_INIT_S1(spmm_input_indptr_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_indices_req);
+  sc_fifo<ac_int<SPMM_META_DATATYPE::width, false>>
+      spmm_input_indices_resp_fifo;
+  Connections::Combinational<ac_int<SPMM_META_DATATYPE::width, false>>
+      CCS_INIT_S1(spmm_input_indices_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_data_req);
+  sc_fifo<ac_int<VECTOR_DATATYPE::width, false>> spmm_input_data_resp_fifo;
+  Connections::Combinational<ac_int<VECTOR_DATATYPE::width, false>> CCS_INIT_S1(
+      spmm_input_data_resp);
+
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_req);
+  sc_fifo<ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
+      spmm_weight_resp_fifo;
+  Connections::Combinational<
+      ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
+      CCS_INIT_S1(spmm_weight_resp);
+
+#if SUPPORT_MX
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_scale_req);
+  sc_fifo<ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
+      spmm_weight_scale_resp_fifo;
+  Connections::Combinational<
+      ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
+      CCS_INIT_S1(spmm_weight_scale_resp);
+#endif
+
+  Connections::SyncChannel CCS_INIT_S1(spmm_unit_start_signal);
+  Connections::SyncChannel CCS_INIT_S1(spmm_unit_done_signal);
+#endif
+
+  //----------------------------------------------------------
   // DWC UNIT CONNECTIONS
   //----------------------------------------------------------
 
@@ -256,6 +300,21 @@ SC_MODULE(Harness) {
   void send_matrix_vector_unit_weight_dq_scale_response();
   void read_matrix_vector_unit_weight_dq_zp_request();
   void send_matrix_vector_unit_weight_dq_zp_response();
+
+#if SUPPORT_SPMM
+  void read_spmm_input_indptr_request();
+  void send_spmm_input_indptr_response();
+  void read_spmm_input_indices_request();
+  void send_spmm_input_indices_response();
+  void read_spmm_input_data_request();
+  void send_spmm_input_data_response();
+  void read_spmm_weight_request();
+  void send_spmm_weight_response();
+#if SUPPORT_MX
+  void read_spmm_weight_scale_request();
+  void send_spmm_weight_scale_response();
+#endif
+#endif
 
 #if SUPPORT_DWC
   void read_dwc_input_request();

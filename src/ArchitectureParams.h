@@ -125,6 +125,7 @@ using F9 = StdFloat<3, 5>;
 #define VU_INPUT_TYPES \
   VECTOR_DATATYPE, SCALE_DATATYPE, DataTypes::e4m3, DataTypes::int1
 #define OUTPUT_DATATYPES INPUT_DATATYPE, VU_INPUT_TYPES
+#define SPMM_META_DATATYPE DataTypes::int32
 
 #define SA_INPUT_TYPE DataTypes::int6
 #define SA_WEIGHT_TYPE DataTypes::int6
@@ -140,6 +141,7 @@ using F9 = StdFloat<3, 5>;
 #define OC_PORT_WIDTH (OC_DIMENSION * 4)
 #define VECTOR_UNIT_WIDTH OC_DIMENSION
 #define MV_UNIT_WIDTH (OC_DIMENSION * 2)
+#define SPMM_UNIT_WIDTH OC_DIMENSION
 
 #define SUPPORT_MX true
 #define SUPPORT_CODEBOOK_QUANT true
@@ -181,8 +183,16 @@ using F9 = StdFloat<3, 5>;
 #define SUPPORT_MVM false
 #endif
 
+#ifndef SUPPORT_SPMM
+#define SUPPORT_SPMM false
+#endif
+
 #ifndef MV_UNIT_WIDTH
 #define MV_UNIT_WIDTH OC_DIMENSION
+#endif
+
+#ifndef SPMM_UNIT_WIDTH
+#define SPMM_UNIT_WIDTH OC_DIMENSION
 #endif
 
 #ifndef VECTOR_UNIT_WIDTH

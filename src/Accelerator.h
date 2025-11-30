@@ -7,6 +7,7 @@
 #include "ArchitectureParams.h"
 #include "DwCUnit.h"
 #include "MatrixUnit.h"
+#include "SpMMUnit.h"
 #include "matrix_vector_unit/main.h"
 #include "mc_scverify.h"
 #include "vector_unit/main.h"
@@ -97,6 +98,37 @@ SC_MODULE(Accelerator) {
       matrix_vector_unit_data;
   Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_start_signal);
   Connections::SyncOut CCS_INIT_S1(matrix_vector_unit_done_signal);
+#endif
+
+#if SUPPORT_SPMM
+  SpMMUnit<WeightTypeList, VECTOR_DATATYPE, SA_WEIGHT_TYPE, SPMM_META_DATATYPE,
+           VECTOR_DATATYPE, SCALE_DATATYPE, SPMM_UNIT_WIDTH, OC_DIMENSION>
+      CCS_INIT_S1(spmm_unit);
+
+  Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_spmm_unit_params_in);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(spmm_input_indptr_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(spmm_input_indices_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(spmm_input_data_req);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(spmm_weight_req);
+
+  Connections::In<ac_int<SPMM_META_DATATYPE::width, false>> CCS_INIT_S1(
+      spmm_input_indptr_resp);
+  Connections::In<ac_int<SPMM_META_DATATYPE::width, false>> CCS_INIT_S1(
+      spmm_input_indices_resp);
+  Connections::In<ac_int<VECTOR_DATATYPE::width, false>> CCS_INIT_S1(
+      spmm_input_data_resp);
+  Connections::In<ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
+      CCS_INIT_S1(spmm_weight_resp);
+
+#if SUPPORT_MX
+  Connections::Out<MemoryRequest> CCS_INIT_S1(spmm_weight_scale_req);
+  Connections::In<ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
+      CCS_INIT_S1(spmm_weight_scale_resp);
+#endif
+  Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>>(
+      spmm_output);
+  Connections::SyncOut CCS_INIT_S1(spmm_unit_start_signal);
+  Connections::SyncOut CCS_INIT_S1(spmm_unit_done_signal);
 #endif
 
   VectorUnit<VECTOR_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
@@ -221,7 +253,32 @@ SC_MODULE(Accelerator) {
     matrix_vector_unit.start_signal(matrix_vector_unit_start_signal);
     matrix_vector_unit.done_signal(matrix_vector_unit_done_signal);
 
-    vector_unit.matrix_vector_unit_data(matrix_vector_unit_data);
+    vector_unit.matrix_vector_unit_output(matrix_vector_unit_data);
+#endif
+
+#if SUPPORT_SPMM
+    spmm_unit.clk(clk);
+    spmm_unit.rstn(rstn);
+    spmm_unit.serial_params_in(serial_spmm_unit_params_in);
+    spmm_unit.input_indptr_req(spmm_input_indptr_req);
+    spmm_unit.input_indices_req(spmm_input_indices_req);
+    spmm_unit.input_data_req(spmm_input_data_req);
+    spmm_unit.weight_req(spmm_weight_req);
+
+    spmm_unit.input_indptr_resp(spmm_input_indptr_resp);
+    spmm_unit.input_indices_resp(spmm_input_indices_resp);
+    spmm_unit.input_data_resp(spmm_input_data_resp);
+    spmm_unit.weight_resp(spmm_weight_resp);
+
+#if SUPPORT_MX
+    spmm_unit.weight_scale_req(spmm_weight_scale_req);
+    spmm_unit.weight_scale_resp(spmm_weight_scale_resp);
+#endif
+    spmm_unit.matrix_out(spmm_output);
+    spmm_unit.start_signal(spmm_unit_start_signal);
+    spmm_unit.done_signal(spmm_unit_done_signal);
+
+    vector_unit.spmm_unit_output(spmm_output);
 #endif
 
     vector_unit.clk(clk);

@@ -30,7 +30,11 @@ SC_MODULE(VectorUnit) {
 
 #if SUPPORT_MVM
   Connections::In<Pack1D<VectorType, width>> CCS_INIT_S1(
-      matrix_vector_unit_data);
+      matrix_vector_unit_output);
+#endif
+
+#if SUPPORT_SPMM
+  Connections::In<Pack1D<VectorType, width>> CCS_INIT_S1(spmm_unit_output);
 #endif
 
 #if SUPPORT_DWC
@@ -159,7 +163,10 @@ SC_MODULE(VectorUnit) {
     pipeline.accumulation_buffer_output(accumulation_buffer_output);
 #endif
 #if SUPPORT_MVM
-    pipeline.matrix_vector_unit_data(matrix_vector_unit_data);
+    pipeline.matrix_vector_unit_output(matrix_vector_unit_output);
+#endif
+#if SUPPORT_SPMM
+    pipeline.spmm_unit_output(spmm_unit_output);
 #endif
 #if SUPPORT_DWC
     pipeline.dwc_unit_in(dwc_unit_in);

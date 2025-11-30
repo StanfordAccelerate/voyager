@@ -17,29 +17,7 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
       clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS,
           true),
       operations(operations),
-      dataloader(dataloader),
-      matrix_unit_input_resp_fifo("matrix_unit_input_resp_fifo", 1024),
-      matrix_unit_weight_resp_fifo("matrix_unit_weight_resp_fifo", 1024),
-      matrix_unit_bias_resp_fifo("matrix_unit_bias_resp_fifo", 1024),
-      vector_fetch_0_resp_fifo("vector_fetch_0_resp_fifo", 1024),
-      vector_fetch_1_resp_fifo("vector_fetch_1_resp_fifo", 1024),
-      vector_fetch_2_resp_fifo("vector_fetch_2_resp_fifo", 1024)
-#if SUPPORT_MVM
-      ,
-      matrix_vector_unit_input_resp_fifo("matrix_vector_unit_input_resp_fifo",
-                                         1024),
-      matrix_vector_unit_weight_resp_fifo("matrix_vector_unit_weight_resp_fifo",
-                                          1024),
-      matrix_vector_unit_bias_resp_fifo("matrix_vector_unit_bias_resp_fifo",
-                                        1024)
-#endif
-#if SUPPORT_DWC
-      ,
-      dwc_input_resp_fifo("dwc_input_resp_fifo", 1024),
-      dwc_weight_resp_fifo("dwc_weight_resp_fifo", 1024),
-      dwc_bias_resp_fifo("dwc_bias_resp_fifo", 1024)
-#endif
-{
+      dataloader(dataloader) {
   accelerator.clk(clk);
   accelerator.rstn(rstn);
   accelerator.serial_matrix_params_in(serial_matrix_params_in);
@@ -85,6 +63,23 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
       matrix_vector_unit_weight_dq_zp_resp);
   accelerator.matrix_vector_unit_start_signal(matrix_vector_unit_start_signal);
   accelerator.matrix_vector_unit_done_signal(matrix_vector_unit_done_signal);
+#endif
+#if SUPPORT_SPMM
+  accelerator.serial_spmm_unit_params_in(serial_spmm_unit_params_in);
+  accelerator.spmm_input_indptr_req(spmm_input_indptr_req);
+  accelerator.spmm_input_indptr_resp(spmm_input_indptr_resp);
+  accelerator.spmm_input_indices_req(spmm_input_indices_req);
+  accelerator.spmm_input_indices_resp(spmm_input_indices_resp);
+  accelerator.spmm_input_data_req(spmm_input_data_req);
+  accelerator.spmm_input_data_resp(spmm_input_data_resp);
+  accelerator.spmm_weight_req(spmm_weight_req);
+  accelerator.spmm_weight_resp(spmm_weight_resp);
+#if SUPPORT_MX
+  accelerator.spmm_weight_scale_req(spmm_weight_scale_req);
+  accelerator.spmm_weight_scale_resp(spmm_weight_scale_resp);
+#endif
+  accelerator.spmm_unit_start_signal(spmm_unit_start_signal);
+  accelerator.spmm_unit_done_signal(spmm_unit_done_signal);
 #endif
 #if SUPPORT_DWC
   accelerator.serial_dwc_params_in(serial_dwc_params_in);
@@ -146,6 +141,16 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 #endif
   REGISTER_IO_FN(matrix_vector_unit_weight_dq_scale)
   REGISTER_IO_FN(matrix_vector_unit_weight_dq_zp)
+#endif
+
+#if SUPPORT_SPMM
+  REGISTER_IO_FN(spmm_input_indptr)
+  REGISTER_IO_FN(spmm_input_indices)
+  REGISTER_IO_FN(spmm_input_data)
+  REGISTER_IO_FN(spmm_weight)
+#if SUPPORT_MX
+  REGISTER_IO_FN(spmm_weight_scale)
+#endif
 #endif
 
 #if SUPPORT_DWC
@@ -281,6 +286,16 @@ DEFINE_IO_FN(matrix_vector_unit_weight_dq_scale)
 DEFINE_IO_FN(matrix_vector_unit_weight_dq_zp)
 #endif
 
+#if SUPPORT_SPMM
+DEFINE_IO_FN(spmm_input_indptr)
+DEFINE_IO_FN(spmm_input_indices)
+DEFINE_IO_FN(spmm_input_data)
+DEFINE_IO_FN(spmm_weight)
+#if SUPPORT_MX
+DEFINE_IO_FN(spmm_weight_scale)
+#endif
+#endif
+
 #if SUPPORT_DWC
 DEFINE_IO_FN(dwc_input)
 DEFINE_IO_FN(dwc_weight)
@@ -333,6 +348,12 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
       if (matrix_params->is_fc) {
         send_serialized_params<MatrixParams, 64>(
             *matrix_params, &serial_matrix_vector_params_in);
+      } else
+#endif
+#if SUPPORT_SPMM
+          if (matrix_params->is_spmm) {
+        send_serialized_params<MatrixParams, 64>(*matrix_params,
+                                                 &serial_spmm_unit_params_in);
       } else
 #endif
       {
@@ -401,6 +422,11 @@ void Harness::record_start(const std::deque<BaseParams*>& params,
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
         matrix_vector_unit_start_signal.SyncPop();
+      } else
+#endif
+#if SUPPORT_SPMM
+          if (matrix_params->is_spmm) {
+        spmm_unit_start_signal.SyncPop();
       } else
 #endif
       {
@@ -496,6 +522,11 @@ void Harness::record_done(const std::deque<BaseParams*>& params,
         matrix_vector_unit_done_signal.SyncPop();
       } else
 #endif
+#if SUPPORT_SPMM
+          if (matrix_params->is_spmm) {
+        spmm_unit_done_signal.SyncPop();
+      } else
+#endif
       {
         matrix_unit_done_signal.SyncPop();
       }
@@ -571,6 +602,9 @@ void Harness::param_sender() {
 #if SUPPORT_MVM
   serial_matrix_vector_params_in.ResetWrite();
 #endif
+#if SUPPORT_SPMM
+  serial_spmm_unit_params_in.ResetWrite();
+#endif
 #if SUPPORT_DWC
   serial_dwc_params_in.ResetWrite();
 #endif
@@ -623,6 +657,9 @@ void Harness::start_monitor() {
 #if SUPPORT_MVM
   matrix_vector_unit_start_signal.ResetRead();
 #endif
+#if SUPPORT_SPMM
+  spmm_unit_start_signal.ResetRead();
+#endif
 #if SUPPORT_DWC
   dwc_start_signal.ResetRead();
 #endif
@@ -656,6 +693,9 @@ void Harness::done_monitor() {
   vector_unit_done_signal.ResetRead();
 #if SUPPORT_MVM
   matrix_vector_unit_done_signal.ResetRead();
+#endif
+#if SUPPORT_SPMM
+  spmm_unit_done_signal.ResetRead();
 #endif
 #if SUPPORT_DWC
   dwc_done_signal.ResetRead();

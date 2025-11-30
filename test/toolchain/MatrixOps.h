@@ -236,72 +236,74 @@ void map_matrix_operation(const Operation& operation,
   if (is_dwc) {
     dwc_params = new DwCParams;
 
-    const auto bias = matrix_op.kwargs().at("bias").tensor();
-    const auto output = get_op_outputs(param).back();
+    const auto& kwargs = matrix_op.kwargs();
+    const auto& bias = kwargs.at("bias").tensor();
+    const auto& output = get_op_outputs(param).back();
 
     dwc_params->input_offset = get_address(input);
     dwc_params->weight_offset = get_address(weight);
     dwc_params->bias_offset = get_address(bias);
     dwc_params->output_offset = get_address(output);
 
+    int Y = input.shape(1);
+    int X = input.shape(2);
+    int C = input.shape(3);
+
+    dwc_params->bounds[0] = Y;
+    dwc_params->bounds[1] = X;
+    dwc_params->bounds[2] = C;
+
     if (is_mx_op) {
-      int block_size = matrix_op.kwargs().at("block_size").int_value();
+      int block_size = kwargs.at("block_size").int_value();
       assert(block_size % UNROLLFACTOR == 0);
 
       dwc_params->use_mx = 1;
       dwc_params->block_size = log2(block_size);
       assert(1 << dwc_params->block_size == block_size);
 
-      const auto input_scale = matrix_op.kwargs().at("input_scale").tensor();
+      const auto& input_scale = kwargs.at("input_scale").tensor();
+      const auto& weight_scale = kwargs.at("weight_scale").tensor();
       dwc_params->input_scale_offset = get_address(input_scale);
-      const auto weight_scale = matrix_op.kwargs().at("weight_scale").tensor();
       dwc_params->weight_scale_offset = get_address(weight_scale);
-    } else {
-      dwc_params->use_mx = 0;
-      dwc_params->block_size = 0;
     }
 
-    dwc_params->bounds[0] = input.shape(1);  // Y
-    dwc_params->bounds[1] = input.shape(2);  // X
-    dwc_params->bounds[2] = input.shape(3);  // C
-
-    const auto paddings = matrix_op.kwargs().at("padding").int_list().values();
+    const auto paddings = kwargs.at("padding").int_list().values();
     int x_pad = paddings[1];
     int y_pad = paddings[0];
 
-    dwc_params->stride = matrix_op.kwargs().at("stride").int_list().values()[0];
-    assert(dwc_params->stride < 7);
-    assert((input.shape(1) + y_pad + y_pad - 2) % dwc_params->stride == 0);
-    assert((input.shape(2) + x_pad + x_pad - 2) % dwc_params->stride == 0);
+    const int stride = kwargs.at("stride").int_list().values()[0];
+    dwc_params->stride = stride;
+    assert(stride < 7);
 
-    int X0 = ((DWC_WIDTH - 2) / dwc_params->stride) * dwc_params->stride;
+    int padded_Y = Y + 2 * y_pad - 2;
+    int padded_X = X + 2 * x_pad - 2;
+
+    assert(padded_Y % stride == 0);
+    assert(padded_X % stride == 0);
+
+    int X0 = ((DWC_WIDTH - 2) / stride) * stride;
     int X1 = (input.shape(2) + x_pad + x_pad - 2 + X0 - 1) /
              X0;  // Padding lines, asym in future
     int C1 = (input.shape(3) + UNROLLFACTOR - 1) / UNROLLFACTOR;
 
-    dwc_params->loops[0][0] = input.shape(1);  // Y
-    dwc_params->loops[1][0] = 0;               // Unused
-    dwc_params->loops[0][1] = X1;              // X
+    dwc_params->loops[0][0] = Y;
+    dwc_params->loops[0][1] = X1;
+    dwc_params->loops[0][2] = C1;
+
+    dwc_params->loops[1][0] = 0;  // unused
     dwc_params->loops[1][1] = X0;
-    dwc_params->loops[0][2] = C1;  // C
     dwc_params->loops[1][2] = UNROLLFACTOR;
 
-    dwc_params->outloops[0] =
-        (input.shape(1) + y_pad + y_pad - 2) / dwc_params->stride;  // Y
-    dwc_params->outloops[1] =
-        (input.shape(2) + x_pad + x_pad - 2) / dwc_params->stride;  // X1
-    dwc_params->outloops[2] = X0 / dwc_params->stride;              // X0
+    dwc_params->outloops[0] = padded_Y / stride;
+    dwc_params->outloops[1] = padded_X / stride;
+    dwc_params->outloops[2] = X0 / stride;
 
-    dwc_params->padding[0][0] = y_pad;  // Y
-    dwc_params->padding[0][1] = y_pad;  // Y
-    dwc_params->padding[1][0] = x_pad;  // X
-    dwc_params->padding[1][1] = x_pad;  // X
+    dwc_params->padding[0][0] = y_pad;
+    dwc_params->padding[0][1] = y_pad;
+    dwc_params->padding[1][0] = x_pad;
+    dwc_params->padding[1][1] = x_pad;
 
-    if ((input.shape(2) + x_pad + x_pad - (X1 - 1) * X0 == 3)) {
-      dwc_params->fast_forward_mode = 1;
-    } else {
-      dwc_params->fast_forward_mode = 0;
-    }
+    dwc_params->fast_forward_mode = (X + 2 * x_pad - (X1 - 1) * X0) == 3;
 
     tiling = {
         .loops = {{output.shape(1), output.shape(2),

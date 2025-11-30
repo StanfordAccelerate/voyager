@@ -92,6 +92,13 @@ struct MatrixParams : BaseParams {
     weight_transpose = false;
     write_output_to_accum_buffer = false;
     weight_dequant = false;
+
+#if SUPPORT_SPMM
+    is_spmm = false;
+    spmm_indices_offset = 0;
+    spmm_indptr_offset = 0;
+    spmm_data_offset = 0;
+#endif
   }
 #endif
 
@@ -164,6 +171,13 @@ struct MatrixParams : BaseParams {
   ac_int<ADDRESS_WIDTH, false> dq_scale_offset;
   ac_int<ADDRESS_WIDTH, false> dq_zero_point_offset;
 
+#if SUPPORT_SPMM
+  bool is_spmm;
+  ac_int<ADDRESS_WIDTH, false> spmm_indices_offset;
+  ac_int<ADDRESS_WIDTH, false> spmm_indptr_offset;
+  ac_int<ADDRESS_WIDTH, false> spmm_data_offset;
+#endif
+
   static const unsigned int base_width =
       7 * 64 /* addresses */ + (12 + 10) * LOOP_WIDTH /* loops */ +
       21 * 3 /* loop indices */ + 8 /* stride */ + 8 /* padding */ +
@@ -175,7 +189,13 @@ struct MatrixParams : BaseParams {
       NUM_CODEBOOK_ENTRIES * DECODED_INPUT_DTYPE_WIDTH +
       NUM_CODEBOOK_ENTRIES * DECODED_WEIGHT_DTYPE_WIDTH + 4;
 
-  static const unsigned int width = base_width + extra_width;
+#if SUPPORT_SPMM
+  static const unsigned int spmm_extra_width = 3 * ADDRESS_WIDTH + 1;
+#else
+  static const unsigned int spmm_extra_width = 0;
+#endif
+
+  static const unsigned int width = base_width + extra_width + spmm_extra_width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -268,10 +288,17 @@ struct MatrixParams : BaseParams {
     m & input_transpose;
     m & weight_transpose;
     m & write_output_to_accum_buffer;
-    m & weight_dequant;
 
+    m & weight_dequant;
     m & dq_scale_offset;
     m & dq_zero_point_offset;
+
+#if SUPPORT_SPMM
+    m & is_spmm;
+    m & spmm_indices_offset;
+    m & spmm_indptr_offset;
+    m & spmm_data_offset;
+#endif
   }
 
   inline friend void sc_trace(sc_trace_file* tf, const MatrixParams& params,
@@ -385,6 +412,13 @@ struct MatrixParams : BaseParams {
     os << "weight_dequant: " << params.weight_dequant << std::endl;
     os << "dq_scale_offset: " << params.dq_scale_offset << std::endl;
     os << "dq_zero_point_offset: " << params.dq_zero_point_offset << std::endl;
+
+#if SUPPORT_SPMM
+    os << "is_spmm: " << params.is_spmm << std::endl;
+    os << "spmm_indices_offset: " << params.spmm_indices_offset << std::endl;
+    os << "spmm_indptr_offset: " << params.spmm_indptr_offset << std::endl;
+    os << "spmm_data_offset: " << params.spmm_data_offset << std::endl;
+#endif
     return os;
   }
 
@@ -468,10 +502,17 @@ struct MatrixParams : BaseParams {
     if (lhs.weight_transpose != rhs.weight_transpose) return false;
     if (lhs.write_output_to_accum_buffer != rhs.write_output_to_accum_buffer)
       return false;
-    if (lhs.weight_dequant != rhs.weight_dequant) return false;
 
+    if (lhs.weight_dequant != rhs.weight_dequant) return false;
     if (lhs.dq_scale_offset != rhs.dq_scale_offset) return false;
     if (lhs.dq_zero_point_offset != rhs.dq_zero_point_offset) return false;
+
+#if SUPPORT_SPMM
+    if (lhs.is_spmm != rhs.is_spmm) return false;
+    if (lhs.spmm_indices_offset != rhs.spmm_indices_offset) return false;
+    if (lhs.spmm_indptr_offset != rhs.spmm_indptr_offset) return false;
+    if (lhs.spmm_data_offset != rhs.spmm_data_offset) return false;
+#endif
 
     // If all members are equal, return true
     return true;
@@ -541,6 +582,7 @@ struct VectorInstructions {
   static const unsigned int from_immediate_1 = 11;
   static const unsigned int from_immediate_2 = 12;
   static const unsigned int from_dwc_unit = 13;
+  static const unsigned int from_spmm_unit = 14;
 
   ac_int<1, false> vdequantize;
   ac_int<16, false> vector_dq_scale;
