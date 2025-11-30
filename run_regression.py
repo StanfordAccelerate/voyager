@@ -767,7 +767,8 @@ def add_layers(network, layers, layer_counts, tile_counts, uniquify, skip_layers
             name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
 
             # Skip layers that are in the skip list
-            if any(p.match(name) for p in skip_layers):
+            if any(p.fullmatch(name) for p in skip_layers):
+                print(f"Skipping layer {name}")
                 continue
 
             # remove the name, memory, and node fields from the op

@@ -16,8 +16,8 @@
         ],
         "block_size": "*",
         "layers": [
-            "^pad_default(_[0-9]+)?$",
-            "^slice_tensor(_[0-9]+)?$"
+            "pad_default(_[0-9]+)?",
+            "slice_tensor(_[0-9]+)?"
         ]
     },
     {
@@ -51,7 +51,8 @@
         ],
         "block_size": 32,
         "layers": [
-            "slice_tensor(_[0-9]+)?"
+            "slice_tensor(_[0-9]+)?",
+            "permute_default"
         ]
     },
     {
@@ -136,7 +137,7 @@
             "embedding",
             "expand(_[0-9]+)?",
             "index_copy_",
-            "^matmul$",
+            "matmul",
             "mul_180",
             "mul_181",
             "pad_default(_[0-9]+)?",
