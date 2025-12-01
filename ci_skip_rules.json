@@ -71,7 +71,7 @@
         "layers": [
             "index_copy_",
             "index_copy__1",
-            "transpose_int_(_[0-9]+)?"
+            "transpose_int(_[0-9]+)?"
         ]
     },
     {
@@ -114,7 +114,7 @@
             "permute_default_1",
             "slice(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?",
-            "transpose_int_(_[0-9]+)?"
+            "transpose_int(_[0-9]+)?"
         ]
     },
     {
@@ -146,7 +146,7 @@
             "slice_tensor(_[0-9]+)?",
             "to(_[0-9]+)?",
             "transpose(_[0-9]+)?",
-            "transpose_int_(_[0-9]+)?"
+            "transpose_int(_[0-9]+)?"
         ]
     },
     {
@@ -166,7 +166,9 @@
         "layers": [
             "cat(_[0-9]+)?",
             "pad(_[0-9]+)?",
-            "slice(_[0-9]+)?"
+            "pad_default(_[0-9]+)?",
+            "slice(_[0-9]+)?",
+            "slice_tensor(_[0-9]+)?"
         ]
     }
 ]
