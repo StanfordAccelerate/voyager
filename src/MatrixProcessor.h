@@ -274,7 +274,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   void push_inputs() {
     params_in.Reset();
     input_channel.Reset();
-    psum_out_skewer_dout.ResetRead();
     push_weights_params.ResetWrite();
     process_accumulation_params_enq.ResetWrite();
     write_back_params_enq.ResetWrite();
