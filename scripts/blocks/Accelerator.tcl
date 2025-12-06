@@ -127,7 +127,7 @@ proc configure_double_buffer {template_name size width tech} {
   directive set ${base_path}:mem1_run/mem1_run/mem1 -WORD_WIDTH $width
 
   # 3. Map to Library (only for specific technologies)
-  if {$tech != "generic" && $tech != "tsmc40"} {
+  if {$tech != "generic" && $tech != "tsmc40" && $size > 32} {
     # 1 = Single Port Memory
     set mem_lib [get_memory_name 1 $size $width]
 
@@ -145,8 +145,6 @@ proc pre_architect {} {
          ACCUM_BUFFER_DATATYPE ACCUM_BUFFER_SIZE ACCUM_DATATYPE_WIDTH \
          ACC_BUF_C_DATA_REP_NAME SUPPORT_MX DOUBLE_BUFFERED_ACCUM_BUFFER \
          SCALE_DATATYPE_WIDTH
-
-  directive set MEM_MAP_THRESHOLD 128
 
   # --- 1. Standard Double Buffers ---
 
