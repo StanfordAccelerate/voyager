@@ -46,6 +46,9 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
 
   int index = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
+    if (index % 1000000 == 0) {
+      spdlog::debug("Writing element {} / {}\n", index, size);
+    }
     memory_interface->write_value(partition, address, index, tensor.dtype(),
                                   *it);
 
@@ -216,6 +219,9 @@ void DataLoader::copy_tile(
   std::vector<int> indices(rank, 0);
 
   for (int i = 0; i < size; ++i) {
+    if (i % 1000000 == 0) {
+      spdlog::debug("Copying element {} / {}\n", i, size);
+    }
     int index = i;
     // In the case of replication, we store 8 x 3 elements in a single word
     if (replication) {
@@ -290,6 +296,8 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
       }
     }
 
+    int stack_offset = std::stoi(getenv("SOC_MEM_OFFSET", "0"));
+
     for (const auto& [key, tensor] : tensor_dict) {
       std::string dtype = tensor.dtype();
       const auto full_shape = get_shape(tensor, false, false);
@@ -307,7 +315,7 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
 
       const auto scratch = tensor.scratchpad();
       const int scratch_par = scratch.partition();
-      const uint64_t scratch_addr = scratch.address() + offset;
+      const uint64_t scratch_addr = scratch.address() + offset + stack_offset;
 
       int curr_tile_index = tile_index;
 
@@ -357,6 +365,7 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
 void DataLoader::store_scratchpad(const codegen::Operation& param,
                                   const int tile_index, const int offset) {
   const auto tensors = get_op_outputs(param);
+  int stack_offset = std::stoi(getenv("SOC_MEM_OFFSET", "0"));
   for (const auto& tensor : tensors) {
     std::string dtype = tensor.dtype();
     const auto full_shape = get_shape(tensor, false, false);
@@ -369,7 +378,7 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
 
     const auto scratch = tensor.scratchpad();
     const int scratch_par = scratch.partition();
-    const uint64_t scratch_addr = scratch.address() + offset;
+    const uint64_t scratch_addr = scratch.address() + offset + stack_offset;
 
     auto tiles = get_tiles(full_shape, tiled_shape);
     auto actual_tiles = get_tile_index(tiles, tile_index);

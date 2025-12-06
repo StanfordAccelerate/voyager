@@ -239,7 +239,7 @@ std::vector<std::any> run_operation(const Operation& operation,
     output_ptr = spmm_csr<Vector, SaWeight, Vector, Scale>(
         input_data_ptr, input_indices_ptr, input_indptr_ptr, weight_ptr,
         weight_scale_ptr, first_op);
-  } else {
+  } else if (first_op.kwargs().contains("input")) {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];
 
@@ -316,7 +316,7 @@ std::vector<std::any> run_operation(const Operation& operation,
 
   if (output_ptr.has_value()) {
     op_list.erase(op_list.begin());
-  } else {
+  } else if (first_op.kwargs().contains("input")) {
     // fetch the input of the first vector instruction
     const auto input = first_op.kwargs().at("input").tensor();
     output_ptr = kwargs[input.node()];

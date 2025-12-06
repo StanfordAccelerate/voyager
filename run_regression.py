@@ -128,10 +128,10 @@ def print_test_results(test_results, layers, output_folder):
         model_df = df[df["Model"] == model].copy()
 
         # sort according to order in layers
-        model_df.loc[:, "Layer"] = pd.Categorical(model_df["Layer"], layers[model])
+        model_df["Layer"]= pd.Categorical(model_df["Layer"], layers[model])
         model_df.sort_values("Layer", inplace=True)
         # turn categorial back to string
-        model_df.loc[:, "Layer"] = model_df["Layer"].astype(str)
+        model_df["Layer"] = model_df["Layer"].astype(str)
         sorted_df.append(model_df)
 
         passed = model_df[model_df["Status"] == True]
