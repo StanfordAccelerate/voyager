@@ -315,9 +315,20 @@ int Simulation::check_outputs() {
       suffix = "_" + std::to_string(i) + ".txt";
     }
 
-    rel_err +=
-        compare_arrays<SUPPORTED_TYPES>(output_tensors[i], outputs1[i], name1,
-                                        outputs2[i], name2, filename + suffix);
+    const auto full_shape = get_shape(output_tensors[i], true, false);
+
+    std::vector<uint8_t> valid;
+    if (is_soc_sim()) {
+      const auto tile_shape = get_shape(output_tensors[i], true, true);
+      const int num_tiles_executed = get_tile_count(param);
+      build_valid_mask(full_shape, tile_shape, num_tiles_executed, valid);
+    } else {
+      valid.resize(get_size(full_shape), 1);
+    }
+
+    rel_err += compare_arrays<SUPPORTED_TYPES>(output_tensors[i], outputs1[i],
+                                               name1, outputs2[i], name2,
+                                               filename + suffix, valid);
   }
 
   int error_count = 0;
