@@ -731,7 +731,7 @@ def add_layers(network, layers, layer_counts, tile_counts, uniquify, skip_layers
             # Filter out layers that should be skipped
             layers[network] = [
                 layer for layer in all_layers
-                if not any(p.match(layer) for p in skip_layers)
+                if not any(p.fullmatch(layer) for p in skip_layers)
             ]
             layer_counts[network] = {layer: 1 for layer in layers[network]}
     else:
