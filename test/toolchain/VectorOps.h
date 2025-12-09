@@ -69,9 +69,10 @@ void set_vector_fetch_1(const codegen::Tensor& tensor,
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
   const int dtype_width =
       get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_1_dtype);
-  int fetch_width = max(OC_DIMENSION * dtype_width, OC_PORT_WIDTH);
+  int fetch_width = OC_DIMENSION * dtype_width;
   vector_params->vector_fetch_1_burst_size = fetch_width / 8;
-  vector_params->vector_fetch_1_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_1_num_beats =
+      (fetch_width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
   vector_params->vector_fetch_1_packing_factor =
       OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
@@ -113,9 +114,10 @@ void set_vector_fetch_2(const codegen::Tensor& tensor,
       get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
   const int dtype_width =
       get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_2_dtype);
-  int fetch_width = max(OC_DIMENSION * dtype_width, OC_PORT_WIDTH);
+  int fetch_width = OC_DIMENSION * dtype_width;
   vector_params->vector_fetch_2_burst_size = fetch_width / 8;
-  vector_params->vector_fetch_2_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_2_num_beats =
+      (fetch_width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
   vector_params->vector_fetch_2_packing_factor =
       OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
@@ -371,9 +373,10 @@ void map_vector_operations(const codegen::Operation& param,
 
   const int dtype_width =
       get_type_width<VU_INPUT_TYPES>(vector_params->vector_fetch_0_dtype);
-  const int fetch_width = max(numel * dtype_width, OC_PORT_WIDTH);
+  const int fetch_width = numel * dtype_width;
   vector_params->vector_fetch_0_burst_size = fetch_width / 8;
-  vector_params->vector_fetch_0_num_beats = fetch_width / OC_PORT_WIDTH;
+  vector_params->vector_fetch_0_num_beats =
+      (fetch_width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
   vector_params->vector_fetch_0_packing_factor = packing_factor;
 
   VECTOR_DATATYPE scale = get_tensor_scalar_scale(input);
