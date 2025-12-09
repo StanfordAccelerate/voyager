@@ -621,8 +621,7 @@ void Harness::param_sender() {
     map_operation(operation, accelerator_params);
 
     if (is_soc_sim()) {
-      const auto l2_tiling = get_l2_tiling(param);
-      const int num_tiles = get_num_tiles(l2_tiling);
+      const int num_tiles = get_tile_count(param);
       const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
 
       auto params_offseted =
@@ -674,9 +673,7 @@ void Harness::start_monitor() {
     map_operation(operation, accelerator_params);
 
     if (is_soc_sim()) {
-      const auto l2_tiling = get_l2_tiling(param);
-      const int num_tiles = get_num_tiles(l2_tiling);
-
+      const int num_tiles = get_tile_count(param);
       for (int j = 0; j < num_tiles; j++) {
         std::cerr << "Waiting for tile " << j << " to start" << std::endl;
         bool is_first = j == 0;
@@ -721,8 +718,7 @@ void Harness::done_monitor() {
     }
 
     if (is_soc_sim()) {
-      const auto l2_tiling = get_l2_tiling(param);
-      const int num_tiles = get_num_tiles(l2_tiling);
+      const int num_tiles = get_tile_count(param);
       const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
 
       dataloader->load_scratchpad(param, 0, 0);

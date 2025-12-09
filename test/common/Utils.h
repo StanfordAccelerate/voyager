@@ -215,7 +215,8 @@ inline std::vector<int> get_l2_tiling(codegen::Operation param) {
   return {rep.begin(), rep.end()};
 }
 
-inline int get_num_tiles(std::vector<int> tiling) {
+inline int get_tile_count(codegen::Operation param) {
+  const auto tiling = get_l2_tiling(param);
   int size = 1;
   for (auto d : tiling) {
     size *= d;
@@ -406,4 +407,34 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
                 (float)rel_diff_buckets[4] / size;
 
   return error * 100.0f;
+}
+
+template <typename T>
+bool compare_arrays_helper(codegen::Tensor tensor, const std::any& output1,
+                           const std::string& name1, const std::any& output2,
+                           const std::string& name2,
+                           const std::string& filename, int& error_count) {
+  if (tensor.dtype() == DataTypes::TypeName<T>::name()) {
+    const auto size = get_size(tensor, true, false);
+    error_count += compare_arrays<T, T>(output1, name1, output2, name2, size,
+                                        filename, false);
+    return true;
+  }
+  return false;
+}
+
+template <typename... Ts>
+int compare_arrays(codegen::Tensor tensor, const std::any& output1,
+                   const std::string& name1, const std::any& output2,
+                   const std::string& name2, const std::string& filename) {
+  int error_count = 0;
+  bool matched = (compare_arrays_helper<Ts>(tensor, output1, name1, output2,
+                                            name2, filename, error_count) ||
+                  ...);
+
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+
+  return error_count;
 }

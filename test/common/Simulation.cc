@@ -142,11 +142,8 @@ void Simulation::print_ideal_runtime(const Operation operation) {
 
   long cycles;
 
-  char* clock_period = std::getenv("CLOCK_PERIOD");
-  long clock_period_ns = clock_period ? std::stoi(clock_period) : 1;
-
-  const auto l2_tiling = get_l2_tiling(param);
-  const int num_tiles = is_soc_sim() ? get_num_tiles(l2_tiling) : 1;
+  const long clock_period_ns = getenv_int("CLOCK_PERIOD", 1);
+  const int num_tiles = is_soc_sim() ? get_tile_count(param) : 1;
 
   if (is_gemm_op(first_op.target())) {
     bool is_matmul = first_op.target().find("matmul") != std::string::npos;
@@ -218,8 +215,7 @@ void Simulation::run() {
       const auto memory = (ArrayMemory*)dataloader->memory;
 
       if (is_soc_sim()) {
-        const auto l2_tiling = get_l2_tiling(param);
-        const int num_tiles = get_num_tiles(l2_tiling);
+        const int num_tiles = get_tile_count(param);
         std::cerr << "Number of tiles to run: " << num_tiles << std::endl;
 
         // for SoC simulation, run operation num_tiles times
@@ -254,37 +250,6 @@ void Simulation::run() {
   if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
     run_accelerator(operations, dataloaders["accelerator"]);
   }
-}
-
-template <typename T>
-bool compare_arrays(codegen::Tensor tensor, const std::any& output1,
-                    const std::string& name1, const std::any& output2,
-                    const std::string& name2, const std::string& filename,
-                    int& error_count) {
-  if (tensor.dtype() == DataTypes::TypeName<T>::name()) {
-    const auto size = get_size(tensor, true, false);
-    error_count += compare_arrays<T, T>(output1, name1, output2, name2, size,
-                                        filename, false);
-    return true;
-  }
-  return false;
-}
-
-template <typename... Ts>
-int compare_arrays_helper(codegen::Tensor tensor, const std::any& output1,
-                          const std::string& name1, const std::any& output2,
-                          const std::string& name2,
-                          const std::string& filename) {
-  int error_count = 0;
-  bool matched = (compare_arrays<Ts>(tensor, output1, name1, output2, name2,
-                                     filename, error_count) ||
-                  ...);
-
-  if (!matched) {
-    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
-  }
-
-  return error_count;
 }
 
 int Simulation::check_outputs() {
@@ -350,9 +315,9 @@ int Simulation::check_outputs() {
       suffix = "_" + std::to_string(i) + ".txt";
     }
 
-    rel_err += compare_arrays_helper<SUPPORTED_TYPES>(
-        output_tensors[i], outputs1[i], name1, outputs2[i], name2,
-        filename + suffix);
+    rel_err +=
+        compare_arrays<SUPPORTED_TYPES>(output_tensors[i], outputs1[i], name1,
+                                        outputs2[i], name2, filename + suffix);
   }
 
   int error_count = 0;
