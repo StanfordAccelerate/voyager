@@ -28,18 +28,6 @@ bool run_sample(std::string model_name, std::string data_dir,
 
   auto data_loader = std::make_unique<DataLoader>(memory.get(), false);
 
-  int num_classes;
-  if (model_name == "mobilebert" || model_name == "bert") {
-    num_classes = 2;
-  } else if (model_name == "resnet18" || model_name == "resnet50" ||
-             model_name == "vit" || model_name == "mobilenet_v2") {
-    num_classes = 1000;
-  } else {
-    throw std::runtime_error("Error: Model not supported.");
-  }
-
-  float logits[num_classes];
-
   // Load inputs and parameters
   std::string inputs_dir = data_dir + "/" + sample;
   for (const auto& tensor : model.inputs()) {
@@ -57,7 +45,7 @@ bool run_sample(std::string model_name, std::string data_dir,
   const auto operations = network.get_operations(true);
   for (const auto& operation : operations) {
     const auto param = operation.param;
-    const auto kwargs = memory->get_args(param);
+    const auto kwargs = data_loader->get_args(param);
     const auto outputs = run_gold_model(operation, kwargs);
     const auto tensors = get_op_outputs(param);
 
@@ -70,24 +58,14 @@ bool run_sample(std::string model_name, std::string data_dir,
 
   // Extract final output
   const auto last_op = model.ops(model.ops_size() - 1);
-  const auto output = memory->get_outputs(last_op).back();
-  if (last_op.output().dtype() == "bfloat16") {
-    auto output_ptr = std::any_cast<DataTypes::bfloat16*>(output);
-    for (int i = 0; i < num_classes; i++) {
-      logits[i] = output_ptr[i];
-    }
-  } else {
-    // if unspecified, we will assume it's INPUT_DATATYPE
-    auto output_ptr = std::any_cast<INPUT_DATATYPE*>(output);
-    for (int i = 0; i < num_classes; i++) {
-      logits[i] = output_ptr[i];
-    }
-  }
+  const auto output = data_loader->get_outputs(last_op).back();
+  auto output_ptr = std::any_cast<VECTOR_DATATYPE*>(output);
 
-  // Find the maximum logit index
+  const int num_classes = get_size(last_op.output());
+
   int max_index = 0;
   for (int i = 1; i < num_classes; i++) {
-    if (logits[i] > logits[max_index]) {
+    if (output_ptr[i] > output_ptr[max_index]) {
       max_index = i;
     }
   }
@@ -95,12 +73,14 @@ bool run_sample(std::string model_name, std::string data_dir,
   // Get ground truth from folder name
   int ground_truth;
   if (model_name == "mobilebert" || model_name == "bert") {
-    // last character of folder name is 0 or 1
+    // SST2: the last character of folder name is 0 or 1
     ground_truth = sample.back() - '0';
   } else if (model_name == "resnet18" || model_name == "resnet50" ||
              model_name == "vit" || model_name == "mobilenet_v2") {
-    // split folder name by underscore, second part is ground truth
+    // ImageNet: split folder name by underscore, second part is ground truth
     ground_truth = std::stoi(sample.substr(sample.find("_") + 1));
+  } else {
+    throw std::runtime_error("Error: Model not supported.");
   }
 
   return max_index == ground_truth;

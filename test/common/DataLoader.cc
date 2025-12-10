@@ -27,8 +27,7 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   for (const auto& dim : shape) {
     spdlog::debug("{} ", dim);
   }
-  spdlog::debug("\n");
-  spdlog::debug("Datatype: {}\n", tensor.dtype());
+  spdlog::debug("\nDatatype: {}\n", tensor.dtype());
   spdlog::debug("Address: {}\n", address);
   spdlog::debug("Replication: {}\n", replication);
 
@@ -46,13 +45,19 @@ void DataLoader::load_tensor(const codegen::Tensor& tensor,
   int index = 0;
   for (auto it = array.begin(); it != array.end(); ++it) {
     if ((index + 1) % 1000000 == 0) {
-      spdlog::debug("Writing element {} / {}\n", index, size);
+      spdlog::debug("Writing element {} / {}\n", index + 1, size);
     }
     memory->write_value(partition, address, index, tensor.dtype(), *it);
+    ++index;
 
-    index++;
     if (replication && index % IC_DIMENSION == packing_factor) {
-      index += IC_DIMENSION - packing_factor;
+      const int pad = IC_DIMENSION - packing_factor;
+      for (int i = 0; i < pad; ++i) {
+        // FIXME: for codebook quantization, we need to pad the index of the 0
+        // value in the codebook
+        memory->write_value(partition, address, index, tensor.dtype(), 0);
+        ++index;
+      }
     }
   }
 
@@ -193,7 +198,7 @@ void DataLoader::copy_tile(
 
   for (int i = 0; i < size; ++i) {
     if ((i + 1) % 1000000 == 0) {
-      spdlog::debug("Copying element {} / {}\n", i, size);
+      spdlog::debug("Copying element {} / {}\n", i + 1, size);
     }
     int index = i;
     // In the case of replication, we store 8 x 3 elements in a single word
@@ -275,18 +280,15 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
     for (const auto& dim : tiled_shape) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\n");
-    spdlog::debug("Tile: ");
+    spdlog::debug("\nTile: ");
     for (const auto& dim : actual_tiles) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\n");
-    spdlog::debug("Tile Strides: ");
+    spdlog::debug("\nTile Strides: ");
     for (const auto& dim : tile_strides) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\n");
-    spdlog::debug("Datatype: {}\n", dtype);
+    spdlog::debug("\nDatatype: {}\n", dtype);
     spdlog::debug("Replication: {}\n", replication);
     spdlog::debug("DRAM Address: {}\n", address);
     spdlog::debug("Scratchpad Address: {}\n", scratchpad_addr);
@@ -323,13 +325,11 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
     for (const auto& dim : tiled_shape) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\n");
-    spdlog::debug("Tile: ");
+    spdlog::debug("\nTile: ");
     for (const auto& dim : actual_tiles) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\n");
-    spdlog::debug("Datatype: {}\n", dtype);
+    spdlog::debug("\nDatatype: {}\n", dtype);
     spdlog::debug("DRAM Address: {}\n", address);
     spdlog::debug("Scratchpad Address: {}\n", scratchpad_addr);
 
