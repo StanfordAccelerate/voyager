@@ -17,7 +17,9 @@ SC_MODULE(VectorUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  VectorParamsDeserializer CCS_INIT_S1(param_deserializer);
+  Connections::In<Pack1D<BufferType, mu_width>> CCS_INIT_S1(matrix_unit_output);
+  Connections::Combinational<Pack1D<BufferType, width>> CCS_INIT_S1(
+      matrix_unit_output_unpacked);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
@@ -29,7 +31,7 @@ SC_MODULE(VectorUnit) {
 #endif
 
 #if SUPPORT_MVM
-  Connections::In<Pack1D<VectorType, width>> CCS_INIT_S1(
+  Connections::In<Pack1D<BufferType, width>> CCS_INIT_S1(
       matrix_vector_unit_output);
 #endif
 
@@ -41,10 +43,6 @@ SC_MODULE(VectorUnit) {
   Connections::In<Pack1D<BufferType, width>> CCS_INIT_S1(dwc_unit_in);
   Connections::In<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(dwc_address_in);
 #endif
-
-  Connections::In<Pack1D<BufferType, mu_width>> CCS_INIT_S1(matrix_unit_output);
-  Connections::Combinational<Pack1D<BufferType, width>> CCS_INIT_S1(
-      matrix_unit_output_unpacked);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<VectorParams> CCS_INIT_S1(vector_params);
@@ -112,6 +110,7 @@ SC_MODULE(VectorUnit) {
   Connections::SyncOut CCS_INIT_S1(done);
 
   // Submodules
+  VectorParamsDeserializer CCS_INIT_S1(param_deserializer);
   VectorFetchUnit<VectorType, BufferType, width, mu_width, VU_INPUT_TYPES>
       CCS_INIT_S1(fetcher);
   VectorPipeline<VectorType, BufferType, ScaleType, width, mu_width>
@@ -288,18 +287,13 @@ SC_MODULE(VectorUnit) {
 #pragma hls_pipeline_stall_mode flush
     while (true) {
       auto full_response = matrix_unit_output.Pop();
-
-      if constexpr (mu_width == width) {
-        matrix_unit_output_unpacked.Push(full_response);
-      } else {
-        for (int i = 0; i < mu_width / width; i++) {
-          Pack1D<BufferType, width> unpacked_data;
+      for (int i = 0; i < mu_width / width; i++) {
+        Pack1D<BufferType, width> unpacked_data;
 #pragma hls_unroll yes
-          for (int j = 0; j < width; j++) {
-            unpacked_data[j] = full_response[i * width + j];
-          }
-          matrix_unit_output_unpacked.Push(unpacked_data);
+        for (int j = 0; j < width; j++) {
+          unpacked_data[j] = full_response[i * width + j];
         }
+        matrix_unit_output_unpacked.Push(unpacked_data);
       }
     }
   }
@@ -333,6 +327,18 @@ SC_MODULE(VectorUnit) {
         }
       }
 
+#if SUPPORT_CODEBOOK_QUANT
+      VectorType midpoints[NUM_CODEBOOK_ENTRIES];
+      if (params.use_output_codebook) {
+#pragma hls_unroll yes
+        for (int i = 1; i < NUM_CODEBOOK_ENTRIES; i++) {
+          midpoints[i] =
+              typename VectorType::ac_float_rep(params.output_code[i - 1]);
+          midpoints[i].adjust_exponent(-1);
+        }
+      }
+#endif
+
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode bubble
       for (ac_int<32, false> count = 0;; count++) {
@@ -353,6 +359,16 @@ SC_MODULE(VectorUnit) {
           } else if (op_type == VectorInstructions::reduction) {
             outputs = reducer_to_memory.Pop();
           }
+
+#if SUPPORT_CODEBOOK_QUANT
+          if (params.use_output_codebook) {
+#pragma hls_unroll yes
+            for (int i = 0; i < width; i++) {
+              auto index = find_codebook_index(outputs[i], midpoints);
+              outputs[i].set_bits(index);
+            }
+          }
+#endif
 
 #pragma hls_unroll yes
           for (int i = 0; i < width; i++) {

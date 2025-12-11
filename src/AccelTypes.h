@@ -124,7 +124,6 @@ class Pack1D {
   static const unsigned int width = T::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
 
   static Pack1D Create(const T (&arr)[pack_width]) {
     Pack1D p;
@@ -134,8 +133,6 @@ class Pack1D {
     }
     return p;
   }
-
-  operator int() const { return Pack1D<T, pack_width>(); }
 
   T& operator[](unsigned int i) { return this->value[i]; }
   const T& operator[](unsigned int i) const { return this->value[i]; }
@@ -170,11 +167,6 @@ class Pack1D<PEInput<ac_int<W, false>>, pack_width> {
       PEInput<ac_int<W, false>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const {
-    return Pack1D<PEInput<ac_int<W, false>>, pack_width>();
-  }
 
   PEInput<ac_int<W, false>>& operator[](unsigned int i) {
     return this->value[i];
@@ -217,11 +209,6 @@ class Pack1D<PEWeight<ac_int<W, false>>, pack_width> {
       PEWeight<ac_int<W, false>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const {
-    return Pack1D<PEWeight<ac_int<W, false>>, pack_width>();
-  }
 
   PEWeight<ac_int<W, false>>& operator[](unsigned int i) {
     return this->value[i];
@@ -263,9 +250,6 @@ class Pack1D<PEInput<Posit<W, es>>, pack_width> {
   static const unsigned int width = PEInput<Posit<W, es>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<PEInput<Posit<W, es>>, pack_width>(); }
 
   PEInput<Posit<W, es>>& operator[](unsigned int i) { return this->value[i]; }
   const PEInput<Posit<W, es>>& operator[](unsigned int i) const {
@@ -302,9 +286,6 @@ class Pack1D<PEWeight<Posit<W, es>>, pack_width> {
   static const unsigned int width = PEWeight<Posit<W, es>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<PEWeight<Posit<W, es>>, pack_width>(); }
 
   PEWeight<Posit<W, es>>& operator[](unsigned int i) { return this->value[i]; }
   const PEWeight<Posit<W, es>>& operator[](unsigned int i) const {
@@ -339,10 +320,12 @@ class Pack1D<StdFloat<mantissa, exp>, pack_width> {
   StdFloat<mantissa, exp> value[pack_width];
   static const unsigned int width = StdFloat<mantissa, exp>::width * pack_width;
 
-  Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<StdFloat<mantissa, exp>, pack_width>(); }
+  Pack1D() {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < pack_width; i++) {
+      value[i] = StdFloat<mantissa, exp>::zero();
+    }
+  }
 
   StdFloat<mantissa, exp>& operator[](size_t i) { return value[i]; }
   const StdFloat<mantissa, exp>& operator[](size_t i) const { return value[i]; }
@@ -375,11 +358,6 @@ class Pack1D<PEInput<StdFloat<mantissa, exp>>, pack_width> {
       PEInput<StdFloat<mantissa, exp>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const {
-    return Pack1D<PEInput<StdFloat<mantissa, exp>>, pack_width>();
-  }
 
   PEInput<StdFloat<mantissa, exp>>& operator[](unsigned int i) {
     return this->value[i];
@@ -419,11 +397,6 @@ class Pack1D<PEWeight<StdFloat<mantissa, exp>>, pack_width> {
       PEWeight<StdFloat<mantissa, exp>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const {
-    return Pack1D<PEWeight<StdFloat<mantissa, exp>>, pack_width>();
-  }
 
   PEWeight<StdFloat<mantissa, exp>>& operator[](unsigned int i) {
     return this->value[i];
@@ -460,10 +433,12 @@ class Pack1D<Int<W, S>, pack_width> {
   Int<W, S> value[pack_width];
   static const unsigned int width = Int<W, S>::width * pack_width;
 
-  Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<Int<W, S>, pack_width>(); }
+  Pack1D() {
+#pragma hls_unroll yes
+    for (unsigned int i = 0; i < pack_width; i++) {
+      value[i] = Int<W, S>::zero();
+    }
+  }
 
   Int<W, S>& operator[](size_t i) { return value[i]; }
   const Int<W, S>& operator[](size_t i) const { return value[i]; }
@@ -495,9 +470,6 @@ class Pack1D<PEInput<Int<W, S>>, pack_width> {
   static const unsigned int width = PEInput<Int<W, S>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<PEInput<Int<W, S>>, pack_width>(); }
 
   PEInput<Int<W, S>>& operator[](unsigned int i) { return this->value[i]; }
   const PEInput<Int<W, S>>& operator[](unsigned int i) const {
@@ -534,9 +506,6 @@ class Pack1D<PEWeight<Int<W, S>>, pack_width> {
   static const unsigned int width = PEWeight<Int<W, S>>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<PEWeight<Int<W, S>>, pack_width>(); }
 
   PEWeight<Int<W, S>>& operator[](unsigned int i) { return this->value[i]; }
   const PEWeight<Int<W, S>>& operator[](unsigned int i) const {
@@ -572,9 +541,6 @@ class Pack1D<NormalFloat4, pack_width> {
   static const unsigned int width = NormalFloat4::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<NormalFloat4, pack_width>(); }
 
   NormalFloat4& operator[](size_t i) { return value[i]; }
   const NormalFloat4& operator[](size_t i) const { return value[i]; }
@@ -606,9 +572,6 @@ class Pack1D<PEInput<NormalFloat4>, pack_width> {
   static const unsigned int width = PEInput<NormalFloat4>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<PEInput<NormalFloat4>, pack_width>(); }
 
   PEInput<NormalFloat4>& operator[](unsigned int i) { return this->value[i]; }
   const PEInput<NormalFloat4>& operator[](unsigned int i) const {
@@ -646,9 +609,6 @@ class Pack1D<PEWeight<NormalFloat4>, pack_width> {
   static const unsigned int width = PEWeight<NormalFloat4>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<PEWeight<NormalFloat4>, pack_width>(); }
 
   PEWeight<NormalFloat4>& operator[](unsigned int i) { return this->value[i]; }
   const PEWeight<NormalFloat4>& operator[](unsigned int i) const {
@@ -685,9 +645,6 @@ class Pack1D<UFloat<W, E>, pack_width> {
   static const unsigned int width = UFloat<W, E>::width * pack_width;
 
   Pack1D() {}
-  Pack1D(const int a) {}
-
-  operator int() const { return Pack1D<UFloat<W, E>, pack_width>(); }
 
   UFloat<W, E>& operator[](size_t i) { return value[i]; }
   const UFloat<W, E>& operator[](size_t i) const { return value[i]; }

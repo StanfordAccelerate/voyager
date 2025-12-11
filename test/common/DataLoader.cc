@@ -99,7 +99,7 @@ void DataLoader::load_outputs(const codegen::Operation param,
     tensor.mutable_memory()->set_partition(-1);
     tensor.mutable_memory()->set_address(address);
     load_tensor(tensor, data_dir);
-    address += get_size(tensor);
+    address += get_size(tensor, false, false);
   }
 }
 

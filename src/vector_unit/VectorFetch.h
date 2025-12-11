@@ -428,10 +428,10 @@ SC_MODULE(VectorFetchUnit) {
                                          params.vector_fetch_0_loops[1][1];
         ac_int<32, false> counter = 0;
 
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
       TRANSPOSE_OUTER:
         while (counter++ < total_values) {
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
         TRANSPOSE_READ:
           for (int col = 0; col < mu_width; col++) {
             auto bits = vector_fetch_0_packed_bits.Pop();
@@ -459,6 +459,8 @@ SC_MODULE(VectorFetchUnit) {
             }
           }
 
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
         TRANSPOSE_WRITE:
           for (int row = 0; row < BUFSIZE; row++) {
             Pack1D<VectorType, mu_width> transposed;
@@ -467,17 +469,13 @@ SC_MODULE(VectorFetchUnit) {
               transposed[col] = buffer[row][col];
             }
 
-            if constexpr (mu_width == width) {
-              vector_fetch_0_data.Push(transposed);
-            } else {
-              for (int pack = 0; pack < mu_width / width; pack++) {
-                Pack1D<VectorType, width> unpacked;
+            for (int pack = 0; pack < mu_width / width; pack++) {
+              Pack1D<VectorType, width> unpacked;
 #pragma hls_unroll yes
-                for (int i = 0; i < width; i++) {
-                  unpacked[i] = transposed[pack * width + i];
-                }
-                vector_fetch_0_data.Push(unpacked);
+              for (int i = 0; i < width; i++) {
+                unpacked[i] = transposed[pack * width + i];
               }
+              vector_fetch_0_data.Push(unpacked);
             }
           }
         }

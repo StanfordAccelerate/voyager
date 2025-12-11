@@ -391,7 +391,7 @@ bool send_output_address(
 
 #pragma hls_design ccore
 template <typename T>
-ac_int<4, false> quantize16_iter(T x, const T B[16]) {
+ac_int<4, false> find_codebook_index(T x, const T B[16]) {
   ac_int<4, false> low = 0;
   ac_int<5, false> high = 16;
 

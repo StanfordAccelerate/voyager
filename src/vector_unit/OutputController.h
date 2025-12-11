@@ -13,8 +13,6 @@ SC_MODULE(OutputController) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<VectorParams> CCS_INIT_S1(params_in);
-  Connections::Combinational<VectorParams> CCS_INIT_S1(
-      quantize_codebook_params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(write_address_params);
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       write_scale_address_params);
@@ -22,9 +20,6 @@ SC_MODULE(OutputController) {
 
   Connections::In<Pack1D<VectorType, width>> CCS_INIT_S1(vector_in);
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
-
-  Connections::Combinational<Pack1D<VectorType, width>> CCS_INIT_S1(
-      quantize_output);
 
 #if SUPPORT_DWC
   Connections::In<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(dwc_address_in);
@@ -43,10 +38,6 @@ SC_MODULE(OutputController) {
   static constexpr int LOOP_WIDTH = 16;
 
   SC_CTOR(OutputController) {
-    SC_THREAD(quantize_codebook);
-    sensitive << clk.pos();
-    async_reset_signal_is(rstn, false);
-
     SC_THREAD(write_data);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -66,66 +57,12 @@ SC_MODULE(OutputController) {
 #endif
   }
 
-  void quantize_codebook() {
-    vector_in.Reset();
-    quantize_codebook_params.ResetRead();
-    quantize_output.ResetWrite();
-
-    wait();
-
-    while (true) {
-      VectorParams params = quantize_codebook_params.Pop();
-
-      ac_int<32, false> loop_bound =
-          params.output_loops[0][0] * params.output_loops[0][1] *
-              params.output_loops[0][2] * params.output_loops[1][0] *
-              params.output_loops[1][1] * params.output_loops[1][2] -
-          1;
-
-#if SUPPORT_CODEBOOK_QUANT
-      if (params.use_output_codebook) {
-        VectorType midpoints[NUM_CODEBOOK_ENTRIES];
-#pragma hls_unroll yes
-        for (int i = 1; i < NUM_CODEBOOK_ENTRIES; i++) {
-          midpoints[i] =
-              typename VectorType::ac_float_rep(params.output_code[i - 1]);
-          midpoints[i].adjust_exponent(-1);
-        }
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (ac_int<32, false> i = 0;; i++) {
-          auto outputs = vector_in.Pop();
-          Pack1D<VectorType, width> indices;
-#pragma hls_unroll yes
-          for (int j = 0; j < width; j++) {
-            auto index = quantize16_iter(outputs[j], midpoints);
-            indices[j].set_bits(index);
-          }
-          quantize_output.Push(indices);
-          if (i == loop_bound) break;
-        }
-      } else
-#endif
-      {
-        // Pass through
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (ac_int<32, false> i = 0;; i++) {
-          quantize_output.Push(vector_in.Pop());
-          if (i == loop_bound) break;
-        }
-      }
-    }
-  }
-
   void write_data() {
     params_in.Reset();
-    quantize_codebook_params.ResetWrite();
     write_address_params.ResetWrite();
     write_scale_params.ResetWrite();
     write_scale_address_params.ResetWrite();
-    quantize_output.ResetRead();
+    vector_in.Reset();
     vector_out.Reset();
     done.Reset();
 
@@ -133,7 +70,6 @@ SC_MODULE(OutputController) {
 
     while (true) {
       VectorParams params = params_in.Pop();
-      quantize_codebook_params.Push(params);
       write_address_params.Push(params);
 
       ac_int<32, false> loop_bound =
@@ -150,7 +86,7 @@ SC_MODULE(OutputController) {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (ac_int<32, false> i = 0;; i++) {
-        Pack1D<VectorType, width> outputs = quantize_output.Pop();
+        Pack1D<VectorType, width> outputs = vector_in.Pop();
 
         bool found = (send_output_data<OutputTypes, width, VectorType,
                                        OC_PORT_WIDTH, OutputTypes...>(
