@@ -91,7 +91,10 @@ struct MatrixParams : BaseParams {
     input_transpose = false;
     weight_transpose = false;
     write_output_to_accum_buffer = false;
+
     weight_dequant = false;
+    dq_scale_offset = 0;
+    dq_zero_point_offset = 0;
 
 #if SUPPORT_SPMM
     is_spmm = false;

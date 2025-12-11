@@ -3,9 +3,11 @@
 #define NO_SYSC
 
 // IWYU pragma: begin_exports
+#include <algorithm>
 #include <any>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <unordered_set>
@@ -13,9 +15,14 @@
 
 #include "spdlog/spdlog.h"
 #include "src/ArchitectureParams.h"
-#include "src/datatypes/DataTypes.h"
 #include "test/compiler/proto/param.pb.h"
 // IWYU pragma: end_exports
+
+template <typename Container, typename T>
+inline bool contains(const Container& container, const T& value) {
+  return std::find(std::begin(container), std::end(container), value) !=
+         std::end(container);
+}
 
 inline bool is_gemm_op(const std::string& op_target) {
   static const std::unordered_set<std::string> GEMM_OPS = {
@@ -211,7 +218,8 @@ inline std::vector<int> get_l2_tiling(codegen::Operation param) {
   return {rep.begin(), rep.end()};
 }
 
-inline int get_num_tiles(std::vector<int> tiling) {
+inline int get_tile_count(codegen::Operation param) {
+  const auto tiling = get_l2_tiling(param);
   int size = 1;
   for (auto d : tiling) {
     size *= d;
@@ -262,6 +270,68 @@ inline float get_tensor_scalar_scale(const codegen::Tensor& tensor) {
   return scale_val[0];
 }
 
+inline void build_valid_mask(const std::vector<int>& full_shape,
+                             const std::vector<int>& tile_shape,
+                             int num_tiles_executed,
+                             std::vector<uint8_t>& valid) {
+  const int rank = full_shape.size();
+  const int total_elems = get_size(full_shape);
+
+  valid.assign(total_elems, 0);
+
+  // Compute number of tiles along each dimension
+  std::vector<int> tiles_per_dim(rank);
+  for (int d = 0; d < rank; ++d) {
+    tiles_per_dim[d] = (full_shape[d] + tile_shape[d] - 1) / tile_shape[d];
+  }
+
+  // Precompute strides for flattening indices
+  std::vector<int> strides(rank);
+  strides[rank - 1] = 1;
+  for (int d = rank - 2; d >= 0; --d) {
+    strides[d] = strides[d + 1] * full_shape[d + 1];
+  }
+
+  // Walk each executed tile
+  for (int tile_id = 0; tile_id < num_tiles_executed; ++tile_id) {
+    // Convert linear tile index -> multi-dimensional tile coords
+    int tmp = tile_id;
+    std::vector<int> tile_idx(rank);
+    for (int d = rank - 1; d >= 0; --d) {
+      tile_idx[d] = tmp % tiles_per_dim[d];
+      tmp /= tiles_per_dim[d];
+    }
+
+    // Compute start/end for each dimension
+    std::vector<int> start(rank), end(rank);
+    for (int d = 0; d < rank; ++d) {
+      start[d] = tile_idx[d] * tile_shape[d];
+      end[d] = std::min(start[d] + tile_shape[d], full_shape[d]);
+    }
+
+    // Recursive n-dimensional region iterator (implemented iteratively)
+    std::vector<int> idx = start;
+    while (true) {
+      // Compute flat index
+      int flat = 0;
+      for (int d = 0; d < rank; ++d) {
+        flat += idx[d] * strides[d];
+      }
+      valid[flat] = 1;
+
+      // Increment multidimensional index (last dim fastest)
+      int d = rank - 1;
+      while (d >= 0) {
+        idx[d]++;
+        if (idx[d] < end[d]) break;
+        idx[d] = start[d];
+        d--;
+      }
+      if (d < 0) break;  // done
+    }
+  }
+}
+
 static void log_diff_buckets(const std::string& label, const int buckets[5],
                              size_t size) {
   spdlog::info("{}:\n", label);
@@ -280,14 +350,14 @@ static void log_diff_buckets(const std::string& label, const int buckets[5],
 template <typename T1, typename T2>
 float compare_arrays(std::any matrix_a, const std::string& name_a,
                      std::any matrix_b, const std::string& name_b, size_t size,
-                     const std::string& filename, bool double_precision) {
+                     const std::string& filename,
+                     const std::vector<uint8_t>& valid) {
   spdlog::info("Comparing {} and {} (size: {}) -> output: {}\n", name_a, name_b,
                size, filename);
 
-  std::ofstream diff_file;
-  diff_file.open(filename);
-
+  std::ofstream diff_file(filename);
   std::ostringstream buffer;
+
   buffer << name_a << " vs. " << name_b << '\n';
   constexpr size_t flush_interval = 10000;  // Flush every 10k lines
 
@@ -298,51 +368,30 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
   T1* matrix_a_ptr = std::any_cast<T1*>(matrix_a);
   T2* matrix_b_ptr = std::any_cast<T2*>(matrix_b);
 
-  // For compressing repeated identical lines in output file
-  std::string prev_line = "";
-  size_t repeat_start_index = 0;
-  size_t repeat_count = 0;
   size_t lines_written = 0;
 
   for (size_t i = 0; i < size; ++i) {
+    // skip uncomputed tile region
+    if (!valid[i]) {
+      continue;
+    }
+
     float a = static_cast<float>(matrix_a_ptr[i]);
     float b = static_cast<float>(matrix_b_ptr[i]);
     sum_abs += std::abs(a) + std::abs(b);
     float abs_diff = std::abs(a - b);
 
     // Build the current line content
-    std::ostringstream line_stream;
-    line_stream << a << " vs. " << b << " ";
+    buffer << "[" << i << "] " << a << " vs. " << b << " ";
     for (float j = 0.001f; j < abs_diff; j *= 10.0f) {
-      line_stream << '*';
+      buffer << '*';
     }
-    std::string current_line = line_stream.str();
+    buffer << '\n';
 
-    if (current_line == prev_line && a == 0 && b == 0) {
-      repeat_count++;
-    } else {
-      if (repeat_count > 0) {
-        if (repeat_count == 1) {
-          buffer << "[" << repeat_start_index << "] " << prev_line << '\n';
-        } else {
-          buffer << "[" << repeat_start_index << "-"
-                 << (repeat_start_index + repeat_count - 1) << "] ("
-                 << repeat_count << "x) " << prev_line << '\n';
-        }
-        lines_written++;
-
-        // Periodically flush buffer to disk to avoid memory issues
-        if (lines_written % flush_interval == 0) {
-          diff_file << buffer.str();
-          buffer.str("");
-          buffer.clear();
-        }
-      }
-
-      // Start tracking the new line
-      prev_line = current_line;
-      repeat_start_index = i;
-      repeat_count = 1;
+    if (++lines_written % flush_interval == 0) {
+      diff_file << buffer.str();
+      buffer.str("");
+      buffer.clear();
     }
 
     bool is_nan = std::isinf(abs_diff) || std::isnan(abs_diff);
@@ -371,35 +420,63 @@ float compare_arrays(std::any matrix_a, const std::string& name_a,
     }
   }
 
-  // Write out the final line(s) after the loop
-  if (repeat_count > 0) {
-    if (repeat_count == 1) {
-      buffer << "[" << repeat_start_index << "] " << prev_line << '\n';
-    } else {
-      buffer << "[" << repeat_start_index << "-"
-             << (repeat_start_index + repeat_count - 1) << "] (" << repeat_count
-             << "x) " << prev_line << '\n';
-    }
-  }
-
   // Final flush of remaining buffered content
   diff_file << buffer.str();
   diff_file.close();
 
+  size_t num_valid = std::accumulate(valid.begin(), valid.end(), 0ull);
+
+  spdlog::info("Outputs compared: {} / {} ({}%)\n", num_valid, size,
+               (100.0 * num_valid / size));
+
   spdlog::info("-------------------------------\n");
-  log_diff_buckets("Absolute Difference Count", abs_diff_buckets, size);
+  log_diff_buckets("Absolute Difference Count", abs_diff_buckets, num_valid);
   spdlog::info("-------------------------------\n");
-  log_diff_buckets("Relative Difference Count", rel_diff_buckets, size);
+  log_diff_buckets("Relative Difference Count", rel_diff_buckets, num_valid);
   spdlog::info("-------------------------------\n");
 
   if (sum_abs == 0.0) {
     spdlog::warn("WARNING: All compared values are zero!\n");
   }
 
-  float error = (1 - (float)rel_diff_buckets[1] / size) * 0.001f +
-                (1 - (float)rel_diff_buckets[2] / size) * 0.01f +
-                (1 - (float)rel_diff_buckets[3] / size) * 0.1f +
-                (float)rel_diff_buckets[4] / size;
+  float error = (1 - (float)rel_diff_buckets[1] / num_valid) * 0.001f +
+                (1 - (float)rel_diff_buckets[2] / num_valid) * 0.01f +
+                (1 - (float)rel_diff_buckets[3] / num_valid) * 0.1f +
+                (float)rel_diff_buckets[4] / num_valid;
 
   return error * 100.0f;
+}
+
+template <typename T>
+bool compare_arrays_helper(codegen::Tensor tensor, const std::any& output1,
+                           const std::string& name1, const std::any& output2,
+                           const std::string& name2,
+                           const std::string& filename,
+                           const std::vector<uint8_t>& valid,
+                           int& error_count) {
+  if (tensor.dtype() == DataTypes::TypeName<T>::name()) {
+    const auto size = get_size(tensor, true, false);
+    error_count += compare_arrays<T, T>(output1, name1, output2, name2, size,
+                                        filename, valid);
+    return true;
+  }
+  return false;
+}
+
+template <typename... Ts>
+int compare_arrays(codegen::Tensor tensor, const std::any& output1,
+                   const std::string& name1, const std::any& output2,
+                   const std::string& name2, const std::string& filename,
+                   const std::vector<uint8_t>& valid) {
+  int error_count = 0;
+  bool matched =
+      (compare_arrays_helper<Ts>(tensor, output1, name1, output2, name2,
+                                 filename, valid, error_count) ||
+       ...);
+
+  if (!matched) {
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+  }
+
+  return error_count;
 }

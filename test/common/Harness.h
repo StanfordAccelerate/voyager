@@ -349,6 +349,6 @@ SC_MODULE(Harness) {
   void record_start(const std::deque<BaseParams*>& params,
                     const Operation& operation, bool is_first);
   void record_done(const std::deque<BaseParams*>& params,
-                   const Operation& operation, int runtime_scale, bool is_last);
+                   const Operation& operation, bool is_last);
 };
 #endif

@@ -100,6 +100,10 @@ else
 	override BASE_FLAGS += -O3
 endif
 
+ifdef ZERO_INIT
+	override BASE_FLAGS += -DZERO_INIT
+endif
+
 # We need to work with multiple C++ standards, as the SystemC lib is only
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations

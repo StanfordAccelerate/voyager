@@ -142,11 +142,8 @@ void Simulation::print_ideal_runtime(const Operation operation) {
 
   long cycles;
 
-  char* clock_period = std::getenv("CLOCK_PERIOD");
-  long clock_period_ns = clock_period ? std::stoi(clock_period) : 1;
-
-  const auto l2_tiling = get_l2_tiling(param);
-  const int num_tiles = is_soc_sim() ? get_num_tiles(l2_tiling) : 1;
+  const long clock_period_ns = getenv_int("CLOCK_PERIOD", 1);
+  const int num_tiles = is_soc_sim() ? get_tile_count(param) : 1;
 
   if (is_gemm_op(first_op.target())) {
     bool is_matmul = first_op.target().find("matmul") != std::string::npos;
@@ -169,10 +166,6 @@ void Simulation::print_ideal_runtime(const Operation operation) {
     } else {
       int K = weight_shape[weight_shape.size() - 1];
       cycles = num_macs / K / (IC_DIMENSION * OC_DIMENSION);
-
-      if (operation.has_shrunk_tiling) {
-        cycles *= operation.shrink_factor;
-      }
     }
 
     spdlog::info("{}, matrix unit ideal runtime: {} ns\n", get_op_name(param),
@@ -214,18 +207,18 @@ void Simulation::run() {
       print_ideal_runtime(operation);
 
       const auto tensors = get_op_outputs(param);
-      const auto memory = (ArrayMemory*)(memories["gold"]);
+      const auto dataloader = dataloaders["gold"];
+      const auto memory = (ArrayMemory*)dataloader->memory;
 
       if (is_soc_sim()) {
-        const auto l2_tiling = get_l2_tiling(param);
-        const int num_tiles = get_num_tiles(l2_tiling);
+        const int num_tiles = get_tile_count(param);
         std::cerr << "Number of tiles to run: " << num_tiles << std::endl;
 
         // for SoC simulation, run operation num_tiles times
         for (int i = 0; i < num_tiles; i++) {
-          dataloaders["gold"]->load_scratchpad(param, i);
+          dataloader->load_scratchpad(param, i);
 
-          const auto kwargs = memory->get_args(param);
+          const auto kwargs = dataloader->get_args(param);
           const auto outputs = run_gold_model(operation, kwargs);
 
           assert(outputs.size() == tensors.size());
@@ -234,10 +227,10 @@ void Simulation::run() {
             memory->write_tensor(tensors[i], outputs[i]);
           }
 
-          dataloaders["gold"]->store_scratchpad(param, i);
+          dataloader->store_scratchpad(param, i);
         }
       } else {
-        const auto kwargs = memory->get_args(param);
+        const auto kwargs = dataloader->get_args(param);
         const auto outputs = run_gold_model(operation, kwargs);
 
         assert(outputs.size() == tensors.size());
@@ -255,37 +248,6 @@ void Simulation::run() {
   }
 }
 
-template <typename T>
-bool compare_arrays(codegen::Tensor tensor, const std::any& output1,
-                    const std::string& name1, const std::any& output2,
-                    const std::string& name2, const std::string& filename,
-                    int& error_count) {
-  if (tensor.dtype() == DataTypes::TypeName<T>::name()) {
-    const auto size = get_size(tensor, true, false);
-    error_count += compare_arrays<T, T>(output1, name1, output2, name2, size,
-                                        filename, false);
-    return true;
-  }
-  return false;
-}
-
-template <typename... Ts>
-int compare_arrays_helper(codegen::Tensor tensor, const std::any& output1,
-                          const std::string& name1, const std::any& output2,
-                          const std::string& name2,
-                          const std::string& filename) {
-  int error_count = 0;
-  bool matched = (compare_arrays<Ts>(tensor, output1, name1, output2, name2,
-                                     filename, error_count) ||
-                  ...);
-
-  if (!matched) {
-    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
-  }
-
-  return error_count;
-}
-
 int Simulation::check_outputs() {
   std::string prefix;
   if (operations.size() == 1) {
@@ -297,59 +259,45 @@ int Simulation::check_outputs() {
 
   const auto param = operations.back().param;
 
-  bool pytorch = std::find(sims.begin(), sims.end(), "pytorch") != sims.end();
-  auto gold_memory = memories["gold"];
-  auto accel_memory = memories["accelerator"];
+  bool has_pytorch = contains(sims, "pytorch");
+  bool has_gold = contains(sims, "gold");
+  bool has_accelerator = contains(sims, "accelerator");
 
   std::string filename;
   std::vector<std::any> outputs1, outputs2;
   std::string name1, name2;
 
-  bool has_valid_comp = false;
-
-  if (gold_memory && pytorch) {
+  if (has_gold && has_pytorch) {
     spdlog::info("Gold Model vs. PyTorch\n");
     spdlog::info("(reveals issues in data loading or mapping)\n");
     filename = prefix + "gold_vs_pytorch";
 
     name1 = "gold_model";
-    outputs1 = gold_memory->get_outputs(param);
+    outputs1 = dataloaders["gold"]->get_outputs(param);
 
     name2 = "pytorch";
-    outputs2 = gold_memory->get_reference_outputs(param);
-
-    has_valid_comp = true;
-  }
-
-  if (accel_memory && pytorch) {
+    outputs2 = dataloaders["gold"]->get_reference_outputs(param);
+  } else if (has_accelerator && has_pytorch) {
     spdlog::info("Accelerator vs. PyTorch\n");
     spdlog::info("(reveals bugs in accelerator or memory placement)\n");
     filename = prefix + "accelerator_vs_pytorch";
 
     name1 = "accelerator";
-    outputs1 = accel_memory->get_outputs(param);
+    outputs1 = dataloaders["accelerator"]->get_outputs(param);
 
     name2 = "pytorch";
-    outputs2 = accel_memory->get_reference_outputs(param);
-
-    has_valid_comp = true;
-  }
-
-  if (accel_memory && gold_memory) {
+    outputs2 = dataloaders["accelerator"]->get_reference_outputs(param);
+  } else if (has_accelerator && has_gold) {
     spdlog::info("Accelerator vs. Gold Model\n");
     spdlog::info("(reveals bugs in accelerator or memory placement)\n");
     filename = prefix + "accelerator_vs_gold";
 
     name1 = "accelerator";
-    outputs1 = accel_memory->get_outputs(param);
+    outputs1 = dataloaders["accelerator"]->get_outputs(param);
 
     name2 = "gold_model";
-    outputs2 = gold_memory->get_outputs(param);
-
-    has_valid_comp = true;
-  }
-
-  if (!has_valid_comp) {
+    outputs2 = dataloaders["gold"]->get_outputs(param);
+  } else {
     spdlog::info("No valid comparisons specified\n");
     std::abort();
   }
@@ -363,9 +311,20 @@ int Simulation::check_outputs() {
       suffix = "_" + std::to_string(i) + ".txt";
     }
 
-    rel_err += compare_arrays_helper<SUPPORTED_TYPES>(
-        output_tensors[i], outputs1[i], name1, outputs2[i], name2,
-        filename + suffix);
+    const auto full_shape = get_shape(output_tensors[i], true, false);
+
+    std::vector<uint8_t> valid;
+    if (is_soc_sim()) {
+      const auto tile_shape = get_shape(output_tensors[i], true, true);
+      const int num_tiles_executed = get_tile_count(param);
+      build_valid_mask(full_shape, tile_shape, num_tiles_executed, valid);
+    } else {
+      valid.resize(get_size(full_shape), 1);
+    }
+
+    rel_err += compare_arrays<SUPPORTED_TYPES>(output_tensors[i], outputs1[i],
+                                               name1, outputs2[i], name2,
+                                               filename + suffix, valid);
   }
 
   int error_count = 0;
