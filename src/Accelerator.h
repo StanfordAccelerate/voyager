@@ -105,7 +105,7 @@ SC_MODULE(Accelerator) {
 #if SUPPORT_SPMM
   SpMMUnit<WeightTypeList, VECTOR_DATATYPE, SA_WEIGHT_TYPE, SPMM_META_DATATYPE,
            VECTOR_DATATYPE, SCALE_DATATYPE, OC_PORT_WIDTH, SPMM_UNIT_WIDTH,
-           OC_DIMENSION, VECTOR_UNIT_WIDTH>
+           IC_DIMENSION, VECTOR_UNIT_WIDTH>
       CCS_INIT_S1(spmm_unit);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_spmm_unit_params_in);

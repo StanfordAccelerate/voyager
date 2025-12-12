@@ -10,15 +10,15 @@
 #include "Utils.h"
 #include "connections/connections.h"
 
-template <typename WeightTypeTuple, typename Vector, typename Weight,
+template <typename WeightTypeTuple, typename Input, typename Weight,
           typename Meta, typename Output, typename Scale, int port_width,
           int width, int bs, int vu_width>
 struct SpMMUnit;
 
-template <typename... WeightTypes, typename Vector, typename Weight,
+template <typename... WeightTypes, typename Input, typename Weight,
           typename Meta, typename Output, typename Scale, int port_width,
           int width, int bs, int vu_width>
-struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
+struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
                 port_width, width, bs, vu_width> : public sc_module {
   static constexpr int LOOP_WIDTH = 16;
   using loop_t = ac_int<LOOP_WIDTH, false>;
@@ -27,7 +27,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
   static constexpr int FEEDBACK_LAST = FEEDBACK_DEPTH - 1;
 
   static constexpr int NUM_META = port_width / Meta::width;
-  static constexpr int NUM_DATA = port_width / Vector::width;
+  static constexpr int NUM_DATA = port_width / Input::width;
 
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -65,9 +65,9 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(input_data_req);
   Connections::In<ac_int<port_width, false>> CCS_INIT_S1(input_data_resp);
-  Connections::Combinational<Pack1D<Vector, NUM_DATA>> CCS_INIT_S1(
+  Connections::Combinational<Pack1D<Input, NUM_DATA>> CCS_INIT_S1(
       input_data_packed);
-  Connections::Combinational<Vector> CCS_INIT_S1(input_data);
+  Connections::Combinational<Input> CCS_INIT_S1(input_data);
 
   Connections::Out<MemoryRequest> CCS_INIT_S1(weight_req);
   Connections::In<ac_int<Weight::width * width, false>> CCS_INIT_S1(
@@ -84,7 +84,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 
   Connections::Combinational<Pack1D<Output, width>> CCS_INIT_S1(
       accumulation_out);
-  Connections::Out<Pack1D<Output, bs>> CCS_INIT_S1(spmm_unit_output);
+  Connections::Out<Pack1D<Output, vu_width>> CCS_INIT_S1(spmm_unit_output);
 
   Connections::SyncOut CCS_INIT_S1(start_signal);
   Connections::SyncOut CCS_INIT_S1(done_signal);
@@ -162,9 +162,9 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           send_input_request<Meta, NUM_META>(params.spmm_indptr_offset,
-                                             i * NUM_META, input_indptr_req);
+                                             x * NUM_META, input_indptr_req);
           ac_int<Meta::width * NUM_META, false> bits = 0;
           process_matrix_input<Meta, NUM_META, port_width,
                                Meta::width * NUM_META>(input_indptr_resp, bits);
@@ -175,7 +175,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
                 bits.template slc<Meta::width>(j * Meta::width));
           }
           input_indptr_pack.Push(indptrs);
-          if (i == indptr_bound) break;
+          if (x == indptr_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -199,13 +199,13 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           auto indptrs = input_indptr_pack.Pop();
-          for (int j = 0; j < NUM_META; j++) {
-            input_indptr.Push(indptrs[j]);
-            if (i * NUM_META + j == indptr_len - 1) break;
+          for (int i = 0; i < NUM_META; i++) {
+            input_indptr.Push(indptrs[i]);
+            if (x * NUM_META + i == indptr_len - 1) break;
           }
-          if (i == indptr_bound) break;
+          if (x == indptr_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -228,10 +228,10 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           send_input_request<Meta, NUM_META>(params.spmm_indices_offset,
-                                             i * NUM_META, input_indices_req);
-          if (i == indices_bound) break;
+                                             x * NUM_META, input_indices_req);
+          if (x == indices_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -255,7 +255,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           ac_int<Meta::width * NUM_META, false> bits = 0;
           process_matrix_input<Meta, NUM_META, port_width,
                                Meta::width * NUM_META>(input_indices_resp,
@@ -267,7 +267,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
                 bits.template slc<Meta::width>(j * Meta::width));
           }
           input_indices.Push(indices);
-          if (i == indices_bound) break;
+          if (x == indices_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -293,20 +293,19 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
-          send_input_request<Vector, NUM_DATA>(params.spmm_data_offset,
-                                               i * NUM_DATA, input_data_req);
-          ac_int<Vector::width * NUM_DATA, false> bits = 0;
-          process_matrix_input<Vector, NUM_DATA, port_width,
-                               Vector::width * NUM_DATA>(input_data_resp, bits);
-          Pack1D<Vector, NUM_DATA> data;
+        for (loop_t x = 0;; x++) {
+          send_input_request<Input, NUM_DATA>(params.spmm_data_offset,
+                                              x * NUM_DATA, input_data_req);
+          ac_int<Input::width * NUM_DATA, false> bits = 0;
+          process_matrix_input<Input, NUM_DATA, port_width,
+                               Input::width * NUM_DATA>(input_data_resp, bits);
+          Pack1D<Input, NUM_DATA> data;
 #pragma hls_unroll yes
           for (int j = 0; j < NUM_DATA; j++) {
-            data[j].set_bits(
-                bits.template slc<Vector::width>(j * Vector::width));
+            data[j].set_bits(bits.template slc<Input::width>(j * Input::width));
           }
           input_data_packed.Push(data);
-          if (i == input_bound) break;
+          if (x == input_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -330,13 +329,13 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           auto input_pack = input_data_packed.Pop();
           for (int j = 0; j < NUM_DATA; j++) {
             input_data.Push(input_pack[j]);
-            if (i * NUM_DATA + j == input_len - 1) break;
+            if (x * NUM_DATA + j == input_len - 1) break;
           }
-          if (i == input_bound) break;
+          if (x == input_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -365,7 +364,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           // index here is row index (y dimension)
           Pack1D<Meta, NUM_META> indices = input_indices.Pop();
           for (int j = 0; j < NUM_META; j++) {
@@ -385,9 +384,9 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
             }
 #endif
 
-            if (i * NUM_META + j == indices_len - 1) break;
+            if (x * NUM_META + j == indices_len - 1) break;
           }
-          if (i == indices_bound) break;
+          if (x == indices_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -416,7 +415,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           ac_int<buffer_width, false> bits = 0;
           bool success =
               (process_matrix_input<WeightTypes, width, Weight::width * width,
@@ -436,7 +435,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 
           weight_data.Push(weights);
 
-          if (i == indices_bound) break;
+          if (x == indices_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -463,7 +462,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           ac_int<Scale::width * width, false> data;
           process_matrix_input<Scale, width, Scale::width * width,
                                Scale::width * width>(weight_scale_resp, data);
@@ -475,7 +474,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
                 data.template slc<Scale::width>(j * Scale::width));
           }
           weight_scale_data.Push(scales);
-          if (i == indices_bound) break;
+          if (x == indices_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -499,24 +498,19 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
     while (true) {
       MatrixParams params = run_accumulation_param.Pop();
 
-      std::cerr << "SpMM Unit params: " << std::endl << params << std::endl;
-
       start_signal.SyncPush();
 
-      loop_t indptr_len = params.loops[0][params.y_loop_idx[0]];
-      loop_t K = params.loops[0][params.weight_loop_idx[0]];
+      loop_t k_bound = params.loops[0][params.weight_loop_idx[0]] - 1;
 
       // -1 because the first indptr is popped outside of the loop
+      loop_t indptr_len = params.loops[0][params.y_loop_idx[0]];
       loop_t indptr_bound = indptr_len - 2;
-      loop_t k_bound = K - 1;
-
-      Pack1D<Scale, width> weight_scales;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
         Meta start_index = input_indptr.Pop();
-        for (loop_t i = 0;; i++) {
+        for (loop_t x = 0;; x++) {
           Meta end_index = input_indptr.Pop();
           Meta num_nonzero = end_index - start_index;
 
@@ -534,25 +528,25 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
               weight_scale = weight_scale_data.Pop();
             }
 #endif
-            Vector input = input_data.Pop();
+            Input input = input_data.Pop();
             Pack1D<Weight, width> weights = weight_data.Pop();
 
 #pragma hls_unroll yes
-            for (int w = 0; w < width; w++) {
-              Output product = (Output)weights[w] * (Output)input;
+            for (int i = 0; i < width; i++) {
+              Output product = (Output)input * (Output)weights[i];
 #if SUPPORT_MX
               if (params.is_mx_op) {
-                product *= (Output)weight_scale[w];
+                product *= (Output)weight_scale[i];
               }
 #endif
-              psums[w] += product;
+              psums[i] += product;
             }
           }
 
           accumulation_out.Push(psums);
           start_index = end_index;
 
-          if (i == indptr_bound) break;
+          if (x == indptr_bound) break;
         }
         if (k == k_bound) break;
       }
@@ -571,31 +565,26 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Vector, Weight, Meta, Output, Scale,
     while (true) {
       MatrixParams params = send_outputs_param.Pop();
 
-      loop_t indptr_len = params.loops[0][params.y_loop_idx[0]];
-      loop_t K = params.loops[0][params.weight_loop_idx[0]];
-      loop_t num_blocks = (width + bs - 1) / bs;
+      loop_t k_bound = params.loops[0][params.weight_loop_idx[0]] - 1;
 
       // the length of the indptr is the number of rows + an extra 0
+      loop_t indptr_len = params.loops[0][params.y_loop_idx[0]];
       loop_t indptr_bound = indptr_len - 2;
-      loop_t k_bound = K - 1;
-      loop_t num_blocks_bound = num_blocks - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k = 0;; k++) {
-        for (loop_t i = 0;; i++) {
-          Pack1D<Output, width> acc = accumulation_out.Pop();
-          for (loop_t b = 0;; b++) {
-            Pack1D<Output, bs> outputs;
+        for (loop_t x = 0;; x++) {
+          auto acc = accumulation_out.Pop();
+          for (int i = 0; i < width / vu_width; i++) {
+            Pack1D<Output, vu_width> outputs;
 #pragma hls_unroll yes
-            for (int j = 0; j < bs; j++) {
-              int index = b * bs + j;
-              outputs[j] = acc[index];
+            for (int j = 0; j < vu_width; j++) {
+              outputs[j] = acc[i * vu_width + j];
             }
             spmm_unit_output.Push(outputs);
-            if (b == num_blocks_bound) break;
           }
-          if (i == indptr_bound) break;
+          if (x == indptr_bound) break;
         }
         if (k == k_bound) break;
       }

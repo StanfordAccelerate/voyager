@@ -721,14 +721,13 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_stall_mode flush
     while (true) {
       Pack1D<Output, bs> outputs = accumulation_out.Pop();
-      for (ac_int<2, false> i = 0;; i++) {
+      for (int i = 0; i < bs / vu_width; i++) {
         Pack1D<Output, vu_width> output_block;
 #pragma hls_unroll yes
         for (int j = 0; j < vu_width; j++) {
           output_block[j] = outputs[i * vu_width + j];
         }
         matrix_out.Push(output_block);
-        if (i == bs / vu_width - 1) break;
       }
     }
   }
