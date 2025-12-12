@@ -306,7 +306,7 @@ SC_MODULE(VectorPipeline) {
           }
         }
 
-        auto payloads = Pack1D<VectorPack, 4>::Create(
+        auto payloads = Pack1D<VectorPack, 4>::create(
             {op0_src0, op0_src1, op2_src1, op3_src1});
         stage_0_input.Push(payloads);
 
@@ -351,7 +351,7 @@ SC_MODULE(VectorPipeline) {
         }
 
         auto payloads_next =
-            Pack1D<VectorPack, 3>::Create({res0, payloads[2], payloads[3]});
+            Pack1D<VectorPack, 3>::create({res0, payloads[2], payloads[3]});
         stage_1_input.Push(payloads_next);
 
         if (i == inst.inst_count - 1) break;
@@ -393,7 +393,7 @@ SC_MODULE(VectorPipeline) {
         }
 
         auto payloads_next =
-            Pack1D<VectorPack, 3>::Create({res1, payloads[1], payloads[2]});
+            Pack1D<VectorPack, 3>::create({res1, payloads[1], payloads[2]});
         stage_2_input.Push(payloads_next);
 
         if (i == inst.inst_count - 1) break;
@@ -445,7 +445,7 @@ SC_MODULE(VectorPipeline) {
         // Write outputs
         if (vdest == VectorInstructions::to_output) {
           auto payloads_next =
-              Pack1D<VectorPack, 2>::Create({res2, payloads[2]});
+              Pack1D<VectorPack, 2>::create({res2, payloads[2]});
 #if MX_SPLIT_MODE
           if (op3 == VectorInstructions::vquantize_mx) {
             calculate_qparam_inputs.Push(res2);

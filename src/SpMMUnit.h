@@ -514,11 +514,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
           Meta end_index = input_indptr.Pop();
           Meta num_nonzero = end_index - start_index;
 
-          Pack1D<Output, width> psums;
-#pragma hls_unroll yes
-          for (int j = 0; j < width; j++) {
-            psums[j] = Output::zero();
-          }
+          Pack1D<Output, width> psums = Pack1D<Output, width>::zero();
 
           for (loop_t nnz = 0;; nnz++) {
             if (nnz == num_nonzero.int_val) break;

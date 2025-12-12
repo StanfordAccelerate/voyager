@@ -667,11 +667,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       for (loop_t k1 = 0;; k1++) {
-        Pack1D<Output, bs> outputs;
-#pragma hls_unroll yes
-        for (int i = 0; i < bs; i++) {
-          outputs[i] = Output::zero();
-        }
+        Pack1D<Output, bs> outputs = Pack1D<Output, bs>::zero();
 
         if (params.has_bias) {
           outputs = bias_data.Pop();

@@ -88,16 +88,9 @@ SC_MODULE(VectorReducer) {
       while (counter++ < total_values) {
         Pack1D<T, width> res;
         for (ac_int<8, false> i = 0;; i++) {
-          Pack1D<T, N> acc_old;
-
-#pragma hls_unroll yes
-          for (int j = 0; j < N; j++) {
-            if (inst.reduce_op == VectorInstructions::radd) {
-              acc_old[j] = T::zero();
-            } else {  // rmax
-              acc_old[j] = T::min();
-            }
-          }
+          Pack1D<T, N> acc_old = Pack1D<T, N>::fill(
+              inst.reduce_op == VectorInstructions::radd ? T::zero()
+                                                         : T::min());
 
           for (decltype(inst.reduce_count) j = 0;; j++) {
             Pack1D<T, width> reduce_input = input.Pop();
@@ -118,9 +111,7 @@ SC_MODULE(VectorReducer) {
 
             acc_old[0] = acc;
 
-            if (j == inst.reduce_count - 1) {
-              break;
-            }
+            if (j == inst.reduce_count - 1) break;
           }
 
           T output;

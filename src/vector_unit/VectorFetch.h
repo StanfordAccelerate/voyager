@@ -540,12 +540,8 @@ SC_MODULE(VectorFetchUnit) {
           }
 
           for (ac_int<4, false> pack = 0;; pack++) {
-            Pack1D<VectorType, width> outputs;
-#pragma hls_unroll yes
-            for (int i = 0; i < width; i++) {
-              outputs[i] =
-                  params.is_maxpool ? VectorType::min() : VectorType::zero();
-            }
+            Pack1D<VectorType, width> outputs = Pack1D<VectorType, width>::fill(
+                params.is_maxpool ? VectorType::min() : VectorType::zero());
 
             if (in_bound[0]) {
               bool found =

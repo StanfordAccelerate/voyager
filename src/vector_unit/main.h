@@ -345,12 +345,7 @@ SC_MODULE(VectorUnit) {
         Pack1D<VectorType, mu_width> packed_outputs;
 
         for (int pack = 0; pack < mu_width / width; pack++) {
-          Pack1D<VectorType, width> outputs;
-          // Initialize with 0 to avoid inferring latches
-#pragma hls_unroll yes
-          for (int i = 0; i < width; i++) {
-            outputs[i] = VectorType::zero();
-          }
+          Pack1D<VectorType, width> outputs = Pack1D<VectorType, width>::zero();
 
           if (op_type == VectorInstructions::vector) {
             outputs = pipeline_to_memory.Pop();

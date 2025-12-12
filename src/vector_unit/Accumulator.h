@@ -60,10 +60,7 @@ SC_MODULE(VectorAccumulator) {
 
 #pragma hls_unroll yes
           for (int i = 0; i < sum_n; i++) {
-#pragma hls_unroll yes
-            for (int j = 0; j < width; j++) {
-              acc_old[i][j] = T::zero();
-            }
+            acc_old[i] = Pack1D<T, width>::zero();
           }
 
           for (decltype(inst.reduce_count) i = 0;; i++) {
@@ -111,10 +108,7 @@ SC_MODULE(VectorAccumulator) {
 
 #pragma hls_unroll yes
           for (int i = 0; i < max_n; i++) {
-#pragma hls_unroll yes
-            for (int j = 0; j < width; j++) {
-              acc_old[i][j] = T::min();
-            }
+            acc_old[i] = Pack1D<T, width>::fill(T::min());
           }
 
           for (decltype(inst.reduce_count) i = 0;; i++) {
