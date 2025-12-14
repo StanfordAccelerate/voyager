@@ -59,9 +59,9 @@ $(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt: quantized-training/test/te
 	mkdir -p $(dir $@)
 	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --mixed_precision &> $(dir $@)codegen.log
 
-$(CODEGEN_DIR)/networks/llama_prefill_mp_with_outlier/%/model.txt: quantized-training/test/test_codegen.py
+$(CODEGEN_DIR)/networks/llama_prefill_spmm/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --mixed_precision &> $(dir $@)codegen.log
+	python quantized-training/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --mixed_precision --outlier 6.0 &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt: quantized-training/test/test_codegen.py
 	mkdir -p $(dir $@)

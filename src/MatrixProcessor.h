@@ -21,7 +21,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
                        Input, Weight, Psum, Buffer, Scale, rows, cols,
                        buffer_size> : public sc_module {
   static constexpr int LOOP_WIDTH = 10;
-  static constexpr int FIFO_DEPTH = SUPPORT_MX ? 16 : 1;
+  static constexpr int FIFO_DEPTH = SUPPORT_MX ? 8 : 1;
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   static constexpr int ACCUM_BUFFER_BANKS = 2;
@@ -45,9 +45,13 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   SystolicArray<Input, Weight, Psum, rows, cols> CCS_INIT_S1(systolic_array);
 
   Connections::Fifo<Pack1D<Buffer, cols>, FIFO_DEPTH> CCS_INIT_S1(
-      accumulation_fifo);
-  Connections::Combinational<Pack1D<Buffer, cols>> accumulation_enq;
-  Connections::Combinational<Pack1D<Buffer, cols>> accumulation_deq;
+      accum_to_wb_fifo);
+  Connections::Combinational<Pack1D<Buffer, cols>> CCS_INIT_S1(accum_to_wb_enq);
+  Connections::Combinational<Pack1D<Buffer, cols>> CCS_INIT_S1(accum_to_wb_deq);
+
+  Connections::Fifo<Pack1D<Buffer, cols>, 8> CCS_INIT_S1(accum_output_fifo);
+  Connections::Combinational<Pack1D<Buffer, cols>> CCS_INIT_S1(
+      accum_output_enq);
 
  public:
   sc_in<bool> CCS_INIT_S1(clk);
@@ -131,10 +135,15 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       systolic_array.weights[i](systolic_array_weights[i]);
     }
 
-    accumulation_fifo.clk(clk);
-    accumulation_fifo.rst(rstn);
-    accumulation_fifo.enq(accumulation_enq);
-    accumulation_fifo.deq(accumulation_deq);
+    accum_to_wb_fifo.clk(clk);
+    accum_to_wb_fifo.rst(rstn);
+    accum_to_wb_fifo.enq(accum_to_wb_enq);
+    accum_to_wb_fifo.deq(accum_to_wb_deq);
+
+    accum_output_fifo.clk(clk);
+    accum_output_fifo.rst(rstn);
+    accum_output_fifo.enq(accum_output_enq);
+    accum_output_fifo.deq(output_channel);
 
     process_accumulation_params_fifo.clk(clk);
     process_accumulation_params_fifo.rst(rstn);
@@ -242,6 +251,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           for (int i = 0; i < cols; i++) {
             Weight decoded_weight = Weight::zero();
             auto bits = data.template slc<weight_width>(i * weight_width);
+
 #if SUPPORT_CODEBOOK_QUANT
             if (params.use_weight_codebook) {
               auto value = params.weight_code[bits];
@@ -261,6 +271,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
               }
 #endif
             }
+
             weights[i].data = decoded_weight;
             weights[i].tag = row;
           }
@@ -362,6 +373,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         for (int i = 0; i < rows; i++) {
           Input decoded_input = Input::zero();
           auto bits = data.template slc<input_width>(i * input_width);
+
 #if SUPPORT_CODEBOOK_QUANT
           if (params.use_input_codebook) {
             auto value = params.input_code[bits];
@@ -380,6 +392,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             }
 #endif
           }
+
           inputs[i].data = decoded_input;
           inputs[i].swap_weights = swap_weights;
         }
@@ -422,7 +435,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     accumulation_buffer_read_data[1].Reset();
     accumulation_buffer_read_address[1].Reset();
 #endif
-    accumulation_enq.ResetWrite();
+    accum_to_wb_enq.ResetWrite();
 
     bool accumulation_buffer_bank = 0;
 
@@ -583,8 +596,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           previous_accumulation[i] += static_cast<Buffer>(outputs[i]);
         }
 #endif
-
-        accumulation_enq.Push(previous_accumulation);
+        accum_to_wb_enq.Push(previous_accumulation);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
         if (params.write_output_to_accum_buffer) {
@@ -627,14 +639,14 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
   void write_back() {
     write_back_params_deq.ResetRead();
-    accumulation_deq.ResetRead();
+    accum_to_wb_deq.ResetRead();
     accumulation_buffer_write_request[0].Reset();
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     accumulation_buffer_write_request[1].Reset();
     accumulation_buffer_done[0].Reset();
     accumulation_buffer_done[1].Reset();
 #endif
-    output_channel.Reset();
+    accum_output_enq.ResetWrite();
     done_signal.Reset();
 
     bool accumulation_buffer_bank = 0;
@@ -684,7 +696,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
       while (step < total_ops) {
-        Pack1D<Buffer, cols> previous_accumulation = accumulation_deq.Pop();
+        Pack1D<Buffer, cols> previous_accumulation = accum_to_wb_deq.Pop();
 
         bool accumulation_finished =
             (loop_counters[0][params.reduction_loop_idx[0]] == c2_bound) &&
@@ -693,11 +705,10 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
             (loop_counters[0][params.fy_loop_idx[0]] == fy0_bound) &&
             (loop_counters[1][params.fy_loop_idx[1]] == fy1_bound);
 
-        if ((accumulation_finished && !DOUBLE_BUFFERED_ACCUM_BUFFER) ||
-            (accumulation_finished && DOUBLE_BUFFERED_ACCUM_BUFFER &&
-             !params.write_output_to_accum_buffer)) {
+        if (accumulation_finished && !(DOUBLE_BUFFERED_ACCUM_BUFFER &&
+                                       params.write_output_to_accum_buffer)) {
           // write out to vector unit directly
-          output_channel.Push(previous_accumulation);
+          accum_output_enq.Push(previous_accumulation);
         } else {
           ac_int<16, false> address =
               loop_counters[1][params.weight_loop_idx[1]] * k_stride +
