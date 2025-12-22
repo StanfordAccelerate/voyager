@@ -22,7 +22,7 @@ Install conda with [miniforge](https://github.com/conda-forge/miniforge/#downloa
 
 ### 1. Clone the repository
 ```bash
-git clone git@code.stanford.edu:tsmc40r/brainpower/accelerator.git
+git clone git@code.stanford.edu:voyager/accelerator.git
 ```
 
 ### 2. Environment Requirements
@@ -46,9 +46,7 @@ After creating the `.envrc` file, ensure the conda environment is activated.
 git submodule update --init --recursive
 ```
 - After initialization, install required packages:
-  - In the submodule `quantized_training`, install with `pip install -r requirements.txt`
-  - Further, run `pip install -e .`
-  - From the root directory, execute `pip install quantized_training`
+  - In the submodule `voyager-compiler` directory, run `pip install -e .`
 
 ### Running Examples
 Once the setup is complete, you can test the environment with the following command to compile and run ResNet18 through the compiler:

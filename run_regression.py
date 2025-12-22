@@ -14,7 +14,7 @@ from deepdiff import DeepDiff
 
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
-from quantized_training.codegen import param_pb2
+from voyager_compiler.codegen import param_pb2
 
 ACCURACY_RESULTS = {
     "resnet18": {
@@ -609,7 +609,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         subprocess.run(
             [
                 "python",
-                "quantized-training/test/test_codegen.py",
+                "voyager-compiler/test/test_codegen.py",
                 model,
                 "--model_name_or_path",
                 model_path,

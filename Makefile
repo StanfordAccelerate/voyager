@@ -401,8 +401,8 @@ toolchain: $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/Tiling.o $(CC_BUILD_DI
 $(CC_BUILD_DIR)/Network.o: test/common/Network.cc test/compiler/proto/param.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-test/compiler/proto/param.pb.cc: quantized-training/src/quantized_training/codegen/param.proto
-	protoc -I=quantized-training/src/quantized_training/codegen --cpp_out=test/compiler/proto $<
+test/compiler/proto/param.pb.cc: voyager-compiler/src/voyager_compiler/codegen/param.proto
+	protoc -I=voyager-compiler/src/voyager_compiler/codegen --cpp_out=test/compiler/proto $<
 
 test/compiler/proto/tiling_pb2.py: test/compiler/proto/tiling.proto
 	protoc --proto_path=test/compiler/proto/ --python_out=test/compiler/proto $<

@@ -30,7 +30,7 @@
       * If the function takes in extra parameters at runtime (e.g. leaky_relu), some math and coefficient loading will be done within this `else if` block.
 
 4. **Unit Test Support:**
-    * In `quantized_training/test_codegen.py` add the new function to the `polyapprox` model portion.
+    * In `voyager_compiler/test_codegen.py` add the new function to the `polyapprox` model portion.
     * Gold vs. PyTorch test (e.g. calling gelu, silu, and tanhshrink): `DATATYPE=MXINT8 IC_DIMENSION=32 OC_DIMENSION=32 python run_regression.py --models polyapprox --tests gelu,silu,tanh_1 --sims gold_model --num_processes 16`
       * We expect differences in output because (1) we are approximating and (2) datatype differences (the Vector Unit's 16-bit BFloat16 versus Pytorch's 32-bit type).
     * Gold vs. Fast-SystemC (e.g. calling gelu, silu, and tanhshrink): `DATATYPE=MXINT8 IC_DIMENSION=32 OC_DIMENSION=32 python run_regression.py --models polyapprox --tests gelu,silu,tanh_1 --sims fast-systemc --num_processes 16`

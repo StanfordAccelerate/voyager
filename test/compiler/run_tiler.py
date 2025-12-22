@@ -7,7 +7,7 @@ import re
 from deepdiff import DeepDiff
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
-from quantized_training.codegen import param_pb2
+from voyager_compiler.codegen import param_pb2
 from proto import tiling_pb2
 
 
