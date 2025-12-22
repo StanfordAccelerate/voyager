@@ -236,7 +236,7 @@ std::vector<std::any> run_operation(const Operation& operation,
       delete[] weight_code;
     }
 
-    output_ptr = spmm_csr<Vector, SaWeight, Vector, Scale>(
+    output_ptr = spmm_csr<SPMM_META_DATATYPE, Vector, SaWeight, Vector, Scale>(
         input_data_ptr, input_indices_ptr, input_indptr_ptr, weight_ptr,
         weight_scale_ptr, first_op);
   } else if (first_op.kwargs().contains("input")) {

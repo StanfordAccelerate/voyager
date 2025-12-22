@@ -246,49 +246,29 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                               }
                             }
 
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
 
       fetcher_done.write(true);
@@ -364,7 +344,8 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
       // reduce the number of iterations by packing factor
       C1 = C1 >> params.input_pack_factor_lg2;
       loop_bounds[1][params.reduction_loop_idx[1]] = C1;
-      ac_int<4, false> num_packs = (1 << params.input_pack_factor_lg2) - 1;
+      ac_int<4, false> pack_offset_bound =
+          (1 << params.input_pack_factor_lg2) - 1;
 
       ac_int<16, false> Y = params.input_y;
       ac_int<16, false> X = params.input_x;
@@ -442,7 +423,7 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                                                  loop_bounds[1][1] - 1 &&
                                              loop_counters[1][0] ==
                                                  loop_bounds[1][0] - 1 &&
-                                             pack == num_packs;
+                                             pack == pack_offset_bound;
 
                               BufferWriteRequest<ac_int<buffer_width, false>>
                                   req;
@@ -451,54 +432,32 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                               req.last = is_last;
                               write_request[bank_sel].Push(req);
 
-                              if (pack == num_packs) {
-                                break;
-                              }
+                              if (pack == pack_offset_bound) break;
                             }
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
                 bank_sel = !bank_sel;
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
     }
   }
@@ -622,50 +581,30 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                             };
                             read_request[bank_sel].Push(req);
 
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
                 bank_sel = !bank_sel;
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
     }
   }
@@ -804,41 +743,24 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                               break;
                             }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
-                if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                  break;
-                }
+                if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
               }
-              if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-                break;
-              }
+              if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
             }
-            if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-              break;
-            }
+            if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
           }
-          if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-            break;
-          }
+          if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
         }
       } else if (params.is_resnet_replication && rows == 8) {
         // no window buffer reuse, but need to combine
@@ -879,45 +801,27 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
 
                             window_buffer_out.Push(data);
 
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
-                if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                  break;
-                }
+                if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
               }
-              if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-                break;
-              }
+              if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
             }
-            if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-              break;
-            }
+            if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
           }
-          if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-            break;
-          }
+          if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
         }
       } else {  // bypass
         ac_int<32, false> total_count =
@@ -951,9 +855,7 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
 
         for (ac_int<4, false> i = 0;; i++) {
           bits.set_slc(i * port_width, input_resp.Pop());
-          if (i == params.input_num_beats - 1) {
-            break;
-          }
+          if (i == params.input_num_beats - 1) break;
         }
 
         packed_bits.Push(bits);
@@ -1034,7 +936,8 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
           }
         }
       } else {  // passthrough
-        ac_int<4, false> num_packs = (1 << params.input_pack_factor_lg2) - 1;
+        ac_int<4, false> pack_offset_bound =
+            (1 << params.input_pack_factor_lg2) - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -1058,9 +961,7 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
 
             transpose_out.Push(outputs);
 
-            if (i == num_packs) {
-              break;
-            }
+            if (i == pack_offset_bound) break;
           }
         }
       }
