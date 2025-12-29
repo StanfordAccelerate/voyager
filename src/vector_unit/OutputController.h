@@ -313,7 +313,7 @@ SC_MODULE(OutputController) {
       }
     }
   }
-
+#if SUPPORT_MX
   void write_mx_scale() {
     write_scale_params.ResetRead();
     scale_in.Reset();
@@ -448,6 +448,7 @@ SC_MODULE(OutputController) {
       }
     }
   }
+#endif
 #if SUPPORT_SPMM
   template <typename T, int pack_width>
   void write_sparse_data(const Pack1D<T, pack_width>& pack,
