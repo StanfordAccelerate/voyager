@@ -17,6 +17,7 @@ SC_MODULE(OutputController) {
   Connections::Combinational<VectorParams> CCS_INIT_S1(
       write_scale_address_params);
   Connections::Combinational<ac_int<32, false>> CCS_INIT_S1(write_scale_params);
+  Connections::Combinational<VectorParams> CCS_INIT_S1(signal_done_params);
 
   Connections::In<Pack1D<VectorType, width>> CCS_INIT_S1(vector_in);
   Connections::In<ScaleType> CCS_INIT_S1(scale_in);
@@ -116,6 +117,7 @@ SC_MODULE(OutputController) {
     vector_in.Reset();
     vector_output.Reset();
     write_vector_output_done.ResetWrite();
+    signal_done_params.ResetWrite();
 
     wait();
 
@@ -138,6 +140,8 @@ SC_MODULE(OutputController) {
         write_scale_params.Push(loop_bound);
         write_scale_address_params.Push(params);
       }
+
+      signal_done_params.Push(params);
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -568,6 +572,7 @@ SC_MODULE(OutputController) {
 
   void signal_done() {
     done.Reset();
+    signal_done_params.ResetRead();
     write_vector_output_done.ResetRead();
 #if SUPPORT_MX
     write_mx_scale_done.ResetRead();
@@ -580,15 +585,21 @@ SC_MODULE(OutputController) {
     wait();
 
     while (true) {
+      VectorParams params = signal_done_params.Pop();
+
       write_vector_output_done.SyncPop();
 
 #if SUPPORT_MX
-      write_mx_scale_done.SyncPop();
+      if (params.quantize_output_mx) {
+        write_mx_scale_done.SyncPop();
+      }
 #endif
 
 #if SUPPORT_SPMM
-      process_csr_data_and_indices_done.SyncPop();
-      process_csr_indptr_done.SyncPop();
+      if (params.has_sparse_output) {
+        process_csr_data_and_indices_done.SyncPop();
+        process_csr_indptr_done.SyncPop();
+      }
 #endif
 
       done.SyncPush();
