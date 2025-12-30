@@ -99,7 +99,9 @@ void DataLoader::load_outputs(const codegen::Operation param,
     tensor.mutable_memory()->set_partition(-1);
     tensor.mutable_memory()->set_address(address);
     load_tensor(tensor, data_dir);
-    address += get_size(tensor, false, false);
+
+    int width = get_type_width<SUPPORTED_TYPES>(tensor.dtype());
+    address += get_size(tensor, false, false) * width / 8;
   }
 }
 
@@ -143,7 +145,9 @@ std::vector<std::any> DataLoader::get_reference_outputs(
     tensor.clear_scratchpad();
 
     outputs.push_back(memory->read_tensor(tensor));
-    address += get_size(tensor);
+
+    int width = get_type_width<SUPPORTED_TYPES>(tensor.dtype());
+    address += get_size(tensor) * width / 8;
   }
 
   return outputs;

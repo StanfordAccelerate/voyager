@@ -80,23 +80,26 @@ SC_MODULE(VectorReducer) {
 
     while (true) {
       VectorInstructions inst = instr.Pop();
-      decltype(inst.inst_loop_count) total_values = inst.inst_loop_count;
-      decltype(inst.inst_loop_count) counter = 0;
+
+      const bool is_sum_reduction = inst.reduce_op == VectorInstructions::radd;
+      const T fill_value = is_sum_reduction ? T::zero() : T::min();
+
+      ac_int<16, false> repeat_times =
+          inst.rduplicate ? OC_DIMENSION / width : 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
-      while (counter++ < total_values) {
+      for (decltype(inst.inst_loop_count) count = 0;; count++) {
         Pack1D<T, width> res;
-        for (ac_int<8, false> i = 0;; i++) {
-          Pack1D<T, N> acc_old = Pack1D<T, N>::fill(
-              inst.reduce_op == VectorInstructions::radd ? T::zero()
-                                                         : T::min());
+
+        for (int i = 0; i < width; i++) {
+          auto acc_old = Pack1D<T, N>::fill(fill_value);
 
           for (decltype(inst.reduce_count) j = 0;; j++) {
             Pack1D<T, width> reduce_input = input.Pop();
 
             T acc;
-            if (inst.reduce_op == VectorInstructions::radd) {
+            if (is_sum_reduction) {
               T sum = tree_sum(reduce_input);
               acc = acc_old[LAST] + sum;
             } else {
@@ -115,7 +118,7 @@ SC_MODULE(VectorReducer) {
           }
 
           T output;
-          if (inst.reduce_op == VectorInstructions::radd) {
+          if (is_sum_reduction) {
             output = tree_sum(acc_old);
           } else {
             output = tree_max(acc_old);
@@ -136,15 +139,10 @@ SC_MODULE(VectorReducer) {
           }
 
           res[i] = output;
-          if (inst.rduplicate || i == width - 1) {
-            break;
-          }
-        }
 
-        if (inst.rduplicate) {
-#pragma hls_unroll yes
-          for (int i = 0; i < width; i++) {
-            res[i] = res[0];
+          if (inst.rduplicate) {
+            res = Pack1D<T, width>::fill(output);
+            break;
           }
         }
 
@@ -155,13 +153,15 @@ SC_MODULE(VectorReducer) {
           repeat_count_1.Push(inst.immediate0);
           repeat_input_1.Push(res);
         } else if (inst.rdest == VectorInstructions::to_memory) {
-#if VECTOR_UNIT_WIDTH == OC_DIMENSION
-          output_to_memory.Push(res);
-#else
-          repeat_count_2.Push(inst.rduplicate ? OC_DIMENSION / width : 1);
+#if VECTOR_UNIT_WIDTH != OC_DIMENSION
+          repeat_count_2.Push(repeat_times);
           repeat_input_2.Push(res);
+#else
+          output_to_memory.Push(res);
 #endif
         }
+
+        if (count == inst.inst_loop_count - 1) break;
       }
     }
   }

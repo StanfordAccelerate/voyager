@@ -171,10 +171,13 @@ SC_MODULE(VectorPipeline) {
       stage_0_inst.Push(inst);
       stage_1_inst.Push(inst);
       stage_2_inst.Push(inst);
-      stage_3_inst.Push(inst);
+
+      if (inst.vdest == VectorInstructions::to_output) {
+        stage_3_inst.Push(inst);
 #if SUPPORT_SPMM
-      outlier_filter_inst.Push(inst);
+        outlier_filter_inst.Push(inst);
 #endif
+      }
 
       for (decltype(inst.inst_loop_count) i = 0;; i++) {
         VectorPack op0_src0, op0_src1, op2_src1, op3_src1;
@@ -595,9 +598,9 @@ SC_MODULE(VectorPipeline) {
       auto op3 = inst.vector_op3;
       auto qparam = inst.immediate2;
 
-      if (inst.vdest != VectorInstructions::to_output) {
-        continue;
-      }
+      bool is_mx_quantization =
+          (op3 == VectorInstructions::vquantize_mx ||
+           op3 == VectorInstructions::vquantize_mx_outlier);
 
 #if MX_SPLIT_MODE
       constexpr int ratio = mu_width / vu_width;
@@ -611,8 +614,7 @@ SC_MODULE(VectorPipeline) {
         VectorPack res3;
 
 #if SUPPORT_MX
-        if (op3 == VectorInstructions::vquantize_mx ||
-            op3 == VectorInstructions::vquantize_mx_outlier) {
+        if (is_mx_quantization) {
 #if MX_SPLIT_MODE
           if (i % ratio == 0) {
             VectorType amax = stage_3_amax.Pop();
@@ -632,9 +634,7 @@ SC_MODULE(VectorPipeline) {
         }
 #endif
         // Stage 3: div, quantize
-        if (op3 == VectorInstructions::vdiv ||
-            op3 == VectorInstructions::vquantize_mx ||
-            op3 == VectorInstructions::vquantize_mx_outlier) {
+        if (op3 == VectorInstructions::vdiv || is_mx_quantization) {
           res3 = vdiv<VectorType, vu_width>(op3_src0, op3_src1);
         } else {
           res3 = op3_src0;

@@ -212,6 +212,15 @@ int get_index_from_type_name(const std::string& dtype) {
   return index;
 }
 
+template <typename... Ts>
+size_t get_type_width(std::string dtype) {
+  int index = get_index_from_type_name<Ts...>(dtype);
+  if (index == -1) {
+    throw std::invalid_argument("Unsupported datatype: " + dtype);
+  }
+  return get_type_width<Ts...>(index);
+}
+
 template <typename T, size_t N, int port_width>
 struct dtype_fetch_config {
   static constexpr int fetch_width = T::width * N;
