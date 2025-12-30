@@ -5,7 +5,7 @@
 
 #include "../AccelTypes.h"
 #include "../ArchitectureParams.h"
-#include "OutlierFilter.h"
+#include "OutlierFilter2.h"
 #include "VectorOps.h"
 
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
@@ -87,7 +87,8 @@ SC_MODULE(VectorPipeline) {
       csr_data_and_indices;
   Connections::Out<Pack1D<Meta, vu_width>> csr_indptr;
 
-  OutlierFilter<VectorType, Meta, vu_width> CCS_INIT_S1(outlier_filter);
+  OutlierFilter<VectorType, SPMM_META_DATATYPE, vu_width> CCS_INIT_S1(
+      outlier_filter);
 #endif
 
   SC_CTOR(VectorPipeline) {
