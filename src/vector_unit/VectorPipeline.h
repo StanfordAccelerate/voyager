@@ -78,16 +78,16 @@ SC_MODULE(VectorPipeline) {
   using Meta = SPMM_META_DATATYPE;
 
   Connections::In<OutlierFilterConfig> outlier_filter_config;
+  Connections::Combinational<VectorInstructions> outlier_filter_inst;
+  Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_payload;
 
-  Connections::Combinational<VectorPack> stage_3_payload;
   Connections::Combinational<VectorPack> outlier_filter_input;
-  Connections::Combinational<VectorPack> filtered_data;
+  Connections::Combinational<VectorPack> outlier_filter_output;
   Connections::Out<CsrDataAndIndices<VectorType, Meta, vu_width>>
       csr_data_and_indices;
   Connections::Out<Pack1D<Meta, vu_width>> csr_indptr;
 
-  OutlierFilter<VectorType, Meta, vu_width, mu_width> CCS_INIT_S1(
-      outlier_filter);
+  OutlierFilter<VectorType, Meta, vu_width> CCS_INIT_S1(outlier_filter);
 #endif
 
   SC_CTOR(VectorPipeline) {
@@ -129,7 +129,7 @@ SC_MODULE(VectorPipeline) {
     outlier_filter.rstn(rstn);
     outlier_filter.config_in(outlier_filter_config);
     outlier_filter.data_in(outlier_filter_input);
-    outlier_filter.data_out(filtered_data);
+    outlier_filter.data_out(outlier_filter_output);
     outlier_filter.csr_data_and_indices_out(csr_data_and_indices);
     outlier_filter.csr_indptr_out(csr_indptr);
 #endif
@@ -158,6 +158,9 @@ SC_MODULE(VectorPipeline) {
     stage_2_inst.ResetWrite();
     stage_3_inst.ResetWrite();
     stage_0_input.ResetWrite();
+#if SUPPORT_SPMM
+    outlier_filter_inst.ResetWrite();
+#endif
 
     wait();
 
@@ -169,6 +172,9 @@ SC_MODULE(VectorPipeline) {
       stage_1_inst.Push(inst);
       stage_2_inst.Push(inst);
       stage_3_inst.Push(inst);
+#if SUPPORT_SPMM
+      outlier_filter_inst.Push(inst);
+#endif
 
       for (decltype(inst.inst_loop_count) i = 0;; i++) {
         VectorPack op0_src0, op0_src1, op2_src1, op3_src1;
@@ -493,12 +499,10 @@ SC_MODULE(VectorPipeline) {
           auto payloads_next =
               Pack1D<VectorPack, 2>::create({res2, payloads[2]});
 #if SUPPORT_SPMM
-          if (inst.vector_op3 == VectorInstructions::vquantize_mx_outlier) {
+          if (op3 == VectorInstructions::vquantize_mx_outlier) {
             outlier_filter_input.Push(res2);
-            stage_3_payload.Push(payloads[2]);
-          } else {
-            push_stage_3_inputs(op3, payloads_next);
           }
+          stage_3_payload.Push(payloads_next);
 #else
           push_stage_3_inputs(op3, payloads_next);
 #endif
@@ -507,6 +511,7 @@ SC_MODULE(VectorPipeline) {
         } else if (vdest == VectorInstructions::to_accumulate) {
           accumulator_input.Push(res2);
         }
+
         if (i == inst.inst_loop_count - 1) break;
       }
     }
@@ -514,19 +519,29 @@ SC_MODULE(VectorPipeline) {
 
 #if SUPPORT_SPMM
   void run_outlier_filter() {
+    outlier_filter_inst.ResetRead();
     stage_3_payload.ResetRead();
-    filtered_data.ResetRead();
+    outlier_filter_output.ResetRead();
 
     wait();
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (1) {
-      auto filtered = filtered_data.Pop();
-      auto payload = stage_3_payload.Pop();
-      auto payloads_next = Pack1D<VectorPack, 2>::create({filtered, payload});
-      push_stage_3_inputs(VectorInstructions::vquantize_mx_outlier,
-                          payloads_next);
+      VectorInstructions inst = outlier_filter_inst.Pop();
+      auto op3 = inst.vector_op3;
+
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
+        auto payload = stage_3_payload.Pop();
+
+        if (op3 == VectorInstructions::vquantize_mx_outlier) {
+          payload[0] = outlier_filter_output.Pop();
+        }
+
+        push_stage_3_inputs(op3, payload);
+
+        if (i == inst.inst_loop_count - 1) break;
+      }
     }
   }
 #endif

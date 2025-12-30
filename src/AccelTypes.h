@@ -479,21 +479,21 @@ class Pack1D<UFloat<W, E>, pack_width> {
   }
 };
 
-template <typename T, typename Meta, int width>
+template <typename T, typename Meta, int pack_width>
 struct CsrDataAndIndices {
-  Pack1D<T, width> data;
-  Pack1D<Meta, width> indices;
+  Pack1D<T, pack_width> data;
+  Pack1D<Meta, pack_width> indices;
   bool is_last;
 
-  static const unsigned int total_width =
-      T::width * width + Meta::width * width + 1;
+  static const unsigned int width =
+      Pack1D<T, pack_width>::width + Pack1D<Meta, pack_width>::width + 1;
 
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < pack_width; i++) {
       m& data[i];
     }
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < pack_width; i++) {
       m& indices[i];
     }
     m & is_last;

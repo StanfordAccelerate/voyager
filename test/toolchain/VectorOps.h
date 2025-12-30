@@ -562,21 +562,6 @@ void map_vector_operations(const codegen::Operation& param,
             get_size(quantize_input) / quantize_shape.back();
       }
 
-      if (op.kwargs().contains("output_code")) {
-        const auto code = op.kwargs().at("output_code").tensor();
-        const int size = get_size(code);
-
-        float* array = read_constant_param(code);
-
-        for (int i = 0; i < size; i++) {
-          vector_params->output_code[i] = array[i] * 2;
-        }
-
-        delete[] array;
-
-        vector_params->use_output_codebook = true;
-      }
-
       // Copy coefficients from ApproximationConstants.h
     } else if (opcode == "gelu" || opcode == "gelu_") {
       for (int i = 0; i < NUM_MAXES; i++) {
@@ -887,6 +872,22 @@ void map_vector_operations(const codegen::Operation& param,
           set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
         }
       }
+    }
+
+    // For both quantize and quantize_mx, set output codebook if provided
+    if (op.kwargs().contains("output_code")) {
+      const auto code = op.kwargs().at("output_code").tensor();
+      const int size = get_size(code);
+
+      float* array = read_constant_param(code);
+
+      for (int i = 0; i < size; i++) {
+        vector_params->output_code[i] = array[i] * 2;
+      }
+
+      delete[] array;
+
+      vector_params->use_output_codebook = true;
     }
 
     stage++;

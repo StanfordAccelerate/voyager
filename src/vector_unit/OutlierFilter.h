@@ -3,7 +3,7 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
-template <typename Vector, typename Meta, int width, int block_size>
+template <typename Vector, typename Meta, int width>
 SC_MODULE(OutlierFilter) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
@@ -64,11 +64,13 @@ SC_MODULE(OutlierFilter) {
 
           data_out.Push(filtered);
 
+#ifndef __SYNTHESIS__
           std::cerr << "OutlierFilter: x=" << x << " k=" << k << " nnz=" << nnz
                     << " threshold=" << threshold << "\n";
           std::cerr << "  data:     " << data << "\n";
           std::cerr << "  filtered: " << filtered << "\n";
           std::cerr << "  outliers: " << outliers << "\n";
+#endif
 
 #pragma hls_unroll yes
           for (int k0 = 0; k0 < width; k0++) {
@@ -80,9 +82,11 @@ SC_MODULE(OutlierFilter) {
             }
           }
 
+#ifndef __SYNTHESIS__
           std::cerr << "  nnz after: " << nnz << "\n";
           std::cerr << "  csr_data: " << csr_data << "\n";
           std::cerr << "  csr_indices: " << csr_indices << "\n";
+#endif
 
           int nnz_in_block = nnz % (2 * width);
 
@@ -118,7 +122,6 @@ SC_MODULE(OutlierFilter) {
         int indptr_idx = x % width;
         if (indptr_idx == width - 1) {
           csr_indptr_out.Push(indptr);
-          std::cerr << "  Pushed indptr: " << indptr << "\n";
           indptr = Pack1D<Meta, width>::zero();
           indptr[0] = nnz;
         } else {
@@ -150,7 +153,6 @@ SC_MODULE(OutlierFilter) {
 
       // Flush final indptr
       csr_indptr_out.Push(indptr);
-      std::cerr << "  Pushed final indptr: " << indptr << "\n";
     }
   }
 };

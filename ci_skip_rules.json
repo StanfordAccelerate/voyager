@@ -54,6 +54,7 @@
         ],
         "block_size": 32,
         "layers": [
+            "slice(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?",
             "permute_default"
         ]
