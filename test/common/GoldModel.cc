@@ -30,13 +30,6 @@ bool type_cast_helper(std::any& input_ptr, float* codebook,
 
   int size = get_size(tensor);
 
-  std::cerr << "Casting tensor " << tensor.node() << " from "
-            << (is_input ? DataTypes::TypeName<T>::name()
-                         : DataTypes::TypeName<U>::name())
-            << " to "
-            << (is_input ? DataTypes::TypeName<U>::name()
-                         : DataTypes::TypeName<T>::name())
-            << "\n";
   T* inputs = std::any_cast<T*>(input_ptr);
   U* outputs = new U[size];
 

@@ -38,10 +38,6 @@ std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
   const int K = input_shape[ndim - 1];
   const int X = get_size(input_shape) / K;
 
-  std::cerr << "Filtering outliers with threshold " << threshold << "\n";
-  std::cerr << "Input shape: " << X << " x " << K << "\n";
-  std::cerr << "Data size: " << data_size << "\n";
-
   Input* data = new Input[data_size];
   Meta* indices = new Meta[data_size];
   Meta* indptr = new Meta[X + 1];

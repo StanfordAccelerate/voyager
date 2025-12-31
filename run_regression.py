@@ -622,6 +622,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--dump_dataset",
                 "--dataset_output_dir",
                 output_data_dir,
+                "--dump_tensors",
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,

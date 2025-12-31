@@ -22,14 +22,15 @@
 // IWYU pragma: end_exports
 
 namespace DataTypes {
-typedef Int<2, false> uint2;
 typedef Int<1, true> int1;
+typedef Int<2, false> uint2;
 typedef Int<2, true> int2;
 typedef Int<4, true> int4;
 typedef Int<6, true> int6;
 typedef Int<8, true> int8;
-typedef Int<18, true> int18;
+typedef Int<16, false> uint16;
 typedef Int<16, true> int16;
+typedef Int<18, true> int18;
 typedef Int<24, true> int24;
 typedef Int<32, true> int32;
 typedef Int<64, true> int64;
@@ -54,13 +55,13 @@ struct TypeName {
 };
 
 template <>
-struct TypeName<uint2> {
-  static std::string name() { return "uint2"; }
+struct TypeName<int1> {
+  static std::string name() { return "int1"; }
 };
 
 template <>
-struct TypeName<int1> {
-  static std::string name() { return "int1"; }
+struct TypeName<uint2> {
+  static std::string name() { return "uint2"; }
 };
 
 template <>
@@ -81,6 +82,11 @@ struct TypeName<int6> {
 template <>
 struct TypeName<int8> {
   static std::string name() { return "int8"; }
+};
+
+template <>
+struct TypeName<uint16> {
+  static std::string name() { return "uint16"; }
 };
 
 template <>
@@ -147,12 +153,13 @@ struct TypeName<posit8> {
 
 // clang-format off
 #define SUPPORTED_TYPES          \
-  DataTypes::uint2,              \
   DataTypes::int1,               \
+  DataTypes::uint2,              \
   DataTypes::int2,               \
   DataTypes::int4,               \
   DataTypes::int6,               \
   DataTypes::int8,               \
+  DataTypes::uint16,             \
   DataTypes::int16,              \
   DataTypes::int18,              \
   DataTypes::int24,              \
