@@ -54,7 +54,7 @@ SC_MODULE(OutlierFilter) {
 
 #pragma hls_unroll yes
           for (int i = 0; i < width; i++) {
-            if (data[i] > threshold) {
+            if (data[i].abs() > threshold) {
               outliers[i] = data[i];
               flag[i] = 1;
             } else {
@@ -64,25 +64,9 @@ SC_MODULE(OutlierFilter) {
 
           data_out.Push(filtered);
 
-#ifndef __SYNTHESIS__
-          std::cerr << "OutlierFilter: x=" << x << " k=" << k << " nnz=" << nnz
-                    << " threshold=" << threshold << "\n";
-          std::cerr << "  data:     " << data << "\n";
-          std::cerr << "  filtered: " << filtered << "\n";
-          std::cerr << "  outliers: " << outliers << "\n";
-          std::cerr << "  flag:     " << flag << "\n";
-#endif
-
           flag.reverse();
-
           bool all_sign;
           auto pos = flag.leading_sign(all_sign);
-
-#ifndef __SYNTHESIS__
-          std::cerr << "  flag reversed: " << flag << "\n";
-          std::cerr << "  first pos: " << pos << "\n";
-          std::cerr << "  all_sign: " << all_sign << "\n";
-#endif
 
           while (!all_sign) {
             int index = nnz % width;
