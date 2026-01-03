@@ -236,6 +236,15 @@ class Pack1D<StdFloat<mantissa, exp>, pack_width> {
     return p;
   }
 
+  static Pack1D one() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = StdFloat<mantissa, exp>::one();
+    }
+    return p;
+  }
+
   static Pack1D fill(StdFloat<mantissa, exp> value) {
     Pack1D p;
 #pragma hls_unroll yes
@@ -354,6 +363,15 @@ class Pack1D<Int<W, S>, pack_width> {
     return p;
   }
 
+  static Pack1D one() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = Int<W, S>::one();
+    }
+    return p;
+  }
+
   static Pack1D fill(Int<W, S> value) {
     Pack1D p;
 #pragma hls_unroll yes
@@ -456,6 +474,33 @@ class Pack1D<UFloat<W, E>, pack_width> {
  public:
   UFloat<W, E> value[pack_width];
   static const unsigned int width = UFloat<W, E>::width * pack_width;
+
+  static Pack1D zero() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = UFloat<W, E>::zero();
+    }
+    return p;
+  }
+
+  static Pack1D one() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = UFloat<W, E>::one();
+    }
+    return p;
+  }
+
+  static Pack1D fill(UFloat<W, E> value) {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = value;
+    }
+    return p;
+  }
 
   UFloat<W, E>& operator[](size_t i) { return value[i]; }
   const UFloat<W, E>& operator[](size_t i) const { return value[i]; }
