@@ -21,7 +21,7 @@ std::vector<std::set<std::string>> vector_unit_stages = {
      "leaky_relu_",  "rrelu",        "rrelu_",    "softshrink", "softshrink_",
      "threshold",    "threshold_"},
     {"add", "add_", "mul", "mul_", "square", "div", "div_"},
-    {"div", "div_", "quantize", "quantize_mx"},
+    {"div", "div_", "quantize", "quantize_mx", "quantize_mx_outlier"},
 };
 
 std::map<std::string, unsigned int> get_vector_instruction_mapping() {
@@ -80,6 +80,7 @@ std::map<std::string, unsigned int> get_vector_instruction_mapping() {
   mapping["threshold_"] = VectorInstructions::vpoly;
   mapping["quantize"] = VectorInstructions::vdiv;
   mapping["quantize_mx"] = VectorInstructions::vquantize_mx;
+  mapping["quantize_mx_outlier"] = VectorInstructions::vquantize_mx_outlier;
   return mapping;
 }
 
@@ -278,13 +279,15 @@ void set_dequantize_scale(const codegen::Tensor& tensor,
 }
 
 void set_quantize_params(const codegen::Operation& param,
-                         VectorParams* vector_params,
-                         VectorInstructions& inst) {
+                         VectorParams* vector_params, VectorInstructions& inst,
+                         VectorInstructionConfig* vector_instruction_config) {
   const auto op_list = get_op_list(param);
-  const auto last_op = op_list.back();
+  const auto op = op_list.back();
+  const auto kwargs = op.kwargs();
+  const std::string opcode = op.target();
 
-  if (last_op.target() == "quantize") {
-    const auto scale = last_op.kwargs().at("scale").tensor();
+  if (opcode == "quantize") {
+    const auto scale = kwargs.at("scale").tensor();
     assert(get_size(scale) == 1);
 
     inst.vector_op3 = VectorInstructions::vdiv;
@@ -296,11 +299,11 @@ void set_quantize_params(const codegen::Operation& param,
     inst.immediate2 = immediate.bits_rep();
 
     delete[] array;
-  } else if (last_op.target() == "quantize_mx") {
-    int block_size = last_op.kwargs().at("block_size").int_value();
-    float quant_max = last_op.kwargs().at("quant_max").float_value();
+  } else if (opcode == "quantize_mx" || opcode == "quantize_mx_outlier") {
+    int block_size = kwargs.at("block_size").int_value();
+    float quant_max = kwargs.at("quant_max").float_value();
     bool force_scale_power_of_two =
-        last_op.kwargs().at("force_scale_power_of_two").int_value();
+        kwargs.at("force_scale_power_of_two").bool_value();
 
     assert(block_size == IC_DIMENSION);
 
@@ -313,11 +316,32 @@ void set_quantize_params(const codegen::Operation& param,
       inst.immediate2 = scale.bits_rep();
     }
 
-    vector_params->quantize_output_mx = true;
-    vector_params->mx_scale_offset = get_address(param.outputs().tensors(0));
+    const auto outputs = get_op_outputs(param);
+    const int num_outputs = outputs.size();
 
-    if (last_op.kwargs().contains("output_code")) {
-      const auto code = last_op.kwargs().at("output_code").tensor();
+    vector_params->quantize_output_mx = true;
+    vector_params->mx_scale_offset = get_address(outputs[num_outputs - 2]);
+
+    if (opcode == "quantize_mx_outlier") {
+      vector_params->has_sparse_output = true;
+      vector_params->csr_data_offset = get_address(outputs[0]);
+      vector_params->csr_indices_offset = get_address(outputs[1]);
+      vector_params->csr_indptr_offset = get_address(outputs[2]);
+
+      auto& config = vector_instruction_config->outlier_filter;
+
+      VECTOR_DATATYPE threshold = kwargs.at("threshold").float_value();
+      config.outlier_threshold = threshold.bits_rep();
+
+      const auto quantize_input = kwargs.at("input").tensor();
+      const auto quantize_shape = get_shape(quantize_input);
+      config.dense_input_shape[1] = quantize_shape.back() / VECTOR_UNIT_WIDTH;
+      config.dense_input_shape[0] =
+          get_size(quantize_input) / quantize_shape.back();
+    }
+
+    if (kwargs.contains("output_code")) {
+      const auto code = kwargs.at("output_code").tensor();
       const int size = get_size(code);
 
       float* array = read_constant_param(code);

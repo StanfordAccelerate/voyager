@@ -151,7 +151,7 @@ inline float* read_constant_param(const codegen::Tensor& tensor) {
       project_root + "/" + std::string(getenv("CODEGEN_DIR")) + "/networks/" +
       model_name + "/" + datatype + "/tensor_files/" + tensor.node() + ".bin";
 
-  const int size = get_size(tensor, false);
+  const int size = get_size(tensor, false, false);
 
   float* data = new float[size];
   std::ifstream input_stream(filename, std::ios::binary);

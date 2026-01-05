@@ -14,22 +14,22 @@ from deepdiff import DeepDiff
 
 from google.protobuf import text_format
 from google.protobuf.json_format import MessageToDict
-from quantized_training.codegen import param_pb2
+from voyager_compiler.codegen import param_pb2
 
 ACCURACY_RESULTS = {
     "resnet18": {
-        "E4M3": 69.6,
+        "E4M3": 69.3,
         "CFLOAT": 70.8,
-        "INT8": 69.8,
-        "MXINT8": 70.0,
-        "P8_1": 69.5,
+        "INT8": 69.5,
+        "MXINT8": 70.3,
+        "P8_1": 69.7,
     },
     "resnet50": {
-        "E4M3": 79.8,
+        "E4M3": 79.5,
         "CFLOAT": 81.2,
-        "INT8": 78.7,
-        "MXINT8": 81.1,
-        "P8_1": 79.7,
+        "INT8": 78.6,
+        "MXINT8": 81.2,
+        "P8_1": 80.2,
     },
     "mobilebert": {
         "E4M3": 90.94,
@@ -46,17 +46,17 @@ ACCURACY_RESULTS = {
         "P8_1": 92.78,
     },
     "vit": {
-        "E4M3": 84.3,
+        "E4M3": 84.5,
         "CFLOAT": 84.7,
-        "INT8": 78.2,
-        "MXINT8": 84.2,
-        "P8_1": 84.2,
+        "INT8": 77.1,
+        "MXINT8": 84.6,
+        "P8_1": 84.0,
     },
     "mobilenet_v2": {
         "E4M3":  62.5,
         "CFLOAT": 70.0,
         "INT8": 66.0,
-        "MXINT8": 72.3,
+        "MXINT8": 72.1,
         "P8_1": 63.8,
     },
 }
@@ -594,6 +594,14 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             "int8,qs=microscaling,bs=" + str(block_size),
             "--bf16",
         ]
+    elif env_vars["DATATYPE"] == "MXNF4":
+        quantization_args = [
+            "--activation",
+            f"int6,qs=microscaling,bs={block_size},scale=fp8_e5m3",
+            "--weight",
+            f"int6,qs=microscaling,bs={block_size},scale=fp8_e5m3",
+            "--bf16",
+        ]
     else:
         raise ValueError("Invalid datatype")
 
@@ -609,7 +617,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         subprocess.run(
             [
                 "python",
-                "quantized-training/test/test_codegen.py",
+                "voyager-compiler/test/test_codegen.py",
                 model,
                 "--model_name_or_path",
                 model_path,
@@ -622,6 +630,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 "--dump_dataset",
                 "--dataset_output_dir",
                 output_data_dir,
+                "--dump_tensors",
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,

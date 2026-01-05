@@ -98,9 +98,9 @@ struct MatrixParams : BaseParams {
 
 #if SUPPORT_SPMM
     is_spmm = false;
+    spmm_data_offset = 0;
     spmm_indices_offset = 0;
     spmm_indptr_offset = 0;
-    spmm_data_offset = 0;
 #endif
   }
 #endif
@@ -176,13 +176,13 @@ struct MatrixParams : BaseParams {
 
 #if SUPPORT_SPMM
   bool is_spmm;
+  ac_int<ADDRESS_WIDTH, false> spmm_data_offset;
   ac_int<ADDRESS_WIDTH, false> spmm_indices_offset;
   ac_int<ADDRESS_WIDTH, false> spmm_indptr_offset;
-  ac_int<ADDRESS_WIDTH, false> spmm_data_offset;
 #endif
 
   static const unsigned int base_width =
-      7 * 64 /* addresses */ + (12 + 10) * LOOP_WIDTH /* loops */ +
+      7 * ADDRESS_WIDTH /* addresses */ + (12 + 10) * LOOP_WIDTH /* loops */ +
       21 * 3 /* loop indices */ + 8 /* stride */ + 8 /* padding */ +
       8 /* Head Size */ + 2 /* num_channels */ + 3 /* fx_unrolling_lg2 */ +
       12 * 1 /* Bools */ + 32 /* input shapes */;
@@ -298,9 +298,9 @@ struct MatrixParams : BaseParams {
 
 #if SUPPORT_SPMM
     m & is_spmm;
+    m & spmm_data_offset;
     m & spmm_indices_offset;
     m & spmm_indptr_offset;
-    m & spmm_data_offset;
 #endif
   }
 
@@ -418,9 +418,9 @@ struct MatrixParams : BaseParams {
 
 #if SUPPORT_SPMM
     os << "is_spmm: " << params.is_spmm << std::endl;
+    os << "spmm_data_offset: " << params.spmm_data_offset << std::endl;
     os << "spmm_indices_offset: " << params.spmm_indices_offset << std::endl;
     os << "spmm_indptr_offset: " << params.spmm_indptr_offset << std::endl;
-    os << "spmm_data_offset: " << params.spmm_data_offset << std::endl;
 #endif
     return os;
   }
@@ -512,9 +512,9 @@ struct MatrixParams : BaseParams {
 
 #if SUPPORT_SPMM
     if (lhs.is_spmm != rhs.is_spmm) return false;
+    if (lhs.spmm_data_offset != rhs.spmm_data_offset) return false;
     if (lhs.spmm_indices_offset != rhs.spmm_indices_offset) return false;
     if (lhs.spmm_indptr_offset != rhs.spmm_indptr_offset) return false;
-    if (lhs.spmm_data_offset != rhs.spmm_data_offset) return false;
 #endif
 
     // If all members are equal, return true
@@ -535,7 +535,7 @@ struct VectorInstructions {
 #ifndef __SYNTHESIS__
   VectorInstructions() {
     op_type = 0;
-    inst_count = 1;
+    inst_loop_count = 1;
     vector_op0_src0 = 0;
     vector_op0_src1 = 0;
     vector_op2_src1 = 0;
@@ -565,7 +565,7 @@ struct VectorInstructions {
   static const unsigned int reduction = 1;
   static const unsigned int accumulation = 2;
 
-  ac_int<24, false> inst_count;
+  ac_int<24, false> inst_loop_count;
 
   ac_int<4, false> vector_op0_src0;
   ac_int<4, false> vector_op0_src1;
@@ -610,6 +610,7 @@ struct VectorInstructions {
   ac_int<2, false> vector_op3;
   static const unsigned int vdiv = 1;
   static const unsigned int vquantize_mx = 2;
+  static const unsigned int vquantize_mx_outlier = 3;
 
   ac_int<10, false> reduce_count;
   ac_int<2, false> reduce_op;
@@ -641,7 +642,7 @@ struct VectorInstructions {
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     m & op_type;
-    m & inst_count;
+    m & inst_loop_count;
     m & vector_op0_src0;
     m & vector_op0_src1;
     m & vector_op2_src1;
@@ -675,7 +676,7 @@ struct VectorInstructions {
   inline friend std::ostream& operator<<(ostream& os,
                                          const VectorInstructions& params) {
     os << "op_type: " << params.op_type << std::endl;
-    os << "inst_count: " << params.inst_count << std::endl;
+    os << "inst_loop_count: " << params.inst_loop_count << std::endl;
     os << "vector_op0_src0: " << params.vector_op0_src0 << std::endl;
     os << "vector_op0_src1: " << params.vector_op0_src1 << std::endl;
     os << "vector_op2_src1: " << params.vector_op2_src1 << std::endl;
@@ -702,7 +703,8 @@ struct VectorInstructions {
 
   inline friend bool operator==(const VectorInstructions& lhs,
                                 const VectorInstructions& rhs) {
-    return lhs.op_type == rhs.op_type && lhs.inst_count == rhs.inst_count &&
+    return lhs.op_type == rhs.op_type &&
+           lhs.inst_loop_count == rhs.inst_loop_count &&
            lhs.vector_op0_src0 == rhs.vector_op0_src0 &&
            lhs.vector_op0_src1 == rhs.vector_op0_src1 &&
            lhs.vector_op2_src1 == rhs.vector_op2_src1 &&
@@ -823,6 +825,12 @@ struct VectorParams : BaseParams {
 
     quantize_output_mx = false;
     mx_scale_offset = 0;
+
+    has_sparse_output = false;
+    csr_data_offset = 0;
+    csr_indices_offset = 0;
+    csr_indptr_offset = 0;
+
     use_output_codebook = false;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       output_code[i] = 0;
@@ -912,6 +920,12 @@ struct VectorParams : BaseParams {
   bool quantize_output_mx;
   ac_int<ADDRESS_WIDTH, false> mx_scale_offset;
 
+  // Sparse tensor output
+  bool has_sparse_output;
+  ac_int<ADDRESS_WIDTH, false> csr_data_offset;
+  ac_int<ADDRESS_WIDTH, false> csr_indices_offset;
+  ac_int<ADDRESS_WIDTH, false> csr_indptr_offset;
+
   bool use_output_codebook;
   ac_int<MAX_DECODED_DTYPE_WIDTH + 1, true>
       output_code[NUM_CODEBOOK_ENTRIES - 1];
@@ -927,13 +941,15 @@ struct VectorParams : BaseParams {
   static const unsigned int codebook_params_width =
       (NUM_CODEBOOK_ENTRIES - 1) * (MAX_DECODED_DTYPE_WIDTH + 1);
 
+  static const unsigned int sparse_params_width = 3 * ADDRESS_WIDTH + 1;
+
   // There are 4 address generators in total + 12-bit broadcasting flag + 36-bit
   // slicing params + 32-bit pooling param + 18-bit reshape params + 4-bit head
   // size + 8 boolean flags + 64-bit scale offset - output dequantize scale and
   // packing params + cookbook params
   static const unsigned int width = 4 * address_gen_width + 12 + 36 + 32 + 18 +
                                     4 + 8 + ADDRESS_WIDTH - 16 - 18 +
-                                    codebook_params_width;
+                                    codebook_params_width + sparse_params_width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -1058,6 +1074,12 @@ struct VectorParams : BaseParams {
 
     m & quantize_output_mx;
     m & mx_scale_offset;
+
+    // Sparse tensor output offsets
+    m & has_sparse_output;
+    m & csr_data_offset;
+    m & csr_indices_offset;
+    m & csr_indptr_offset;
 
     m & use_output_codebook;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
@@ -1228,6 +1250,11 @@ struct VectorParams : BaseParams {
     os << "quantize_output_mx: " << params.quantize_output_mx << std::endl;
     os << "mx_scale_offset: " << params.mx_scale_offset << std::endl;
 
+    os << "has_sparse_output: " << params.has_sparse_output << std::endl;
+    os << "csr_data_offset: " << params.csr_data_offset << std::endl;
+    os << "csr_indices_offset: " << params.csr_indices_offset << std::endl;
+    os << "csr_indptr_offset: " << params.csr_indptr_offset << std::endl;
+
     os << "use_output_codebook: " << params.use_output_codebook << std::endl;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       os << "output_code[" << i << "]: " << params.output_code[i] << std::endl;
@@ -1375,6 +1402,12 @@ struct VectorParams : BaseParams {
 
     if (lhs.quantize_output_mx != rhs.quantize_output_mx) return false;
     if (lhs.mx_scale_offset != rhs.mx_scale_offset) return false;
+
+    if (lhs.has_sparse_output != rhs.has_sparse_output) return false;
+    if (lhs.csr_data_offset != rhs.csr_data_offset) return false;
+    if (lhs.csr_indices_offset != rhs.csr_indices_offset) return false;
+    if (lhs.csr_indptr_offset != rhs.csr_indptr_offset) return false;
+
     if (lhs.use_output_codebook != rhs.use_output_codebook) return false;
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES - 1; i++) {
       if (lhs.output_code[i] != rhs.output_code[i]) return false;
@@ -1430,7 +1463,6 @@ struct ApproxUnitConfig {
                               const std::string& name) {
     // TODO
   }
-
 #endif
 
   inline friend std::ostream& operator<<(std::ostream& os,
@@ -1466,21 +1498,68 @@ struct ApproxUnitConfig {
   }
 };
 
+struct OutlierFilterConfig {
+#ifndef __SYNTHESIS__
+  OutlierFilterConfig() {
+    outlier_threshold = 0;
+    dense_input_shape[0] = 0;
+    dense_input_shape[1] = 0;
+  }
+#endif
+
+  ac_int<16, false> outlier_threshold;
+  ac_int<16, false> dense_input_shape[2];
+
+  static const unsigned int width = 16 + 16 * 2;
+
+#ifndef NO_SYSC
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size>& m) {
+    m & outlier_threshold;
+    m& dense_input_shape[0];
+    m& dense_input_shape[1];
+  }
+
+  // TODO
+  inline friend void sc_trace(sc_trace_file* tf,
+                              const OutlierFilterConfig& config,
+                              const std::string& name) {}
+#endif
+
+  inline friend std::ostream& operator<<(std::ostream& os,
+                                         const OutlierFilterConfig& config) {
+    os << "outlier_threshold: " << config.outlier_threshold << std::endl;
+    os << "dense_input_shape[0]: " << config.dense_input_shape[0] << std::endl;
+    os << "dense_input_shape[1]: " << config.dense_input_shape[1] << std::endl;
+    return os;
+  }
+
+  inline friend bool operator==(const OutlierFilterConfig& lhs,
+                                const OutlierFilterConfig& rhs) {
+    if (lhs.outlier_threshold != rhs.outlier_threshold) return false;
+    if (lhs.dense_input_shape[0] != rhs.dense_input_shape[0]) return false;
+    if (lhs.dense_input_shape[1] != rhs.dense_input_shape[1]) return false;
+    return true;
+  }
+};
+
 struct VectorInstructionConfig : BaseParams {
 #ifndef __SYNTHESIS__
   VectorInstructionConfig() {
     num_inst = 0;
-    repeat_count = 0;
+    config_loop_count = 0;
   }
 #endif
 
   VectorInstructions inst[8];
   ac_int<4, false> num_inst;
-  ac_int<16, false> repeat_count;
+  ac_int<16, false> config_loop_count;
   ApproxUnitConfig approx;
+  OutlierFilterConfig outlier_filter;
 
-  static const unsigned int width =
-      VectorInstructions::width * 8 + 4 + 16 + ApproxUnitConfig::width;
+  static const unsigned int width = VectorInstructions::width * 8 + 4 + 16 +
+                                    ApproxUnitConfig::width +
+                                    OutlierFilterConfig::width;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
@@ -1489,7 +1568,7 @@ struct VectorInstructionConfig : BaseParams {
       m& inst[j].op_type;
     }
     for (int j = 0; j < 8; j++) {
-      m& inst[j].inst_count;
+      m& inst[j].inst_loop_count;
     }
     for (int j = 0; j < 8; j++) {
       m& inst[j].vector_op0_src0;
@@ -1556,7 +1635,7 @@ struct VectorInstructionConfig : BaseParams {
     }
 
     m & num_inst;
-    m & repeat_count;
+    m & config_loop_count;
 
     for (int i = 0; i < NUM_MAXES; i++) {
       m & approx.maxes[i];
@@ -1568,6 +1647,10 @@ struct VectorInstructionConfig : BaseParams {
     }
     m & approx.clamp_min;
     m & approx.clamp_max;
+
+    m & outlier_filter.outlier_threshold;
+    m & outlier_filter.dense_input_shape[0];
+    m & outlier_filter.dense_input_shape[1];
   }
 
   inline friend void sc_trace(sc_trace_file* tf,
@@ -1580,11 +1663,11 @@ struct VectorInstructionConfig : BaseParams {
   inline friend std::ostream& operator<<(
       ostream& os, const VectorInstructionConfig& params) {
     for (int i = 0; i < params.num_inst; i++) {
-      os << "instIndex: " << i << std::endl;
+      os << "Instruction " << i << std::endl;
       os << params.inst[i] << std::endl;
     }
     os << "num_inst: " << params.num_inst << std::endl;
-    os << "repeat_count: " << params.repeat_count << std::endl;
+    os << "config_loop_count: " << params.config_loop_count << std::endl;
     return os;
   }
 
@@ -1593,7 +1676,8 @@ struct VectorInstructionConfig : BaseParams {
     for (int i = 0; i < 8; i++) {
       if (!(lhs.inst[i] == rhs.inst[i])) return false;
     }
-    if (lhs.num_inst != rhs.num_inst || lhs.repeat_count != rhs.repeat_count)
+    if (lhs.num_inst != rhs.num_inst ||
+        lhs.config_loop_count != rhs.config_loop_count)
       return false;
     if (!(lhs.approx == rhs.approx)) return false;
 
@@ -1654,7 +1738,7 @@ struct DwCParams : BaseParams {
   ac_int<1, false> use_mx;             // 0: no mx, 1: use mx
 
   static const unsigned int width =
-      (4 + 2) * 64 /* OFFSETS */ + (6 + 3) * 10 /* Loops */ +
+      (4 + 2) * ADDRESS_WIDTH /* OFFSETS */ + (6 + 3) * 10 /* Loops */ +
       (3) * 10 /* bounds */ + 4 /* stride */ + (2 * 2) * 7 /* padding */ +
       1 /* MODE */ + 3 /* block_size */ + 1 /* use_mx */;
 

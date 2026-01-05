@@ -167,49 +167,29 @@ SC_MODULE(InputScaleController) {
                                   scale_req);
                             }
 
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
     }
   }
@@ -327,50 +307,30 @@ SC_MODULE(InputScaleController) {
                             scale_req.last = is_last;
                             write_request[bank_sel].Push(scale_req);
 
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
                 bank_sel = !bank_sel;
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
     }
   }
@@ -464,50 +424,30 @@ SC_MODULE(InputScaleController) {
                             };
                             read_request[bank_sel].Push(req);
 
-                            if (loop_counters[1][5] == loop_bounds[1][5] - 1) {
+                            if (loop_counters[1][5] == loop_bounds[1][5] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4] - 1) {
+                          if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3] - 1) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2] - 1) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                 }
                 bank_sel = !bank_sel;
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
     }
   }

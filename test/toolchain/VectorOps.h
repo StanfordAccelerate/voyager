@@ -451,7 +451,7 @@ void map_vector_operations(const codegen::Operation& param,
 
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;
-  inst.inst_count = get_size(output) / VECTOR_UNIT_WIDTH;
+  inst.inst_loop_count = get_size(output) / VECTOR_UNIT_WIDTH;
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
@@ -526,10 +526,10 @@ void map_vector_operations(const codegen::Operation& param,
       inst.immediate0 = immediate.bits_rep();
       inst.vector_op0_src0 = VectorInstructions::from_immediate_0;
       inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_0;
-    } else if (opcode == "quantize_mx") {
+    } else if (opcode == "quantize_mx" || opcode == "quantize_mx_outlier") {
       float quant_max = op.kwargs().at("quant_max").float_value();
       bool force_scale_power_of_two =
-          op.kwargs().at("force_scale_power_of_two").int_value();
+          op.kwargs().at("force_scale_power_of_two").bool_value();
 
       if (force_scale_power_of_two) {
         inst.immediate2 = floor(log2(quant_max));
@@ -538,8 +538,29 @@ void map_vector_operations(const codegen::Operation& param,
         inst.immediate2 = scale.bits_rep();
       }
 
+      const auto outputs = get_op_outputs(param);
+      const int num_outputs = outputs.size();
+
       vector_params->quantize_output_mx = true;
-      vector_params->mx_scale_offset = get_address(param.outputs().tensors(0));
+      vector_params->mx_scale_offset = get_address(outputs[num_outputs - 2]);
+
+      if (opcode == "quantize_mx_outlier") {
+        vector_params->has_sparse_output = true;
+        vector_params->csr_data_offset = get_address(outputs[0]);
+        vector_params->csr_indices_offset = get_address(outputs[1]);
+        vector_params->csr_indptr_offset = get_address(outputs[2]);
+
+        auto& config = vector_instruction_config->outlier_filter;
+
+        VECTOR_DATATYPE threshold = op.kwargs().at("threshold").float_value();
+        config.outlier_threshold = threshold.bits_rep();
+
+        const auto quantize_input = op.kwargs().at("input").tensor();
+        const auto quantize_shape = get_shape(quantize_input);
+        config.dense_input_shape[1] = quantize_shape.back() / VECTOR_UNIT_WIDTH;
+        config.dense_input_shape[0] =
+            get_size(quantize_input) / quantize_shape.back();
+      }
 
       // Copy coefficients from ApproximationConstants.h
     } else if (opcode == "gelu" || opcode == "gelu_") {
@@ -853,6 +874,7 @@ void map_vector_operations(const codegen::Operation& param,
       }
     }
 
+    // For both quantize and quantize_mx, set output codebook if provided
     if (op.kwargs().contains("output_code")) {
       const auto code = op.kwargs().at("output_code").tensor();
       const int size = get_size(code);
@@ -874,7 +896,7 @@ void map_vector_operations(const codegen::Operation& param,
   // total output count
   vector_instruction_config->inst[0] = inst;
   vector_instruction_config->num_inst = 1;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);

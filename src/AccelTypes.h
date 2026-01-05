@@ -61,15 +61,15 @@ struct PEInput {
     m & swap_weights;
   }
 
-  inline friend void sc_trace(sc_trace_file* tf, const PEInput& peInput,
+  inline friend void sc_trace(sc_trace_file* tf, const PEInput& pe_input,
                               const std::string& name) {
-    sc_trace(tf, peInput.data, name + ".data");
-    sc_trace(tf, peInput.swap_weights, name + ".swap_weights");
+    sc_trace(tf, pe_input.data, name + ".data");
+    sc_trace(tf, pe_input.swap_weights, name + ".swap_weights");
   }
 
-  inline friend std::ostream& operator<<(ostream& os, const PEInput& peInput) {
-    os << peInput.data << " ";
-    os << peInput.swap_weights << " ";
+  inline friend std::ostream& operator<<(ostream& os, const PEInput& pe_input) {
+    os << pe_input.data << " ";
+    os << pe_input.swap_weights << " ";
 
     return os;
   }
@@ -236,6 +236,15 @@ class Pack1D<StdFloat<mantissa, exp>, pack_width> {
     return p;
   }
 
+  static Pack1D one() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = StdFloat<mantissa, exp>::one();
+    }
+    return p;
+  }
+
   static Pack1D fill(StdFloat<mantissa, exp> value) {
     Pack1D p;
 #pragma hls_unroll yes
@@ -354,6 +363,15 @@ class Pack1D<Int<W, S>, pack_width> {
     return p;
   }
 
+  static Pack1D one() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = Int<W, S>::one();
+    }
+    return p;
+  }
+
   static Pack1D fill(Int<W, S> value) {
     Pack1D p;
 #pragma hls_unroll yes
@@ -457,6 +475,33 @@ class Pack1D<UFloat<W, E>, pack_width> {
   UFloat<W, E> value[pack_width];
   static const unsigned int width = UFloat<W, E>::width * pack_width;
 
+  static Pack1D zero() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = UFloat<W, E>::zero();
+    }
+    return p;
+  }
+
+  static Pack1D one() {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = UFloat<W, E>::one();
+    }
+    return p;
+  }
+
+  static Pack1D fill(UFloat<W, E> value) {
+    Pack1D p;
+#pragma hls_unroll yes
+    for (int i = 0; i < pack_width; ++i) {
+      p.value[i] = value;
+    }
+    return p;
+  }
+
   UFloat<W, E>& operator[](size_t i) { return value[i]; }
   const UFloat<W, E>& operator[](size_t i) const { return value[i]; }
 
@@ -476,6 +521,76 @@ class Pack1D<UFloat<W, E>, pack_width> {
     }
 
     return true;
+  }
+};
+
+template <typename T, typename Meta, int pack_width>
+struct CsrDataAndIndices {
+  Pack1D<T, pack_width> data;
+  Pack1D<Meta, pack_width> indices;
+  bool is_last;
+
+  static const unsigned int width =
+      Pack1D<T, pack_width>::width + Pack1D<Meta, pack_width>::width + 1;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size>& m) {
+    for (int i = 0; i < pack_width; i++) {
+      m& data[i];
+    }
+    for (int i = 0; i < pack_width; i++) {
+      m& indices[i];
+    }
+    m & is_last;
+  }
+
+  inline friend void sc_trace(sc_trace_file* tf, const CsrDataAndIndices& csr,
+                              const std::string& name) {
+    sc_trace(tf, csr.data, name + ".data");
+    sc_trace(tf, csr.indices, name + ".indices");
+    sc_trace(tf, csr.is_last, name + ".is_last");
+  }
+
+  inline friend std::ostream& operator<<(ostream& os,
+                                         const CsrDataAndIndices& csr) {
+    return os << "data: " << csr.data << " indices: " << csr.indices
+              << " is_last: " << csr.is_last;
+  }
+
+  inline friend bool operator==(const CsrDataAndIndices& lhs,
+                                const CsrDataAndIndices& rhs) {
+    return lhs.data == rhs.data && lhs.indices == rhs.indices &&
+           lhs.is_last == rhs.is_last;
+  }
+};
+
+template <typename T>
+struct CsrWriteRequest {
+  ac_int<ADDRESS_WIDTH, false> address;
+  T data;
+
+  static const unsigned int width = ADDRESS_WIDTH + T::width;
+
+  template <unsigned int Size>
+  void Marshall(Marshaller<Size>& m) {
+    m & address;
+    m & data;
+  }
+
+  inline friend void sc_trace(sc_trace_file* tf, const CsrWriteRequest& request,
+                              const std::string& name) {
+    sc_trace(tf, request.address, name + ".address");
+    sc_trace(tf, request.data, name + ".data");
+  }
+
+  inline friend std::ostream& operator<<(ostream& os,
+                                         const CsrWriteRequest& request) {
+    return os << request.address << " " << request.data << " ";
+  }
+
+  inline friend bool operator==(const CsrWriteRequest& lhs,
+                                const CsrWriteRequest& rhs) {
+    return lhs.address == rhs.address && lhs.data == rhs.data;
   }
 };
 

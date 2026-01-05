@@ -147,7 +147,7 @@ void map_matrix_vector_multiply(const codegen::Operation& param,
   // up the entire vector (this is now output_dim dimension)
   VectorInstructions vinst1;
   vinst1.op_type = VectorInstructions::vector;
-  vinst1.inst_count = reduction_dim;
+  vinst1.inst_loop_count = reduction_dim;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   vinst1.vector_op0 = VectorInstructions::vmult;
@@ -166,7 +166,7 @@ void map_matrix_vector_multiply(const codegen::Operation& param,
   }
 
   vector_instruction_config->num_inst = has_bias ? 3 : 2;
-  vector_instruction_config->repeat_count = output_dim / VECTOR_UNIT_WIDTH;
+  vector_instruction_config->config_loop_count = output_dim / VECTOR_UNIT_WIDTH;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);

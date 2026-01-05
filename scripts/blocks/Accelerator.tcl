@@ -37,7 +37,7 @@ proc get_accelerator_config {} {
 
   lappend config_list [dict create \
     name "MatrixParamsDeserializer" \
-    template "MatrixParamsDeserializer<[expr {$SUPPORT_MX ? 5 : 3}]>" \
+    template "MatrixParamsDeserializer<0, [expr {$SUPPORT_MX ? 5 : 3}]>" \
   ]
 
   lappend config_list [dict create \

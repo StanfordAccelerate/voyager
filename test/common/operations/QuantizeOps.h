@@ -26,6 +26,54 @@ Input* quantize(std::any input, std::any scale, std::vector<int> shape) {
   return outputs;
 }
 
+template <typename Input, typename Meta>
+std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
+    std::any input, std::vector<int> input_shape, const int data_size,
+    Input threshold) {
+  spdlog::debug("Performing outlier filtering operation\n");
+  Input* inputs = std::any_cast<Input*>(input);
+
+  // Expect 2D tensor
+  const int ndim = input_shape.size();
+  const int K = input_shape[ndim - 1];
+  const int X = get_size(input_shape) / K;
+
+  Input* data = new Input[data_size];
+  Meta* indices = new Meta[data_size];
+  Meta* indptr = new Meta[X + 1];
+  Input* filtered = new Input[X * K];
+
+  // Initialize indices and data
+  for (int i = 0; i < data_size; i++) {
+    data[i] = 0;
+    indices[i] = -1;
+  }
+
+  indptr[0] = 0;
+  int nnz = 0;
+
+  for (int x = 0; x < X; ++x) {
+    for (int k = 0; k < K; ++k) {
+      Input v = inputs[x * K + k];
+      if (v.abs() > threshold) {
+        indices[nnz] = k;
+        data[nnz] = v;
+        nnz++;
+        filtered[x * K + k] = 0;
+      } else {
+        filtered[x * K + k] = v;
+      }
+    }
+    indptr[x + 1] = nnz;
+  }
+
+  delete[] inputs;
+
+  spdlog::debug("Filtered {} outliers\n", nnz);
+
+  return {data, indices, indptr, filtered};
+}
+
 template <typename Input, typename Scale>
 Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
                    int block_size, int axis) {

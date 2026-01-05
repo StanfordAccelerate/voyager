@@ -173,7 +173,7 @@ using F9 = StdFloat<3, 5>;
 #error "No OC dimension specified!"
 #endif
 
-#define ADDRESS_WIDTH 64
+#define ADDRESS_WIDTH 32
 
 #ifndef SUPPORT_MX
 #define SUPPORT_MX false
@@ -198,9 +198,6 @@ using F9 = StdFloat<3, 5>;
 #ifndef VECTOR_UNIT_WIDTH
 #define VECTOR_UNIT_WIDTH OC_DIMENSION
 #endif
-
-#define MVU_SCALE_PORT_WIDTH \
-  (SCALE_DATATYPE::width * MV_UNIT_WIDTH / OC_DIMENSION)
 
 // ================================================================
 // Default Datatypes
@@ -236,6 +233,10 @@ using F9 = StdFloat<3, 5>;
 #else
 #define OUTPUT_DATATYPES INPUT_DATATYPE, VECTOR_DATATYPE
 #endif
+#endif
+
+#ifndef SPMM_META_DATATYPE
+#define SPMM_META_DATATYPE DataTypes::int16
 #endif
 
 // ================================================================
@@ -297,6 +298,9 @@ using WeightTypeList = std::tuple<WEIGHT_DATATYPE>;
 #endif
 
 #define OC_PORT_TYPE ac_int<OC_PORT_WIDTH, false>
+
+#define MVU_SCALE_PORT_WIDTH \
+  (SCALE_DATATYPE::width * MV_UNIT_WIDTH / OC_DIMENSION)
 
 // ================================================================
 // Buffer Configurations

@@ -12,7 +12,7 @@ void map_microscaling(const codegen::Operation& param,
   const int block_size = quantize_mx_op.kwargs().at("block_size").int_value();
   const float quant_max = quantize_mx_op.kwargs().at("quant_max").float_value();
   const bool force_scale_power_of_two =
-      quantize_mx_op.kwargs().at("force_scale_power_of_two").int_value();
+      quantize_mx_op.kwargs().at("force_scale_power_of_two").bool_value();
 
   codegen::Tensor output;
   if (param.has_output()) {
@@ -85,7 +85,7 @@ void map_microscaling(const codegen::Operation& param,
   // perform max accumulation
   VectorInstructions vinst0;
   vinst0.op_type = VectorInstructions::accumulation;
-  vinst0.inst_count = get_size(input) / block_size / VECTOR_UNIT_WIDTH;
+  vinst0.inst_loop_count = get_size(input) / block_size / VECTOR_UNIT_WIDTH;
   vinst0.reduce_op = VectorInstructions::rmax;
   vinst0.reduce_count = block_size;
   vinst0.rdest = VectorInstructions::to_memory;
@@ -94,7 +94,7 @@ void map_microscaling(const codegen::Operation& param,
   // feed accumulator
   VectorInstructions vinst1;
   vinst1.op_type = VectorInstructions::vector;
-  vinst1.inst_count = get_size(input) / VECTOR_UNIT_WIDTH;
+  vinst1.inst_loop_count = get_size(input) / VECTOR_UNIT_WIDTH;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vector_op0_src1 = VectorInstructions::from_immediate_0;
   VECTOR_DATATYPE immediate = force_scale_power_of_two
@@ -107,7 +107,7 @@ void map_microscaling(const codegen::Operation& param,
   vector_instruction_config->inst[1] = vinst1;
 
   vector_instruction_config->num_inst = 2;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);

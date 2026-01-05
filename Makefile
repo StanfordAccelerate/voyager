@@ -166,6 +166,11 @@ ifeq ($(SUPPORT_DWC), true)
 RTL_DEPENDENCIES += $(CATAPULT_BUILD_DIR)/DwCUnit/DwCUnit.v1/concat_rtl.v
 endif
 
+VU_RTL_DEPENDENCIES =
+ifeq ($(SUPPORT_SPMM), true)
+VU_RTL_DEPENDENCIES += $(CATAPULT_BUILD_DIR)/OutlierFilter/OutlierFilter.v1/concat_rtl.v
+endif
+
 # For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
 InputController: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v
@@ -219,7 +224,11 @@ $(CATAPULT_BUILD_DIR)/VectorParamsDeserializer/VectorParamsDeserializer.v1/conca
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorParamsDeserializer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorParamsDeserializer.log
 
-$(CATAPULT_BUILD_DIR)/VectorPipeline/VectorPipeline.v1/concat_rtl.v: src/vector_unit/VectorPipeline.h $(PROTOS_DEPENDENCY)
+$(CATAPULT_BUILD_DIR)/OutlierFilter/OutlierFilter.v1/concat_rtl.v: src/vector_unit/OutlierFilter.h $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=OutlierFilter catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/OutlierFilter.log
+
+$(CATAPULT_BUILD_DIR)/VectorPipeline/VectorPipeline.v1/concat_rtl.v: $(VU_RTL_DEPENDENCIES) src/vector_unit/VectorPipeline.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorPipeline catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorPipeline.log
 
@@ -401,8 +410,8 @@ toolchain: $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/Tiling.o $(CC_BUILD_DI
 $(CC_BUILD_DIR)/Network.o: test/common/Network.cc test/compiler/proto/param.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
-test/compiler/proto/param.pb.cc: quantized-training/src/quantized_training/codegen/param.proto
-	protoc -I=quantized-training/src/quantized_training/codegen --cpp_out=test/compiler/proto $<
+test/compiler/proto/param.pb.cc: voyager-compiler/src/voyager_compiler/codegen/param.proto
+	protoc -I=voyager-compiler/src/voyager_compiler/codegen --cpp_out=test/compiler/proto $<
 
 test/compiler/proto/tiling_pb2.py: test/compiler/proto/tiling.proto
 	protoc --proto_path=test/compiler/proto/ --python_out=test/compiler/proto $<

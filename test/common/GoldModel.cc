@@ -59,14 +59,16 @@ bool type_cast_helper(std::any& input_ptr, float* codebook,
 }
 
 template <typename U, typename... Ts>
-void cast_input(std::any& input_ptr, float* codebook, codegen::Tensor tensor) {
+void cast_input(std::any& input_ptr, codegen::Tensor tensor,
+                float* codebook = nullptr) {
   if (!(type_cast_helper<Ts, U, true>(input_ptr, codebook, tensor) || ...)) {
     throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
   }
 }
 
 template <typename U, typename... Ts>
-void cast_output(std::any& input_ptr, float* codebook, codegen::Tensor tensor) {
+void cast_output(std::any& input_ptr, codegen::Tensor tensor,
+                 float* codebook = nullptr) {
   if (!(type_cast_helper<U, Ts, false>(input_ptr, codebook, tensor) || ...)) {
     throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
   }
@@ -76,18 +78,18 @@ template <typename T>
 std::any process_gemm_inputs(const codegen::OpOverload& first_op,
                              const std::string& code_key,
                              const codegen::Tensor& tensor, std::any& ptr) {
-  float* code_data = nullptr;
+  float* codebook = nullptr;
 
   if (first_op.kwargs().contains(code_key)) {
     const auto code = first_op.kwargs().at(code_key).tensor();
-    code_data = read_constant_param(code);
+    codebook = read_constant_param(code);
   }
 
   // Cast tensor to systolic array compute type
-  cast_input<T, SUPPORTED_TYPES>(ptr, code_data, tensor);
+  cast_input<T, SUPPORTED_TYPES>(ptr, tensor, codebook);
 
-  if (code_data != nullptr) {
-    delete[] code_data;
+  if (codebook != nullptr) {
+    delete[] codebook;
   }
 
   // Perform reshape if necessary
@@ -110,6 +112,9 @@ std::vector<std::any> run_operation(const Operation& operation,
   auto op_list = get_op_list(param);
   const auto first_op = op_list.front();
   spdlog::debug("Running operation: {}\n", first_op.target());
+
+  const auto& output_tensors = get_op_outputs(param);
+  const int num_outputs = output_tensors.size();
 
   if (is_gemm_op(first_op.target())) {
     const auto input = first_op.kwargs().at("input").tensor();
@@ -230,13 +235,13 @@ std::vector<std::any> run_operation(const Operation& operation,
       weight_code = read_constant_param(code);
     }
 
-    cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight_code, weight);
+    cast_input<SaWeight, SUPPORTED_TYPES>(weight_ptr, weight, weight_code);
 
     if (weight_code != nullptr) {
       delete[] weight_code;
     }
 
-    output_ptr = spmm_csr<Vector, SaWeight, Vector, Scale>(
+    output_ptr = spmm_csr<SPMM_META_DATATYPE, Vector, SaWeight, Vector, Scale>(
         input_data_ptr, input_indices_ptr, input_indptr_ptr, weight_ptr,
         weight_scale_ptr, first_op);
   } else if (first_op.kwargs().contains("input")) {
@@ -289,28 +294,28 @@ std::vector<std::any> run_operation(const Operation& operation,
   if (first_op.target() == "transpose") {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];
-    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, input);
     output_ptr = transpose<Vector>(input_ptr, first_op);
   }
 
   if (first_op.target() == "permute") {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];
-    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, input);
     output_ptr = permute<Vector>(input_ptr, first_op);
   }
 
   if (first_op.target() == "slice") {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];
-    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, input);
     output_ptr = slice<Vector>(input_ptr, first_op);
   }
 
   if (first_op.target() == "pad") {
     const auto input = first_op.kwargs().at("input").tensor();
     std::any input_ptr = kwargs[input.node()];
-    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, nullptr, input);
+    cast_input<Vector, SUPPORTED_TYPES>(input_ptr, input);
     output_ptr = pad_tensor<Vector>(input_ptr, first_op);
   }
 
@@ -323,10 +328,10 @@ std::vector<std::any> run_operation(const Operation& operation,
 
     if (input.has_reshape()) {
       const auto reshape_op = input.reshape();
-      cast_input<Vector, SUPPORTED_TYPES>(output_ptr, nullptr, input);
+      cast_input<Vector, SUPPORTED_TYPES>(output_ptr, input);
       output_ptr = permute<Vector>(output_ptr, reshape_op);
       output_ptr = slice<Vector>(output_ptr, reshape_op);
-      cast_output<Vector, SUPPORTED_TYPES>(output_ptr, nullptr, input);
+      cast_output<Vector, SUPPORTED_TYPES>(output_ptr, input);
     }
   }
 
@@ -447,7 +452,8 @@ std::vector<std::any> run_operation(const Operation& operation,
               output_ptr, scale_ptr, input_shape, block_size, axis);
         }
       }
-    } else if (op.target() == "quantize_mx") {
+    } else if (op.target() == "quantize_mx" ||
+               op.target() == "quantize_mx_outlier") {
       if constexpr (std::is_same<Vector, CFloat>::value) {
         spdlog::error(
             "No quantization operations should be emitted for CFloat\n");
@@ -459,20 +465,33 @@ std::vector<std::any> run_operation(const Operation& operation,
         const int block_size = op.kwargs().at("block_size").int_value();
         const int axis = op.kwargs().at("axes").int_list().values()[0];
         const bool force_scale_power_of_two =
-            op.kwargs().at("force_scale_power_of_two").int_value();
+            op.kwargs().at("force_scale_power_of_two").bool_value();
 
         if (op.kwargs().contains("output_code")) {
           const auto code = op.kwargs().at("output_code").tensor();
           output_code = read_constant_param(code);
         }
 
-        Vector* mx_scale = calculate_mx_qparam<Vector, Scale>(
+        if (op.target() == "quantize_mx_outlier") {
+          const float threshold = op.kwargs().at("threshold").float_value();
+          const auto& csr_data = output_tensors[0];
+          const int data_size = get_size(csr_data);
+          auto [data, indices, indptr, filtered] =
+              filter_outlier<Vector, SPMM_META_DATATYPE>(
+                  output_ptr, input_shape, data_size, threshold);
+          outputs.insert(outputs.end(), {data, indices, indptr});
+          output_ptr = filtered;
+        }
+
+        std::any mx_scale = calculate_mx_qparam<Vector, Scale>(
             output_ptr, input_shape, quant_max, block_size, axis,
             force_scale_power_of_two);
 
         output_ptr = quantize_mx<Vector, Vector>(output_ptr, mx_scale,
                                                  input_shape, block_size, axis);
 
+        cast_output<Vector, SUPPORTED_TYPES>(mx_scale,
+                                             output_tensors[num_outputs - 2]);
         outputs.push_back(mx_scale);
       }
     } else if (op.target() == "dequantize") {
@@ -510,27 +529,21 @@ std::vector<std::any> run_operation(const Operation& operation,
     }
   }
 
-  outputs.push_back(output_ptr);
+  const auto output_tensor = output_tensors[num_outputs - 1];
 
-  spdlog::debug("Operation {} finished\n", first_op.target());
-
-  const auto output_tensors = get_op_outputs(param);
-
-  for (int i = 0; i < output_tensors.size(); i++) {
-    const auto output_tensor = output_tensors[i];
-
-    if (output_tensor.has_reshape()) {
-      const auto reshape_op = output_tensor.reshape();
-      outputs[i] = reshape_if_needed<Vector>(outputs[i], reshape_op);
-    }
-
-    float* codebook = i == output_tensors.size() - 1 ? output_code : nullptr;
-    cast_output<Vector, SUPPORTED_TYPES>(outputs[i], codebook, output_tensor);
+  if (output_tensor.has_reshape()) {
+    const auto reshape_op = output_tensor.reshape();
+    output_ptr = reshape_if_needed<Vector>(output_ptr, reshape_op);
   }
+
+  cast_output<Vector, SUPPORTED_TYPES>(output_ptr, output_tensor, output_code);
+  outputs.push_back(output_ptr);
 
   if (output_code != nullptr) {
     delete[] output_code;
   }
+
+  spdlog::debug("Operation {} finished\n", first_op.target());
 
   return outputs;
 }

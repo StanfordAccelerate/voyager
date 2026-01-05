@@ -99,7 +99,9 @@ void DataLoader::load_outputs(const codegen::Operation param,
     tensor.mutable_memory()->set_partition(-1);
     tensor.mutable_memory()->set_address(address);
     load_tensor(tensor, data_dir);
-    address += get_size(tensor, false, false);
+
+    int width = get_type_width<SUPPORTED_TYPES>(tensor.dtype());
+    address += get_size(tensor, false, false) * width / 8;
   }
 }
 
@@ -143,7 +145,9 @@ std::vector<std::any> DataLoader::get_reference_outputs(
     tensor.clear_scratchpad();
 
     outputs.push_back(memory->read_tensor(tensor));
-    address += get_size(tensor);
+
+    int width = get_type_width<SUPPORTED_TYPES>(tensor.dtype());
+    address += get_size(tensor) * width / 8;
   }
 
   return outputs;
@@ -231,23 +235,22 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
   const auto outputs = get_op_outputs(param);
   const auto output = outputs.back();
   const auto output_full_shape = get_shape(output, false, false);
-  const auto output_tiled_shape = get_shape(output, false);
+  const auto output_tiled_shape = get_shape(output, false, true);
   const auto output_tiles = get_tiles(output_full_shape, output_tiled_shape);
   const int k_tile = output_tiles.back();
 
-  const auto op_list = get_op_list(param);
+  const auto tensors = extract_tensors_from_op(param);
+  const int stack_offset = getenv_int("SOC_MEM_OFFSET", 0);
 
-  const int stack_offset = std::stoi(getenv("SOC_MEM_OFFSET", "0"));
-
-  auto tensors = extract_tensors_from_op(param);
   for (auto& entry : tensors) {
     const auto& key = entry.key;
     const auto& tensor = entry.tensor;
     bool replication = entry.needs_replication;
+    const auto target = entry.target;
 
     std::string dtype = tensor.dtype();
     const auto full_shape = get_shape(tensor, false, false);
-    const auto tiled_shape = get_shape(tensor, false);
+    const auto tiled_shape = get_shape(tensor, false, true);
     std::vector<int> tile_strides;
     if (tensor.tile_strides_size() > 0) {
       tile_strides = {tensor.tile_strides().begin(),
@@ -264,12 +267,16 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
         tensor.scratchpad().address() + offset + stack_offset;
 
     int curr_tile_index = tile_index;
-    if (is_gemm_op(entry.target)) {
+    if (is_gemm_op(target)) {
       if (key == "input" || key == "input_scale") {
         curr_tile_index = tile_index / k_tile;
       } else if (key == "weight" || key == "other" || key == "weight_scale") {
         curr_tile_index = tile_index % k_tile;
       }
+    }
+
+    if (target == "spmm_csr" && key == "indptr") {
+      curr_tile_index = tile_index / k_tile;
     }
 
     auto tiles = get_tiles(full_shape, tiled_shape);
@@ -291,7 +298,7 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
     spdlog::debug("\nDatatype: {}\n", dtype);
     spdlog::debug("Replication: {}\n", replication);
     spdlog::debug("DRAM Address: {}\n", address);
-    spdlog::debug("Scratchpad Address: {}\n", scratchpad_addr);
+    spdlog::debug("SRAM Address: {}\n", scratchpad_addr);
 
     copy_tile(dtype, full_shape, tiled_shape, tile_strides, actual_tiles,
               partition, address, false, scratchpad_par, scratchpad_addr, true,
@@ -302,11 +309,12 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
 void DataLoader::store_scratchpad(const codegen::Operation& param,
                                   const int tile_index, const int offset) {
   const auto tensors = get_op_outputs(param);
-  const int stack_offset = std::stoi(getenv("SOC_MEM_OFFSET", "0"));
+  const int stack_offset = getenv_int("SOC_MEM_OFFSET", 0);
+
   for (const auto& tensor : tensors) {
     std::string dtype = tensor.dtype();
     const auto full_shape = get_shape(tensor, false, false);
-    auto tiled_shape = get_shape(tensor, false);
+    auto tiled_shape = get_shape(tensor, false, true);
     pad_shape_to_ndim(tiled_shape, full_shape.size());
     auto tile_strides = tiled_shape;
 
@@ -331,7 +339,7 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
     }
     spdlog::debug("\nDatatype: {}\n", dtype);
     spdlog::debug("DRAM Address: {}\n", address);
-    spdlog::debug("Scratchpad Address: {}\n", scratchpad_addr);
+    spdlog::debug("SRAM Address: {}\n", scratchpad_addr);
 
     copy_tile(dtype, full_shape, tiled_shape, tile_strides, actual_tiles,
               scratchpad_par, scratchpad_addr, true, partition, address, false);

@@ -232,7 +232,7 @@ void vdequantize(const Pack1D<Input, width>& op0, Pack1D<Output, width>& res,
   }
 }
 
-template <typename VectorType, typename ScaleType, int width>
+template <typename VectorType, typename ScaleType>
 ScaleType compute_scale(const VectorType amax, ac_int<16> qparam) {
   ScaleType scale;
 
@@ -362,9 +362,8 @@ bool send_output_data(
   ac_int<T::width * N, false> bits;
   bits = BitsToType<decltype(bits)>(TypeToBits(outputs));
 
-  for (ac_int<4, false> i = 0;; i++) {
+  for (int i = 0; i < num_words; i++) {
     output_channel.Push(bits.template slc<port_width>(i * port_width));
-    if (i == num_words - 1) break;
   }
 
   return true;
@@ -381,9 +380,8 @@ bool send_output_address(
 
   constexpr int num_words = (T::width * N + port_width - 1) / port_width;
 
-  for (ac_int<4, false> i = 0;; i++) {
+  for (int i = 0; i < num_words; i++) {
     address_channel.Push(offset + address * T::width / 8 + i * port_width / 8);
-    if (i == num_words - 1) break;
   }
 
   return true;

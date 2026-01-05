@@ -90,7 +90,7 @@ void map_layer_norm(const codegen::Operation& param,
   // Configure reduction engine
   VectorInstructions inst0_0;
   inst0_0.op_type = VectorInstructions::reduction;
-  inst0_0.inst_count = reduced_size;
+  inst0_0.inst_loop_count = reduced_size;
   inst0_0.reduce_count = reduction_dim / OC_DIMENSION * packing_factor;
   inst0_0.reduce_op = VectorInstructions::radd;
   inst0_0.rduplicate = 1;
@@ -100,7 +100,7 @@ void map_layer_norm(const codegen::Operation& param,
   // Scale inputs by 1 / norm_size and send to the reduction engine
   VectorInstructions inst0_1;
   inst0_1.op_type = VectorInstructions::vector;
-  inst0_1.inst_count = input_size / OC_DIMENSION * packing_factor;
+  inst0_1.inst_loop_count = input_size / OC_DIMENSION * packing_factor;
   inst0_1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst0_1.vector_op0_src1 = VectorInstructions::from_immediate_0;
   inst0_1.vector_op0 = VectorInstructions::vmult;
@@ -110,7 +110,7 @@ void map_layer_norm(const codegen::Operation& param,
   vector_instruction_config->inst[1] = inst0_1;
 
   vector_instruction_config->num_inst = 2;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
@@ -173,7 +173,7 @@ void map_layer_norm(const codegen::Operation& param,
   // Configure reduction unit
   VectorInstructions inst1_0;
   inst1_0.op_type = VectorInstructions::reduction;
-  inst1_0.inst_count = reduced_size;
+  inst1_0.inst_loop_count = reduced_size;
   inst1_0.reduce_count = reduction_dim / OC_DIMENSION * packing_factor;
   inst1_0.reduce_op = VectorInstructions::radd;
   inst1_0.rsqrt = 1;
@@ -187,7 +187,7 @@ void map_layer_norm(const codegen::Operation& param,
 
   VectorInstructions inst1_1;
   inst1_1.op_type = VectorInstructions::vector;
-  inst1_1.inst_count = input_size / OC_DIMENSION * packing_factor;
+  inst1_1.inst_loop_count = input_size / OC_DIMENSION * packing_factor;
   inst1_1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst1_1.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   inst1_1.vector_op0 = VectorInstructions::vsub;
@@ -196,7 +196,7 @@ void map_layer_norm(const codegen::Operation& param,
   vector_instruction_config->inst[1] = inst1_1;
 
   vector_instruction_config->num_inst = 2;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
@@ -276,7 +276,7 @@ void map_layer_norm(const codegen::Operation& param,
   // Multiply inputs with the inverse sqrt of the variance
   VectorInstructions inst2;
   inst2.op_type = VectorInstructions::vector;
-  inst2.inst_count = input_size / OC_DIMENSION * packing_factor;
+  inst2.inst_loop_count = input_size / OC_DIMENSION * packing_factor;
   inst2.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst2.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   inst2.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
@@ -286,7 +286,7 @@ void map_layer_norm(const codegen::Operation& param,
   vector_instruction_config->inst[0] = inst2;
 
   vector_instruction_config->num_inst = 1;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
@@ -380,7 +380,7 @@ void map_layer_norm(const codegen::Operation& param,
   // inputs x weights + bias
   VectorInstructions inst3;
   inst3.op_type = VectorInstructions::vector;
-  inst3.inst_count = get_size(output) / OC_DIMENSION * packing_factor;
+  inst3.inst_loop_count = get_size(output) / OC_DIMENSION * packing_factor;
   inst3.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst3.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   inst3.vector_op0 = VectorInstructions::vmult;
@@ -390,12 +390,12 @@ void map_layer_norm(const codegen::Operation& param,
   }
   inst3.vdest = VectorInstructions::to_output;
 
-  set_quantize_params(param, vector_params, inst3);
+  set_quantize_params(param, vector_params, inst3, vector_instruction_config);
 
   vector_instruction_config->inst[0] = inst3;
 
   vector_instruction_config->num_inst = 1;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);

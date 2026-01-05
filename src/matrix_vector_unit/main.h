@@ -25,7 +25,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
-  MatrixParamsDeserializer<1> CCS_INIT_S1(params_deserializer);
+  MatrixParamsDeserializer<1, 1> CCS_INIT_S1(params_deserializer);
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(params_in);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(fetch_input_param);

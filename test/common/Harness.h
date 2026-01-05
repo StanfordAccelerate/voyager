@@ -141,19 +141,15 @@ SC_MODULE(Harness) {
       spmm_input_data_resp);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_req);
-  sc_fifo<ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
-      spmm_weight_resp_fifo;
-  Connections::Combinational<
-      ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
-      CCS_INIT_S1(spmm_weight_resp);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_weight_resp_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      spmm_weight_resp);
 
 #if SUPPORT_MX
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_scale_req);
-  sc_fifo<ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
-      spmm_weight_scale_resp_fifo;
-  Connections::Combinational<
-      ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
-      CCS_INIT_S1(spmm_weight_scale_resp);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_weight_scale_resp_fifo;
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      spmm_weight_scale_resp);
 #endif
 
   Connections::SyncChannel CCS_INIT_S1(spmm_unit_start_signal);
@@ -227,9 +223,13 @@ SC_MODULE(Harness) {
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_output_address);
   Connections::Combinational<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
-      scalar_output);
+      mx_scale_output);
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      scalar_output_address);
+      mx_scale_address);
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      sparse_tensor_output);
+  Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      sparse_tensor_address);
 
   Connections::SyncChannel CCS_INIT_S1(vector_unit_start_signal);
   Connections::SyncChannel CCS_INIT_S1(vector_unit_done_signal);
@@ -275,7 +275,6 @@ SC_MODULE(Harness) {
   void send_matrix_unit_weight_response();
   void read_matrix_unit_bias_request();
   void send_matrix_unit_bias_response();
-
 #if SUPPORT_MX
   void read_matrix_unit_input_scale_request();
   void send_matrix_unit_input_scale_response();
@@ -337,8 +336,9 @@ SC_MODULE(Harness) {
   void read_vector_fetch_2_request();
   void send_vector_fetch_2_response();
 
-  void store_vector_outputs();
-  void store_scale_outputs();
+  void store_vector_output();
+  void store_mx_scale_output();
+  void store_sparse_tensor_output();
 
   void reset();
   void param_sender();

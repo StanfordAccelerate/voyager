@@ -83,9 +83,9 @@ void map_pool2d(const codegen::Operation& param,
   const int reduce_count = tiling.loops[1][tiling.y_loop_idx[1]] *
                            tiling.loops[1][tiling.x_loop_idx[1]];
 
-  const int inst_count = tiling.loops[0][tiling.y_loop_idx[0]] *
-                         tiling.loops[0][tiling.x_loop_idx[0]] * output_dim /
-                         OC_DIMENSION;
+  const int inst_loop_count = tiling.loops[0][tiling.y_loop_idx[0]] *
+                              tiling.loops[0][tiling.x_loop_idx[0]] *
+                              output_dim / OC_DIMENSION;
 
   bool is_max_pool = pooling_op.target().find("max") != std::string::npos;
   vector_params->is_maxpool = is_max_pool;
@@ -93,7 +93,7 @@ void map_pool2d(const codegen::Operation& param,
   // perform max/sum accumulation
   VectorInstructions vinst0;
   vinst0.op_type = VectorInstructions::accumulation;
-  vinst0.inst_count = inst_count * packing_factor;
+  vinst0.inst_loop_count = inst_loop_count * packing_factor;
   vinst0.reduce_count = reduce_count;
   vinst0.reduce_op =
       is_max_pool ? VectorInstructions::rmax : VectorInstructions::radd;
@@ -103,7 +103,7 @@ void map_pool2d(const codegen::Operation& param,
   // feed accumulator
   VectorInstructions vinst1;
   vinst1.op_type = VectorInstructions::vector;
-  vinst1.inst_count = inst_count * reduce_count * packing_factor;
+  vinst1.inst_loop_count = inst_loop_count * reduce_count * packing_factor;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vdest = VectorInstructions::to_accumulate;
 
@@ -118,7 +118,7 @@ void map_pool2d(const codegen::Operation& param,
   vector_instruction_config->inst[1] = vinst1;
 
   vector_instruction_config->num_inst = 2;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);

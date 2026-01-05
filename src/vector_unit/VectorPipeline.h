@@ -5,6 +5,7 @@
 
 #include "../AccelTypes.h"
 #include "../ArchitectureParams.h"
+#include "OutlierFilter2.h"
 #include "VectorOps.h"
 
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
@@ -21,11 +22,10 @@ SC_MODULE(VectorPipeline) {
   sc_in<bool> clk;
   sc_in<bool> rstn;
 
-  // Inputs
   Connections::In<VectorInstructions> instr;
   Connections::In<ApproxUnitConfig> approx_unit_config;
-  Connections::In<Pack1D<BufferType, vu_width>> matrix_unit_output;
 
+  Connections::In<Pack1D<BufferType, vu_width>> matrix_unit_output;
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::In<Pack1D<BufferType, vu_width>> accumulation_buffer_output;
 #endif
@@ -68,10 +68,27 @@ SC_MODULE(VectorPipeline) {
   Connections::Fifo<Pack1D<VectorPack, 2>, mu_width / vu_width + 8>
       stage_3_input_fifo;
   Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_input_fifo_in;
-  Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_input_fifo_out;
 
   Connections::Combinational<VectorPack> calculate_qparam_inputs;
   Connections::Combinational<VectorType> stage_3_amax;
+#endif
+
+// TODO: define new flags for outlier filtering
+#if SUPPORT_SPMM
+  using Meta = SPMM_META_DATATYPE;
+
+  Connections::In<OutlierFilterConfig> outlier_filter_config;
+  Connections::Combinational<VectorInstructions> outlier_filter_inst;
+  Connections::Combinational<Pack1D<VectorPack, 2>> stage_3_payload;
+
+  Connections::Combinational<VectorPack> outlier_filter_input;
+  Connections::Combinational<VectorPack> outlier_filter_output;
+  Connections::Out<CsrDataAndIndices<VectorType, Meta, vu_width>>
+      csr_data_and_indices;
+  Connections::Out<Pack1D<Meta, vu_width>> csr_indptr;
+
+  OutlierFilter<VectorType, SPMM_META_DATATYPE, vu_width> CCS_INIT_S1(
+      outlier_filter);
 #endif
 
   SC_CTOR(VectorPipeline) {
@@ -102,7 +119,20 @@ SC_MODULE(VectorPipeline) {
     stage_3_input_fifo.clk(clk);
     stage_3_input_fifo.rst(rstn);
     stage_3_input_fifo.enq(stage_3_input_fifo_in);
-    stage_3_input_fifo.deq(stage_3_input_fifo_out);
+    stage_3_input_fifo.deq(stage_3_input);
+#endif
+#if SUPPORT_SPMM
+    SC_THREAD(run_outlier_filter);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+
+    outlier_filter.clk(clk);
+    outlier_filter.rstn(rstn);
+    outlier_filter.config_in(outlier_filter_config);
+    outlier_filter.data_in(outlier_filter_input);
+    outlier_filter.data_out(outlier_filter_output);
+    outlier_filter.csr_data_and_indices_out(csr_data_and_indices);
+    outlier_filter.csr_indptr_out(csr_indptr);
 #endif
   }
 
@@ -129,6 +159,9 @@ SC_MODULE(VectorPipeline) {
     stage_2_inst.ResetWrite();
     stage_3_inst.ResetWrite();
     stage_0_input.ResetWrite();
+#if SUPPORT_SPMM
+    outlier_filter_inst.ResetWrite();
+#endif
 
     wait();
 
@@ -139,9 +172,15 @@ SC_MODULE(VectorPipeline) {
       stage_0_inst.Push(inst);
       stage_1_inst.Push(inst);
       stage_2_inst.Push(inst);
-      stage_3_inst.Push(inst);
 
-      for (decltype(inst.inst_count) i = 0;; i++) {
+      if (inst.vdest == VectorInstructions::to_output) {
+        stage_3_inst.Push(inst);
+#if SUPPORT_SPMM
+        outlier_filter_inst.Push(inst);
+#endif
+      }
+
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
         VectorPack op0_src0, op0_src1, op2_src1, op3_src1;
 
         Pack1D<BufferType, vu_width> raw_dq_input;
@@ -310,7 +349,7 @@ SC_MODULE(VectorPipeline) {
             {op0_src0, op0_src1, op2_src1, op3_src1});
         stage_0_input.Push(payloads);
 
-        if (i == inst.inst_count - 1) break;
+        if (i == inst.inst_loop_count - 1) break;
       }
     }
   }
@@ -328,7 +367,7 @@ SC_MODULE(VectorPipeline) {
       VectorInstructions inst = stage_0_inst.Pop();
       auto op0 = inst.vector_op0;
 
-      for (decltype(inst.inst_count) i = 0;; i++) {
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
         auto payloads = stage_0_input.Pop();
         auto op0_src0 = payloads[0];
         auto op0_src1 = payloads[1];
@@ -354,7 +393,7 @@ SC_MODULE(VectorPipeline) {
             Pack1D<VectorPack, 3>::create({res0, payloads[2], payloads[3]});
         stage_1_input.Push(payloads_next);
 
-        if (i == inst.inst_count - 1) break;
+        if (i == inst.inst_loop_count - 1) break;
       }
     }
   }
@@ -374,7 +413,7 @@ SC_MODULE(VectorPipeline) {
       ApproxUnitConfig config = approx_unit_config.Pop();
       auto op1 = inst.vector_op1;
 
-      for (decltype(inst.inst_count) i = 0;; i++) {
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
         auto payloads = stage_1_input.Pop();
         auto op1_src0 = payloads[0];
         VectorPack res1;
@@ -396,9 +435,22 @@ SC_MODULE(VectorPipeline) {
             Pack1D<VectorPack, 3>::create({res1, payloads[1], payloads[2]});
         stage_2_input.Push(payloads_next);
 
-        if (i == inst.inst_count - 1) break;
+        if (i == inst.inst_loop_count - 1) break;
       }
     }
+  }
+
+  void push_stage_3_inputs(const ac_int<2, false> op3,
+                           const Pack1D<VectorPack, 2>& payloads) {
+#if MX_SPLIT_MODE
+    if (op3 == VectorInstructions::vquantize_mx ||
+        op3 == VectorInstructions::vquantize_mx_outlier) {
+      calculate_qparam_inputs.Push(payloads[0]);
+    }
+    stage_3_input_fifo_in.Push(payloads);
+#else
+    stage_3_input.Push(payloads);
+#endif
   }
 
   void run_stage_2() {
@@ -406,6 +458,10 @@ SC_MODULE(VectorPipeline) {
     stage_2_input.ResetRead();
     reducer_input.Reset();
     accumulator_input.Reset();
+#if SUPPORT_SPMM
+    outlier_filter_input.ResetWrite();
+    stage_3_payload.ResetWrite();
+#endif
 #if MX_SPLIT_MODE
     calculate_qparam_inputs.ResetWrite();
     stage_3_input_fifo_in.ResetWrite();
@@ -423,7 +479,7 @@ SC_MODULE(VectorPipeline) {
       auto op3 = inst.vector_op3;
       auto vdest = inst.vdest;
 
-      for (decltype(inst.inst_count) i = 0;; i++) {
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
         auto payloads = stage_2_input.Pop();
         auto op2_src0 = payloads[0];
         auto op2_src1 = payloads[1];
@@ -446,23 +502,54 @@ SC_MODULE(VectorPipeline) {
         if (vdest == VectorInstructions::to_output) {
           auto payloads_next =
               Pack1D<VectorPack, 2>::create({res2, payloads[2]});
-#if MX_SPLIT_MODE
-          if (op3 == VectorInstructions::vquantize_mx) {
-            calculate_qparam_inputs.Push(res2);
+#if SUPPORT_SPMM
+          if (op3 == VectorInstructions::vquantize_mx_outlier) {
+            outlier_filter_input.Push(res2);
           }
-          stage_3_input_fifo_in.Push(payloads_next);
+          stage_3_payload.Push(payloads_next);
 #else
-          stage_3_input.Push(payloads_next);
+          push_stage_3_inputs(op3, payloads_next);
 #endif
         } else if (vdest == VectorInstructions::to_reduce) {
           reducer_input.Push(res2);
         } else if (vdest == VectorInstructions::to_accumulate) {
           accumulator_input.Push(res2);
         }
-        if (i == inst.inst_count - 1) break;
+
+        if (i == inst.inst_loop_count - 1) break;
       }
     }
   }
+
+#if SUPPORT_SPMM
+  void run_outlier_filter() {
+    outlier_filter_inst.ResetRead();
+    stage_3_payload.ResetRead();
+    outlier_filter_output.ResetRead();
+
+    wait();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (1) {
+      VectorInstructions inst = outlier_filter_inst.Pop();
+      auto op3 = inst.vector_op3;
+
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
+        auto payload = stage_3_payload.Pop();
+
+        if (op3 == VectorInstructions::vquantize_mx_outlier) {
+          payload[0] = outlier_filter_output.Pop();
+        }
+
+        push_stage_3_inputs(op3, payload);
+
+        if (i == inst.inst_loop_count - 1) break;
+      }
+    }
+  }
+#endif
+
 #if MX_SPLIT_MODE
   void compute_mx_qparams() {
     calculate_qparam_inputs.ResetRead();
@@ -470,37 +557,34 @@ SC_MODULE(VectorPipeline) {
 
     wait();
 
-    VectorType amax_history;
-    ac_int<4, false> count = 0;
-
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
     while (1) {
-      auto op3_src0 = calculate_qparam_inputs.Pop();
+      VectorType amax_history = VectorType::Zero();
 
-      VectorPack temp;
+      for (int i = 0; i < mu_width / vu_width; i++) {
+        auto op3_src0 = calculate_qparam_inputs.Pop();
+
+        VectorPack temp;
 #pragma hls_unroll yes
-      for (int i = 0; i < vu_width; i++) {
-        temp[i] = op3_src0[i].abs();
-      }
-      VectorType amax = tree_max(temp);
-      amax_history = count == 0 ? amax : std::max(amax, amax_history);
+        for (int j = 0; j < vu_width; j++) {
+          temp[j] = op3_src0[j].abs();
+        }
+        VectorType amax = tree_max(temp);
 
-      if (count == mu_width / vu_width - 1) {
-        stage_3_amax.Push(amax_history);
-        count = 0;
-      } else {
-        count++;
+        amax_history = std::max(amax, amax_history);
       }
+
+      stage_3_amax.Push(amax_history);
     }
   }
 #endif
+
   void run_stage_3() {
     stage_3_inst.ResetRead();
     mx_scale.Reset();
     vector_unit_output.Reset();
 #if MX_SPLIT_MODE
-    stage_3_input_fifo_out.ResetRead();
     stage_3_amax.ResetRead();
 #else
     stage_3_input.ResetRead();
@@ -515,39 +599,28 @@ SC_MODULE(VectorPipeline) {
       auto op3 = inst.vector_op3;
       auto qparam = inst.immediate2;
 
-      if (inst.vdest != VectorInstructions::to_output) {
-        continue;
-      }
+      bool is_mx_quantization =
+          (op3 == VectorInstructions::vquantize_mx ||
+           op3 == VectorInstructions::vquantize_mx_outlier);
 
 #if MX_SPLIT_MODE
-      ac_int<4, false> count = 0;
+      constexpr int ratio = mu_width / vu_width;
       ScaleType scale;
 #endif
 
-      for (decltype(inst.inst_count) i = 0;; i++) {
-#if MX_SPLIT_MODE
-        auto payloads = stage_3_input_fifo_out.Pop();
-#else
+      for (decltype(inst.inst_loop_count) i = 0;; i++) {
         auto payloads = stage_3_input.Pop();
-#endif
         auto op3_src0 = payloads[0];
         auto op3_src1 = payloads[1];
         VectorPack res3;
 
 #if SUPPORT_MX
-        if (op3 == VectorInstructions::vquantize_mx) {
-#if VECTOR_UNIT_WIDTH != OC_DIMENSION
-          if (count == 0) {
+        if (is_mx_quantization) {
+#if MX_SPLIT_MODE
+          if (i % ratio == 0) {
             VectorType amax = stage_3_amax.Pop();
-            scale =
-                compute_scale<VectorType, ScaleType, vu_width>(amax, qparam);
+            scale = compute_scale<VectorType, ScaleType>(amax, qparam);
             mx_scale.Push(scale);
-          }
-
-          if (count == mu_width / vu_width - 1) {
-            count = 0;
-          } else {
-            count++;
           }
 #else
           ScaleType scale = calculate_mx_scale<VectorType, ScaleType, vu_width>(
@@ -561,10 +634,8 @@ SC_MODULE(VectorPipeline) {
           }
         }
 #endif
-
         // Stage 3: div, quantize
-        if (op3 == VectorInstructions::vdiv ||
-            op3 == VectorInstructions::vquantize_mx) {
+        if (op3 == VectorInstructions::vdiv || is_mx_quantization) {
           res3 = vdiv<VectorType, vu_width>(op3_src0, op3_src1);
         } else {
           res3 = op3_src0;
@@ -572,7 +643,7 @@ SC_MODULE(VectorPipeline) {
 
         vector_unit_output.Push(res3);
 
-        if (i == inst.inst_count - 1) break;
+        if (i == inst.inst_loop_count - 1) break;
       }
     }
   }

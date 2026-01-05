@@ -304,6 +304,22 @@ int Simulation::check_outputs() {
 
   double rel_err = 0.0;
   const auto output_tensors = get_op_outputs(param);
+  const int num_tiles_executed = get_tile_count(param);
+
+  // HACK For sparse outputs, we only want to compare the non-zero values
+  const int num_outputs = output_tensors.size();
+  int csr_data_size;
+  if (num_outputs > 2) {
+    const int indptr_size = get_size(output_tensors[2]);
+    const int last_index = (indptr_size - 1) * num_tiles_executed;
+    std::cerr << "indptr size: " << indptr_size << " last index: " << last_index
+              << "\n";
+
+    // Try to get the index of last CSR column indices
+    const auto indptr = std::any_cast<SPMM_META_DATATYPE*>(outputs2[2]);
+    csr_data_size = indptr[last_index];
+    std::cerr << "num_data: " << csr_data_size << "\n";
+  }
 
   for (int i = 0; i < output_tensors.size(); i++) {
     std::string suffix = ".txt";
@@ -314,9 +330,11 @@ int Simulation::check_outputs() {
     const auto full_shape = get_shape(output_tensors[i], true, false);
 
     std::vector<uint8_t> valid;
-    if (is_soc_sim()) {
+    if (num_outputs > 2 && i < 2) {
+      valid.resize(get_size(full_shape), 0);
+      std::fill_n(valid.begin(), csr_data_size, 1);
+    } else if (is_soc_sim()) {
       const auto tile_shape = get_shape(output_tensors[i], true, true);
-      const int num_tiles_executed = get_tile_count(param);
       build_valid_mask(full_shape, tile_shape, num_tiles_executed, valid);
     } else {
       valid.resize(get_size(full_shape), 1);

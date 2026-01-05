@@ -33,9 +33,7 @@ SC_MODULE(Repeater) {
       for (ac_int<16, false> i = 0;; i++) {
         data_out.Push(data);
 
-        if (i == repeat_count) {
-          break;
-        }
+        if (i == repeat_count) break;
       }
     }
   }

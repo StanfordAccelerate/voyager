@@ -30,7 +30,7 @@ SC_MODULE(MatrixUnit) {
   static constexpr int ACCUM_BUFFER_BANKS = 1;
 #endif
 
-  MatrixParamsDeserializer<PARAMS_MODULE_COUNT> CCS_INIT_S1(
+  MatrixParamsDeserializer<0, PARAMS_MODULE_COUNT> CCS_INIT_S1(
       params_deserializer);
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
   Connections::Combinational<MatrixParams> matrix_params[PARAMS_MODULE_COUNT];

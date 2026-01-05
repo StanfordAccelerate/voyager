@@ -178,45 +178,25 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                             fetcher_done_2.write(false);
                           }
 
-                          if (loop_counters[1][4] == loop_bounds[1][4]) {
-                            break;
-                          }
+                          if (loop_counters[1][4] == loop_bounds[1][4]) break;
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3]) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3]) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2]) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2]) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1]) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1]) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0]) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
-                if (loop_counters[0][4] == loop_bounds[0][4]) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3]) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3]) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2]) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1]) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1]) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0]) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0]) break;
       }
       fetcher_done.write(true);
       fetcher_done_2.write(true);
@@ -263,7 +243,8 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
       // reduce the number of iterations by packing factor
       K1 = K1 >> params.weight_pack_factor_lg2;
       loop_bounds[1][params.weight_addr_weight_loop_idx[1]] = K1 - 1;
-      ac_int<4, false> num_packs = (1 << params.weight_pack_factor_lg2) - 1;
+      ac_int<4, false> pack_offset_bound =
+          (1 << params.weight_pack_factor_lg2) - 1;
 
       ac_int<24, false> fx_stride = C1 * C0 * K1;
       ac_int<24, false> fy_stride = FX * fx_stride;
@@ -313,53 +294,31 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                 loop_counters[1][2] == loop_bounds[1][2] &&
                                 loop_counters[1][1] == loop_bounds[1][1] &&
                                 loop_counters[1][0] == loop_bounds[1][0] &&
-                                pack == num_packs;
+                                pack == pack_offset_bound;
                             write_request[bank_sel].Push(req);
 
-                            if (pack == num_packs) {
-                              break;
-                            }
+                            if (pack == pack_offset_bound) break;
                           }
-                          if (loop_counters[1][4] == loop_bounds[1][4]) {
-                            break;
-                          }
+                          if (loop_counters[1][4] == loop_bounds[1][4]) break;
                         }
-                        if (loop_counters[1][3] == loop_bounds[1][3]) {
-                          break;
-                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3]) break;
                       }
-                      if (loop_counters[1][2] == loop_bounds[1][2]) {
-                        break;
-                      }
+                      if (loop_counters[1][2] == loop_bounds[1][2]) break;
                     }
-                    if (loop_counters[1][1] == loop_bounds[1][1]) {
-                      break;
-                    }
+                    if (loop_counters[1][1] == loop_bounds[1][1]) break;
                   }
-                  if (loop_counters[1][0] == loop_bounds[1][0]) {
-                    break;
-                  }
+                  if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
                 bank_sel = !bank_sel;
-                if (loop_counters[0][4] == loop_bounds[0][4]) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3]) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3]) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2]) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1]) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1]) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0]) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0]) break;
       }
     }
   }
@@ -392,18 +351,6 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
       loop_bounds[1][params.weight_reuse_idx[0]] = 1;
       loop_bounds[1][params.weight_reuse_idx[1]] = 1;
 
-      // extra loop to control reuse which only occurs during transpose and
-      // when cols > rows
-      int rep_bound = 1;
-
-      if (params.weight_transpose && cols > rows) {
-        if (loop_bounds[0][params.reduction_loop_idx[0]] >= (cols / rows)) {
-          // we are able to reuse the weights already in the buffer
-          loop_bounds[0][params.reduction_loop_idx[0]] /= (cols / rows);
-          rep_bound = (cols / rows);
-        }
-      }
-
       ac_int<LOOP_WIDTH, false> K2 = params.loops[0][params.weight_loop_idx[0]];
       ac_int<LOOP_WIDTH, false> FY1 = params.loops[0][params.fy_loop_idx[0]];
       ac_int<LOOP_WIDTH, false> C2 =
@@ -414,25 +361,35 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
           params.loops[1][params.reduction_loop_idx[1]];
       ac_int<LOOP_WIDTH, false> K1 = params.loops[1][params.weight_loop_idx[1]];
 
+      // extra loop to control reuse which only occurs during transpose and
+      // when cols > rows
+      int transpose_reuse_bound = 1;
+      constexpr int ratio = cols / rows;
+      if (ratio > 1 && params.weight_transpose && C2 >= ratio) {
+        // we can reuse the weights already in the buffer
+        loop_bounds[0][params.reduction_loop_idx[0]] = C2 / ratio;
+        transpose_reuse_bound = ratio;
+      }
+
       bool reuse_weights =
           FY1 == 1 && C2 == 1 && FY0 == 1 && FX == 1 && C1 == 1 && K1 == 1;
 
       // extra loop for exploiting L1 buffer reuse.
       // this loop is used when OX and OY are the innermost L2 loops. when
       // this occurs, we can move OX and/or OY into the buffer reuse L1 loop
-      int buffer_reuse = 1;
-      if (params.loops[0][params.reduction_loop_idx[0]] == 1) {
+      ac_int<LOOP_WIDTH, false> spatial_reuse_bound = 1;
+      if (C2 == 1) {
         // OX loop can be absorbed
         if (params.weight_loop_idx[0] < params.x_loop_idx[0]) {
           if (!reuse_weights) {
-            buffer_reuse *= loop_bounds[0][params.x_loop_idx[0]];
+            spatial_reuse_bound = loop_bounds[0][params.x_loop_idx[0]];
           }
           loop_bounds[0][params.x_loop_idx[0]] = 1;
         }
         // OY loop can be absorbed
         if (params.weight_loop_idx[0] < params.y_loop_idx[0]) {
           if (!reuse_weights) {
-            buffer_reuse *= loop_bounds[0][params.y_loop_idx[0]];
+            spatial_reuse_bound *= loop_bounds[0][params.y_loop_idx[0]];
           }
           loop_bounds[0][params.y_loop_idx[0]] = 1;
         }
@@ -440,8 +397,8 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
 
       ac_int<16, false> fx_stride = rows * C1 * K1;
       ac_int<16, false> fy_stride = FX * fx_stride;
-      ac_int<16, false> fx_stride_with_repl = fx_stride * rep_bound;
-      ac_int<16, false> fy_stride_with_repl = fy_stride * rep_bound;
+      ac_int<16, false> fx_stride_with_repl = fx_stride * transpose_reuse_bound;
+      ac_int<16, false> fy_stride_with_repl = fy_stride * transpose_reuse_bound;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -450,8 +407,10 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
           for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
             for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
               for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
-                for (int reuse = 0;; reuse++) {
-                  for (int rep = 0;; rep++) {
+                for (ac_int<LOOP_WIDTH, false> spatial_reuse_idx = 0;;
+                     spatial_reuse_idx++) {
+                  for (int transpose_reuse_idx = 0; transpose_reuse_idx < ratio;
+                       transpose_reuse_idx++) {
                     for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
                       for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
                         for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
@@ -545,12 +504,13 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                     c = row;
                                     if (params.weight_transpose &&
                                         cols > rows) {
-                                      address = fy0 * fy_stride_with_repl +
-                                                fx * fx_stride_with_repl +
-                                                ((c + rep * rows) +
-                                                 c1 * C0 * rep_bound) *
-                                                    K1 +
-                                                k1;
+                                      address =
+                                          fy0 * fy_stride_with_repl +
+                                          fx * fx_stride_with_repl +
+                                          ((c + transpose_reuse_idx * rows) +
+                                           c1 * C0 * transpose_reuse_bound) *
+                                              K1 +
+                                          k1;
                                     } else {
                                       address = fy0 * fy_stride +
                                                 fx * fx_stride +
@@ -573,65 +533,44 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                                                  loop_bounds[1][1] - 1 &&
                                              loop_counters[1][0] ==
                                                  loop_bounds[1][0] - 1 &&
-                                             reuse == buffer_reuse - 1 &&
-                                             rep == rep_bound - 1;
+                                             spatial_reuse_idx ==
+                                                 spatial_reuse_bound - 1 &&
+                                             transpose_reuse_idx ==
+                                                 transpose_reuse_bound - 1;
                                   read_request[bank_sel].Push(req);
                                 }
 
                                 if (loop_counters[1][5] ==
-                                    loop_bounds[1][5] - 1) {
+                                    loop_bounds[1][5] - 1)
                                   break;
-                                }
                               }
-                              if (loop_counters[1][4] ==
-                                  loop_bounds[1][4] - 1) {
+                              if (loop_counters[1][4] == loop_bounds[1][4] - 1)
                                 break;
-                              }
                             }
-                            if (loop_counters[1][3] == loop_bounds[1][3] - 1) {
+                            if (loop_counters[1][3] == loop_bounds[1][3] - 1)
                               break;
-                            }
                           }
-                          if (loop_counters[1][2] == loop_bounds[1][2] - 1) {
+                          if (loop_counters[1][2] == loop_bounds[1][2] - 1)
                             break;
-                          }
                         }
-                        if (loop_counters[1][1] == loop_bounds[1][1] - 1) {
-                          break;
-                        }
+                        if (loop_counters[1][1] == loop_bounds[1][1] - 1) break;
                       }
-                      if (loop_counters[1][0] == loop_bounds[1][0] - 1) {
-                        break;
-                      }
+                      if (loop_counters[1][0] == loop_bounds[1][0] - 1) break;
                     }
-                    if (rep == rep_bound - 1) {
-                      break;
-                    }
+                    if (transpose_reuse_idx == transpose_reuse_bound - 1) break;
                   }
-                  if (reuse == buffer_reuse - 1) {
-                    break;
-                  }
+                  if (spatial_reuse_idx == spatial_reuse_bound - 1) break;
                 }
                 bank_sel = !bank_sel;
-                if (loop_counters[0][4] == loop_bounds[0][4] - 1) {
-                  break;
-                }
+                if (loop_counters[0][4] == loop_bounds[0][4] - 1) break;
               }
-              if (loop_counters[0][3] == loop_bounds[0][3] - 1) {
-                break;
-              }
+              if (loop_counters[0][3] == loop_bounds[0][3] - 1) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2] - 1) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2] - 1) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1] - 1) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1] - 1) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0] - 1) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0] - 1) break;
       }
     }
   }
@@ -653,9 +592,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
 
         for (ac_int<4, false> i = 0;; i++) {
           bits.set_slc(i * port_width, weight_resp.Pop());
-          if (i == params.weight_num_beats - 1) {
-            break;
-          }
+          if (i == params.weight_num_beats - 1) break;
         }
 
         packed_bits.Push(bits);
@@ -740,7 +677,8 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
           }
         }
       } else {  // passthrough
-        ac_int<4, false> num_packs = (1 << params.weight_pack_factor_lg2) - 1;
+        ac_int<4, false> pack_offset_bound =
+            (1 << params.weight_pack_factor_lg2) - 1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -764,9 +702,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
 
             transpose_out.Push(outputs);
 
-            if (i == num_packs) {
-              break;
-            }
+            if (i == pack_offset_bound) break;
           }
         }
       }
@@ -827,41 +763,23 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
 
                         bias_req.Push(request);
 
-                        if (loop_counters[1][5] == loop_bounds[1][5]) {
-                          break;
-                        }
+                        if (loop_counters[1][5] == loop_bounds[1][5]) break;
                       }
-                      if (loop_counters[1][4] == loop_bounds[1][4]) {
-                        break;
-                      }
+                      if (loop_counters[1][4] == loop_bounds[1][4]) break;
                     }
-                    if (loop_counters[1][3] == loop_bounds[1][3]) {
-                      break;
-                    }
+                    if (loop_counters[1][3] == loop_bounds[1][3]) break;
                   }
-                  if (loop_counters[1][2] == loop_bounds[1][2]) {
-                    break;
-                  }
+                  if (loop_counters[1][2] == loop_bounds[1][2]) break;
                 }
-                if (loop_counters[1][1] == loop_bounds[1][1]) {
-                  break;
-                }
+                if (loop_counters[1][1] == loop_bounds[1][1]) break;
               }
-              if (loop_counters[1][0] == loop_bounds[1][0]) {
-                break;
-              }
+              if (loop_counters[1][0] == loop_bounds[1][0]) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2]) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1]) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1]) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0]) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0]) break;
       }
     }
   }
@@ -915,41 +833,23 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
                             BitsToType<Pack1D<Bias, cols>>(TypeToBits(bits));
 
                         bias_data.Push(biases);
-                        if (loop_counters[1][5] == loop_bounds[1][5]) {
-                          break;
-                        }
+                        if (loop_counters[1][5] == loop_bounds[1][5]) break;
                       }
-                      if (loop_counters[1][4] == loop_bounds[1][4]) {
-                        break;
-                      }
+                      if (loop_counters[1][4] == loop_bounds[1][4]) break;
                     }
-                    if (loop_counters[1][3] == loop_bounds[1][3]) {
-                      break;
-                    }
+                    if (loop_counters[1][3] == loop_bounds[1][3]) break;
                   }
-                  if (loop_counters[1][2] == loop_bounds[1][2]) {
-                    break;
-                  }
+                  if (loop_counters[1][2] == loop_bounds[1][2]) break;
                 }
-                if (loop_counters[1][1] == loop_bounds[1][1]) {
-                  break;
-                }
+                if (loop_counters[1][1] == loop_bounds[1][1]) break;
               }
-              if (loop_counters[1][0] == loop_bounds[1][0]) {
-                break;
-              }
+              if (loop_counters[1][0] == loop_bounds[1][0]) break;
             }
-            if (loop_counters[0][2] == loop_bounds[0][2]) {
-              break;
-            }
+            if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
-          if (loop_counters[0][1] == loop_bounds[0][1]) {
-            break;
-          }
+          if (loop_counters[0][1] == loop_bounds[0][1]) break;
         }
-        if (loop_counters[0][0] == loop_bounds[0][0]) {
-          break;
-        }
+        if (loop_counters[0][0] == loop_bounds[0][0]) break;
       }
     }
   }

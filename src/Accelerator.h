@@ -120,13 +120,12 @@ SC_MODULE(Accelerator) {
       spmm_input_indices_resp);
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       spmm_input_data_resp);
-  Connections::In<ac_int<SA_WEIGHT_TYPE::width * SPMM_UNIT_WIDTH, false>>
-      CCS_INIT_S1(spmm_weight_resp);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(spmm_weight_resp);
 
 #if SUPPORT_MX
   Connections::Out<MemoryRequest> CCS_INIT_S1(spmm_weight_scale_req);
-  Connections::In<ac_int<SCALE_DATATYPE::width * SPMM_UNIT_WIDTH, false>>
-      CCS_INIT_S1(spmm_weight_scale_resp);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      spmm_weight_scale_resp);
 #endif
   Connections::Combinational<Pack1D<VECTOR_DATATYPE, OC_DIMENSION>> CCS_INIT_S1(
       spmm_output);
@@ -155,9 +154,12 @@ SC_MODULE(Accelerator) {
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
       vector_output_address);
   Connections::Out<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
-      scalar_output);
+      mx_scale_output);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(mx_scale_address);
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      sparse_tensor_output);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      scalar_output_address);
+      sparse_tensor_address);
 
   Connections::SyncOut CCS_INIT_S1(vector_unit_start_signal);
   Connections::SyncOut CCS_INIT_S1(vector_unit_done_signal);
@@ -293,10 +295,12 @@ SC_MODULE(Accelerator) {
     vector_unit.vector_fetch_1_resp(vector_fetch_1_resp);
     vector_unit.vector_fetch_2_req(vector_fetch_2_req);
     vector_unit.vector_fetch_2_resp(vector_fetch_2_resp);
-    vector_unit.vector_out(vector_output);
-    vector_unit.vector_address_out(vector_output_address);
-    vector_unit.scale_out(scalar_output);
-    vector_unit.scale_address_out(scalar_output_address);
+    vector_unit.vector_output(vector_output);
+    vector_unit.vector_output_address(vector_output_address);
+    vector_unit.mx_scale_output(mx_scale_output);
+    vector_unit.mx_scale_address(mx_scale_address);
+    vector_unit.sparse_tensor_output(sparse_tensor_output);
+    vector_unit.sparse_tensor_address(sparse_tensor_address);
     vector_unit.start(vector_unit_start_signal);
     vector_unit.done(vector_unit_done_signal);
     vector_unit.matrix_unit_output(matrix_unit_output);

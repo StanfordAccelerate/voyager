@@ -107,8 +107,10 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.vector_fetch_2_resp(vector_fetch_2_resp);
   accelerator.vector_output(vector_output);
   accelerator.vector_output_address(vector_output_address);
-  accelerator.scalar_output(scalar_output);
-  accelerator.scalar_output_address(scalar_output_address);
+  accelerator.mx_scale_output(mx_scale_output);
+  accelerator.mx_scale_address(mx_scale_address);
+  accelerator.sparse_tensor_output(sparse_tensor_output);
+  accelerator.sparse_tensor_address(sparse_tensor_address);
   accelerator.vector_unit_start_signal(vector_unit_start_signal);
   accelerator.vector_unit_done_signal(vector_unit_done_signal);
 
@@ -167,8 +169,10 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   REGISTER_IO_FN(vector_fetch_1)
   REGISTER_IO_FN(vector_fetch_2)
 
-  REGISTER_FN(store_vector_outputs)
-  REGISTER_FN(store_scale_outputs)
+  REGISTER_FN(store_vector_output)
+  REGISTER_FN(store_mx_scale_output)
+  REGISTER_FN(store_sparse_tensor_output)
+
   REGISTER_FN(param_sender)
   REGISTER_FN(start_monitor)
   REGISTER_FN(done_monitor)
@@ -310,12 +314,16 @@ DEFINE_IO_FN(vector_fetch_0)
 DEFINE_IO_FN(vector_fetch_1)
 DEFINE_IO_FN(vector_fetch_2)
 
-void Harness::store_vector_outputs() {
+void Harness::store_vector_output() {
   process_write_request(&vector_output, &vector_output_address);
 }
 
-void Harness::store_scale_outputs() {
-  process_write_request(&scalar_output, &scalar_output_address);
+void Harness::store_mx_scale_output() {
+  process_write_request(&mx_scale_output, &mx_scale_address);
+}
+
+void Harness::store_sparse_tensor_output() {
+  process_write_request(&sparse_tensor_output, &sparse_tensor_address);
 }
 
 void Harness::reset() {
@@ -592,6 +600,9 @@ std::deque<BaseParams*> offset_param_addresses(std::deque<BaseParams*> params,
       param->vector_fetch_2_offset += offset;
       param->vector_output_offset += offset;
       param->mx_scale_offset += offset;
+      param->csr_data_offset += offset;
+      param->csr_indices_offset += offset;
+      param->csr_indptr_offset += offset;
       new_params.push_back(param);
     } else {
       new_params.push_back(base_param);

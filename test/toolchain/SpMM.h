@@ -26,18 +26,13 @@ void map_spmm(const codegen::Operation& operation,
   spmm_param->is_spmm = true;
 
   float* indptr_array = read_constant_param(indptr_tensor);
-  int max_index = -1;
-  for (int i = 0; i < get_size(indptr_tensor); i++) {
-    max_index = std::max(max_index, static_cast<int>(indptr_array[i]));
-  }
 
   // indptr is in y_loop_idx[0]
   // indices is in x_loop_idx[0]
   // K is in weight_loop_idx[0]
   const int indptr_len = get_size(indptr_tensor);
-  const int indices_len = max_index;
+  const int indices_len = indptr_array[indptr_len - 1];
   const int K = get_shape(weight_tensor)[1];
-
   const int k0 = K / OC_DIMENSION;
 
   Tiling tiling = {
@@ -102,21 +97,22 @@ void map_spmm(const codegen::Operation& operation,
   vector_params->output_mode = 1;
 
   // outer loops not used in SPMM
-  vector_params->output_loops[0][0] = 1;
-  vector_params->output_loops[0][1] = 1;
-  vector_params->output_loops[0][2] = 1;
+  for (int i = 0; i < 3; i++) {
+    vector_params->output_loops[0][i] = 1;
+  }
+
   vector_params->output_y_loop_idx[0] = 0;
-  vector_params->output_x_loop_idx[0] = 2;
-  vector_params->output_k_loop_idx[0] = 1;
+  vector_params->output_x_loop_idx[0] = 1;
+  vector_params->output_k_loop_idx[0] = 2;
 
   // outermost loop, K
-  vector_params->output_loops[1][0] = tiling.loops[0][2];
+  vector_params->output_loops[1][0] = k0;
   // second loop, indptr (a.k.a the number of rows) -1 to rid of the extra zero
-  vector_params->output_loops[1][1] = tiling.loops[0][1] - 1;
+  vector_params->output_loops[1][1] = indptr_len - 1;
   // only support matrices for now, no third loop
   vector_params->output_loops[1][2] = 1;
-  vector_params->output_y_loop_idx[1] = 1;
-  vector_params->output_x_loop_idx[1] = 2;
+  vector_params->output_y_loop_idx[1] = 2;
+  vector_params->output_x_loop_idx[1] = 1;
   vector_params->output_k_loop_idx[1] = 0;
 
   vector_params->output_dtype =
@@ -124,12 +120,7 @@ void map_spmm(const codegen::Operation& operation,
 
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;
-  inst.inst_count = tiling.loops[0][tiling.x_loop_idx[0]] *
-                    tiling.loops[1][tiling.x_loop_idx[1]] *
-                    tiling.loops[0][tiling.y_loop_idx[0]] *
-                    tiling.loops[1][tiling.y_loop_idx[1]] *
-                    tiling.loops[0][tiling.weight_loop_idx[0]] *
-                    tiling.loops[1][tiling.weight_loop_idx[1]];
+  inst.inst_loop_count = k0 * (indptr_len - 1);
 
   inst.vector_op0_src0 = VectorInstructions::from_spmm_unit;
   inst.vdest = VectorInstructions::to_output;
@@ -138,7 +129,7 @@ void map_spmm(const codegen::Operation& operation,
       new VectorInstructionConfig;
   vector_instruction_config->inst[0] = inst;
   vector_instruction_config->num_inst = 1;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(spmm_param);
   mapped_params.push_back(vector_params);

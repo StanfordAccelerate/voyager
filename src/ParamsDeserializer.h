@@ -65,13 +65,13 @@ SC_MODULE(TypeConverter) {
   }
 };
 
-template <int MODULE_COUNT>
+template <int id, int module_count>
 SC_MODULE(MatrixParamsDeserializer) {
   sc_in<bool> CCS_INIT_S1(clk);
   sc_in<bool> CCS_INIT_S1(rstn);
 
   Connections::In<ac_int<64, false>> CCS_INIT_S1(serial_params_in);
-  Connections::Out<MatrixParams> params_out[MODULE_COUNT];
+  Connections::Out<MatrixParams> params_out[module_count];
 
   Connections::Combinational<ac_int<MatrixParams::width, false>> params_bits;
   Connections::Combinational<MatrixParams> converted_params;
@@ -93,7 +93,7 @@ SC_MODULE(MatrixParamsDeserializer) {
     params_bits.ResetWrite();
     converted_params.ResetRead();
 
-    for (int i = 0; i < MODULE_COUNT; i++) {
+    for (int i = 0; i < module_count; i++) {
       params_out[i].Reset();
     }
 
@@ -111,7 +111,7 @@ SC_MODULE(MatrixParamsDeserializer) {
       spdlog::debug(oss.str());
 #endif
 
-      for (int i = 0; i < MODULE_COUNT; i++) {
+      for (int i = 0; i < module_count; i++) {
         params_out[i].Push(params);
       }
     }

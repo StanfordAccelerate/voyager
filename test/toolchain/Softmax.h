@@ -86,7 +86,7 @@ void map_softmax(const codegen::Operation& param,
   // Instruction 0 - start reduction engine to calculate max
   VectorInstructions vinst0;
   vinst0.op_type = VectorInstructions::reduction;
-  vinst0.inst_count = reduced_size;
+  vinst0.inst_loop_count = reduced_size;
   vinst0.reduce_count = reduction_dim / OC_DIMENSION * packing_factor;
   vinst0.reduce_op = VectorInstructions::rmax;
   vinst0.rduplicate = 1;
@@ -96,13 +96,13 @@ void map_softmax(const codegen::Operation& param,
   // Instruction 1 - send to reduction engine to calculate max
   VectorInstructions vinst1;
   vinst1.op_type = VectorInstructions::vector;
-  vinst1.inst_count = input_size / OC_DIMENSION * packing_factor;
+  vinst1.inst_loop_count = input_size / OC_DIMENSION * packing_factor;
   vinst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst1.vdest = VectorInstructions::to_reduce;
   vector_instruction_config->inst[1] = vinst1;
 
   vector_instruction_config->num_inst = 2;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   mapped_params.push_back(vector_params);
   mapped_params.push_back(vector_instruction_config);
@@ -167,7 +167,7 @@ void map_softmax(const codegen::Operation& param,
   // Instruction 2 - start reduction engine to calculate sum
   VectorInstructions vinst2;
   vinst2.op_type = VectorInstructions::reduction;
-  vinst2.inst_count = reduced_size;
+  vinst2.inst_loop_count = reduced_size;
   vinst2.reduce_count = reduction_dim / OC_DIMENSION * packing_factor;
   vinst2.reduce_op = VectorInstructions::radd;
   vinst2.rreciprocal = 1;
@@ -178,7 +178,7 @@ void map_softmax(const codegen::Operation& param,
   // Instruction 3 - subtract max and exp, and reduce sum
   VectorInstructions vinst3;
   vinst3.op_type = VectorInstructions::vector;
-  vinst3.inst_count = input_size / OC_DIMENSION * packing_factor;
+  vinst3.inst_loop_count = input_size / OC_DIMENSION * packing_factor;
   vinst3.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   vinst3.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   vinst3.vector_op0 = VectorInstructions::vsub;
@@ -187,7 +187,7 @@ void map_softmax(const codegen::Operation& param,
   vector_instruction_config->inst[1] = vinst3;
 
   vector_instruction_config->num_inst = 2;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   // Copy coefficients from ApproximationConstants.h
   for (int i = 0; i < NUM_MAXES; i++) {
@@ -279,7 +279,7 @@ void map_softmax(const codegen::Operation& param,
   // Instruction 4 - subtract max and exp, and divide by reduced value
   VectorInstructions inst4;
   inst4.op_type = VectorInstructions::vector;
-  inst4.inst_count = input_size / OC_DIMENSION * packing_factor;
+  inst4.inst_loop_count = input_size / OC_DIMENSION * packing_factor;
   inst4.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst4.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
   inst4.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
@@ -288,12 +288,12 @@ void map_softmax(const codegen::Operation& param,
   inst4.vector_op2 = VectorInstructions::vmult;
   inst4.vdest = VectorInstructions::to_output;
 
-  set_quantize_params(param, vector_params, inst4);
+  set_quantize_params(param, vector_params, inst4, vector_instruction_config);
 
   vector_instruction_config->inst[0] = inst4;
 
   vector_instruction_config->num_inst = 1;
-  vector_instruction_config->repeat_count = 1;
+  vector_instruction_config->config_loop_count = 1;
 
   // Copy coefficients from ApproximationConstants.h
   for (int i = 0; i < NUM_MAXES; i++) {

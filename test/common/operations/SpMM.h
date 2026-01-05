@@ -4,7 +4,8 @@
 #include "test/common/operations/Common.h"
 #include "test/compiler/proto/param.pb.h"
 
-template <typename Vector, typename Weight, typename Output, typename Scale>
+template <typename Meta, typename Vector, typename Weight, typename Output,
+          typename Scale>
 inline Output* spmm_csr(std::any data_ptr, std::any indices_ptr,
                         std::any indptr_ptr, std::any weight_ptr,
                         std::any weight_scale_ptr,
@@ -22,8 +23,8 @@ inline Output* spmm_csr(std::any data_ptr, std::any indices_ptr,
   }
 
   Vector* data = std::any_cast<Vector*>(data_ptr);
-  Int<32, true>* indices = std::any_cast<Int<32, true>*>(indices_ptr);
-  Int<32, true>* indptr = std::any_cast<Int<32, true>*>(indptr_ptr);
+  Meta* indices = std::any_cast<Meta*>(indices_ptr);
+  Meta* indptr = std::any_cast<Meta*>(indptr_ptr);
 
   Weight* weight = std::any_cast<Weight*>(weight_ptr);
   Scale* scale = std::any_cast<Scale*>(weight_scale_ptr);
