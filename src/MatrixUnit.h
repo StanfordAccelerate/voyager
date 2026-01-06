@@ -132,8 +132,8 @@ SC_MODULE(MatrixUnit) {
 
   Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>> output_channel;
 
-  Connections::SyncOut CCS_INIT_S1(start_signal);
-  Connections::SyncOut CCS_INIT_S1(done_signal);
+  Connections::SyncOut CCS_INIT_S1(start);
+  Connections::SyncOut CCS_INIT_S1(done);
 
   SC_CTOR(MatrixUnit) {
     params_deserializer.clk(clk);
@@ -226,8 +226,8 @@ SC_MODULE(MatrixUnit) {
     matrix_processor.weight_channel(weight_buffer_read_resp);
     matrix_processor.bias_channel(bias_data);
     matrix_processor.params_in(matrix_params[2]);
-    matrix_processor.start_signal(start_signal);
-    matrix_processor.done_signal(done_signal);
+    matrix_processor.start(start);
+    matrix_processor.done(done);
 
     for (int i = 0; i < ACCUM_BUFFER_BANKS; i++) {
       matrix_processor.accumulation_buffer_read_address[i](

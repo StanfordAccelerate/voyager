@@ -110,16 +110,16 @@ SC_MODULE(VectorUnit) {
 #endif
 
   // Outputs
-  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output_data);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      vector_output_address);
+      vector_output_addr);
   Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(
-      mx_scale_output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(mx_scale_address);
+      mx_scale_output_data);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(mx_scale_output_addr);
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      sparse_tensor_output);
+      sparse_tensor_output_data);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      sparse_tensor_address);
+      sparse_tensor_output_addr);
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
@@ -229,12 +229,12 @@ SC_MODULE(VectorUnit) {
     output_controller.csr_indptr(csr_indptr);
     output_controller.csr_data_and_indices(csr_data_and_indices);
 #endif
-    output_controller.vector_output(vector_output);
-    output_controller.vector_output_address(vector_output_address);
-    output_controller.mx_scale_output(mx_scale_output);
-    output_controller.mx_scale_address(mx_scale_address);
-    output_controller.sparse_tensor_output(sparse_tensor_output);
-    output_controller.sparse_tensor_address(sparse_tensor_address);
+    output_controller.vector_output_data(vector_output_data);
+    output_controller.vector_output_addr(vector_output_addr);
+    output_controller.mx_scale_output_data(mx_scale_output_data);
+    output_controller.mx_scale_output_addr(mx_scale_output_addr);
+    output_controller.sparse_tensor_output_data(sparse_tensor_output_data);
+    output_controller.sparse_tensor_output_addr(sparse_tensor_output_addr);
     output_controller.done(done);
 #if SUPPORT_DWC
     output_controller.dwc_address_in(dwc_address_in);

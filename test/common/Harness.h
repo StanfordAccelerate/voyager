@@ -26,7 +26,7 @@ SC_MODULE(Harness) {
   //----------------------------------------------------------
 
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serial_matrix_params_in);
+      matrix_unit_params_in);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(matrix_unit_input_req);
   sc_fifo<IC_PORT_TYPE> matrix_unit_input_resp_fifo;
@@ -56,8 +56,8 @@ SC_MODULE(Harness) {
       matrix_unit_weight_scale_resp);
 #endif
 
-  Connections::SyncChannel CCS_INIT_S1(matrix_unit_start_signal);
-  Connections::SyncChannel CCS_INIT_S1(matrix_unit_done_signal);
+  Connections::SyncChannel CCS_INIT_S1(matrix_unit_start);
+  Connections::SyncChannel CCS_INIT_S1(matrix_unit_done);
 
   //----------------------------------------------------------
   // MATRIX VECTOR UNIT CONNECTIONS
@@ -65,7 +65,7 @@ SC_MODULE(Harness) {
 
 #if SUPPORT_MVM
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serial_matrix_vector_params_in);
+      matrix_vector_unit_params_in);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(
       matrix_vector_unit_input_req);
@@ -113,8 +113,8 @@ SC_MODULE(Harness) {
   Connections::Combinational<OC_PORT_TYPE> CCS_INIT_S1(
       matrix_vector_unit_weight_dq_zp_resp);
 
-  Connections::SyncChannel CCS_INIT_S1(matrix_vector_unit_start_signal);
-  Connections::SyncChannel CCS_INIT_S1(matrix_vector_unit_done_signal);
+  Connections::SyncChannel CCS_INIT_S1(matrix_vector_unit_start);
+  Connections::SyncChannel CCS_INIT_S1(matrix_vector_unit_done);
 #endif
 
   //----------------------------------------------------------
@@ -123,37 +123,41 @@ SC_MODULE(Harness) {
 
 #if SUPPORT_SPMM
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serial_spmm_unit_params_in);
+      spmm_unit_params_in);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_indptr_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_input_indptr_resp_fifo;
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      spmm_unit_input_indptr_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_unit_input_indptr_resp_fifo;
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      spmm_input_indptr_resp);
+      spmm_unit_input_indptr_resp);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_indices_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_input_indices_resp_fifo;
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      spmm_unit_input_indices_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_unit_input_indices_resp_fifo;
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      spmm_input_indices_resp);
+      spmm_unit_input_indices_resp);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_input_data_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_input_data_resp_fifo;
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      spmm_unit_input_data_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_unit_input_data_resp_fifo;
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      spmm_input_data_resp);
+      spmm_unit_input_data_resp);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_weight_resp_fifo;
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_unit_weight_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_unit_weight_resp_fifo;
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      spmm_weight_resp);
+      spmm_unit_weight_resp);
 
 #if SUPPORT_MX
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(spmm_weight_scale_req);
-  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_weight_scale_resp_fifo;
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      spmm_unit_weight_scale_req);
+  sc_fifo<ac_int<OC_PORT_WIDTH, false>> spmm_unit_weight_scale_resp_fifo;
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      spmm_weight_scale_resp);
+      spmm_unit_weight_scale_resp);
 #endif
 
-  Connections::SyncChannel CCS_INIT_S1(spmm_unit_start_signal);
-  Connections::SyncChannel CCS_INIT_S1(spmm_unit_done_signal);
+  Connections::SyncChannel CCS_INIT_S1(spmm_unit_start);
+  Connections::SyncChannel CCS_INIT_S1(spmm_unit_done);
 #endif
 
   //----------------------------------------------------------
@@ -161,41 +165,42 @@ SC_MODULE(Harness) {
   //----------------------------------------------------------
 
 #if SUPPORT_DWC
-  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serial_dwc_params_in);
+  Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(dwc_unit_params_in);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_input_req);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_unit_input_req);
   sc_fifo<ac_int<UNROLLFACTOR * DWC_DATATYPE::width, false>>
-      dwc_input_resp_fifo;
+      dwc_unit_input_resp_fifo;
   Connections::Combinational<ac_int<UNROLLFACTOR * DWC_DATATYPE::width, false>>
-      CCS_INIT_S1(dwc_input_resp);
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_weight_req);
+      CCS_INIT_S1(dwc_unit_input_resp);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_unit_weight_req);
   sc_fifo<ac_int<DWC_KERNEL_SIZE * DWC_DATATYPE::width, false>>
-      dwc_weight_resp_fifo;
+      dwc_unit_weight_resp_fifo;
   Connections::Combinational<
       ac_int<DWC_KERNEL_SIZE * DWC_DATATYPE::width, false>>
-      CCS_INIT_S1(dwc_weight_resp);
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_bias_req);
-  sc_fifo<ac_int<ACCUM_BUFFER_DATATYPE::width, false>> dwc_bias_resp_fifo;
+      CCS_INIT_S1(dwc_unit_weight_resp);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_unit_bias_req);
+  sc_fifo<ac_int<ACCUM_BUFFER_DATATYPE::width, false>> dwc_unit_bias_resp_fifo;
   Connections::Combinational<ac_int<ACCUM_BUFFER_DATATYPE::width, false>>
-      CCS_INIT_S1(dwc_bias_resp);
+      CCS_INIT_S1(dwc_unit_bias_resp);
 
 #if SUPPORT_MX
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_input_scale_req);
-  sc_fifo<ac_int<SCALE_DATATYPE::width, false>> dwc_input_scale_resp_fifo;
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      dwc_unit_input_scale_req);
+  sc_fifo<ac_int<SCALE_DATATYPE::width, false>> dwc_unit_input_scale_resp_fifo;
   Connections::Combinational<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
-      dwc_input_scale_resp);
+      dwc_unit_input_scale_resp);
 
-  Connections::Combinational<MemoryRequest> CCS_INIT_S1(dwc_weight_scale_req);
+  Connections::Combinational<MemoryRequest> CCS_INIT_S1(
+      dwc_unit_weight_scale_req);
   sc_fifo<ac_int<DWC_KERNEL_SIZE * SCALE_DATATYPE::width, false>>
-      dwc_weight_scale_resp_fifo;
+      dwc_unit_weight_scale_resp_fifo;
   Connections::Combinational<
       ac_int<DWC_KERNEL_SIZE * SCALE_DATATYPE::width, false>>
-      CCS_INIT_S1(dwc_weight_scale_resp);
+      CCS_INIT_S1(dwc_unit_weight_scale_resp);
 #endif
 
-  Connections::SyncChannel CCS_INIT_S1(dwc_start_signal);
-  Connections::SyncChannel CCS_INIT_S1(dwc_done_signal);
+  Connections::SyncChannel CCS_INIT_S1(dwc_unit_start);
+  Connections::SyncChannel CCS_INIT_S1(dwc_unit_done);
 #endif
 
   //----------------------------------------------------------
@@ -203,7 +208,7 @@ SC_MODULE(Harness) {
   //----------------------------------------------------------
 
   Connections::Combinational<ac_int<64, false>> CCS_INIT_S1(
-      serial_vector_params_in);
+      vector_unit_params_in);
 
   Connections::Combinational<MemoryRequest> CCS_INIT_S1(vector_fetch_0_req);
   sc_fifo<ac_int<OC_PORT_WIDTH, false>> vector_fetch_0_resp_fifo;
@@ -219,20 +224,20 @@ SC_MODULE(Harness) {
       vector_fetch_2_resp);
 
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      vector_output);
+      vector_output_data);
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      vector_output_address);
+      vector_output_addr);
   Connections::Combinational<ac_int<SCALE_DATATYPE::width, false>> CCS_INIT_S1(
-      mx_scale_output);
+      mx_scale_output_data);
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      mx_scale_address);
+      mx_scale_output_addr);
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      sparse_tensor_output);
+      sparse_tensor_output_data);
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      sparse_tensor_address);
+      sparse_tensor_output_addr);
 
-  Connections::SyncChannel CCS_INIT_S1(vector_unit_start_signal);
-  Connections::SyncChannel CCS_INIT_S1(vector_unit_done_signal);
+  Connections::SyncChannel CCS_INIT_S1(vector_unit_start);
+  Connections::SyncChannel CCS_INIT_S1(vector_unit_done);
 
   Connections::SyncChannel CCS_INIT_S1(tile_done);
   Connections::SyncChannel CCS_INIT_S1(operation_done);
@@ -300,32 +305,32 @@ SC_MODULE(Harness) {
   void send_matrix_vector_unit_weight_dq_zp_response();
 
 #if SUPPORT_SPMM
-  void read_spmm_input_indptr_request();
-  void send_spmm_input_indptr_response();
-  void read_spmm_input_indices_request();
-  void send_spmm_input_indices_response();
-  void read_spmm_input_data_request();
-  void send_spmm_input_data_response();
-  void read_spmm_weight_request();
-  void send_spmm_weight_response();
+  void read_spmm_unit_input_indptr_request();
+  void send_spmm_unit_input_indptr_response();
+  void read_spmm_unit_input_indices_request();
+  void send_spmm_unit_input_indices_response();
+  void read_spmm_unit_input_data_request();
+  void send_spmm_unit_input_data_response();
+  void read_spmm_unit_weight_request();
+  void send_spmm_unit_weight_response();
 #if SUPPORT_MX
-  void read_spmm_weight_scale_request();
-  void send_spmm_weight_scale_response();
+  void read_spmm_unit_weight_scale_request();
+  void send_spmm_unit_weight_scale_response();
 #endif
 #endif
 
 #if SUPPORT_DWC
-  void read_dwc_input_request();
-  void send_dwc_input_response();
-  void read_dwc_weight_request();
-  void send_dwc_weight_response();
-  void read_dwc_bias_request();
-  void send_dwc_bias_response();
+  void read_dwc_unit_input_request();
+  void send_dwc_unit_input_response();
+  void read_dwc_unit_weight_request();
+  void send_dwc_unit_weight_response();
+  void read_dwc_unit_bias_request();
+  void send_dwc_unit_bias_response();
 #if SUPPORT_MX
-  void read_dwc_input_scale_request();
-  void send_dwc_input_scale_response();
-  void read_dwc_weight_scale_request();
-  void send_dwc_weight_scale_response();
+  void read_dwc_unit_input_scale_request();
+  void send_dwc_unit_input_scale_response();
+  void read_dwc_unit_weight_scale_request();
+  void send_dwc_unit_weight_scale_response();
 #endif
 #endif
 

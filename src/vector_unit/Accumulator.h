@@ -25,9 +25,7 @@ SC_MODULE(VectorAccumulator) {
 #endif
 
   // Number of feedback delay stages based on clock period
-  static constexpr int SUM_N = (clock_period < 1)   ? 5
-                               : (clock_period < 5) ? 4
-                                                    : 2;
+  static constexpr int SUM_N = (clock_period < 5) ? 4 : 2;
   static constexpr int SUM_LAST = SUM_N - 1;
   static constexpr int MAX_N = (clock_period < 5) ? 2 : 1;
   static constexpr int MAX_LAST = MAX_N - 1;

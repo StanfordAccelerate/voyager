@@ -20,7 +20,7 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
       dataloader(dataloader) {
   accelerator.clk(clk);
   accelerator.rstn(rstn);
-  accelerator.serial_matrix_params_in(serial_matrix_params_in);
+  accelerator.matrix_unit_params_in(matrix_unit_params_in);
   accelerator.matrix_unit_input_req(matrix_unit_input_req);
   accelerator.matrix_unit_input_resp(matrix_unit_input_resp);
   accelerator.matrix_unit_weight_req(matrix_unit_weight_req);
@@ -33,10 +33,10 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.matrix_unit_weight_scale_req(matrix_unit_weight_scale_req);
   accelerator.matrix_unit_weight_scale_resp(matrix_unit_weight_scale_resp);
 #endif
-  accelerator.matrix_unit_start_signal(matrix_unit_start_signal);
-  accelerator.matrix_unit_done_signal(matrix_unit_done_signal);
+  accelerator.matrix_unit_start(matrix_unit_start);
+  accelerator.matrix_unit_done(matrix_unit_done);
 #if SUPPORT_MVM
-  accelerator.serial_matrix_vector_params_in(serial_matrix_vector_params_in);
+  accelerator.matrix_vector_unit_params_in(matrix_vector_unit_params_in);
   accelerator.matrix_vector_unit_input_req(matrix_vector_unit_input_req);
   accelerator.matrix_vector_unit_input_resp(matrix_vector_unit_input_resp);
   accelerator.matrix_vector_unit_weight_req(matrix_vector_unit_weight_req);
@@ -61,58 +61,58 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
       matrix_vector_unit_weight_dq_zp_req);
   accelerator.matrix_vector_unit_weight_dq_zp_resp(
       matrix_vector_unit_weight_dq_zp_resp);
-  accelerator.matrix_vector_unit_start_signal(matrix_vector_unit_start_signal);
-  accelerator.matrix_vector_unit_done_signal(matrix_vector_unit_done_signal);
+  accelerator.matrix_vector_unit_start(matrix_vector_unit_start);
+  accelerator.matrix_vector_unit_done(matrix_vector_unit_done);
 #endif
 #if SUPPORT_SPMM
-  accelerator.serial_spmm_unit_params_in(serial_spmm_unit_params_in);
-  accelerator.spmm_input_indptr_req(spmm_input_indptr_req);
-  accelerator.spmm_input_indptr_resp(spmm_input_indptr_resp);
-  accelerator.spmm_input_indices_req(spmm_input_indices_req);
-  accelerator.spmm_input_indices_resp(spmm_input_indices_resp);
-  accelerator.spmm_input_data_req(spmm_input_data_req);
-  accelerator.spmm_input_data_resp(spmm_input_data_resp);
-  accelerator.spmm_weight_req(spmm_weight_req);
-  accelerator.spmm_weight_resp(spmm_weight_resp);
+  accelerator.spmm_unit_params_in(spmm_unit_params_in);
+  accelerator.spmm_unit_input_indptr_req(spmm_unit_input_indptr_req);
+  accelerator.spmm_unit_input_indptr_resp(spmm_unit_input_indptr_resp);
+  accelerator.spmm_unit_input_indices_req(spmm_unit_input_indices_req);
+  accelerator.spmm_unit_input_indices_resp(spmm_unit_input_indices_resp);
+  accelerator.spmm_unit_input_data_req(spmm_unit_input_data_req);
+  accelerator.spmm_unit_input_data_resp(spmm_unit_input_data_resp);
+  accelerator.spmm_unit_weight_req(spmm_unit_weight_req);
+  accelerator.spmm_unit_weight_resp(spmm_unit_weight_resp);
 #if SUPPORT_MX
-  accelerator.spmm_weight_scale_req(spmm_weight_scale_req);
-  accelerator.spmm_weight_scale_resp(spmm_weight_scale_resp);
+  accelerator.spmm_unit_weight_scale_req(spmm_unit_weight_scale_req);
+  accelerator.spmm_unit_weight_scale_resp(spmm_unit_weight_scale_resp);
 #endif
-  accelerator.spmm_unit_start_signal(spmm_unit_start_signal);
-  accelerator.spmm_unit_done_signal(spmm_unit_done_signal);
+  accelerator.spmm_unit_start(spmm_unit_start);
+  accelerator.spmm_unit_done(spmm_unit_done);
 #endif
 #if SUPPORT_DWC
-  accelerator.serial_dwc_params_in(serial_dwc_params_in);
-  accelerator.dwc_input_req(dwc_input_req);
-  accelerator.dwc_input_resp(dwc_input_resp);
-  accelerator.dwc_weight_req(dwc_weight_req);
-  accelerator.dwc_weight_resp(dwc_weight_resp);
-  accelerator.dwc_bias_req(dwc_bias_req);
-  accelerator.dwc_bias_resp(dwc_bias_resp);
+  accelerator.dwc_unit_params_in(dwc_unit_params_in);
+  accelerator.dwc_unit_input_req(dwc_unit_input_req);
+  accelerator.dwc_unit_input_resp(dwc_unit_input_resp);
+  accelerator.dwc_unit_weight_req(dwc_unit_weight_req);
+  accelerator.dwc_unit_weight_resp(dwc_unit_weight_resp);
+  accelerator.dwc_unit_bias_req(dwc_unit_bias_req);
+  accelerator.dwc_unit_bias_resp(dwc_unit_bias_resp);
 #if SUPPORT_MX
-  accelerator.dwc_input_scale_req(dwc_input_scale_req);
-  accelerator.dwc_input_scale_resp(dwc_input_scale_resp);
-  accelerator.dwc_weight_scale_req(dwc_weight_scale_req);
-  accelerator.dwc_weight_scale_resp(dwc_weight_scale_resp);
+  accelerator.dwc_unit_input_scale_req(dwc_unit_input_scale_req);
+  accelerator.dwc_unit_input_scale_resp(dwc_unit_input_scale_resp);
+  accelerator.dwc_unit_weight_scale_req(dwc_unit_weight_scale_req);
+  accelerator.dwc_unit_weight_scale_resp(dwc_unit_weight_scale_resp);
 #endif
-  accelerator.dwc_start_signal(dwc_start_signal);
-  accelerator.dwc_done_signal(dwc_done_signal);
+  accelerator.dwc_unit_start(dwc_unit_start);
+  accelerator.dwc_unit_done(dwc_unit_done);
 #endif
-  accelerator.serial_vector_params_in(serial_vector_params_in);
+  accelerator.vector_unit_params_in(vector_unit_params_in);
   accelerator.vector_fetch_0_req(vector_fetch_0_req);
   accelerator.vector_fetch_0_resp(vector_fetch_0_resp);
   accelerator.vector_fetch_1_req(vector_fetch_1_req);
   accelerator.vector_fetch_1_resp(vector_fetch_1_resp);
   accelerator.vector_fetch_2_req(vector_fetch_2_req);
   accelerator.vector_fetch_2_resp(vector_fetch_2_resp);
-  accelerator.vector_output(vector_output);
-  accelerator.vector_output_address(vector_output_address);
-  accelerator.mx_scale_output(mx_scale_output);
-  accelerator.mx_scale_address(mx_scale_address);
-  accelerator.sparse_tensor_output(sparse_tensor_output);
-  accelerator.sparse_tensor_address(sparse_tensor_address);
-  accelerator.vector_unit_start_signal(vector_unit_start_signal);
-  accelerator.vector_unit_done_signal(vector_unit_done_signal);
+  accelerator.vector_output_data(vector_output_data);
+  accelerator.vector_output_addr(vector_output_addr);
+  accelerator.mx_scale_output_data(mx_scale_output_data);
+  accelerator.mx_scale_output_addr(mx_scale_output_addr);
+  accelerator.sparse_tensor_output_data(sparse_tensor_output_data);
+  accelerator.sparse_tensor_output_addr(sparse_tensor_output_addr);
+  accelerator.vector_unit_start(vector_unit_start);
+  accelerator.vector_unit_done(vector_unit_done);
 
   SC_CTHREAD(reset, clk);
 
@@ -146,22 +146,22 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
 #endif
 
 #if SUPPORT_SPMM
-  REGISTER_IO_FN(spmm_input_indptr)
-  REGISTER_IO_FN(spmm_input_indices)
-  REGISTER_IO_FN(spmm_input_data)
-  REGISTER_IO_FN(spmm_weight)
+  REGISTER_IO_FN(spmm_unit_input_indptr)
+  REGISTER_IO_FN(spmm_unit_input_indices)
+  REGISTER_IO_FN(spmm_unit_input_data)
+  REGISTER_IO_FN(spmm_unit_weight)
 #if SUPPORT_MX
-  REGISTER_IO_FN(spmm_weight_scale)
+  REGISTER_IO_FN(spmm_unit_weight_scale)
 #endif
 #endif
 
 #if SUPPORT_DWC
-  REGISTER_IO_FN(dwc_input)
-  REGISTER_IO_FN(dwc_weight)
-  REGISTER_IO_FN(dwc_bias)
+  REGISTER_IO_FN(dwc_unit_input)
+  REGISTER_IO_FN(dwc_unit_weight)
+  REGISTER_IO_FN(dwc_unit_bias)
 #if SUPPORT_MX
-  REGISTER_IO_FN(dwc_input_scale)
-  REGISTER_IO_FN(dwc_weight_scale)
+  REGISTER_IO_FN(dwc_unit_input_scale)
+  REGISTER_IO_FN(dwc_unit_weight_scale)
 #endif
 #endif
 
@@ -291,22 +291,22 @@ DEFINE_IO_FN(matrix_vector_unit_weight_dq_zp)
 #endif
 
 #if SUPPORT_SPMM
-DEFINE_IO_FN(spmm_input_indptr)
-DEFINE_IO_FN(spmm_input_indices)
-DEFINE_IO_FN(spmm_input_data)
-DEFINE_IO_FN(spmm_weight)
+DEFINE_IO_FN(spmm_unit_input_indptr)
+DEFINE_IO_FN(spmm_unit_input_indices)
+DEFINE_IO_FN(spmm_unit_input_data)
+DEFINE_IO_FN(spmm_unit_weight)
 #if SUPPORT_MX
-DEFINE_IO_FN(spmm_weight_scale)
+DEFINE_IO_FN(spmm_unit_weight_scale)
 #endif
 #endif
 
 #if SUPPORT_DWC
-DEFINE_IO_FN(dwc_input)
-DEFINE_IO_FN(dwc_weight)
-DEFINE_IO_FN(dwc_bias)
+DEFINE_IO_FN(dwc_unit_input)
+DEFINE_IO_FN(dwc_unit_weight)
+DEFINE_IO_FN(dwc_unit_bias)
 #if SUPPORT_MX
-DEFINE_IO_FN(dwc_input_scale)
-DEFINE_IO_FN(dwc_weight_scale)
+DEFINE_IO_FN(dwc_unit_input_scale)
+DEFINE_IO_FN(dwc_unit_weight_scale)
 #endif
 #endif
 
@@ -315,15 +315,15 @@ DEFINE_IO_FN(vector_fetch_1)
 DEFINE_IO_FN(vector_fetch_2)
 
 void Harness::store_vector_output() {
-  process_write_request(&vector_output, &vector_output_address);
+  process_write_request(&vector_output_data, &vector_output_addr);
 }
 
 void Harness::store_mx_scale_output() {
-  process_write_request(&mx_scale_output, &mx_scale_address);
+  process_write_request(&mx_scale_output_data, &mx_scale_output_addr);
 }
 
 void Harness::store_sparse_tensor_output() {
-  process_write_request(&sparse_tensor_output, &sparse_tensor_address);
+  process_write_request(&sparse_tensor_output_data, &sparse_tensor_output_addr);
 }
 
 void Harness::reset() {
@@ -354,19 +354,19 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
     if (auto* matrix_params = dynamic_cast<MatrixParams*>(params[idx])) {
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
-        send_serialized_params<MatrixParams, 64>(
-            *matrix_params, &serial_matrix_vector_params_in);
+        send_serialized_params<MatrixParams, 64>(*matrix_params,
+                                                 &matrix_vector_unit_params_in);
       } else
 #endif
 #if SUPPORT_SPMM
           if (matrix_params->is_spmm) {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
-                                                 &serial_spmm_unit_params_in);
+                                                 &spmm_unit_params_in);
       } else
 #endif
       {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
-                                                 &serial_matrix_params_in);
+                                                 &matrix_unit_params_in);
       }
 
       idx++;
@@ -374,7 +374,7 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
 
 #if SUPPORT_DWC
     if (auto* dwc_params = dynamic_cast<DwCParams*>(params[idx])) {
-      send_serialized_params<DwCParams, 64>(*dwc_params, &serial_dwc_params_in);
+      send_serialized_params<DwCParams, 64>(*dwc_params, &dwc_unit_params_in);
       idx++;
     }
 #endif
@@ -384,9 +384,9 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
           dynamic_cast<VectorInstructionConfig*>(params[++idx]);
 
       send_serialized_params<VectorParams, 64>(*vector_params,
-                                               &serial_vector_params_in);
+                                               &vector_unit_params_in);
       send_serialized_params<VectorInstructionConfig, 64>(
-          *vector_config, &serial_vector_params_in);
+          *vector_config, &vector_unit_params_in);
     }
 
     // Wait for last operation to finish
@@ -429,16 +429,16 @@ void Harness::record_start(const std::deque<BaseParams*>& params,
     if (has_matrix_params) {
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
-        matrix_vector_unit_start_signal.SyncPop();
+        matrix_vector_unit_start.SyncPop();
       } else
 #endif
 #if SUPPORT_SPMM
           if (matrix_params->is_spmm) {
-        spmm_unit_start_signal.SyncPop();
+        spmm_unit_start.SyncPop();
       } else
 #endif
       {
-        matrix_unit_start_signal.SyncPop();
+        matrix_unit_start.SyncPop();
       }
 
       auto start = sc_time_stamp();
@@ -453,12 +453,12 @@ void Harness::record_start(const std::deque<BaseParams*>& params,
                                           << "' Started. -----");
 
       if (has_vector_params) {
-        vector_unit_start_signal.SyncPop();
+        vector_unit_start.SyncPop();
       }
     }
 #if SUPPORT_DWC
     else if (has_dwc_params) {
-      dwc_start_signal.SyncPop();
+      dwc_unit_start.SyncPop();
 
       auto start = sc_time_stamp();
       start_times.push_back(start);
@@ -472,12 +472,12 @@ void Harness::record_start(const std::deque<BaseParams*>& params,
                                           << "' Started. -----");
 
       if (has_vector_params) {
-        vector_unit_start_signal.SyncPop();
+        vector_unit_start.SyncPop();
       }
     }
 #endif
     else if (has_vector_params) {
-      vector_unit_start_signal.SyncPop();
+      vector_unit_start.SyncPop();
 
       auto start = sc_time_stamp();
       start_times.push_back(start);
@@ -526,26 +526,26 @@ void Harness::record_done(const std::deque<BaseParams*>& params,
     if (has_matrix_params) {
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
-        matrix_vector_unit_done_signal.SyncPop();
+        matrix_vector_unit_done.SyncPop();
       } else
 #endif
 #if SUPPORT_SPMM
           if (matrix_params->is_spmm) {
-        spmm_unit_done_signal.SyncPop();
+        spmm_unit_done.SyncPop();
       } else
 #endif
       {
-        matrix_unit_done_signal.SyncPop();
+        matrix_unit_done.SyncPop();
       }
     }
 #if SUPPORT_DWC
     else if (has_dwc_params) {
-      dwc_done_signal.SyncPop();
+      dwc_unit_done.SyncPop();
     }
 #endif
 
     if (has_vector_params) {
-      vector_unit_done_signal.SyncPop();
+      vector_unit_done.SyncPop();
     }
 
     sc_time end = sc_time_stamp();
@@ -612,16 +612,16 @@ std::deque<BaseParams*> offset_param_addresses(std::deque<BaseParams*> params,
 }
 
 void Harness::param_sender() {
-  serial_matrix_params_in.ResetWrite();
-  serial_vector_params_in.ResetWrite();
+  matrix_unit_params_in.ResetWrite();
+  vector_unit_params_in.ResetWrite();
 #if SUPPORT_MVM
-  serial_matrix_vector_params_in.ResetWrite();
+  matrix_vector_unit_params_in.ResetWrite();
 #endif
 #if SUPPORT_SPMM
-  serial_spmm_unit_params_in.ResetWrite();
+  spmm_unit_params_in.ResetWrite();
 #endif
 #if SUPPORT_DWC
-  serial_dwc_params_in.ResetWrite();
+  dwc_unit_params_in.ResetWrite();
 #endif
   operation_done.ResetRead();
   tile_done.ResetRead();
@@ -666,16 +666,16 @@ void Harness::param_sender() {
 }
 
 void Harness::start_monitor() {
-  matrix_unit_start_signal.ResetRead();
-  vector_unit_start_signal.ResetRead();
+  matrix_unit_start.ResetRead();
+  vector_unit_start.ResetRead();
 #if SUPPORT_MVM
-  matrix_vector_unit_start_signal.ResetRead();
+  matrix_vector_unit_start.ResetRead();
 #endif
 #if SUPPORT_SPMM
-  spmm_unit_start_signal.ResetRead();
+  spmm_unit_start.ResetRead();
 #endif
 #if SUPPORT_DWC
-  dwc_start_signal.ResetRead();
+  dwc_unit_start.ResetRead();
 #endif
 
   wait();
@@ -701,16 +701,16 @@ void Harness::start_monitor() {
 }
 
 void Harness::done_monitor() {
-  matrix_unit_done_signal.ResetRead();
-  vector_unit_done_signal.ResetRead();
+  matrix_unit_done.ResetRead();
+  vector_unit_done.ResetRead();
 #if SUPPORT_MVM
-  matrix_vector_unit_done_signal.ResetRead();
+  matrix_vector_unit_done.ResetRead();
 #endif
 #if SUPPORT_SPMM
-  spmm_unit_done_signal.ResetRead();
+  spmm_unit_done.ResetRead();
 #endif
 #if SUPPORT_DWC
-  dwc_done_signal.ResetRead();
+  dwc_unit_done.ResetRead();
 #endif
 
   operation_done.ResetWrite();

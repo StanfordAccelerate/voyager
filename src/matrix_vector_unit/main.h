@@ -90,8 +90,8 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
   Connections::Combinational<Pack1D<Output, bs>> CCS_INIT_S1(accumulation_out);
   Connections::Out<Pack1D<Output, vu_width>> CCS_INIT_S1(matrix_out);
 
-  Connections::SyncOut CCS_INIT_S1(start_signal);
-  Connections::SyncOut CCS_INIT_S1(done_signal);
+  Connections::SyncOut CCS_INIT_S1(start);
+  Connections::SyncOut CCS_INIT_S1(done);
 
   using loop_t = ac_int<LOOP_WIDTH, false>;
 
@@ -311,7 +311,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     send_inputs_param.ResetRead();
     input_data.ResetRead();
     mac_inputs.ResetWrite();
-    start_signal.Reset();
+    start.Reset();
 #if SUPPORT_MX
     input_scale_data.ResetRead();
     mac_input_scales.ResetWrite();
@@ -321,7 +321,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 
     while (true) {
       MatrixParams params = send_inputs_param.Pop();
-      start_signal.SyncPush();
+      start.SyncPush();
 
       loop_t K1 = params.loops[0][params.weight_loop_idx[0]];
       loop_t K0 = params.loops[1][params.weight_loop_idx[1]];
@@ -648,7 +648,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     bias_data.ResetRead();
     psum_out.ResetRead();
     accumulation_out.ResetWrite();
-    done_signal.Reset();
+    done.Reset();
 
     wait();
 
@@ -703,7 +703,7 @@ struct MatrixVectorUnit<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
         accumulation_out.Push(outputs);
         if (k1 == k_bound) break;
       }
-      done_signal.SyncPush();
+      done.SyncPush();
     }
   }
 

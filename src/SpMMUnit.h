@@ -30,7 +30,13 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   static constexpr int LOOP_WIDTH = 16;
   using loop_t = ac_int<LOOP_WIDTH, false>;
 
-  static constexpr int FEEDBACK_DEPTH = 4;
+#ifdef CLOCK_PERIOD
+  static constexpr double clock_period = CLOCK_PERIOD;
+#else
+  static constexpr double clock_period = 5.0;  // Default to 5 ns if not defined
+#endif
+
+  static constexpr int FEEDBACK_DEPTH = (clock_period < 5) ? 5 : 3;
   static constexpr int FEEDBACK_LAST = FEEDBACK_DEPTH - 1;
 
   static constexpr int NUM_META = port_width / Meta::width;
@@ -91,8 +97,8 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
       accumulation_out);
   Connections::Out<Pack1D<Output, vu_width>> CCS_INIT_S1(spmm_unit_output);
 
-  Connections::SyncOut CCS_INIT_S1(start_signal);
-  Connections::SyncOut CCS_INIT_S1(done_signal);
+  Connections::SyncOut CCS_INIT_S1(start);
+  Connections::SyncOut CCS_INIT_S1(done);
 
   SC_CTOR(SpMMUnit) {
     params_deserializer.clk(clk);
@@ -533,15 +539,15 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
     weight_scale_data.ResetRead();
 #endif
     accumulation_out.ResetWrite();
-    start_signal.Reset();
-    done_signal.Reset();
+    start.Reset();
+    done.Reset();
 
     wait();
 
     while (true) {
       MatrixParams params = run_accumulation_param.Pop();
 
-      start_signal.SyncPush();
+      start.SyncPush();
 
       loop_t k_bound = params.loops[0][params.weight_loop_idx[0]] - 1;
 
@@ -604,7 +610,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
         if (k == k_bound) break;
       }
 
-      done_signal.SyncPush();
+      done.SyncPush();
     }
   }
 

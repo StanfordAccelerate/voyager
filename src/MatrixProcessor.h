@@ -98,8 +98,8 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       weight_scale_channel);
 #endif
 
-  Connections::SyncOut CCS_INIT_S1(start_signal);
-  Connections::SyncOut CCS_INIT_S1(done_signal);
+  Connections::SyncOut CCS_INIT_S1(start);
+  Connections::SyncOut CCS_INIT_S1(done);
 
   SC_CTOR(MatrixProcessor) {
     input_skewer.clk(clk);
@@ -289,8 +289,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     process_accumulation_params_enq.ResetWrite();
     write_back_params_enq.ResetWrite();
     input_skewer_din.ResetWrite();
-
-    start_signal.Reset();
+    start.Reset();
 
     wait();
 
@@ -300,7 +299,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
       process_accumulation_params_enq.Push(params);
       write_back_params_enq.Push(params);
 
-      start_signal.SyncPush();
+      start.SyncPush();
 
       ac_int<LOOP_WIDTH, false> loop_counters[2][6];
 
@@ -647,7 +646,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     accumulation_buffer_done[1].Reset();
 #endif
     accum_output_enq.ResetWrite();
-    done_signal.Reset();
+    done.Reset();
 
     bool accumulation_buffer_bank = 0;
 
@@ -759,7 +758,7 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           }
         }
       }
-      done_signal.SyncPush();
+      done.SyncPush();
     }
   }
 };

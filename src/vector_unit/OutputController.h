@@ -46,17 +46,18 @@ SC_MODULE(OutputController) {
   Connections::Combinational<write_req_t> CCS_INIT_S1(csr_indptr_write_req);
 #endif
 
-  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(vector_output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      vector_output_address);
-  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(
-      mx_scale_output);
-  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(mx_scale_address);
-
   Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
-      sparse_tensor_output);
+      vector_output_data);
   Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
-      sparse_tensor_address);
+      vector_output_addr);
+  Connections::Out<ac_int<ScaleType::width, false>> CCS_INIT_S1(
+      mx_scale_output_data);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      mx_scale_output_addr);
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      sparse_tensor_output_data);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      sparse_tensor_output_addr);
 
   Connections::SyncChannel CCS_INIT_S1(write_vector_output_done);
 #if SUPPORT_MX
@@ -115,7 +116,7 @@ SC_MODULE(OutputController) {
     process_csr_indptr_params.ResetWrite();
 #endif
     vector_in.Reset();
-    vector_output.Reset();
+    vector_output_data.Reset();
     write_vector_output_done.ResetWrite();
     signal_done_params.ResetWrite();
 
@@ -151,7 +152,7 @@ SC_MODULE(OutputController) {
         bool found = (send_output_data<OutputTypes, width, VectorType,
                                        OC_PORT_WIDTH, OutputTypes...>(
                           params.output_dtype, params.use_output_codebook,
-                          outputs, vector_output) ||
+                          outputs, vector_output_data) ||
                       ...);
 #ifndef __SYNTHESIS__
         if (!found) {
@@ -168,7 +169,7 @@ SC_MODULE(OutputController) {
 
   void write_vector_address() {
     write_address_params.ResetRead();
-    vector_output_address.Reset();
+    vector_output_addr.Reset();
 #if SUPPORT_DWC
     dwc_address_in.Reset();
     dwc_scale_address.ResetWrite();
@@ -222,7 +223,7 @@ SC_MODULE(OutputController) {
           bool found = (send_output_address<OutputTypes, width, OC_PORT_WIDTH,
                                             OutputTypes...>(
                             params.output_dtype, params.vector_output_offset,
-                            address, vector_output_address) ||
+                            address, vector_output_addr) ||
                         ...);
 
 #ifndef __SYNTHESIS__
@@ -293,7 +294,7 @@ SC_MODULE(OutputController) {
                         (send_output_address<OutputTypes, width, OC_PORT_WIDTH,
                                              OutputTypes...>(
                              params.output_dtype, params.vector_output_offset,
-                             address, vector_output_address) ||
+                             address, vector_output_addr) ||
                          ...);
 
 #ifndef __SYNTHESIS__
@@ -321,7 +322,7 @@ SC_MODULE(OutputController) {
   void write_mx_scale() {
     write_scale_params.ResetRead();
     scale_in.Reset();
-    mx_scale_output.Reset();
+    mx_scale_output_data.Reset();
     write_mx_scale_done.ResetWrite();
 
     wait();
@@ -333,7 +334,7 @@ SC_MODULE(OutputController) {
 #pragma hls_pipeline_stall_mode flush
       for (ac_int<32, false> i = 0;; i++) {
         ScaleType scale = scale_in.Pop();
-        mx_scale_output.Push(scale.bits_rep());
+        mx_scale_output_data.Push(scale.bits_rep());
         if (i == loop_bound) break;
       }
 
@@ -343,7 +344,7 @@ SC_MODULE(OutputController) {
 
   void write_scale_address() {
     write_scale_address_params.ResetRead();
-    mx_scale_address.Reset();
+    mx_scale_output_addr.Reset();
 #if SUPPORT_DWC
     dwc_scale_address.ResetRead();
 #endif
@@ -393,7 +394,7 @@ SC_MODULE(OutputController) {
 #pragma hls_pipeline_stall_mode flush
         while (true) {
           ac_int<ADDRESS_WIDTH, false> address = dwc_scale_address.Pop();
-          mx_scale_address.Push(address);
+          mx_scale_output_addr.Push(address);
         }
       } else
 #endif
@@ -434,8 +435,8 @@ SC_MODULE(OutputController) {
                                 loop_counters[1][2];
                     }
 
-                    mx_scale_address.Push(params.mx_scale_offset +
-                                          address * ScaleType::width / 8);
+                    mx_scale_output_addr.Push(params.mx_scale_offset +
+                                              address * ScaleType::width / 8);
 
                     if (loop_counters[1][2] == loop_bounds[1][2]) break;
                   }
@@ -548,8 +549,8 @@ SC_MODULE(OutputController) {
   void write_sparse_tensor() {
     csr_data_write_req.ResetRead();
     csr_indptr_write_req.ResetRead();
-    sparse_tensor_output.Reset();
-    sparse_tensor_address.Reset();
+    sparse_tensor_output_data.Reset();
+    sparse_tensor_output_addr.Reset();
 
     wait();
 
@@ -558,11 +559,11 @@ SC_MODULE(OutputController) {
     while (true) {
       write_req_t write_req;
       if (csr_data_write_req.PopNB(write_req)) {
-        sparse_tensor_output.Push(write_req.data);
-        sparse_tensor_address.Push(write_req.address);
+        sparse_tensor_output_data.Push(write_req.data);
+        sparse_tensor_output_addr.Push(write_req.address);
       } else if (csr_indptr_write_req.PopNB(write_req)) {
-        sparse_tensor_output.Push(write_req.data);
-        sparse_tensor_address.Push(write_req.address);
+        sparse_tensor_output_data.Push(write_req.data);
+        sparse_tensor_output_addr.Push(write_req.address);
       } else {
         wait();
       }
