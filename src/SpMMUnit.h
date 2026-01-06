@@ -36,7 +36,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   static constexpr double clock_period = 5.0;  // Default to 5 ns if not defined
 #endif
 
-  static constexpr int FEEDBACK_DEPTH = (clock_period < 5) ? 5 : 3;
+  static constexpr int FEEDBACK_DEPTH = (clock_period < 5) ? 6 : 4;
   static constexpr int FEEDBACK_LAST = FEEDBACK_DEPTH - 1;
 
   static constexpr int NUM_META = port_width / Meta::width;
