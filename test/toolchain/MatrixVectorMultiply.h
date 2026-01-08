@@ -8,18 +8,12 @@ void map_matrix_vector_multiply(const codegen::Operation& param,
   const auto matrix_op = op_list[0];
 
   const auto input = matrix_op.kwargs().at("input").tensor();
+  const auto output = get_op_outputs(param).back();
+
   bool is_matmul = matrix_op.target().find("matmul") != std::string::npos;
   std::string key = is_matmul ? "other" : "weight";
   const auto weight = matrix_op.kwargs().at(key).tensor();
   bool has_bias = matrix_op.kwargs().contains("bias");
-
-  codegen::Tensor output;
-  if (param.has_output()) {
-    output = param.output();
-  } else {
-    assert(op_list.back().target() == "quantize_mx");
-    output = param.outputs().tensors(1);
-  }
 
   const auto weight_shape = get_shape(weight);
   int output_dim = weight_shape[0];
