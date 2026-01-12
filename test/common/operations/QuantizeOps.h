@@ -55,7 +55,7 @@ std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
   for (int x = 0; x < X; ++x) {
     for (int k = 0; k < K; ++k) {
       Input v = inputs[x * K + k];
-      if (v.abs() > threshold) {
+      if (v.abs() > threshold && nnz < data_size) {
         indices[nnz] = k;
         data[nnz] = v;
         nnz++;
