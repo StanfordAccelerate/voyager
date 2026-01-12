@@ -1,0 +1,24 @@
+.cache
+build
+data
+pybuild
+.direnv
+.vscode
+compile_commands.json
+novas*
+*.fsdb*
+ucli.key
+verdiLog/
+__pycache__
+*.py[cod]
+venv
+.envrc
+.env
+.swp
+.gitlab-ci-local
+# Simulation output files
+test_outputs/
+test_outputs_e2e/
+logs/
+regression_results/
+.conda-env/

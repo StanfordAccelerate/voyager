@@ -1,0 +1,11 @@
+Diagnostics:
+  Suppress:
+
+    # `clangd` doesn't know about HLS loop pragmas
+    - '-Wunknown-pragmas'
+    # Sometimes, we use a label to tell Catapult about structure, even if we
+    # don't use it in the code directly.
+    - '-Wunused-label'
+
+    # The test code uses VLAs
+    - '-Wvla-cxx-extension'

@@ -1,0 +1,15 @@
+[submodule "lib/xtensor"]
+	path = lib/xtensor
+	url = https://github.com/xtensor-stack/xtensor.git
+[submodule "lib/xtl"]
+	path = lib/xtl
+	url = https://github.com/xtensor-stack/xtl.git
+[submodule "interstellar"]
+	path = interstellar
+	url = git@code.stanford.edu:voyager/interstellar.git
+[submodule "lib/spdlog"]
+	path = lib/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "voyager-compiler"]
+	path = voyager-compiler
+	url = https://github.com/jeffreyyu0602/voyager-compiler.git
