@@ -13,14 +13,7 @@ void map_pool2d(const codegen::Operation& param,
   const auto pooling_op = op_list.front();
 
   const auto input = pooling_op.kwargs().at("input").tensor();
-
-  codegen::Tensor output;
-  if (param.has_output()) {
-    output = param.output();
-  } else {
-    assert(op_list.back().target() == "quantize_mx");
-    output = param.outputs().tensors(1);
-  }
+  const auto output = get_op_outputs(param).back();
 
   const auto output_shape = get_shape(output);
   const int output_dim = output_shape[3];

@@ -323,6 +323,7 @@ void set_quantize_params(const codegen::Operation& param,
     vector_params->mx_scale_offset = get_address(outputs[num_outputs - 2]);
 
     if (opcode == "quantize_mx_outlier") {
+      inst.vector_op3 = VectorInstructions::vquantize_mx_outlier;
       vector_params->has_sparse_output = true;
       vector_params->csr_data_offset = get_address(outputs[0]);
       vector_params->csr_indices_offset = get_address(outputs[1]);

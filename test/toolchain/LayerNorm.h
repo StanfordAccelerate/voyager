@@ -8,15 +8,7 @@ void map_layer_norm(const codegen::Operation& param,
   const auto layer_norm_op = op_list[0];
 
   const auto input = layer_norm_op.kwargs().at("input").tensor();
-
-  codegen::Tensor output;
-
-  if (param.has_output()) {
-    output = param.output();
-  } else {
-    assert(op_list.back().target() == "quantize_mx");
-    output = param.outputs().tensors(1);
-  }
+  const auto output = get_op_outputs(param).back();
 
   VectorParams* vector_params;
   VectorInstructionConfig* vector_instruction_config;

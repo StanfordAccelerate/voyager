@@ -8,19 +8,13 @@ void map_microscaling(const codegen::Operation& param,
   const auto quantize_mx_op = op_list[0];
 
   const auto input = quantize_mx_op.kwargs().at("input").tensor();
+  const auto output = get_op_outputs(param).back();
+
   const int axis = quantize_mx_op.kwargs().at("axes").int_list().values()[0];
   const int block_size = quantize_mx_op.kwargs().at("block_size").int_value();
   const float quant_max = quantize_mx_op.kwargs().at("quant_max").float_value();
   const bool force_scale_power_of_two =
       quantize_mx_op.kwargs().at("force_scale_power_of_two").bool_value();
-
-  codegen::Tensor output;
-  if (param.has_output()) {
-    output = param.output();
-  } else {
-    assert(op_list.back().target() == "quantize_mx");
-    output = param.outputs().tensors(1);
-  }
 
   // Microscaling on the last dimension can be handled by vector operations
   auto input_shape = get_shape(input);
