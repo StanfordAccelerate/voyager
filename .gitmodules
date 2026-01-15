@@ -6,7 +6,7 @@
 	url = https://github.com/xtensor-stack/xtl.git
 [submodule "interstellar"]
 	path = interstellar
-	url = git@code.stanford.edu:voyager/interstellar.git
+	url = https://code.stanford.edu/voyager/interstellar.git
 [submodule "lib/spdlog"]
 	path = lib/spdlog
 	url = https://github.com/gabime/spdlog.git
