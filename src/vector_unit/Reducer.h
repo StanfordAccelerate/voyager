@@ -26,8 +26,7 @@ SC_MODULE(VectorReducer) {
   Connections::Combinational<Pack1D<T, width>> output_repeat_data;
 #endif
 
-  // FIXME:
-  static constexpr int N = 1;
+  static constexpr int N = 2;
   static constexpr int LAST = N - 1;
 
   static_assert(N > 0, "Pipeline size N must be greater than 0");

@@ -56,6 +56,12 @@ class UFloat {
 
   void set_bits(const ac_int<W, true>& rhs) { d = rhs; }
 
+  static UFloat from_bits(const ac_int<W, true>& bits) {
+    UFloat r;
+    r.d = bits;
+    return r;
+  }
+
   bool is_zero() const { return d == ac_float_rep::zero().data(); }
 
   static UFloat zero() {

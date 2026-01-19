@@ -40,11 +40,11 @@ Pack1D<T, width> vmul(const Pack1D<T, width> op0, const Pack1D<T, width> op1) {
 }
 
 #pragma hls_design ccore
-template <typename T>
-T div(T op0, T op1) {
+template <typename T1, typename T2>
+T1 div(T1 op0, T2 op1) {
   // Handle division by zero
   if (op1.is_zero()) {
-    return T::zero();  // or some other error handling
+    return T1::zero();  // or some other error handling
   }
   return op0 / op1;
 }
@@ -59,14 +59,35 @@ Pack1D<T, width> vdiv(const Pack1D<T, width> op0, const Pack1D<T, width> op1) {
   return res;
 }
 
-template <typename T, size_t width>
-Pack1D<T, width> vdiv_fp8(const Pack1D<T, width> op0,
-                          const Pack1D<T, width> op1) {
+template <typename T, typename Scale, size_t width>
+Pack1D<T, width> vquantize(const Pack1D<T, width> op0,
+                           const Pack1D<Scale, width> op1) {
   Pack1D<T, width> res;
 #pragma hls_unroll yes
   for (int i = 0; i < width; i++) {
-    DataTypes::e4m3 b = op1[i];
-    res[i] = op0[i].float_val / b.float_val;
+    res[i] = div(op0[i], op1[i]);
+  }
+  return res;
+}
+
+#pragma hls_design ccore
+template <typename Input, typename Output>
+Output dequantize(Input input, Output scale) {
+  return (Output)input * scale;
+}
+
+template <typename Input, typename Output, int width>
+Pack1D<Output, width> vdequantize(const Pack1D<Input, width>& op0,
+                                  ac_int<Output::width, false> scale_bits) {
+  Output scale = Output::from_bits(scale_bits);
+  if (scale.is_zero()) {
+    scale = Output::one();
+  }
+
+  Pack1D<Output, width> res;
+#pragma hls_unroll yes
+  for (int i = 0; i < width; i++) {
+    res[i] = dequantize(op0[i], scale);
   }
   return res;
 }
@@ -234,30 +255,8 @@ T tree_max(Pack1D<T, N> a) {
   return max_s<N>::max(a);
 }
 
-#pragma hls_design ccore
-template <typename Input, typename Output>
-Output dequantize(Input input, Output scale) {
-  return (Output)input * scale;
-}
-
-template <typename Input, typename Output, int width>
-Pack1D<Output, width> vdequantize(const Pack1D<Input, width>& op0,
-                                  ac_int<Output::width, false> scale_bits) {
-  Output scale = Output::from_bits(scale_bits);
-  if (scale.is_zero()) {
-    scale = Output::one();
-  }
-
-  Pack1D<Output, width> res;
-#pragma hls_unroll yes
-  for (int i = 0; i < width; i++) {
-    res[i] = dequantize(op0[i], scale);
-  }
-  return res;
-}
-
 template <typename VectorType, typename ScaleType>
-ScaleType compute_scale(const VectorType amax, ac_int<16> qparam) {
+ScaleType calculate_mx_scale(const VectorType amax, const ac_int<16> qparam) {
   ScaleType scale;
 
   if constexpr (ScaleType::width == ScaleType::e_width) {
@@ -281,7 +280,7 @@ ScaleType compute_scale(const VectorType amax, ac_int<16> qparam) {
 
 template <typename VectorType, typename ScaleType, int width>
 ScaleType calculate_mx_scale(const Pack1D<VectorType, width>& op0,
-                             ac_int<16> qparam) {
+                             const ac_int<16> qparam) {
   ScaleType scale;
 
   if constexpr (ScaleType::width == ScaleType::e_width) {

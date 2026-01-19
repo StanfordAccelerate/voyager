@@ -651,12 +651,19 @@ SC_MODULE(VectorPipeline) {
           }
         }
 
+        // Cast the second operand to ScaleType for division
+        Pack1D<ScaleType, vu_width> div_op1;
+#pragma hls_unroll yes
+        for (int i = 0; i < vu_width; i++) {
+          div_op1[i] = op3_src1[i];
+        }
+
 #if SUPPORT_MX
         if (is_mx_quantization) {
 #if MX_SPLIT_MODE
           if (i % ratio == 0) {
             VectorType amax = stage_3_amax.Pop();
-            scale = compute_scale<VectorType, ScaleType>(amax, qparam);
+            scale = calculate_mx_scale<VectorType, ScaleType>(amax, qparam);
             mx_scale.Push(scale);
           }
 #else
@@ -667,14 +674,15 @@ SC_MODULE(VectorPipeline) {
 
 #pragma hls_unroll yes
           for (int i = 0; i < vu_width; i++) {
-            op3_src1[i] = scale;
+            div_op1[i] = scale;
           }
         }
 #endif
-        // Stage 3: div, quantize
+        // Stage 3: quantize
         VectorPack stage3_output;
         if (op3 == VectorInstructions::op3_div || is_mx_quantization) {
-          stage3_output = vdiv<VectorType, vu_width>(op3_src0, op3_src1);
+          stage3_output =
+              vquantize<VectorType, ScaleType, vu_width>(op3_src0, div_op1);
         } else {
           stage3_output = op3_src0;
         }

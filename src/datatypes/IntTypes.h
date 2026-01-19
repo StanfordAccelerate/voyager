@@ -46,6 +46,12 @@ class Int {
 
   void set_bits(int i) { int_val = i; }
 
+  static Int from_bits(int i) {
+    Int r;
+    r.int_val = i;
+    return r;
+  }
+
   template <int W2, bool S2>
   void set_bits(ac_int<W2, S2> bits) {
     int_val = bits;
