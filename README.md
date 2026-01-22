@@ -1,12 +1,11 @@
 
 # Voyager DNN Accelerator Generator
 
-This repository contains the Voyager DNN accelerator generator, a tool for generating and evaluating deep neural network accelerators. For more details about the methodology and architecture, please refer to the paper: https://arxiv.org/abs/2509.15205
+This repository contains the Voyager DNN accelerator generator, a tool for generating and evaluating deep neural network accelerators.
+
+For more details about the methodology and architecture, please refer to the paper: https://arxiv.org/abs/2509.15205
 
 ## Setup
-
-### 0. Preliminary Step
-Install conda using [miniforge](https://github.com/conda-forge/miniforge/#download). Miniforge is recommended as it uses conda-forge as the default channel, which provides better compatibility with the required packages.
 
 ### 1. Clone the repository and submodules
 ```bash
@@ -15,17 +14,36 @@ cd voyager
 git submodule update --init --recursive
 ```
 
-### 2. Environment Requirements
+### 2. Tool Setup
+
+Voyager does not require commercial tools for accuracy testing, SystemC simulations, or design space exploration.
+
+However, Voyager requires the following EDA tools for RTL generation and simulation:
+- **Catapult HLS** (tested with version 2024.2_1) - Used for high-level synthesis
+- **VCS** (tested with T-2022.06-SP2) - Verilog simulator for RTL verification
+- **Verdi** (tested with T-2022.06-SP2) - Debug tool for waveform analysis
+- **VCS_GNU_PACKAGE** (tested with S-2021.09) - Required compiler toolchain for VCS
+
+**Note**: You must load these tools every time you want to use this project.
+The method for activating these tools depends on your EDA environment setup (e.g., module system, environment scripts, etc.).
+
+### 3. Environment Setup
+
+#### Conda Setup
+Using Conda to perform the setup is preferred due to its portability. Install Conda using [miniforge](https://github.com/conda-forge/miniforge/#download).
+
+Miniforge is recommended as it uses conda-forge as the default channel, which provides better compatibility with the required packages.
 
 Create a Conda environment from the environment.yml file:
 ```bash
 conda env create -f environment.yml
 ```
 
-**Note:** You must activate this environment every time you want to use this project:
+Activate the environment:
 ```bash
 conda activate accelerator-env
 ```
+**Note:** You must activate this environment every time you want to use this project.
 
 After activating the environment, install the required submodule packages:
 ```bash
@@ -33,21 +51,37 @@ pip install ./interstellar
 pip install ./voyager-compiler
 ```
 
-Voyager also requires the following EDA tools for RTL generation and simulation:
-- **Catapult HLS** (tested with version 2024.2_1) - Used for high-level synthesis
-- **VCS** (tested with T-2022.06-SP2) - Verilog simulator for RTL verification
-- **Verdi** (tested with T-2022.06-SP2) - Debug tool for waveform analysis
-- **VCS_GNU_PACKAGE** (tested with S-2021.09) - Required compiler toolchain for VCS
-
-**Note**: You must load these tools every time you want to use this project. The method for activating these tools depends on your EDA environment setup (e.g., module system, environment scripts, etc.).
-
-Additionally, set the following environment variables every time you want to use this project:
+Additionally, add the project root path to the conda environment's stored variables, and reactivate the environment:
 ```bash
-export PROJECT_ROOT=`pwd`
-export CODEGEN_DIR=test/compiler
+conda env config vars set PROJECT_ROOT=$(pwd)
+conda deactivate
+conda reactivate accelerator-env
 ```
 
-These variables specify the project root directory and the code generation output directory, respectively.
+In the future, when initializing ```accelerator-env```, you may see a warning about overwriting ```PROJECT_ROOT``` and ```CODEGEN_DIR```. This is expected.
+
+#### Non-Conda Setup
+
+If conda is not being used, then please install the packages listed in the ```environment.yml``` file manually.
+
+This includes installing ```interstellar``` and ```voyager-compiler``` from their corresponding subdirectories.
+
+Please also source ```env.sh``` in the top directory every time you want to use the project.
+
+### 4. HuggingFace Setup
+
+To test on established AI workloads, users first need to set up an account on [HuggingFace](https://huggingface.co/).
+
+To run the tests used in the example, the following assets also require users to request and acquire access on HuggingFace:
+- [ImageNet dataset](https://huggingface.co/datasets/timm/imagenet-1k-wds)
+- [LLaMa transformer model](https://huggingface.co/meta-llama/Llama-3.1-8B)
+
+Finally, to use these assets in the code, create a [HuggingFace access token](https://huggingface.co/settings/tokens) with read permissions.
+
+Use the access token to authenticate using the HuggingFace CLI (installed as part of the environment):
+```bash
+hf auth login
+```
 
 ## Repository Structure
 
@@ -83,7 +117,7 @@ The `run_regression.py` script is the main entry point for running various types
 - Functional SystemC simulations for verification
 - Cycle-accurate RTL simulations after HLS synthesis
 
-For detailed information about available options and underlying steps, refer to the script's help message: `python3 run_regression.py --help`. Upon completion, results and log files are generated in the `regression_results/latest/` directory.
+For detailed information about available options and underlying steps, refer to the script's help message: `python run_regression.py --help`. Upon completion, results and log files are generated in the `regression_results/latest/` directory.
 
 ### Running Accuracy Evaluation
 
@@ -100,7 +134,7 @@ Accuracy evaluation runs inference on full models and datasets to measure the im
 
 **Example:** To evaluate the accuracy of an INT8 16×16 systolic array accelerator on the ResNet-18 model using the ImageNet dataset with 32 parallel processes:
 ```bash
-DATATYPE=INT8 IC_DIMENSION=16 OC_DIMENSION=16 python3 run_regression.py --models resnet18 --dataset imagenet --sims accuracy --num_processes 32
+DATATYPE=INT8 IC_DIMENSION=16 OC_DIMENSION=16 python run_regression.py --models resnet18 --dataset imagenet --sims accuracy --num_processes 32
 ```
 
 ### Running Functional SystemC Simulations
@@ -111,7 +145,7 @@ This is typically the first verification step before proceeding to RTL generatio
 
 **Example:** To verify an E4M3 32×32 accelerator on ResNet-18 and MobileBERT layers:
 ```bash
-DATATYPE=E4M3 IC_DIMENSION=32 OC_DIMENSION=32 python3 run_regression.py --models resnet18,mobilebert_encoder --sims systemc --num_processes 32
+DATATYPE=E4M3 IC_DIMENSION=32 OC_DIMENSION=32 python run_regression.py --models resnet18,mobilebert_encoder --sims systemc --num_processes 32
 ```
 
 ### Running HLS and Cycle-Accurate RTL Simulations
@@ -139,9 +173,9 @@ proc get_memory_name {is_sp depth width} {
 }
 ```
 
-**Example:** To run RTL generation on an INT8 32x32 accelerator with a 5.0ns clock period using the `tsmc40` technology and evaluate runtime on MobileBERT:
+**Example:** To run RTL generation on an INT8 32x32 accelerator with a 5.0ns clock period using the `generic` technology and evaluate runtime on MobileBERT:
 ```bash
-DATATYPE=INT8 IC_DIMENSION=32 OC_DIMENSION=32 CLOCK_PERIOD=5.0 TECHNOLOGY=tsmc40 python3 run_regression.py --models mobilebert_encoder --sims rtl --num_processes 32 --uniquify_layers
+DATATYPE=INT8 IC_DIMENSION=32 OC_DIMENSION=32 CLOCK_PERIOD=5.0 TECHNOLOGY=generic python run_regression.py --models mobilebert_encoder --sims rtl --num_processes 32 --uniquify_layers
 ```
 
 The `--uniquify_layers` flag can be used to reduce the evaluation runtime by only running the layers with unique shapes.
