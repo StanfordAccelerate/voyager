@@ -358,7 +358,10 @@ SC_MODULE(VectorUnit) {
           if (inst.op_type == VectorInstructions::vector) {
             pipeline_instr.Push(inst);
             approx_unit_config.Push(instruction_config.approx_config);
-            codebook_config.Push(instruction_config.codebook_config);
+            if (inst.vdest == VectorInstructions::to_output) {
+              codebook_config.Push(instruction_config.codebook_config);
+            }
+
 #if SUPPORT_SPMM
             if (params.has_sparse_output) {
               outlier_filter_config.Push(instruction_config.outlier_filter);

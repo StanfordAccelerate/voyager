@@ -3,16 +3,16 @@
 
 E4M3_FLAGS := --activation fp8_e4m3 --weight fp8_e4m3 --bf16
 P8_1_FLAGS := --activation posit8_1 --weight posit8_1 --bf16
-INT8_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --calibration_steps 10
-INT8_32_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int32 --bf16 --calibration_steps 10
+INT8_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --calibration_steps 5
+INT8_32_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int32 --bf16 --calibration_steps 5
 BLOCK_SIZE := $(shell [ $(IC_DIMENSION) -gt $(OC_DIMENSION) ] && echo $(IC_DIMENSION) || echo $(OC_DIMENSION))
 MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE) --weight int8,qs=microscaling,bs=$(BLOCK_SIZE) --force_scale_power_of_two --bf16
 MXNF4_FLAGS := --activation nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16 --residual fp8_e4m3 --quantize_fc
-COMMON_FLAGS := --transpose_weight --hardware_unrolling $(IC_DIMENSION),$(OC_DIMENSION) --dump_tensors
+COMMON_FLAGS := --transform_layout --hardware_unrolling $(IC_DIMENSION),$(OC_DIMENSION) --dump_tensors
 EXTRA_COMPILER_FLAGS ?=
 
 CONTEXT ?= 1024
-LLM_FLAGS := --context_length $(CONTEXT) --remove_duplicate --binary_mask
+LLM_FLAGS := --context_length $(CONTEXT) --compile_single_layer --quantize_attention_mask
 
 # Set default values if not already defined in the environment
 CACHE_SIZE ?= 8388608
@@ -41,7 +41,7 @@ $(CODEGEN_DIR)/networks/mobilebert/%/model.txt: voyager-compiler/test/test_codeg
 
 $(CODEGEN_DIR)/networks/mobilebert_encoder/%/model.txt: voyager-compiler/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) --remove_duplicate > $(dir $@)/codegen.log 2>&1
+	python voyager-compiler/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) --compile_single_layer > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/bert/%/model.txt: voyager-compiler/test/test_codegen.py
 	mkdir -p $(dir $@)
@@ -61,15 +61,15 @@ $(CODEGEN_DIR)/networks/llama_decode_kivi/%/model.txt: voyager-compiler/test/tes
 
 $(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt: voyager-compiler/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --mixed_precision &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --enable_mixed_precision &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_prefill_spmm/%/model.txt: voyager-compiler/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --mixed_precision --outlier_pct 0.01 --split_spmm &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --enable_mixed_precision --outlier_pct 0.01 --split_spmm &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt: voyager-compiler/test/test_codegen.py
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --mixed_precision &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --enable_mixed_precision &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/vit/%/model.txt: voyager-compiler/test/test_codegen.py
 	mkdir -p $(dir $@)
