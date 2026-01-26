@@ -64,8 +64,8 @@ SC_MODULE(VectorReducer) {
 
           for (decltype(inst.reduce_count) j = 0;; j++) {
             Pack1D<T, width> reduce_input = input.Pop();
-            T sum = tree_sum(reduce_input);
-            T max = tree_max(reduce_input);
+            T sum = fused_add_tree(reduce_input);
+            T max = max_tree(reduce_input);
             T acc = is_sum_op ? (acc_old[LAST] + sum)
                               : std::max(acc_old[LAST], max);
 
@@ -79,7 +79,7 @@ SC_MODULE(VectorReducer) {
             if (j == inst.reduce_count - 1) break;
           }
 
-          T output = is_sum_op ? tree_sum(acc_old) : tree_max(acc_old);
+          T output = is_sum_op ? fused_add_tree(acc_old) : max_tree(acc_old);
 
           if (inst.rsqrt) {
             output = output.sqrt();

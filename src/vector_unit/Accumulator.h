@@ -84,7 +84,7 @@ SC_MODULE(VectorAccumulator) {
             for (int j = 0; j < SUM_N; j++) {
               col[j] = acc_old[j][i];
             }
-            outputs[i] = tree_sum(col);
+            outputs[i] = fused_add_tree(col);
           }
 
           if (inst.rdest == VectorInstructions::to_memory) {
@@ -129,7 +129,7 @@ SC_MODULE(VectorAccumulator) {
             for (int j = 0; j < MAX_N; j++) {
               col[j] = acc_old[j][i];
             }
-            outputs[i] = tree_max(col);
+            outputs[i] = max_tree(col);
           }
 
           if (inst.rdest == VectorInstructions::to_memory) {

@@ -4,6 +4,7 @@
 #include "../ArchitectureParams.h"
 #include "../TypeToBits.h"
 #include "ApproximationUnit.h"
+#include "ac_std_float_add_tree.h"
 
 using namespace ac_math;
 
@@ -180,22 +181,9 @@ Pack1D<T, width> vpoly(const Pack1D<T, width>& op0, const T maxes[NUM_MAXES],
 template <int N>
 struct sum_s {
   template <typename T>
-  static T sum(Pack1D<T, N> a) {
-    Pack1D<T, N / 2> a0;
-    Pack1D<T, N - N / 2> a1;
-
-#pragma hls_unroll yes
-    for (int i = 0; i < N / 2; i++) {
-      a0[i] = a[i];
-    }
-
-#pragma hls_unroll yes
-    for (int i = 0; i < N - N / 2; i++) {
-      a1[i] = a[i + N / 2];
-    }
-
-    T m0 = sum_s<N / 2>::sum(a0);
-    T m1 = sum_s<N - N / 2>::sum(a1);
+  static T sum(T* a) {
+    T m0 = sum_s<N / 2>::sum(a);
+    T m1 = sum_s<N - N / 2>::sum(a + N / 2);
     return m0 + m1;
   }
 };
@@ -204,53 +192,40 @@ struct sum_s {
 template <>
 struct sum_s<1> {
   template <typename T>
-  static T sum(Pack1D<T, 1> a) {
+  static T sum(T* a) {
     return a[0];
   }
 };
 
 #pragma hls_design ccore
 template <typename T, size_t N>
-T tree_sum(Pack1D<T, N> a) {
-  return sum_s<N>::sum(a);
+T add_tree(Pack1D<T, N> a) {
+  return sum_s<N>::sum(a.value);
 }
 
-template <int N>
-struct max_s {
-  template <typename T>
-  static T max(Pack1D<T, N> a) {
-    Pack1D<T, N / 2> a0;
-    Pack1D<T, N - N / 2> a1;
+// Use ac_math library's fadd_tree save both area and latency
+#pragma hls_design ccore
+template <int E, int M, size_t N>
+StdFloat<M, E> fused_add_tree(Pack1D<StdFloat<M, E>, N> a) {
+  using std_flt = typename StdFloat<M, E>::ac_float_rep;
+
+  std_flt in[N];
+  std_flt acc;
 
 #pragma hls_unroll yes
-    for (int i = 0; i < N / 2; i++) {
-      a0[i] = a[i];
-    }
-
-#pragma hls_unroll yes
-    for (int i = 0; i < N - N / 2; i++) {
-      a1[i] = a[i + N / 2];
-    }
-
-    T m0 = max_s<N / 2>::max(a0);
-    T m1 = max_s<N - N / 2>::max(a1);
-    return std::max(m0, m1);
+  for (int i = 0; i < N; i++) {
+    in[i] = a[i].float_val;
   }
-};
 
-// terminate template recursion
-template <>
-struct max_s<1> {
-  template <typename T>
-  static T max(Pack1D<T, 1> a) {
-    return a[0];
-  }
-};
+  ac_math::fadd_tree(in, acc);
+
+  return acc;
+}
 
 #pragma hls_design ccore
 template <typename T, size_t N>
-T tree_max(Pack1D<T, N> a) {
-  return max_s<N>::max(a);
+T max_tree(Pack1D<T, N> a) {
+  return ac_math::max<N>(a.value);
 }
 
 template <typename VectorType, typename ScaleType>
@@ -294,7 +269,7 @@ std::tuple<VectorType, ScaleType> calculate_mx_scale(
       exponents[i] = op0[i].unbiased_exponent();
     }
 
-    exp_t max_exp = tree_max(exponents);
+    exp_t max_exp = max_tree(exponents);
 
     if (max_exp == 0 || max_exp == 0xFF) {
       scale = ScaleType::one();
@@ -305,7 +280,7 @@ std::tuple<VectorType, ScaleType> calculate_mx_scale(
     float_scale = scale;
   } else {
     Pack1D<VectorType, width> abs = vabs(op0);
-    VectorType max_val = tree_max(abs);
+    VectorType max_val = max_tree(abs);
 
     VectorType quant_max = VectorType::from_bits(qparam);
     float_scale = max_val * quant_max.reciprocal();

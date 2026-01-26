@@ -600,7 +600,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
             for (int j = 0; j < FEEDBACK_DEPTH; j++) {
               col[j] = acc_old[j][i];
             }
-            outputs[i] = tree_sum(col);
+            outputs[i] = add_tree(col);
           }
 
           accumulation_out.Push(outputs);

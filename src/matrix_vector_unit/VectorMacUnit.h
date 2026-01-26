@@ -58,14 +58,14 @@ SC_MODULE(VectorMacUnit) {
         for (int i = 0; i < bs; i++) {
           products[i] = (Psum)inputs[c1 * bs + i] * (Psum)weights[c1 * bs + i];
         }
-        Output psum = tree_sum(products);
+        Output psum = add_tree(products);
 #if SUPPORT_MX
         psum *= (Output)input_scales[c1] * (Output)weight_scales[c1];
 #endif
         psums[c1] = psum;
       }
 
-      Output psum = tree_sum(psums);
+      Output psum = add_tree(psums);
       psum_out.Push(psum);
     }
   }

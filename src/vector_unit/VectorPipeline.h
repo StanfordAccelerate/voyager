@@ -598,7 +598,7 @@ SC_MODULE(VectorPipeline) {
         for (int j = 0; j < vu_width; j++) {
           temp[j] = op3_src0[j].abs();
         }
-        VectorType amax = tree_max(temp);
+        VectorType amax = max_tree(temp);
 
         amax_history = std::max(amax, amax_history);
       }
