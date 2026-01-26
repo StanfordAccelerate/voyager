@@ -208,19 +208,19 @@ SC_MODULE(VectorFetchUnit) {
         }
       }
 
-      // Pre-compute loop bounds
+      // Pre-compute loop strides for flattened addressing
+      ac_int<16, false> strides[6];
+      ac_int<32, false> running_size = stride_k;
+
 #pragma hls_unroll yes
-      for (int i = 0; i < 6; i++) {
+      for (int i = 5; i >= 0; i--) {
+        strides[i] = running_size;
         if (params.vector_fetch_0_broadcast[i]) {
-          loop_bounds[i] = i == 5 ? width : 1;
+          strides[i] = 0;
+        } else {
+          running_size *= loop_bounds[i];
         }
       }
-
-      ac_int<16, false> loop_bound_4 = loop_bounds[5];
-      ac_int<16, false> loop_bound_3 = loop_bounds[4] * loop_bound_4;
-      ac_int<16, false> loop_bound_2 = loop_bounds[3] * loop_bound_3;
-      ac_int<16, false> loop_bound_1 = loop_bounds[2] * loop_bound_2;
-      ac_int<16, false> loop_bound_0 = loop_bounds[1] * loop_bound_1;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -267,13 +267,6 @@ SC_MODULE(VectorFetchUnit) {
                         loop_counters[1][1], loop_counters[1][2],
                     };
 
-#pragma hls_unroll yes
-                    for (int i = 0; i < 6; i++) {
-                      if (params.vector_fetch_0_broadcast[i]) {
-                        indices[i] = 0;
-                      }
-                    }
-
                     if (params.has_permute) {
                       ac_int<LOOP_WIDTH, false> permuted_indices[6];
 #pragma hls_unroll yes
@@ -294,10 +287,9 @@ SC_MODULE(VectorFetchUnit) {
                     }
 
                     address =
-                        (indices[0] * loop_bound_0 + indices[1] * loop_bound_1 +
-                         indices[2] * loop_bound_2 + indices[3] * loop_bound_3 +
-                         indices[4] * loop_bound_4 + indices[5]) *
-                        stride_k;
+                        indices[0] * strides[0] + indices[1] * strides[1] +
+                        indices[2] * strides[2] + indices[3] * strides[3] +
+                        indices[4] * strides[4] + indices[5] * strides[5];
                   }
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
                   else if (params.vector_fetch_0_mode == 3) {
@@ -597,21 +589,25 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<LOOP_WIDTH, false> K1 =
           params.vector_fetch_1_loops[1][params.vector_fetch_1_k_loop_idx[1]];
 
-      ac_int<16, false> stride_k = params.vector_fetch_1_stride;
+      // dimension[0] is a dummy value to make indexing easier
+      ac_int<16, false> dimensions[3] = {1, X1 * X0, K2 * K1};
+      ac_int<16, false> strides[3];
+      ac_int<32, false> running_size = params.vector_fetch_1_stride;
 
-      ac_int<16, false> X = X1 * X0;
-      ac_int<16, false> K = K2 * K1 * stride_k;
-
-      if (params.vector_fetch_1_broadcast[1]) {
-        X = 1;
+#pragma hls_unroll yes
+      for (int i = 2; i >= 0; i--) {
+        strides[i] = running_size;
+        if (params.vector_fetch_1_broadcast[i]) {
+          strides[i] = 0;
+        } else {
+          running_size *= dimensions[i];
+        }
       }
 
-      if (params.vector_fetch_1_broadcast[2]) {
-        K = stride_k;
-        // If k is the inner most loop, we can reuse the data
-        if (params.vector_fetch_1_k_loop_idx[1] == 2) {
-          loop_ends[1][2] = 0;
-        }
+      // If k is the inner most loop, we can reuse the data
+      if (params.vector_fetch_1_broadcast[2] &&
+          params.vector_fetch_1_k_loop_idx[1] == 2) {
+        loop_ends[1][2] = 0;
       }
 
 #pragma hls_pipeline_init_interval 1
@@ -637,21 +633,9 @@ SC_MODULE(VectorFetchUnit) {
 
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> x = x1 * X0 + x0;
-                  ac_int<16, false> k = (k1 * K1 + k0) * stride_k;
-
-                  if (params.vector_fetch_1_broadcast[0]) {
-                    y = 0;
-                  }
-
-                  if (params.vector_fetch_1_broadcast[1]) {
-                    x = 0;
-                  }
-
-                  if (params.vector_fetch_1_broadcast[2]) {
-                    k = 0;
-                  }
-
-                  ac_int<32, false> address = y * X * K + x * K + k;
+                  ac_int<16, false> k = k1 * K1 + k0;
+                  ac_int<32, false> address =
+                      y * strides[0] + x * strides[1] + k * strides[2];
 
                   fetch_vector_input<InputTypes...>(
                       params.vector_fetch_1_dtype, params.vector_fetch_1_offset,
@@ -780,20 +764,25 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<LOOP_WIDTH, false> K1 =
           params.vector_fetch_2_loops[1][params.vector_fetch_2_k_loop_idx[1]];
 
-      ac_int<16, false> X = X1 * X0;
-      ac_int<16, false> stride_k = params.vector_fetch_2_stride;
-      ac_int<16, false> K = K2 * K1 * stride_k;
+      // dimension[0] is a dummy value to make indexing easier
+      ac_int<16, false> dimensions[3] = {1, X1 * X0, K2 * K1};
+      ac_int<16, false> strides[3];
+      ac_int<32, false> running_size = params.vector_fetch_2_stride;
 
-      if (params.vector_fetch_2_broadcast[1]) {
-        X = 1;
+#pragma hls_unroll yes
+      for (int i = 2; i >= 0; i--) {
+        strides[i] = running_size;
+        if (params.vector_fetch_2_broadcast[i]) {
+          strides[i] = 0;
+        } else {
+          running_size *= dimensions[i];
+        }
       }
 
-      if (params.vector_fetch_2_broadcast[2]) {
-        K = stride_k;
-        // If k is the inner most loop, we can reuse the data
-        if (params.vector_fetch_2_k_loop_idx[1] == 2) {
-          loop_ends[1][2] = 0;
-        }
+      // If k is the inner most loop, we can reuse the data
+      if (params.vector_fetch_2_broadcast[2] &&
+          params.vector_fetch_2_k_loop_idx[1] == 2) {
+        loop_ends[1][2] = 0;
       }
 
 #pragma hls_pipeline_init_interval 1
@@ -819,21 +808,9 @@ SC_MODULE(VectorFetchUnit) {
 
                   ac_int<16, false> y = y1 * Y0 + y0;
                   ac_int<16, false> x = x1 * X0 + x0;
-                  ac_int<16, false> k = (k1 * K1 + k0) * stride_k;
-
-                  if (params.vector_fetch_2_broadcast[0]) {
-                    y = 0;
-                  }
-
-                  if (params.vector_fetch_2_broadcast[1]) {
-                    x = 0;
-                  }
-
-                  if (params.vector_fetch_2_broadcast[2]) {
-                    k = 0;
-                  }
-
-                  ac_int<32, false> address = y * X * K + x * K + k;
+                  ac_int<16, false> k = k1 * K1 + k0;
+                  ac_int<32, false> address =
+                      y * strides[0] + x * strides[1] + k * strides[2];
 
                   fetch_vector_input<InputTypes...>(
                       params.vector_fetch_2_dtype, params.vector_fetch_2_offset,
