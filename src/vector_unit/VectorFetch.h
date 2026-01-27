@@ -209,7 +209,7 @@ SC_MODULE(VectorFetchUnit) {
       }
 
       // Pre-compute loop strides for flattened addressing
-      ac_int<16, false> strides[6];
+      ac_int<32, false> strides[6];
       ac_int<32, false> running_size = stride_k;
 
 #pragma hls_unroll yes
@@ -591,7 +591,7 @@ SC_MODULE(VectorFetchUnit) {
 
       // dimension[0] is a dummy value to make indexing easier
       ac_int<16, false> dimensions[3] = {1, X1 * X0, K2 * K1};
-      ac_int<16, false> strides[3];
+      ac_int<32, false> strides[3];
       ac_int<32, false> running_size = params.vector_fetch_1_stride;
 
 #pragma hls_unroll yes
@@ -766,7 +766,7 @@ SC_MODULE(VectorFetchUnit) {
 
       // dimension[0] is a dummy value to make indexing easier
       ac_int<16, false> dimensions[3] = {1, X1 * X0, K2 * K1};
-      ac_int<16, false> strides[3];
+      ac_int<32, false> strides[3];
       ac_int<32, false> running_size = params.vector_fetch_2_stride;
 
 #pragma hls_unroll yes
