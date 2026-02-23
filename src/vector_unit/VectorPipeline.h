@@ -5,7 +5,7 @@
 
 #include "../AccelTypes.h"
 #include "../ArchitectureParams.h"
-#include "OutlierFilter2.h"
+#include "OutlierFilter.h"
 #include "VectorOps.h"
 
 #if SUPPORT_MX && VECTOR_UNIT_WIDTH != OC_DIMENSION
@@ -27,9 +27,6 @@ SC_MODULE(VectorPipeline) {
   Connections::In<CodebookQuantizationConfig> codebook_config;
 
   Connections::In<Pack1D<BufferType, vu_width>> matrix_unit_output;
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-  Connections::In<Pack1D<BufferType, vu_width>> accumulation_buffer_output;
-#endif
 #if SUPPORT_MVM
   Connections::In<Pack1D<BufferType, vu_width>> matrix_vector_unit_output;
 #endif
@@ -144,9 +141,6 @@ SC_MODULE(VectorPipeline) {
     vector_fetch_2_data.Reset();
     reducer_output.Reset();
     accumulator_output.Reset();
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    accumulation_buffer_output.Reset();
-#endif
 #if SUPPORT_MVM
     matrix_vector_unit_output.Reset();
 #endif
@@ -195,17 +189,6 @@ SC_MODULE(VectorPipeline) {
           input_is_src0 =
               (inst.vector_op0_src0 == VectorInstructions::from_matrix_unit);
         }
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-        else if (inst.vector_op0_src0 ==
-                     VectorInstructions::from_accum_buffer ||
-                 inst.vector_op0_src1 ==
-                     VectorInstructions::from_accum_buffer) {
-          raw_input = accumulation_buffer_output.Pop();
-          input_valid = true;
-          input_is_src0 =
-              (inst.vector_op0_src0 == VectorInstructions::from_accum_buffer);
-        }
-#endif
 #if SUPPORT_MVM
         else if (inst.vector_op0_src0 ==
                      VectorInstructions::from_matrix_vector_unit ||

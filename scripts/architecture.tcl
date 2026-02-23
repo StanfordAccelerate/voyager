@@ -144,8 +144,8 @@ if { $DATATYPE == "P8_1" } {
   set ACCUM_BUFFER_DATATYPE "DataTypes::bfloat16"
   set VECTOR_DATATYPE "DataTypes::bfloat16"
   set SCALE_DATATYPE "DataTypes::fp8_e5m3"
-  set VU_INPUT_TYPES "$VECTOR_DATATYPE, $SCALE_DATATYPE, DataTypes::e4m3, DataTypes::int1"
-  set OUTPUT_DATATYPES "$INPUT_DATATYPE, $VU_INPUT_TYPES"
+  set VU_INPUT_TYPES "DataTypes::bfloat16, DataTypes::fp8_e5m3, DataTypes::e4m3, DataTypes::int1"
+  set OUTPUT_DATATYPES "$INPUT_DATATYPE, DataTypes::bfloat16, DataTypes::fp8_e5m3, DataTypes::e4m3"
   set SPMM_META_DATATYPE "DataTypes::int32"
 
   set SA_INPUT_TYPE "DataTypes::int6"

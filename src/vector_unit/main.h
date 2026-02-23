@@ -23,15 +23,6 @@ SC_MODULE(VectorUnit) {
   Connections::Combinational<Pack1D<BufferType, vec_unit_width>> CCS_INIT_S1(
       matrix_unit_output_n);
 
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
-  Connections::In<Pack1D<BufferType, mu_width>>
-      accumulation_buffer_read_data[2];
-  Connections::SyncOut accumulation_buffer_done[2];
-  Connections::Combinational<Pack1D<BufferType, vec_unit_width>>
-      accumulation_buffer_output;
-#endif
-
 #if SUPPORT_MVM
   Connections::In<Pack1D<BufferType, vec_unit_width>> CCS_INIT_S1(
       matrix_vector_unit_output);
@@ -188,17 +179,6 @@ SC_MODULE(VectorUnit) {
     fetcher.clk(clk);
     fetcher.rstn(rstn);
     fetcher.params_in(vector_fetch_params);
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    fetcher.accumulation_buffer_read_address[0](
-        accumulation_buffer_read_address[0]);
-    fetcher.accumulation_buffer_read_address[1](
-        accumulation_buffer_read_address[1]);
-    fetcher.accumulation_buffer_read_data[0](accumulation_buffer_read_data[0]);
-    fetcher.accumulation_buffer_read_data[1](accumulation_buffer_read_data[1]);
-    fetcher.accumulation_buffer_done[0](accumulation_buffer_done[0]);
-    fetcher.accumulation_buffer_done[1](accumulation_buffer_done[1]);
-    fetcher.accumulation_buffer_output(accumulation_buffer_output);
-#endif
     fetcher.vector_fetch_0_req(vector_fetch_0_req);
     fetcher.vector_fetch_0_resp(vector_fetch_0_resp);
     fetcher.vector_fetch_0_data(vector_fetch_0_data);
@@ -215,9 +195,6 @@ SC_MODULE(VectorUnit) {
     pipeline.approx_unit_config(approx_unit_config);
     pipeline.codebook_config(codebook_config);
     pipeline.matrix_unit_output(matrix_unit_output_n);
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    pipeline.accumulation_buffer_output(accumulation_buffer_output);
-#endif
 #if SUPPORT_MVM
     pipeline.matrix_vector_unit_output(matrix_vector_unit_output);
 #endif

@@ -76,17 +76,17 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
       input_indptr_pack);
 
   // FIFOs to avoid stalling between rows
-  Connections::Fifo<Meta, 2> input_indptr_fifo;
-  Connections::Fifo<Meta, 2> fetch_input_indices_start_fifo;
-  Connections::Fifo<Meta, 2> fetch_input_indices_end_fifo;
-  Connections::Fifo<Meta, 2> process_input_indices_start_fifo;
-  Connections::Fifo<Meta, 2> process_input_indices_end_fifo;
-  Connections::Fifo<Meta, 2> fetch_input_data_start_fifo;
-  Connections::Fifo<Meta, 2> fetch_input_data_end_fifo;
-  Connections::Fifo<Meta, 2> process_input_data_start_fifo;
-  Connections::Fifo<Meta, 2> process_input_data_end_fifo;
-  Connections::Fifo<Meta, 2> fetch_weight_nnz_fifo;
-  Connections::Fifo<Meta, 2> process_weight_nnz_fifo;
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(input_indptr_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(fetch_input_indices_start_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(fetch_input_indices_end_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(process_input_indices_start_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(process_input_indices_end_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(fetch_input_data_start_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(fetch_input_data_end_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(process_input_data_start_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(process_input_data_end_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(fetch_weight_nnz_fifo);
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(process_weight_nnz_fifo);
 
   Connections::Combinational<Meta> CCS_INIT_S1(input_indptr_enq);
   Connections::Combinational<Meta> CCS_INIT_S1(input_indptr_deq);
@@ -114,14 +114,15 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   Connections::Out<MemoryRequest> CCS_INIT_S1(input_indices_req);
   Connections::In<ac_int<port_width, false>> CCS_INIT_S1(input_indices_resp);
 
-  Connections::Fifo<Pack1D<Meta, NUM_META>, 2> fetch_weight_input_indices_fifo;
+  Connections::Fifo<Pack1D<Meta, NUM_META>, 2> CCS_INIT_S1(
+      fetch_weight_input_indices_fifo);
   Connections::Combinational<Pack1D<Meta, NUM_META>> CCS_INIT_S1(
       fetch_weight_input_indices_enq);
   Connections::Combinational<Pack1D<Meta, NUM_META>> CCS_INIT_S1(
       fetch_weight_input_indices_deq);
 #if SUPPORT_MX
-  Connections::Fifo<Pack1D<Meta, NUM_META>, 2>
-      read_weight_scale_input_indices_fifo;
+  Connections::Fifo<Pack1D<Meta, NUM_META>, 2> CCS_INIT_S1(
+      read_weight_scale_input_indices_fifo);
   Connections::Combinational<Pack1D<Meta, NUM_META>> CCS_INIT_S1(
       read_weight_scale_input_indices_enq);
   Connections::Combinational<Pack1D<Meta, NUM_META>> CCS_INIT_S1(

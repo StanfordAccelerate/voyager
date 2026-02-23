@@ -33,6 +33,8 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   accelerator.matrix_unit_weight_scale_req(matrix_unit_weight_scale_req);
   accelerator.matrix_unit_weight_scale_resp(matrix_unit_weight_scale_resp);
 #endif
+  accelerator.matrix_unit_output_data(matrix_unit_output_data);
+  accelerator.matrix_unit_output_addr(matrix_unit_output_addr);
   accelerator.matrix_unit_start(matrix_unit_start);
   accelerator.matrix_unit_done(matrix_unit_done);
 #if SUPPORT_MVM
@@ -169,6 +171,7 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   REGISTER_IO_FN(vector_fetch_1)
   REGISTER_IO_FN(vector_fetch_2)
 
+  REGISTER_FN(store_matrix_unit_output)
   REGISTER_FN(store_vector_output)
   REGISTER_FN(store_mx_scale_output)
   REGISTER_FN(store_sparse_tensor_output)
@@ -313,6 +316,10 @@ DEFINE_IO_FN(dwc_unit_weight_scale)
 DEFINE_IO_FN(vector_fetch_0)
 DEFINE_IO_FN(vector_fetch_1)
 DEFINE_IO_FN(vector_fetch_2)
+
+void Harness::store_matrix_unit_output() {
+  process_write_request(&matrix_unit_output_data, &matrix_unit_output_addr);
+}
 
 void Harness::store_vector_output() {
   process_write_request(&vector_output_data, &vector_output_addr);
@@ -664,7 +671,9 @@ void Harness::param_sender() {
           offset_param_addresses(accelerator_params, bank_size);
 
       for (int j = 0; j < num_tiles; j++) {
-        if ((contain_matrix_param(accelerator_params) || accelerator_params.size() < 4) && j > 1) {
+        if ((contain_matrix_param(accelerator_params) ||
+             accelerator_params.size() < 4) &&
+            j > 1) {
           tile_done.SyncPop();
         }
 
@@ -673,7 +682,8 @@ void Harness::param_sender() {
       }
 
       // drain out remaining done signals
-      if ((contain_matrix_param(accelerator_params) || accelerator_params.size() < 4)) {
+      if ((contain_matrix_param(accelerator_params) ||
+           accelerator_params.size() < 4)) {
         tile_done.SyncPop();
 
         if (num_tiles > 1) {
@@ -768,7 +778,8 @@ void Harness::done_monitor() {
           dataloader->load_scratchpad(param, j + 2, offset);
         }
 
-        if (contain_matrix_param(accelerator_params) || accelerator_params.size() < 4) {
+        if (contain_matrix_param(accelerator_params) ||
+            accelerator_params.size() < 4) {
           tile_done.SyncPush();
         }
       }

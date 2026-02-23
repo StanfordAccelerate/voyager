@@ -8,6 +8,7 @@
 #include "InputController.h"
 #include "InputScaleController.h"
 #include "MatrixProcessor.h"
+#include "OutputController.h"
 #include "WeightController.h"
 #include "WeightScaleController.h"
 #include "mc_scverify.h"
@@ -17,11 +18,11 @@ SC_MODULE(MatrixUnit) {
   sc_in<bool> CCS_INIT_S1(rstn);
 
 #if SUPPORT_MX
-  static constexpr int PARAMS_MODULE_COUNT = 5;
+  static constexpr int PARAMS_MODULE_COUNT = 6;
   static constexpr int SCALE_PORT_WIDTH = SCALE_DATATYPE::width * OC_DIMENSION;
   typedef ac_int<SCALE_PORT_WIDTH, false> SCALE_PORT_TYPE;
 #else
-  static constexpr int PARAMS_MODULE_COUNT = 3;
+  static constexpr int PARAMS_MODULE_COUNT = 4;
 #endif
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
@@ -120,17 +121,27 @@ SC_MODULE(MatrixUnit) {
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::SyncChannel accumulation_buffer_mu_done[ACCUM_BUFFER_BANKS];
 
-  Connections::In<ac_int<16, false>> accumulation_buffer_vu_read_address[2];
-  Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+  Connections::Combinational<ac_int<16, false>>
+      accumulation_buffer_vu_read_address[2];
+  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
       accumulation_buffer_vu_read_data[2];
   // Write request from Vector Unit, unused for now
   Connections::Combinational<
       BufferWriteRequest<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>>
       accumulation_buffer_vu_write_request[2];
-  Connections::SyncIn accumulation_buffer_vu_done[2];
+  Connections::SyncChannel accumulation_buffer_vu_done[2];
 #endif
 
+  MatrixUnitOutputController<ACCUM_BUFFER_DATATYPE, OC_DIMENSION, OC_PORT_WIDTH,
+                             MU_OUTPUT_TYPES>
+      CCS_INIT_S1(output_controller);
+
+  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
+      CCS_INIT_S1(matrix_processor_output);
+
   Connections::Out<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>> output_channel;
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> output_data;
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> output_addr;
 
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
@@ -167,7 +178,7 @@ SC_MODULE(MatrixUnit) {
     input_scale_controller.rstn(rstn);
     input_scale_controller.scale_req(input_scale_req);
     input_scale_controller.scale_resp(input_scale_resp);
-    input_scale_controller.params_in(matrix_params[3]);
+    input_scale_controller.params_in(matrix_params[4]);
 
     input_scale_buffer.clk(clk);
     input_scale_buffer.rstn(rstn);
@@ -206,7 +217,7 @@ SC_MODULE(MatrixUnit) {
     weight_scale_controller.rstn(rstn);
     weight_scale_controller.weight_scale_req(weight_scale_req);
     weight_scale_controller.weight_scale_resp(weight_scale_resp);
-    weight_scale_controller.params_in(matrix_params[4]);
+    weight_scale_controller.params_in(matrix_params[5]);
 
     weight_scale_buffer.clk(clk);
     weight_scale_buffer.rstn(rstn);
@@ -227,7 +238,6 @@ SC_MODULE(MatrixUnit) {
     matrix_processor.bias_channel(bias_data);
     matrix_processor.params_in(matrix_params[2]);
     matrix_processor.start(start);
-    matrix_processor.done(done);
 
     for (int i = 0; i < ACCUM_BUFFER_BANKS; i++) {
       matrix_processor.accumulation_buffer_read_address[i](
@@ -242,7 +252,7 @@ SC_MODULE(MatrixUnit) {
 #endif
     }
 
-    matrix_processor.output_channel(output_channel);
+    matrix_processor.output_channel(matrix_processor_output);
 
     accumulation_buffer.clk(clk);
     accumulation_buffer.rstn(rstn);
@@ -274,5 +284,24 @@ SC_MODULE(MatrixUnit) {
     matrix_processor.input_scale_channel(input_scale_read_resp);
     matrix_processor.weight_scale_channel(weight_scale_read_resp);
 #endif
+
+    output_controller.clk(clk);
+    output_controller.rstn(rstn);
+    output_controller.params_in(matrix_params[3]);
+    output_controller.matrix_processor_output(matrix_processor_output);
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+    for (int i = 0; i < ACCUM_BUFFER_BANKS; i++) {
+      output_controller.accumulation_buffer_read_address[i](
+          accumulation_buffer_vu_read_address[i]);
+      output_controller.accumulation_buffer_read_data[i](
+          accumulation_buffer_vu_read_data[i]);
+      output_controller.accumulation_buffer_done[i](
+          accumulation_buffer_vu_done[i]);
+    }
+#endif
+    output_controller.vector_unit_input_data(output_channel);
+    output_controller.matrix_unit_output_data(output_data);
+    output_controller.matrix_unit_output_addr(output_addr);
+    output_controller.done(done);
   }
 };

@@ -65,6 +65,13 @@ inline bool is_fc_layer(const codegen::OpOverload& op) {
   return dim == 1;
 }
 
+inline bool is_reduction_op(const std::string& op_target) {
+  static const std::unordered_set<std::string> REDUCTION_OPS = {
+      "amax", "sum", "mean", "min", "max", "prod",
+  };
+  return REDUCTION_OPS.find(op_target) != REDUCTION_OPS.end();
+}
+
 inline bool is_dma_op(const std::string& op_target) {
   static const std::unordered_set<std::string> DMA_OPS = {
       "slice",

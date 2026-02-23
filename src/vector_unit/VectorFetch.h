@@ -24,15 +24,6 @@ SC_MODULE(VectorFetchUnit) {
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_1_req);
   Connections::Out<MemoryRequest> CCS_INIT_S1(vector_fetch_2_req);
 
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-  Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
-  Connections::In<Pack1D<BufferType, mu_width>>
-      accumulation_buffer_read_data[2];
-  Connections::SyncOut accumulation_buffer_done[2];
-  Connections::Out<Pack1D<BufferType, width>> CCS_INIT_S1(
-      accumulation_buffer_output);
-#endif
-
   Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
       vector_fetch_0_resp);
   Connections::Combinational<ac_int<MAX_RESPONSE_WIDTH, false>> CCS_INIT_S1(
@@ -120,14 +111,6 @@ SC_MODULE(VectorFetchUnit) {
   void send_request_0() {
     vector_fetch_0_params.ResetRead();
     vector_fetch_0_req.Reset();
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    accumulation_buffer_read_address[0].Reset();
-    accumulation_buffer_read_address[1].Reset();
-    accumulation_buffer_done[0].Reset();
-    accumulation_buffer_done[1].Reset();
-#endif
-
-    bool accumulation_buffer_bank = 0;
 
     wait();
 
@@ -179,34 +162,26 @@ SC_MODULE(VectorFetchUnit) {
       ac_int<LOOP_WIDTH, false> loop_counters[2][3];
       ac_int<LOOP_WIDTH, false> loop_ends[2][3];
 
-      ac_int<LOOP_WIDTH, false> loop_bounds[6] = {
-          params.vector_fetch_0_loops[0][0], params.vector_fetch_0_loops[0][1],
-          params.vector_fetch_0_loops[0][2], params.vector_fetch_0_loops[1][0],
-          params.vector_fetch_0_loops[1][1], params.vector_fetch_0_loops[1][2],
-      };
-
-      ac_int<LOOP_WIDTH, false> loop_ends_flat[6];
-#pragma hls_unroll yes
-      for (int dim = 0; dim < 6; dim++) {
-        if (params.has_permute) {
-          loop_ends_flat[dim] =
-              loop_bounds[params.vector_fetch_0_permute_dims[dim]];
-        } else if (params.has_slicing &&
-                   dim == params.vector_fetch_0_slice_dim) {
-          loop_ends_flat[dim] = params.vector_fetch_0_slice_end;
-        } else {
-          loop_ends_flat[dim] = loop_bounds[dim];
-        }
-      }
-
 #pragma hls_unroll yes
       for (int i = 0; i < 2; i++) {
 #pragma hls_unroll yes
         for (int j = 0; j < 3; j++) {
           int index = i ? j + 3 : j;
-          loop_ends[i][j] = loop_ends_flat[index] - 1;
+          if (params.has_slicing && index == params.vector_fetch_0_slice_dim) {
+            loop_ends[i][j] = params.vector_fetch_0_slice_end - 1;
+          } else if (params.has_permute) {
+            loop_ends[i][j] = params.output_loops[i][j] - 1;
+          } else {
+            loop_ends[i][j] = params.vector_fetch_0_loops[i][j] - 1;
+          }
         }
       }
+
+      ac_int<LOOP_WIDTH, false> loop_bounds[6] = {
+          params.vector_fetch_0_loops[0][0], params.vector_fetch_0_loops[0][1],
+          params.vector_fetch_0_loops[0][2], params.vector_fetch_0_loops[1][0],
+          params.vector_fetch_0_loops[1][1], params.vector_fetch_0_loops[1][2],
+      };
 
       // Pre-compute loop strides for flattened addressing
       ac_int<32, false> strides[6];
@@ -230,21 +205,21 @@ SC_MODULE(VectorFetchUnit) {
             for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
               for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
                 for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                  ac_int<LOOP_WIDTH, false> y1 =
+                      loop_counters[0][params.vector_fetch_0_y_loop_idx[0]];
+                  ac_int<LOOP_WIDTH, false> x1 =
+                      loop_counters[0][params.vector_fetch_0_x_loop_idx[0]];
+                  ac_int<LOOP_WIDTH, false> k1 =
+                      loop_counters[0][params.vector_fetch_0_k_loop_idx[0]];
+                  ac_int<LOOP_WIDTH, false> y0 =
+                      loop_counters[1][params.vector_fetch_0_y_loop_idx[1]];
+                  ac_int<LOOP_WIDTH, false> x0 =
+                      loop_counters[1][params.vector_fetch_0_x_loop_idx[1]];
+                  ac_int<LOOP_WIDTH, false> k0 =
+                      loop_counters[1][params.vector_fetch_0_k_loop_idx[1]];
+
                   ac_int<32, false> address;
                   bool in_bound = true;
-
-                  ac_int<11, false> y1 =
-                      loop_counters[0][params.vector_fetch_0_y_loop_idx[0]];
-                  ac_int<11, false> x1 =
-                      loop_counters[0][params.vector_fetch_0_x_loop_idx[0]];
-                  ac_int<11, false> k1 =
-                      loop_counters[0][params.vector_fetch_0_k_loop_idx[0]];
-                  ac_int<11, false> y0 =
-                      loop_counters[1][params.vector_fetch_0_y_loop_idx[1]];
-                  ac_int<11, false> x0 =
-                      loop_counters[1][params.vector_fetch_0_x_loop_idx[1]];
-                  ac_int<11, false> k0 =
-                      loop_counters[1][params.vector_fetch_0_k_loop_idx[1]];
 
                   if (params.vector_fetch_0_mode == 1) {
                     // Tiled indexing with padding and stride
@@ -291,34 +266,19 @@ SC_MODULE(VectorFetchUnit) {
                         indices[2] * strides[2] + indices[3] * strides[3] +
                         indices[4] * strides[4] + indices[5] * strides[5];
                   }
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-                  else if (params.vector_fetch_0_mode == 3) {
-                    // Feeding accumulation buffer addresses
-                    address = k0 * Y0 * X0 + y0 * X0 + x0;
-                    accumulation_buffer_read_address[accumulation_buffer_bank]
-                        .Push(address);
-                    if (k0 == K1 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
-                      accumulation_buffer_done[accumulation_buffer_bank]
-                          .SyncPush();
-                      accumulation_buffer_bank = !accumulation_buffer_bank;
-                    }
-                  }
-#endif
 
-                  if (params.vector_fetch_0_mode == 1 ||
-                      params.vector_fetch_0_mode == 2) {
-                    if (params.has_transpose || in_bound) {
-                      fetch_vector_input<InputTypes...>(
-                          params.vector_fetch_0_dtype,
-                          params.vector_fetch_0_offset, address,
-                          params.vector_fetch_0_burst_size, vector_fetch_0_req);
-                      vector_fetch_0_packer_done.write(false);
-                    }
-
-                    if (!params.has_transpose) {
-                      vector_fetch_0_data_done.write(in_bound);
-                    }
+                  if (params.has_transpose || in_bound) {
+                    fetch_vector_input<InputTypes...>(
+                        params.vector_fetch_0_dtype,
+                        params.vector_fetch_0_offset, address,
+                        params.vector_fetch_0_burst_size, vector_fetch_0_req);
+                    vector_fetch_0_packer_done.write(false);
                   }
+
+                  if (!params.has_transpose) {
+                    vector_fetch_0_data_done.write(in_bound);
+                  }
+
                   if (loop_counters[1][2] == loop_ends[1][2]) break;
                 }
                 if (loop_counters[1][1] == loop_ends[1][1]) break;
@@ -394,14 +354,6 @@ SC_MODULE(VectorFetchUnit) {
     vector_fetch_1_packed_data.ResetRead();
     vector_fetch_0_data.Reset();
 
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    accumulation_buffer_read_data[0].Reset();
-    accumulation_buffer_read_data[1].Reset();
-    accumulation_buffer_output.Reset();
-#endif
-
-    bool accumulation_buffer_bank = 0;
-
     wait();
 
     while (true) {
@@ -452,7 +404,7 @@ SC_MODULE(VectorFetchUnit) {
 
           if (count == loop_bound - 1) break;
         }
-      } else if (params.vector_fetch_0_mode != 3) {
+      } else {
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
         while (true) {
@@ -489,70 +441,6 @@ SC_MODULE(VectorFetchUnit) {
           }
         }
       }
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-      else {
-        ac_int<LOOP_WIDTH, false> loop_counters[2][3];
-        ac_int<LOOP_WIDTH, false> loop_ends[2][3];
-
-#pragma hls_unroll yes
-        for (int i = 0; i < 2; i++) {
-#pragma hls_unroll yes
-          for (int j = 0; j < 3; j++) {
-            loop_ends[i][j] = params.vector_fetch_0_loops[i][j] - 1;
-          }
-        }
-
-        ac_int<LOOP_WIDTH, false> y0_max =
-            loop_ends[1][params.vector_fetch_0_y_loop_idx[1]];
-        ac_int<LOOP_WIDTH, false> x0_max =
-            loop_ends[1][params.vector_fetch_0_x_loop_idx[1]];
-        ac_int<LOOP_WIDTH, false> k1_max =
-            loop_ends[1][params.vector_fetch_0_k_loop_idx[1]];
-
-#pragma hls_pipeline_init_interval 1
-#pragma hls_pipeline_stall_mode flush
-        for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
-          for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
-            for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-              for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
-                for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
-                  for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
-                    auto read_data =
-                        accumulation_buffer_read_data[accumulation_buffer_bank]
-                            .Pop();
-                    for (int i = 0; i < mu_width / width; i++) {
-                      Pack1D<BufferType, width> output_data;
-#pragma hls_unroll yes
-                      for (int j = 0; j < width; j++) {
-                        output_data[j] = read_data[i * width + j];
-                      }
-                      accumulation_buffer_output.Push(output_data);
-                    }
-
-                    ac_int<LOOP_WIDTH, false> x0 =
-                        loop_counters[1][params.vector_fetch_0_x_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> y0 =
-                        loop_counters[1][params.vector_fetch_0_y_loop_idx[1]];
-                    ac_int<LOOP_WIDTH, false> k1 =
-                        loop_counters[1][params.vector_fetch_0_k_loop_idx[1]];
-
-                    if (k1 == k1_max && y0 == y0_max && x0 == x0_max) {
-                      accumulation_buffer_bank = !accumulation_buffer_bank;
-                    }
-                    if (loop_counters[1][2] == loop_ends[1][2]) break;
-                  }
-                  if (loop_counters[1][1] == loop_ends[1][1]) break;
-                }
-                if (loop_counters[1][0] == loop_ends[1][0]) break;
-              }
-              if (loop_counters[0][2] == loop_ends[0][2]) break;
-            }
-            if (loop_counters[0][1] == loop_ends[0][1]) break;
-          }
-          if (loop_counters[0][0] == loop_ends[0][0]) break;
-        }
-      }
-#endif
     }
   }
 

@@ -56,6 +56,11 @@ SC_MODULE(Harness) {
       matrix_unit_weight_scale_resp);
 #endif
 
+  Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_unit_output_data);
+  Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      matrix_unit_output_addr);
+
   Connections::SyncChannel CCS_INIT_S1(matrix_unit_start);
   Connections::SyncChannel CCS_INIT_S1(matrix_unit_done);
 
@@ -341,6 +346,7 @@ SC_MODULE(Harness) {
   void read_vector_fetch_2_request();
   void send_vector_fetch_2_response();
 
+  void store_matrix_unit_output();
   void store_vector_output();
   void store_mx_scale_output();
   void store_sparse_tensor_output();

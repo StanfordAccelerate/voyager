@@ -96,6 +96,7 @@
         "layers": [
             "permute_default",
             "permute_default_1",
+            "quantize_default",
             "slice(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?"
         ]

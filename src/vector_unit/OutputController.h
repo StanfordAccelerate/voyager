@@ -265,9 +265,9 @@ SC_MODULE(OutputController) {
                       ac_int<LOOP_WIDTH, false> k1 =
                           loop_counters[1][params.output_k_loop_idx[1]];
 
-                      ac_int<32, false> y = y1 * Y0 + y0;
-                      ac_int<32, false> x = x1 * X0 + x0;
-                      ac_int<32, false> k = k2 * K1 + k1 * width;
+                      ac_int<16, false> y = y1 * Y0 + y0;
+                      ac_int<16, false> x = x1 * X0 + x0;
+                      ac_int<16, false> k = k2 * K1 + k1 * width;
 
                       if (params.transpose_for_scores) {
                         // k / head_size * (X * head_size) + x * head_size

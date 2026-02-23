@@ -8,11 +8,12 @@
 #include "test/toolchain/MatrixVectorMultiply.h"
 #include "test/toolchain/Microscaling.h"
 #include "test/toolchain/Pooling.h"
+#include "test/toolchain/Reduction.h"
 #include "test/toolchain/Softmax.h"
+#include "test/toolchain/VectorOps.h"
 #if SUPPORT_SPMM
 #include "test/toolchain/SpMM.h"
 #endif
-#include "test/toolchain/VectorOps.h"
 
 void map_operation(const Operation& operation,
                    std::deque<BaseParams*>& mapped_params) {
@@ -40,6 +41,8 @@ void map_operation(const Operation& operation,
   } else if (first_op.target() == "spmm_csr") {
     map_spmm(operation, mapped_params, false);
 #endif
+  } else if (is_reduction_op(first_op.target())) {
+    map_reduction(param, mapped_params);
   } else {
     map_vector_operations(param, mapped_params);
   }

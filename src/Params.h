@@ -21,6 +21,9 @@ struct MatrixParams : BaseParams {
     weight_offset = 0;
     weight_scale_offset = 0;
     bias_offset = 0;
+    output_offset = 0;
+    dq_scale_offset = 0;
+    dq_zero_point_offset = 0;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
@@ -67,6 +70,8 @@ struct MatrixParams : BaseParams {
     weight_num_beats = 1;
     weight_pack_factor_lg2 = 1;
 
+    output_dtype = 0;
+
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       input_code[i] = 0;
       weight_code[i] = 0;
@@ -91,10 +96,8 @@ struct MatrixParams : BaseParams {
     input_transpose = false;
     weight_transpose = false;
     write_output_to_accum_buffer = false;
-
+    output_to_memory = false;
     weight_dequant = false;
-    dq_scale_offset = 0;
-    dq_zero_point_offset = 0;
 
 #if SUPPORT_SPMM
     is_spmm = false;
@@ -112,6 +115,9 @@ struct MatrixParams : BaseParams {
   ac_int<ADDRESS_WIDTH, false> weight_offset;
   ac_int<ADDRESS_WIDTH, false> weight_scale_offset;
   ac_int<ADDRESS_WIDTH, false> bias_offset;
+  ac_int<ADDRESS_WIDTH, false> output_offset;
+  ac_int<ADDRESS_WIDTH, false> dq_scale_offset;
+  ac_int<ADDRESS_WIDTH, false> dq_zero_point_offset;
 
   // systolic array loop
   ac_int<LOOP_WIDTH, false> loops[2][6];
@@ -147,6 +153,8 @@ struct MatrixParams : BaseParams {
   ac_int<4, false> weight_num_beats;
   ac_int<4, false> weight_pack_factor_lg2;
 
+  ac_int<DTYPE_INDEX_WIDTH, false> output_dtype;
+
   ac_int<SA_INPUT_TYPE::width, false> input_code[NUM_CODEBOOK_ENTRIES];
   ac_int<SA_WEIGHT_TYPE::width, false> weight_code[NUM_CODEBOOK_ENTRIES];
 
@@ -169,10 +177,8 @@ struct MatrixParams : BaseParams {
   bool input_transpose;
   bool weight_transpose;
   bool write_output_to_accum_buffer;
-
+  bool output_to_memory;
   bool weight_dequant;
-  ac_int<ADDRESS_WIDTH, false> dq_scale_offset;
-  ac_int<ADDRESS_WIDTH, false> dq_zero_point_offset;
 
 #if SUPPORT_SPMM
   bool is_spmm;
@@ -182,13 +188,13 @@ struct MatrixParams : BaseParams {
 #endif
 
   static const unsigned int base_width =
-      7 * ADDRESS_WIDTH /* addresses */ + (12 + 10) * LOOP_WIDTH /* loops */ +
+      8 * ADDRESS_WIDTH /* addresses */ + (12 + 10) * LOOP_WIDTH /* loops */ +
       21 * 3 /* loop indices */ + 8 /* stride */ + 8 /* padding */ +
       8 /* Head Size */ + 2 /* num_channels */ + 3 /* fx_unrolling_lg2 */ +
-      12 * 1 /* Bools */ + 32 /* input shapes */;
+      13 * 1 /* Bools */ + 32 /* input shapes */;
 
   static const unsigned int extra_width =
-      2 * DTYPE_INDEX_WIDTH + 36 + NUM_CODEBOOK_ENTRIES * SA_INPUT_TYPE::width +
+      3 * DTYPE_INDEX_WIDTH + 36 + NUM_CODEBOOK_ENTRIES * SA_INPUT_TYPE::width +
       NUM_CODEBOOK_ENTRIES * SA_WEIGHT_TYPE::width + 4;
 
 #if SUPPORT_SPMM
@@ -207,6 +213,9 @@ struct MatrixParams : BaseParams {
     m & weight_offset;
     m & weight_scale_offset;
     m & bias_offset;
+    m & output_offset;
+    m & dq_scale_offset;
+    m & dq_zero_point_offset;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
@@ -263,6 +272,8 @@ struct MatrixParams : BaseParams {
     m & weight_num_beats;
     m & weight_pack_factor_lg2;
 
+    m & output_dtype;
+
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       m& input_code[i];
     }
@@ -290,10 +301,8 @@ struct MatrixParams : BaseParams {
     m & input_transpose;
     m & weight_transpose;
     m & write_output_to_accum_buffer;
-
+    m & output_to_memory;
     m & weight_dequant;
-    m & dq_scale_offset;
-    m & dq_zero_point_offset;
 
 #if SUPPORT_SPMM
     m & is_spmm;
@@ -316,6 +325,9 @@ struct MatrixParams : BaseParams {
     os << "weight_offset: " << params.weight_offset << std::endl;
     os << "weight_scale_offset: " << params.weight_scale_offset << std::endl;
     os << "bias_offset: " << params.bias_offset << std::endl;
+    os << "output_offset: " << params.output_offset << std::endl;
+    os << "dq_scale_offset: " << params.dq_scale_offset << std::endl;
+    os << "dq_zero_point_offset: " << params.dq_zero_point_offset << std::endl;
 
     for (int i = 0; i < 2; i++) {
       for (int j = 0; j < 6; j++) {
@@ -381,6 +393,8 @@ struct MatrixParams : BaseParams {
        << std::endl;
     os << "weight_burst_size: " << params.weight_burst_size << std::endl;
 
+    os << "output_dtype: " << params.output_dtype << std::endl;
+
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       os << "input_code[" << i << "]: " << params.input_code[i] << std::endl;
     }
@@ -411,9 +425,8 @@ struct MatrixParams : BaseParams {
     os << "weight_transpose: " << params.weight_transpose << std::endl;
     os << "write_output_to_accum_buffer: "
        << params.write_output_to_accum_buffer << std::endl;
+    os << "output_to_memory: " << params.output_to_memory << std::endl;
     os << "weight_dequant: " << params.weight_dequant << std::endl;
-    os << "dq_scale_offset: " << params.dq_scale_offset << std::endl;
-    os << "dq_zero_point_offset: " << params.dq_zero_point_offset << std::endl;
 
 #if SUPPORT_SPMM
     os << "is_spmm: " << params.is_spmm << std::endl;
@@ -430,7 +443,10 @@ struct MatrixParams : BaseParams {
         lhs.input_scale_offset != rhs.input_scale_offset ||
         lhs.weight_offset != rhs.weight_offset ||
         lhs.weight_scale_offset != rhs.weight_scale_offset ||
-        lhs.bias_offset != rhs.bias_offset)
+        lhs.bias_offset != rhs.bias_offset ||
+        lhs.output_offset != rhs.output_offset ||
+        lhs.dq_scale_offset != rhs.dq_scale_offset ||
+        lhs.dq_zero_point_offset != rhs.dq_zero_point_offset)
       return false;
 
     // Compare the 2D arrays
@@ -478,6 +494,8 @@ struct MatrixParams : BaseParams {
     if (lhs.weight_pack_factor_lg2 != rhs.weight_pack_factor_lg2) return false;
     if (lhs.weight_burst_size != rhs.weight_burst_size) return false;
 
+    if (lhs.output_dtype != rhs.output_dtype) return false;
+
     for (int i = 0; i < NUM_CODEBOOK_ENTRIES; i++) {
       if (lhs.input_code[i] != rhs.input_code[i]) return false;
       if (lhs.weight_code[i] != rhs.weight_code[i]) return false;
@@ -504,10 +522,8 @@ struct MatrixParams : BaseParams {
     if (lhs.weight_transpose != rhs.weight_transpose) return false;
     if (lhs.write_output_to_accum_buffer != rhs.write_output_to_accum_buffer)
       return false;
-
+    if (lhs.output_to_memory != rhs.output_to_memory) return false;
     if (lhs.weight_dequant != rhs.weight_dequant) return false;
-    if (lhs.dq_scale_offset != rhs.dq_scale_offset) return false;
-    if (lhs.dq_zero_point_offset != rhs.dq_zero_point_offset) return false;
 
 #if SUPPORT_SPMM
     if (lhs.is_spmm != rhs.is_spmm) return false;
@@ -572,18 +588,17 @@ struct VectorInstructions {
   ac_int<4, false> vector_op3_src1;
 
   static const unsigned int from_matrix_unit = 1;
-  static const unsigned int from_accum_buffer = 2;
-  static const unsigned int from_matrix_vector_unit = 3;
-  static const unsigned int from_vector_fetch_0 = 4;
-  static const unsigned int from_vector_fetch_1 = 5;
-  static const unsigned int from_vector_fetch_2 = 6;
-  static const unsigned int from_accumulator = 7;
-  static const unsigned int from_vector_reducer = 8;
-  static const unsigned int from_immediate_0 = 9;
-  static const unsigned int from_immediate_1 = 10;
-  static const unsigned int from_immediate_2 = 11;
-  static const unsigned int from_dwc_unit = 12;
-  static const unsigned int from_spmm_unit = 13;
+  static const unsigned int from_matrix_vector_unit = 2;
+  static const unsigned int from_vector_fetch_0 = 3;
+  static const unsigned int from_vector_fetch_1 = 4;
+  static const unsigned int from_vector_fetch_2 = 5;
+  static const unsigned int from_accumulator = 6;
+  static const unsigned int from_vector_reducer = 7;
+  static const unsigned int from_immediate_0 = 8;
+  static const unsigned int from_immediate_1 = 9;
+  static const unsigned int from_immediate_2 = 10;
+  static const unsigned int from_dwc_unit = 11;
+  static const unsigned int from_spmm_unit = 12;
 
   bool vdequantize;
   ac_int<16, false> vector_dq_scale;

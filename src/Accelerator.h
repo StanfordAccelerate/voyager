@@ -40,19 +40,16 @@ SC_MODULE(Accelerator) {
       matrix_unit_weight_scale_resp);
 #endif
 
+  Connections::Out<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(
+      matrix_unit_output_data);
+  Connections::Out<ac_int<ADDRESS_WIDTH, false>> CCS_INIT_S1(
+      matrix_unit_output_addr);
+
   Connections::SyncOut CCS_INIT_S1(matrix_unit_start);
   Connections::SyncOut CCS_INIT_S1(matrix_unit_done);
 
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
       CCS_INIT_S1(matrix_unit_output);
-
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-  Connections::Combinational<ac_int<16, false>>
-      accumulation_buffer_vu_read_address[2];
-  Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
-      accumulation_buffer_vu_read_data[2];
-  Connections::SyncChannel accumulation_buffer_vu_done[2];
-#endif
 
 #if SUPPORT_MVM
   MatrixVectorUnit<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
@@ -219,17 +216,8 @@ SC_MODULE(Accelerator) {
     matrix_unit.start(matrix_unit_start);
     matrix_unit.done(matrix_unit_done);
     matrix_unit.output_channel(matrix_unit_output);
-
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    for (int i = 0; i < 2; i++) {
-      matrix_unit.accumulation_buffer_vu_read_address[i](
-          accumulation_buffer_vu_read_address[i]);
-      matrix_unit.accumulation_buffer_vu_read_data[i](
-          accumulation_buffer_vu_read_data[i]);
-      matrix_unit.accumulation_buffer_vu_done[i](
-          accumulation_buffer_vu_done[i]);
-    }
-#endif
+    matrix_unit.output_data(matrix_unit_output_data);
+    matrix_unit.output_addr(matrix_unit_output_addr);
 
 #if SUPPORT_MVM
     matrix_vector_unit.clk(clk);
@@ -306,16 +294,6 @@ SC_MODULE(Accelerator) {
 #if SUPPORT_DWC
     vector_unit.dwc_unit_in(dwc_output);
     vector_unit.dwc_address_in(dwc_output_address);
-#endif
-
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    for (int i = 0; i < 2; i++) {
-      vector_unit.accumulation_buffer_read_address[i](
-          accumulation_buffer_vu_read_address[i]);
-      vector_unit.accumulation_buffer_read_data[i](
-          accumulation_buffer_vu_read_data[i]);
-      vector_unit.accumulation_buffer_done[i](accumulation_buffer_vu_done[i]);
-    }
 #endif
 
 #if SUPPORT_DWC

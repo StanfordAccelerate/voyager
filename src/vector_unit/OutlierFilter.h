@@ -37,12 +37,10 @@ SC_MODULE(OutlierFilter) {
       Vector threshold;
       threshold.set_bits(config.outlier_threshold);
 
+      auto csr_data = Pack1D<Vector, width>::zero();
+      auto csr_indices = Pack1D<Meta, width>::zero();
       auto indptr = Pack1D<Meta, width>::zero();
       ac_int<32, false> nnz = 0;
-
-      // Keep 2 * width to avoid overflow
-      Pack1D<Vector, 2 * width> csr_data;
-      Pack1D<Meta, 2 * width> csr_indices;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -52,11 +50,13 @@ SC_MODULE(OutlierFilter) {
 
           auto outliers = Pack1D<Vector, width>::zero();
           auto filtered = Pack1D<Vector, width>::zero();
+          ac_int<width, false> flag = 0;
 
 #pragma hls_unroll yes
           for (int i = 0; i < width; i++) {
-            if (data[i] > threshold) {
+            if (data[i].abs() > threshold) {
               outliers[i] = data[i];
+              flag[i] = 1;
             } else {
               filtered[i] = data[i];
             }
@@ -64,56 +64,31 @@ SC_MODULE(OutlierFilter) {
 
           data_out.Push(filtered);
 
-#ifndef __SYNTHESIS__
-          std::cerr << "OutlierFilter: x=" << x << " k=" << k << " nnz=" << nnz
-                    << " threshold=" << threshold << "\n";
-          std::cerr << "  data:     " << data << "\n";
-          std::cerr << "  filtered: " << filtered << "\n";
-          std::cerr << "  outliers: " << outliers << "\n";
-#endif
+          flag.reverse();
+          bool all_sign;
+          auto pos = flag.leading_sign(all_sign);
 
-#pragma hls_unroll yes
-          for (int k0 = 0; k0 < width; k0++) {
-            int index = nnz % (2 * width);
-            if (outliers[k0] != Vector::zero()) {
-              csr_data[index] = outliers[k0];
-              csr_indices[index] = k * width + k0;
-              nnz++;
-            }
-          }
+          while (!all_sign) {
+            int index = nnz % width;
+            csr_data[index] = outliers[pos];
+            csr_indices[index] = k * width + pos;
+            nnz++;
+            flag[width - 1 - pos] = 0;
 
-#ifndef __SYNTHESIS__
-          std::cerr << "  nnz after: " << nnz << "\n";
-          std::cerr << "  csr_data: " << csr_data << "\n";
-          std::cerr << "  csr_indices: " << csr_indices << "\n";
-#endif
+            if (nnz % width == 0 && nnz != 0) {
+              CsrDataAndIndices<Vector, Meta, width> output = {
+                  .data = csr_data,
+                  .indices = csr_indices,
+                  .is_last = false,
+              };
 
-          int nnz_in_block = nnz % (2 * width);
+              csr_data_and_indices_out.Push(output);
 
-          if (nnz_in_block > width) {
-            Pack1D<Vector, width> csr_data_block;
-            Pack1D<Meta, width> csr_indices_block;
-
-#pragma hls_unroll yes
-            for (int i = 0; i < width; i++) {
-              csr_data_block[i] = csr_data[i];
-              csr_indices_block[i] = csr_indices[i];
+              csr_data = Pack1D<Vector, width>::zero();
+              csr_indices = Pack1D<Meta, width>::zero();
             }
 
-            CsrDataAndIndices<Vector, Meta, width> output = {
-                .data = csr_data_block,
-                .indices = csr_indices_block,
-                .is_last = false,
-            };
-
-            csr_data_and_indices_out.Push(output);
-
-            // Shift remaining data to the front
-#pragma hls_unroll yes
-            for (int i = 0; i < width; i++) {
-              csr_data[i] = csr_data[i + width];
-              csr_indices[i] = csr_indices[i + width];
-            }
+            pos = flag.leading_sign(all_sign);
           }
 
           if (k == config.dense_input_shape[1] - 1) break;
@@ -132,26 +107,13 @@ SC_MODULE(OutlierFilter) {
       }
 
       // Flush remaining data
-      int remaining = nnz % width;
-
-      Pack1D<Vector, width> csr_data_block;
-      Pack1D<Meta, width> csr_indices_block;
-
-#pragma hls_unroll yes
-      for (int i = 0; i < width; i++) {
-        csr_data_block[i] = i < remaining ? csr_data[i] : Vector::zero();
-        csr_indices_block[i] = i < remaining ? csr_indices[i] : Meta::zero();
-      }
-
       CsrDataAndIndices<Vector, Meta, width> output = {
-          .data = csr_data_block,
-          .indices = csr_indices_block,
+          .data = csr_data,
+          .indices = csr_indices,
           .is_last = true,
       };
 
       csr_data_and_indices_out.Push(output);
-
-      // Flush final indptr
       csr_indptr_out.Push(indptr);
     }
   }

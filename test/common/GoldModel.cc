@@ -10,6 +10,7 @@
 #include "test/common/operations/Microscaling.h"
 #include "test/common/operations/Pooling.h"
 #include "test/common/operations/QuantizeOps.h"
+#include "test/common/operations/Reduction.h"
 #include "test/common/operations/ReshapeOps.h"
 #include "test/common/operations/SlicingOp.h"
 #include "test/common/operations/Softmax.h"
@@ -529,24 +530,9 @@ std::vector<std::any> run_operation(const Operation& operation,
         std::any scale_ptr = kwargs[scale.node()];
         output_ptr = dequantize_tensor<Vector>(output_ptr, scale_ptr, input);
       }
-    } else if (op.target().rfind("vmap", 0) == 0) {
+    } else if (ReductionRegistry<Vector>::is_supported(op.target())) {
       const auto input = op.kwargs().at("input").tensor();
-      const int size = get_size(input);
-
-      Vector* input_ptr = std::any_cast<Vector*>(output_ptr);
-
-      const auto other = op.kwargs().at("other").tensor();
-      DataTypes::bfloat16* value_map =
-          std::any_cast<DataTypes::bfloat16*>(kwargs[other.node()]);
-
-      for (int i = 0; i < size; i++) {
-        DataTypes::bfloat16 value =
-            static_cast<DataTypes::bfloat16>(input_ptr[i]);
-        unsigned int index = value.bits_rep().to_uint();
-        input_ptr[i] = static_cast<Vector>(value_map[index]);
-      }
-
-      output_ptr = input_ptr;
+      output_ptr = reduce<Vector>(kwargs, op);
     } else {
       spdlog::error("Unsupported instruction: {}\n", op.target());
       std::abort();

@@ -5,15 +5,16 @@
 #include "test/toolchain/ApproximationConstants.h"
 
 const std::set<std::string> unary_ops = {
-    "sqrt",       "sqrt_",       "neg",          "neg_",         "relu",
-    "relu_",      "gelu",        "gelu_",        "silu",         "silu_",
-    "elu",        "elu_",        "hardsigmoid",  "hardsigmoid_", "hardswish",
-    "hardswish_", "log_sigmoid", "log_sigmoid_", "selu",         "selu_",
-    "celu",       "celu_",       "sigmoid",      "sigmoid_",     "mish",
-    "mish_",      "softplus",    "softplus_",    "tanh",         "tanh_",
-    "tanh_1",     "tanh_1_",     "hardshrink",   "hardshrink_",  "hardtanh",
-    "hardtanh_",  "leaky_relu",  "leaky_relu_",  "rrelu",        "rrelu_",
-    "softshrink", "softshrink_", "threshold",    "threshold_"};
+    "sqrt",         "sqrt_",        "neg",       "neg_",       "abs",
+    "abs_",         "exp",          "relu",      "relu_",      "gelu",
+    "gelu_",        "silu",         "silu_",     "elu",        "elu_",
+    "hardsigmoid",  "hardsigmoid_", "hardswish", "hardswish_", "log_sigmoid",
+    "log_sigmoid_", "selu",         "selu_",     "celu",       "celu_",
+    "sigmoid",      "sigmoid_",     "mish",      "mish_",      "softplus",
+    "softplus_",    "tanh",         "tanh_",     "tanh_1",     "tanh_1_",
+    "hardshrink",   "hardshrink_",  "hardtanh",  "hardtanh_",  "leaky_relu",
+    "leaky_relu_",  "rrelu",        "rrelu_",    "softshrink", "softshrink_",
+    "threshold",    "threshold_"};
 
 const std::set<std::string> arithmetics = {"add", "add_", "sub", "sub_",
                                            "mul", "mul_", "div", "div_"};
@@ -157,6 +158,10 @@ inline T* perform_unary_operation(T* input, const std::vector<int> shape,
       result[i] = input[i].sqrt();
     } else if (opcode == "neg" || opcode == "neg_") {
       result[i] = -input[i];
+    } else if (opcode == "abs" || opcode == "abs_") {
+      result[i] = input[i].abs();
+    } else if (opcode == "exp") {
+      result[i] = input[i].exponential();
     } else {
       spdlog::error("Unsupported vector operation: {}\n", opcode);
       std::abort();

@@ -123,9 +123,11 @@ using F9 = StdFloat<3, 5>;
 #define VECTOR_DATATYPE DataTypes::bfloat16
 #define SCALE_DATATYPE DataTypes::fp8_e5m3
 #define VU_INPUT_TYPES \
-  VECTOR_DATATYPE, SCALE_DATATYPE, DataTypes::e4m3, DataTypes::int1
-#define OUTPUT_DATATYPES INPUT_DATATYPE, VU_INPUT_TYPES
+  DataTypes::bfloat16, DataTypes::fp8_e5m3, DataTypes::e4m3, DataTypes::int1
+#define OUTPUT_DATATYPES \
+  INPUT_DATATYPE, DataTypes::bfloat16, DataTypes::fp8_e5m3, DataTypes::e4m3
 #define SPMM_META_DATATYPE DataTypes::int32
+#define MU_OUTPUT_TYPES DataTypes::bfloat16, DataTypes::e4m3
 
 #define SA_INPUT_TYPE DataTypes::int6
 #define SA_WEIGHT_TYPE DataTypes::int6
@@ -225,6 +227,10 @@ using F9 = StdFloat<3, 5>;
 #define ACCUM_BUFFER_DATATYPE ACCUM_DATATYPE
 #endif
 
+#ifndef MU_OUTPUT_TYPES
+#define MU_OUTPUT_TYPES ACCUM_BUFFER_DATATYPE
+#endif
+
 #ifndef SCALE_DATATYPE
 #define SCALE_DATATYPE DataTypes::fp8_e8m0
 #endif
@@ -246,7 +252,7 @@ using F9 = StdFloat<3, 5>;
 #endif
 
 #ifndef SPMM_META_DATATYPE
-#define SPMM_META_DATATYPE DataTypes::int16
+#define SPMM_META_DATATYPE DataTypes::int32
 #endif
 
 // ================================================================

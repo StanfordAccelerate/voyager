@@ -99,7 +99,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #endif
 
   Connections::SyncOut CCS_INIT_S1(start);
-  Connections::SyncOut CCS_INIT_S1(done);
 
   SC_CTOR(MatrixProcessor) {
     input_skewer.clk(clk);
@@ -646,7 +645,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     accumulation_buffer_done[1].Reset();
 #endif
     accum_output_enq.ResetWrite();
-    done.Reset();
 
     bool accumulation_buffer_bank = 0;
 
@@ -758,7 +756,6 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           }
         }
       }
-      done.SyncPush();
     }
   }
 };

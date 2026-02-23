@@ -211,6 +211,7 @@ void map_matrix_operation(const Operation& operation,
   const auto matrix_op = op_list[0];
 
   const auto input = matrix_op.kwargs().at("input").tensor();
+  const auto output = get_op_outputs(param).back();
 
   bool is_matmul = matrix_op.target().find("matmul") != std::string::npos;
   std::string weight_key = is_matmul ? "other" : "weight";
@@ -655,6 +656,18 @@ void map_matrix_operation(const Operation& operation,
     }
   }
 
+  // If there are no vector operations, we don't need to setup the vector
+  // instruction config
+  if (!is_dwc && !is_fc && !has_fused_spmm(matrix_op) && op_list.size() == 1 &&
+      !output.has_reshape()) {
+    matrix_params->output_to_memory = true;
+    matrix_params->output_offset = get_address(output);
+    matrix_params->output_dtype =
+        get_index_from_type_name<MU_OUTPUT_TYPES>(output.dtype());
+    mapped_params.push_back(matrix_params);
+    return;
+  }
+
   // fused spmm operation
   if (has_fused_spmm(matrix_op)) {
 #if !SUPPORT_SPMM
@@ -673,38 +686,6 @@ void map_matrix_operation(const Operation& operation,
     tiling.loops[1][1] /= OC_DIMENSION;
   }
 
-  if (!is_dwc && !is_fc) {
-    vector_params->vector_fetch_0_mode = 3;  // read from accumulation buffer
-    // Set outer loops
-    for (int i = 0; i < 3; i++) {
-      vector_params->vector_fetch_0_loops[0][i] = tiling.loops[0][i];
-    }
-    vector_params->vector_fetch_0_y_loop_idx[0] = tiling.y_loop_idx[0];
-    vector_params->vector_fetch_0_x_loop_idx[0] = tiling.x_loop_idx[0];
-    vector_params->vector_fetch_0_k_loop_idx[0] = tiling.weight_loop_idx[0];
-
-    // Set inner loops
-    int loop_idx = 0;
-    for (int i = 0; i < 6; i++) {
-      // ignore the loops not present in outputs (reduction, fx, fy)
-      if (i == tiling.weight_loop_idx[1] || i == tiling.x_loop_idx[1] ||
-          i == tiling.y_loop_idx[1]) {
-        vector_params->vector_fetch_0_loops[1][loop_idx] = tiling.loops[1][i];
-        if (i == tiling.y_loop_idx[1]) {
-          vector_params->vector_fetch_0_y_loop_idx[1] = loop_idx;
-        }
-        if (i == tiling.x_loop_idx[1]) {
-          vector_params->vector_fetch_0_x_loop_idx[1] = loop_idx;
-        }
-        if (i == tiling.weight_loop_idx[1]) {
-          vector_params->vector_fetch_0_k_loop_idx[1] = loop_idx;
-        }
-        loop_idx++;
-      }
-    }
-  }
-
-  const auto output = get_op_outputs(param).back();
   vector_params->vector_output_offset = get_address(output);
 
   // Set outer loops
@@ -772,16 +753,11 @@ void map_matrix_operation(const Operation& operation,
   } else if (is_fc) {
     inst.vector_op0_src0 = VectorInstructions::from_matrix_vector_unit;
   } else {
-#if DOUBLE_BUFFERED_ACCUM_BUFFER
-    inst.vector_op0_src0 = VectorInstructions::from_accum_buffer;
-    matrix_params->write_output_to_accum_buffer = true;
+    inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
     if (has_fused_spmm(matrix_op)) {
       inst.vector_op0_src1 = VectorInstructions::from_spmm_unit;
       inst.vector_op0 = VectorInstructions::op0_add;
     }
-#else
-    inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
-#endif
   }
 
   int stage = 0;
@@ -925,10 +901,9 @@ void map_matrix_operation(const Operation& operation,
   }
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
-  if (!is_dwc && should_use_direct_path(vector_params)) {
-    inst.vector_op0_src0 = VectorInstructions::from_matrix_unit;
-    vector_params->vector_fetch_0_mode = 0;
-    matrix_params->write_output_to_accum_buffer = false;
+  if (!is_dwc && !is_fc) {
+    matrix_params->write_output_to_accum_buffer =
+        !should_use_direct_path(vector_params);
   }
 #endif
 
