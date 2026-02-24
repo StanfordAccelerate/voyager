@@ -386,18 +386,22 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
     }
 
 #if SUPPORT_DWC
-    if (auto* dwc_params = dynamic_cast<DwCParams*>(params[idx])) {
-      send_serialized_params<DwCParams, 64>(*dwc_params, &dwc_unit_params_in);
-      idx++;
+    if (idx < params.size()) {
+      if (auto* dwc_params = dynamic_cast<DwCParams*>(params[idx])) {
+        send_serialized_params<DwCParams, 64>(*dwc_params, &dwc_unit_params_in);
+        idx++;
+      }
     }
 #endif
-    if (auto* vector_params = dynamic_cast<VectorParams*>(params[idx])) {
-      VectorInstructionConfig* vector_config =
-          dynamic_cast<VectorInstructionConfig*>(params[++idx]);
-      send_serialized_params<VectorParams, 64>(*vector_params,
-                                               &vector_unit_params_in);
-      send_serialized_params<VectorInstructionConfig, 64>(
-          *vector_config, &vector_unit_params_in);
+    if (idx < params.size()) {
+      if (auto* vector_params = dynamic_cast<VectorParams*>(params[idx])) {
+        VectorInstructionConfig* vector_config =
+            dynamic_cast<VectorInstructionConfig*>(params[++idx]);
+        send_serialized_params<VectorParams, 64>(*vector_params,
+                                                 &vector_unit_params_in);
+        send_serialized_params<VectorInstructionConfig, 64>(
+            *vector_config, &vector_unit_params_in);
+      }
     }
 
     // Wait for last operation to finish
@@ -613,6 +617,7 @@ std::deque<BaseParams*> offset_param_addresses(std::deque<BaseParams*> params,
       param->bias_offset += offset;
       param->input_scale_offset += offset;
       param->weight_scale_offset += offset;
+      param->output_offset += offset;
       param->dq_scale_offset += offset;
       param->dq_zero_point_offset += offset;
 #if SUPPORT_SPMM
