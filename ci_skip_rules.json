@@ -97,6 +97,7 @@
             "permute_default",
             "permute_default_1",
             "quantize_default",
+            "quantize_default_1",
             "slice(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?"
         ]
@@ -119,6 +120,8 @@
             "index_copy__1",
             "permute_default",
             "permute_default_1",
+            "quantize_default",
+            "quantize_default_1",
             "slice(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?",
             "transpose_int(_[0-9]+)?"

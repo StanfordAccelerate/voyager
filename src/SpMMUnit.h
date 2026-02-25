@@ -132,7 +132,8 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   Connections::Out<MemoryRequest> CCS_INIT_S1(input_data_req);
   Connections::In<ac_int<port_width, false>> CCS_INIT_S1(input_data_resp);
 
-  Connections::Fifo<Pack1D<Input, NUM_DATA>, 2> input_data_packed_fifo;
+  Connections::Fifo<Pack1D<Input, NUM_DATA>, 2> CCS_INIT_S1(
+      input_data_packed_fifo);
   Connections::Combinational<Pack1D<Input, NUM_DATA>> CCS_INIT_S1(
       input_data_packed_enq);
   Connections::Combinational<Pack1D<Input, NUM_DATA>> CCS_INIT_S1(
@@ -155,7 +156,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   Connections::Combinational<BufferReadRequest> weight_scale_read_req[2];
   Connections::Combinational<ac_int<SCALE_PORT_WIDTH, false>> CCS_INIT_S1(
       weight_scale_read_resp);
-  Connections::Fifo<Meta, 2> read_weight_scale_nnz_fifo;
+  Connections::Fifo<Meta, 2> CCS_INIT_S1(read_weight_scale_nnz_fifo);
   Connections::Combinational<Meta> CCS_INIT_S1(read_weight_scale_nnz_enq);
   Connections::Combinational<Meta> CCS_INIT_S1(read_weight_scale_nnz_deq);
 
