@@ -21,6 +21,7 @@
             "slice(_[0-9]+)?",
             "slice_csr_tensor(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?",
+            "quantize_default_1",
             "quantize_mx_outlier(_[0-9]+)?",
             "quantize_mx_outlier_default(_[0-9]+)?"
         ]

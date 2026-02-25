@@ -371,26 +371,24 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
   int idx = 0;
   while (idx < params.size()) {
     if (auto* matrix_params = get_param<MatrixParams>(params, idx)) {
-      if (matrix_params->is_fc) {
 #if SUPPORT_MVM
+      if (matrix_params->is_fc) {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &matrix_vector_unit_params_in);
-#else
-        throw std::runtime_error("MVM support is not enabled.");
+      }
 #endif
-      } else if (matrix_params->is_spmm) {
+#if SUPPORT_SPMM
+      else if (matrix_params->is_spmm) {
         // SpMM operation could have a fused dense matrix op
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           send_serialized_params<MatrixParams, 64>(*dense_params,
                                                    &matrix_unit_params_in);
         }
-#if SUPPORT_SPMM
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &spmm_unit_params_in);
-#else
-        throw std::runtime_error("SPMM support is not enabled.");
+      }
 #endif
-      } else {
+      else {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &matrix_unit_params_in);
       }
@@ -423,18 +421,20 @@ void Harness::record_start(const std::deque<BaseParams*>& params,
   int idx = 0;
   while (idx < params.size()) {
     if (auto* matrix_params = get_param<MatrixParams>(params, idx)) {
-      if (matrix_params->is_fc) {
 #if SUPPORT_MVM
+      if (matrix_params->is_fc) {
         matrix_vector_unit_start.SyncPop();
+      }
 #endif
-      } else if (matrix_params->is_spmm) {
+#if SUPPORT_SPMM
+      else if (matrix_params->is_spmm) {
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           matrix_unit_start.SyncPop();
         }
-#if SUPPORT_SPMM
         spmm_unit_start.SyncPop();
+      }
 #endif
-      } else {
+      else {
         matrix_unit_start.SyncPop();
       }
 
@@ -494,18 +494,20 @@ void Harness::record_done(const std::deque<BaseParams*>& params,
   int idx = 0;
   while (idx < params.size()) {
     if (auto* matrix_params = get_param<MatrixParams>(params, idx)) {
-      if (matrix_params->is_fc) {
 #if SUPPORT_MVM
+      if (matrix_params->is_fc) {
         matrix_vector_unit_done.SyncPop();
+      }
 #endif
-      } else if (matrix_params->is_spmm) {
+#if SUPPORT_SPMM
+      else if (matrix_params->is_spmm) {
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           matrix_unit_done.SyncPop();
         }
-#if SUPPORT_SPMM
         spmm_unit_done.SyncPop();
+      }
 #endif
-      } else {
+      else {
         matrix_unit_done.SyncPop();
       }
     } else if (auto* dwc_params = get_param<DwCParams>(params, idx)) {
