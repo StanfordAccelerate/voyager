@@ -191,12 +191,9 @@ static bool should_use_direct_path(const VectorParams* vector_params) {
           : get_type_width<OUTPUT_DATATYPES>(vector_params->output_dtype) *
                 OC_DIMENSION;
 
-  bool should_use_direct_path = true;
-  should_use_direct_path &= vector_fetch_1_bw <= available_bandwidth;
-  should_use_direct_path &= vector_fetch_2_bw <= available_bandwidth;
-  should_use_direct_path &= output_bw <= available_bandwidth;
-
-  return should_use_direct_path;
+  return vector_fetch_1_bw <= available_bandwidth &&
+         vector_fetch_2_bw <= available_bandwidth &&
+         output_bw <= available_bandwidth;
 }
 
 void map_matrix_operation(const Operation& operation,
@@ -664,6 +661,12 @@ void map_matrix_operation(const Operation& operation,
     matrix_params->output_offset = get_address(output);
     matrix_params->output_dtype =
         get_index_from_type_name<MU_OUTPUT_TYPES>(output.dtype());
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+    const size_t output_bw =
+        get_type_width<MU_OUTPUT_TYPES>(matrix_params->output_dtype) *
+        OC_DIMENSION;
+    matrix_params->write_output_to_accum_buffer = OC_PORT_WIDTH < output_bw;
+#endif
     mapped_params.push_back(matrix_params);
     return;
   }
