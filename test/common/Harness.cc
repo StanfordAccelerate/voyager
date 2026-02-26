@@ -536,7 +536,7 @@ void Harness::record_done(const std::deque<BaseParams*>& params,
       operation_done.SyncPush();
     }
 
-    if (is_last && idx == params.size() - 1) {
+    if (is_last && idx == params.size()) {
       auto start = operation_start_times.front();
       operation_start_times.pop_front();
 

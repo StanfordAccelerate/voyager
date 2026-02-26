@@ -111,6 +111,7 @@ SC_MODULE(MatrixParamsDeserializer) {
       spdlog::debug(oss.str());
 #endif
 
+#pragma hls_unroll yes
       for (int i = 0; i < module_count; i++) {
         params_out[i].Push(params);
       }
