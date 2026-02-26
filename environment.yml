@@ -3,7 +3,7 @@ channels:
   - conda-forge
 dependencies:
   - libprotobuf<6
-  - python>=3.9,<3.11
+  - python==3.12
   - pip
   - pip:
       - torch==2.6.0
