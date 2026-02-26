@@ -29,7 +29,7 @@ Input* quantize(std::any input, std::any scale, std::vector<int> shape) {
 template <typename Input, typename Meta>
 std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
     std::any input, std::vector<int> input_shape, const int data_size,
-    Input threshold) {
+    Input threshold, int indptr_offset = 0) {
   spdlog::debug("Performing outlier filtering operation\n");
   Input* inputs = std::any_cast<Input*>(input);
 
@@ -49,7 +49,7 @@ std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
     indices[i] = -1;
   }
 
-  indptr[0] = 0;
+  indptr[0] = indptr_offset;
   int nnz = 0;
 
   for (int x = 0; x < X; ++x) {
@@ -64,12 +64,12 @@ std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
         filtered[x * K + k] = v;
       }
     }
-    indptr[x + 1] = nnz;
+    indptr[x + 1] = indptr_offset + nnz;
   }
 
   delete[] inputs;
 
-  spdlog::debug("Filtered {} outliers\n", nnz);
+  spdlog::debug("Filtered {} outliers\n", nnz - indptr_offset);
 
   return {data, indices, indptr, filtered};
 }

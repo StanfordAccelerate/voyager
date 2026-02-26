@@ -1486,20 +1486,23 @@ struct ApproxUnitConfig {
 struct OutlierFilterConfig {
 #ifndef __SYNTHESIS__
   OutlierFilterConfig() {
+    indptr_offset = 0;
     outlier_threshold = 0;
     dense_input_shape[0] = 0;
     dense_input_shape[1] = 0;
   }
 #endif
 
+  ac_int<32, false> indptr_offset;
   ac_int<16, false> outlier_threshold;
   ac_int<16, false> dense_input_shape[2];
 
-  static const unsigned int width = 16 + 16 * 2;
+  static const unsigned int width = 32 + 16 + 16 * 2;
 
 #ifndef NO_SYSC
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
+    m & indptr_offset;
     m & outlier_threshold;
     m& dense_input_shape[0];
     m& dense_input_shape[1];
@@ -1513,6 +1516,7 @@ struct OutlierFilterConfig {
 
   inline friend std::ostream& operator<<(std::ostream& os,
                                          const OutlierFilterConfig& config) {
+    os << "indptr_offset: " << config.indptr_offset << std::endl;
     os << "outlier_threshold: " << config.outlier_threshold << std::endl;
     os << "dense_input_shape[0]: " << config.dense_input_shape[0] << std::endl;
     os << "dense_input_shape[1]: " << config.dense_input_shape[1] << std::endl;
@@ -1521,6 +1525,7 @@ struct OutlierFilterConfig {
 
   inline friend bool operator==(const OutlierFilterConfig& lhs,
                                 const OutlierFilterConfig& rhs) {
+    if (lhs.indptr_offset != rhs.indptr_offset) return false;
     if (lhs.outlier_threshold != rhs.outlier_threshold) return false;
     if (lhs.dense_input_shape[0] != rhs.dense_input_shape[0]) return false;
     if (lhs.dense_input_shape[1] != rhs.dense_input_shape[1]) return false;
@@ -1687,6 +1692,7 @@ struct VectorInstructionConfig : BaseParams {
     m & approx_config.clamp_min;
     m & approx_config.clamp_max;
 
+    m & outlier_filter.indptr_offset;
     m & outlier_filter.outlier_threshold;
     m & outlier_filter.dense_input_shape[0];
     m & outlier_filter.dense_input_shape[1];
@@ -1711,6 +1717,12 @@ struct VectorInstructionConfig : BaseParams {
       os << params.inst[i] << std::endl;
     }
     os << "num_inst: " << params.num_inst << std::endl;
+    os << "ApproxUnitConfig: " << std::endl;
+    os << params.approx_config << std::endl;
+    os << "OutlierFilterConfig: " << std::endl;
+    os << params.outlier_filter << std::endl;
+    os << "CodebookQuantizationConfig: " << std::endl;
+    os << params.codebook_config << std::endl;
     os << "config_loop_count: " << params.config_loop_count << std::endl;
     return os;
   }

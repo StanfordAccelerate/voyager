@@ -501,9 +501,10 @@ std::vector<std::any> run_operation(const Operation& operation,
           const float threshold = op.kwargs().at("threshold").float_value();
           const auto& csr_data = output_tensors[0];
           const int data_size = get_size(csr_data);
+          const int indptr_offset = std::any_cast<int>(kwargs["indptr_offset"]);
           auto [data, indices, indptr, filtered] =
               filter_outlier<Vector, SPMM_META_DATATYPE>(
-                  output_ptr, input_shape, data_size, threshold);
+                  output_ptr, input_shape, data_size, threshold, indptr_offset);
           outputs.insert(outputs.end(), {data, indices, indptr});
           output_ptr = filtered;
         }

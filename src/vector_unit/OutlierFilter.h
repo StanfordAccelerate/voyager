@@ -37,10 +37,11 @@ SC_MODULE(OutlierFilter) {
       Vector threshold;
       threshold.set_bits(config.outlier_threshold);
 
-      auto csr_data = Pack1D<Vector, width>::zero();
-      auto csr_indices = Pack1D<Meta, width>::zero();
+      CsrDataAndIndices<Vector, Meta, width> output;
       auto indptr = Pack1D<Meta, width>::zero();
       ac_int<32, false> nnz = 0;
+
+      indptr[0] = config.indptr_offset;
 
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
@@ -70,22 +71,14 @@ SC_MODULE(OutlierFilter) {
 
           while (!all_sign) {
             int index = nnz % width;
-            csr_data[index] = outliers[pos];
-            csr_indices[index] = k * width + pos;
+            output.data[index] = outliers[pos];
+            output.indices[index] = k * width + pos;
             nnz++;
             flag[width - 1 - pos] = 0;
 
             if (nnz % width == 0 && nnz != 0) {
-              CsrDataAndIndices<Vector, Meta, width> output = {
-                  .data = csr_data,
-                  .indices = csr_indices,
-                  .is_last = false,
-              };
-
               csr_data_and_indices_out.Push(output);
-
-              csr_data = Pack1D<Vector, width>::zero();
-              csr_indices = Pack1D<Meta, width>::zero();
+              output = CsrDataAndIndices<Vector, Meta, width>();
             }
 
             pos = flag.leading_sign(all_sign);
@@ -95,24 +88,20 @@ SC_MODULE(OutlierFilter) {
         }
 
         int indptr_idx = x % width;
+        ac_int<32, false> current_index = config.indptr_offset + nnz;
         if (indptr_idx == width - 1) {
           csr_indptr_out.Push(indptr);
           indptr = Pack1D<Meta, width>::zero();
-          indptr[0] = nnz;
+          indptr[0] = current_index;
         } else {
-          indptr[indptr_idx + 1] = nnz;
+          indptr[indptr_idx + 1] = current_index;
         }
 
         if (x == config.dense_input_shape[0] - 1) break;
       }
 
       // Flush remaining data
-      CsrDataAndIndices<Vector, Meta, width> output = {
-          .data = csr_data,
-          .indices = csr_indices,
-          .is_last = true,
-      };
-
+      output.is_last = true;
       csr_data_and_indices_out.Push(output);
       csr_indptr_out.Push(indptr);
     }

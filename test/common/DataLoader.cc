@@ -106,7 +106,7 @@ void DataLoader::load_outputs(const codegen::Operation param,
 }
 
 std::map<std::string, std::any> DataLoader::get_args(
-    const codegen::Operation& param) {
+    const codegen::Operation& param, const int tile_index) {
   std::map<std::string, std::any> kwargs;
 
   auto tensors = extract_tensors_from_op(param);
@@ -114,6 +114,19 @@ std::map<std::string, std::any> DataLoader::get_args(
   for (const auto& t : tensors) {
     spdlog::debug("Reading tensor: {}\n", t.tensor.node());
     kwargs[t.tensor.node()] = memory->read_tensor(t.tensor);
+  }
+
+  const auto op_list = get_op_list(param);
+  const auto outputs = get_op_outputs(param);
+
+  // For CSR outputs, the tile bounds are dynamic. We need to read them from
+  // memory
+  if (op_list.back().target() == "quantize_mx_outlier") {
+    int csr_tile_start;
+    int csr_tile_end;
+    read_csr_tiled_bounds(outputs[2], tile_index - 1, 1, csr_tile_start,
+                          csr_tile_end);
+    kwargs["indptr_offset"] = tile_index > 0 ? csr_tile_end : 0;
   }
 
   return kwargs;
@@ -230,67 +243,52 @@ void DataLoader::copy_tile(
   }
 }
 
-void DataLoader::read_csr_tiled_bounds(
-    const std::vector<ExtractedTensor>& tensors, const int tile_index,
-    const int k_tile, int& csr_tile_start, int& csr_tile_end) {
-  for (const auto& entry : tensors) {
-    if (entry.key == "A_indptr") {
-      const auto& tensor = entry.tensor;
-      std::string dtype = tensor.dtype();
-      const auto full_shape = get_shape(tensor, false, false);
-      const auto tiled_shape = get_shape(tensor, false, true);
-      std::vector<int> tile_strides;
-      if (tensor.tile_strides_size() > 0) {
-        tile_strides = {tensor.tile_strides().begin(),
-                        tensor.tile_strides().end()};
-      } else {
-        tile_strides = tiled_shape;
-      }
+void DataLoader::read_csr_tiled_bounds(const codegen::Tensor& tensor,
+                                       const int tile_index, const int k_tile,
+                                       int& csr_tile_start, int& csr_tile_end,
+                                       bool scratchpad, const int offset) {
+  std::string dtype = tensor.dtype();
+  const auto full_shape = get_shape(tensor, false, false);
+  const auto tiled_shape = get_shape(tensor, false, true);
 
-      const int partition = tensor.memory().partition();
-      const uint64_t address = tensor.memory().address();
+  std::vector<int> tile_strides = tiled_shape;
+  tile_strides.back() -= 1;
 
-      int curr_tile_index = tile_index / k_tile;
+  // pick partition and address based on input or output
+  const auto loc = scratchpad ? tensor.scratchpad() : tensor.memory();
+  const int partition = loc.partition();
+  const uint64_t address = loc.address() + offset;
 
-      auto tiles = get_tiles(full_shape, tiled_shape);
-      auto actual_tiles = get_tile_index(tiles, curr_tile_index);
+  int curr_tile_index = tile_index / k_tile;
+  auto tiling = get_tiles(full_shape, tiled_shape);
+  auto start_indices = get_tile_index(tiling, curr_tile_index);
 
-      const int size = get_size(tiled_shape);
-      const auto strides = rm_strides(full_shape, false);
+  const auto strides = rm_strides(full_shape, false);
+  const int rank = full_shape.size();
 
-      const int rank = full_shape.size();
-
-      std::vector<int> start(rank);
-      std::vector<int> indices(rank, 0);
-
-      for (int d = 0; d < rank; ++d) {
-        start[d] = actual_tiles[d] * tile_strides[d];
-      }
-
-      int index_start = 0;
-      for (int d = 0; d < rank; ++d) {
-        index_start += start[d] * strides[d];
-      }
-
-      csr_tile_start = static_cast<int>(
-          memory->read_value(partition, address, index_start, dtype));
-
-      spdlog::debug("CSR tile start index: {}\n", csr_tile_start);
-
-      int index_end = 0;
-      for (int d = 0; d < rank; ++d) {
-        index_end += (start[d] + tiled_shape[d] - 1) * strides[d];
-      }
-
-      spdlog::debug("CSR tile end index: {}\n", index_end);
-      csr_tile_end = static_cast<int>(
-          memory->read_value(partition, address, index_end, dtype));
-      return;
-    }
+  std::vector<int> start(rank);
+  for (int d = 0; d < rank; ++d) {
+    start[d] = start_indices[d] * tile_strides[d];
   }
 
-  throw std::invalid_argument(
-      "CSR tiled bounds requested but no CSR tensor found!");
+  int index_start = 0;
+  for (int d = 0; d < rank; ++d) {
+    index_start += start[d] * strides[d];
+  }
+
+  csr_tile_start = static_cast<int>(
+      memory->read_value(partition, address, index_start, dtype));
+
+  int index_end = 0;
+  for (int d = 0; d < rank; ++d) {
+    index_end += (start[d] + tiled_shape[d] - 1) * strides[d];
+  }
+
+  csr_tile_end = static_cast<int>(
+      memory->read_value(partition, address, index_end, dtype));
+
+  spdlog::debug("CSR tile start index: {}\n", csr_tile_start);
+  spdlog::debug("CSR tile end index: {}\n", csr_tile_end);
 }
 
 void DataLoader::copy_tile_csr(const std::string& dtype,
@@ -323,8 +321,12 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
   int csr_tile_end = 0;
 
   if (has_fused_spmm(get_op_list(param).front())) {
-    read_csr_tiled_bounds(tensors, tile_index, k_tile, csr_tile_start,
-                          csr_tile_end);
+    for (const auto& entry : tensors) {
+      if (entry.key == "A_indptr") {
+        read_csr_tiled_bounds(entry.tensor, tile_index, k_tile, csr_tile_start,
+                              csr_tile_end);
+      }
+    }
   }
 
   for (auto& entry : tensors) {
@@ -368,16 +370,16 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
           tensor.node());
       continue;
     }
-    auto tiles = get_tiles(full_shape, tiled_shape);
-    auto actual_tiles = get_tile_index(tiles, curr_tile_index);
+    auto tiling = get_tiles(full_shape, tiled_shape);
+    auto start_indices = get_tile_index(tiling, curr_tile_index);
 
     spdlog::debug("Loading scratchpad tensor: {}\n", tensor.node());
     spdlog::debug("Shape: ");
     for (const auto& dim : tiled_shape) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\nTile: ");
-    for (const auto& dim : actual_tiles) {
+    spdlog::debug("\nTile Indices: ");
+    for (const auto& dim : start_indices) {
       spdlog::debug("{} ", dim);
     }
     spdlog::debug("\nTile Strides: ");
@@ -393,7 +395,7 @@ void DataLoader::load_scratchpad(const codegen::Operation& param,
       copy_tile_csr(dtype, csr_tile_start, csr_tile_end, partition, address,
                     scratchpad_par, scratchpad_addr);
     } else {
-      copy_tile(dtype, full_shape, tiled_shape, tile_strides, actual_tiles,
+      copy_tile(dtype, full_shape, tiled_shape, tile_strides, start_indices,
                 partition, address, false, scratchpad_par, scratchpad_addr,
                 true, replication);
     }
@@ -404,6 +406,19 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
                                   const int tile_index, const int offset) {
   const auto tensors = get_op_outputs(param);
   const int stack_offset = getenv_int("SOC_MEM_OFFSET", 0);
+
+  const auto op_list = get_op_list(param);
+  bool has_csr_outputs = op_list.back().target() == "quantize_mx_outlier";
+
+  int index = 0;
+  int csr_tile_start = 0;
+  int csr_tile_end = 0;
+
+  if (has_csr_outputs) {
+    // Scratchpad only has 1 tile of data so tile_index is always 0
+    read_csr_tiled_bounds(tensors[2], 0, 1, csr_tile_start, csr_tile_end, true,
+                          offset);
+  }
 
   for (const auto& tensor : tensors) {
     std::string dtype = tensor.dtype();
@@ -419,23 +434,38 @@ void DataLoader::store_scratchpad(const codegen::Operation& param,
     const uint64_t scratchpad_addr =
         tensor.scratchpad().address() + offset + stack_offset;
 
-    auto tiles = get_tiles(full_shape, tiled_shape);
-    auto actual_tiles = get_tile_index(tiles, tile_index);
+    auto tiling = get_tiles(full_shape, tiled_shape);
+    auto start_indices = get_tile_index(tiling, tile_index);
+
+    if (has_csr_outputs) {
+      if (index < 2) {
+        tiled_shape.back() = csr_tile_end - csr_tile_start;
+        tile_strides.back() = csr_tile_start;
+        start_indices.back() = 1;
+      } else if (index == 2) {
+        tile_strides.back() -= 1;
+      }
+      index++;
+    }
 
     spdlog::debug("Storing scratchpad tensor: {}\n", tensor.node());
     spdlog::debug("Shape: ");
     for (const auto& dim : tiled_shape) {
       spdlog::debug("{} ", dim);
     }
-    spdlog::debug("\nTile: ");
-    for (const auto& dim : actual_tiles) {
+    spdlog::debug("\nTile Indices: ");
+    for (const auto& dim : start_indices) {
+      spdlog::debug("{} ", dim);
+    }
+    spdlog::debug("\nTile Strides: ");
+    for (const auto& dim : tile_strides) {
       spdlog::debug("{} ", dim);
     }
     spdlog::debug("\nDatatype: {}\n", dtype);
     spdlog::debug("DRAM Address: {}\n", address);
     spdlog::debug("SRAM Address: {}\n", scratchpad_addr);
 
-    copy_tile(dtype, full_shape, tiled_shape, tile_strides, actual_tiles,
+    copy_tile(dtype, full_shape, tiled_shape, tile_strides, start_indices,
               scratchpad_par, scratchpad_addr, true, partition, address, false);
   }
 }

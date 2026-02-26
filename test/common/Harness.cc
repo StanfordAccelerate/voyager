@@ -375,10 +375,10 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
       if (matrix_params->is_fc) {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &matrix_vector_unit_params_in);
-      }
+      } else
 #endif
 #if SUPPORT_SPMM
-      else if (matrix_params->is_spmm) {
+          if (matrix_params->is_spmm) {
         // SpMM operation could have a fused dense matrix op
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           send_serialized_params<MatrixParams, 64>(*dense_params,
@@ -386,9 +386,9 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
         }
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &spmm_unit_params_in);
-      }
+      } else
 #endif
-      else {
+      {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &matrix_unit_params_in);
       }
@@ -424,17 +424,17 @@ void Harness::record_start(const std::deque<BaseParams*>& params,
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
         matrix_vector_unit_start.SyncPop();
-      }
+      } else
 #endif
 #if SUPPORT_SPMM
-      else if (matrix_params->is_spmm) {
+          if (matrix_params->is_spmm) {
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           matrix_unit_start.SyncPop();
         }
         spmm_unit_start.SyncPop();
-      }
+      } else
 #endif
-      else {
+      {
         matrix_unit_start.SyncPop();
       }
 
@@ -497,17 +497,17 @@ void Harness::record_done(const std::deque<BaseParams*>& params,
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
         matrix_vector_unit_done.SyncPop();
-      }
+      } else
 #endif
 #if SUPPORT_SPMM
-      else if (matrix_params->is_spmm) {
+          if (matrix_params->is_spmm) {
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           matrix_unit_done.SyncPop();
         }
         spmm_unit_done.SyncPop();
-      }
+      } else
 #endif
-      else {
+      {
         matrix_unit_done.SyncPop();
       }
     } else if (auto* dwc_params = get_param<DwCParams>(params, idx)) {
@@ -609,6 +609,18 @@ void Harness::param_sender() {
     std::deque<BaseParams*> accelerator_params;
     map_operation(operation, accelerator_params);
 
+    const auto op_list = get_op_list(param);
+    bool has_csr_outputs = op_list.back().target() == "quantize_mx_outlier";
+
+    const auto outputs = get_op_outputs(param);
+
+    const bool single_pass = contain_matrix_param(accelerator_params) ||
+                             accelerator_params.size() < 4;
+
+    // Max tile index allowed to be in-flight before a synchronization wait is
+    // required.
+    const int sync_threshold = has_csr_outputs ? 0 : 1;
+
     if (is_soc_sim()) {
       const int num_tiles = get_tile_count(param);
       const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
@@ -617,22 +629,33 @@ void Harness::param_sender() {
           offset_param_addresses(accelerator_params, bank_size);
 
       for (int j = 0; j < num_tiles; j++) {
-        if ((contain_matrix_param(accelerator_params) ||
-             accelerator_params.size() < 4) &&
-            j > 1) {
+        if (single_pass && j > sync_threshold) {
           tile_done.SyncPop();
         }
 
+        auto params = j % 2 == 0 ? accelerator_params : params_offseted;
+
+        if (has_csr_outputs) {
+          int csr_tile_start;
+          int csr_tile_end;
+          dataloader->read_csr_tiled_bounds(outputs[2], j - 1, 1,
+                                            csr_tile_start, csr_tile_end);
+
+          for (auto& param : params) {
+            if (auto* cfg = dynamic_cast<VectorInstructionConfig*>(param)) {
+              cfg->outlier_filter.indptr_offset = j > 0 ? csr_tile_end : 0;
+              break;
+            }
+          }
+        }
+
         spdlog::debug("Sending tile {} params\n", j);
-        send_params(j % 2 == 0 ? accelerator_params : params_offseted);
+        send_params(params);
       }
 
       // drain out remaining done signals
-      if (contain_matrix_param(accelerator_params) ||
-          accelerator_params.size() < 4) {
-        tile_done.SyncPop();
-
-        if (num_tiles > 1) {
+      if (single_pass) {
+        for (int j = 0; j < std::min(num_tiles, sync_threshold + 1); j++) {
           tile_done.SyncPop();
         }
       }
@@ -706,6 +729,9 @@ void Harness::done_monitor() {
       const int num_tiles = get_tile_count(param);
       const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
 
+      const bool single_pass = contain_matrix_param(accelerator_params) ||
+                               accelerator_params.size() < 4;
+
       dataloader->load_scratchpad(param, 0, 0);
 
       if (num_tiles > 1) {
@@ -724,8 +750,7 @@ void Harness::done_monitor() {
           dataloader->load_scratchpad(param, j + 2, offset);
         }
 
-        if (contain_matrix_param(accelerator_params) ||
-            accelerator_params.size() < 4) {
+        if (single_pass) {
           tile_done.SyncPush();
         }
       }

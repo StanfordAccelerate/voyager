@@ -218,7 +218,7 @@ void Simulation::run() {
         for (int i = 0; i < num_tiles; i++) {
           dataloader->load_scratchpad(param, i);
 
-          const auto kwargs = dataloader->get_args(param);
+          const auto kwargs = dataloader->get_args(param, i);
           const auto outputs = run_gold_model(operation, kwargs);
 
           assert(outputs.size() == tensors.size());

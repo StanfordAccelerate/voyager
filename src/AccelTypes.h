@@ -533,6 +533,15 @@ struct CsrDataAndIndices {
   static const unsigned int width =
       Pack1D<T, pack_width>::width + Pack1D<Meta, pack_width>::width + 1;
 
+  CsrDataAndIndices()
+      : data(Pack1D<T, pack_width>::zero()),
+        indices(Pack1D<Meta, pack_width>::zero()),
+        is_last(false) {}
+
+  CsrDataAndIndices(Pack1D<T, pack_width> d, Pack1D<Meta, pack_width> i,
+                    bool last)
+      : data(d), indices(i), is_last(last) {}
+
   template <unsigned int Size>
   void Marshall(Marshaller<Size>& m) {
     for (int i = 0; i < pack_width; i++) {
