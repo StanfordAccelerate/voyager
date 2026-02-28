@@ -704,7 +704,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
             return False
 
     # Extract accuracy from log file
-    accuracy_regex = "Accuracy: \d+\/\d+ \((\d+\.+\d+)%\)"
+    accuracy_regex = r"Accuracy: \d+\/\d+ \((\d+\.+\d+)%\)"
     with open(f"{output_folder}/{model}_{dataset}.log", "r") as logfile:
         text = logfile.read()
     final_accuracy = float(re.findall(accuracy_regex, text)[-1])

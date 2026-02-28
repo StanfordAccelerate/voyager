@@ -39,13 +39,17 @@ inline T* slice(std::any input_ptr, const codegen::OpOverload op) {
     return std::any_cast<T*>(input_ptr);
   }
 
-  const auto input = op.kwargs().at("input").tensor();
+  const auto kwargs = op.kwargs();
+
+  const auto input = kwargs.at("input").tensor();
   const auto shape = get_shape(input);
 
-  uint64_t start = op.kwargs().at("start").int_value();
-  uint64_t end = op.kwargs().at("end").int_value();
-  uint64_t step = op.kwargs().at("step").int_value();
-  uint64_t dim = op.kwargs().at("dim").int_value();
+  uint64_t dim = kwargs.at("dim").int_value();
+  uint64_t start =
+      kwargs.contains("start") ? kwargs.at("start").int_value() : 0;
+  uint64_t end =
+      kwargs.contains("end") ? kwargs.at("end").int_value() : shape[dim];
+  uint64_t step = kwargs.contains("step") ? kwargs.at("step").int_value() : 1;
 
   dim = dim < 0 ? dim + shape.size() : dim;
   end = end > shape[dim] ? shape[dim] : end;
