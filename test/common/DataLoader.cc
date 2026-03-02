@@ -254,10 +254,14 @@ void DataLoader::read_csr_tiled_bounds(const codegen::Tensor& tensor,
   std::vector<int> tile_strides = tiled_shape;
   tile_strides.back() -= 1;
 
+  // Offset used by instruction memory
+  const int stack_offset = std::stoi(getenv("SOC_MEM_OFFSET", "0"));
+
   // pick partition and address based on input or output
   const auto loc = scratchpad ? tensor.scratchpad() : tensor.memory();
   const int partition = loc.partition();
-  const uint64_t address = get_address(tensor) + offset;
+  const uint64_t address =
+      loc.address() + offset + (scratchpad ? stack_offset : 0);
 
   int curr_tile_index = tile_index / k_tile;
   auto tiling = get_tiles(full_shape, tiled_shape);
