@@ -257,7 +257,7 @@ void DataLoader::read_csr_tiled_bounds(const codegen::Tensor& tensor,
   // pick partition and address based on input or output
   const auto loc = scratchpad ? tensor.scratchpad() : tensor.memory();
   const int partition = loc.partition();
-  const uint64_t address = loc.address() + offset;
+  const uint64_t address = get_address(tensor) + offset;
 
   int curr_tile_index = tile_index / k_tile;
   auto tiling = get_tiles(full_shape, tiled_shape);

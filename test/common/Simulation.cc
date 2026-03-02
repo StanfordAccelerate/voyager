@@ -259,48 +259,35 @@ int Simulation::check_outputs() {
 
   const auto param = operations.back().param;
 
-  bool has_pytorch = contains(sims, "pytorch");
-  bool has_gold = contains(sims, "gold");
-  bool has_accelerator = contains(sims, "accelerator");
-
-  std::string filename;
-  std::vector<std::any> outputs1, outputs2;
-  std::string name1, name2;
-
-  if (has_gold && has_pytorch) {
-    spdlog::info("Gold Model vs. PyTorch\n");
-    spdlog::info("(reveals issues in data loading or mapping)\n");
-    filename = prefix + "gold_vs_pytorch";
-
-    name1 = "gold_model";
-    outputs1 = dataloaders["gold"]->get_outputs(param);
-
-    name2 = "pytorch";
-    outputs2 = dataloaders["gold"]->get_reference_outputs(param);
-  } else if (has_accelerator && has_pytorch) {
-    spdlog::info("Accelerator vs. PyTorch\n");
-    spdlog::info("(reveals bugs in accelerator or memory placement)\n");
-    filename = prefix + "accelerator_vs_pytorch";
-
-    name1 = "accelerator";
-    outputs1 = dataloaders["accelerator"]->get_outputs(param);
-
-    name2 = "pytorch";
-    outputs2 = dataloaders["accelerator"]->get_reference_outputs(param);
-  } else if (has_accelerator && has_gold) {
-    spdlog::info("Accelerator vs. Gold Model\n");
-    spdlog::info("(reveals bugs in accelerator or memory placement)\n");
-    filename = prefix + "accelerator_vs_gold";
-
-    name1 = "accelerator";
-    outputs1 = dataloaders["accelerator"]->get_outputs(param);
-
-    name2 = "gold_model";
-    outputs2 = dataloaders["gold"]->get_outputs(param);
-  } else {
-    spdlog::info("No valid comparisons specified\n");
-    std::abort();
+  std::vector<std::string> active_sims;
+  for (const auto& name : {"soc", "accelerator", "gold", "pytorch"}) {
+    if (contains(sims, name)) {
+      active_sims.push_back(name);
+    }
   }
+
+  std::string name1 = active_sims[0];
+  std::string name2 = active_sims[1];
+
+  std::vector<std::any> outputs1, outputs2;
+  if (name2 == "pytorch") {
+    outputs1 = dataloaders[name1]->get_outputs(param);
+    outputs2 = dataloaders[name1]->get_reference_outputs(param);
+  } else {
+    outputs1 = dataloaders[name1]->get_outputs(param);
+    outputs2 = dataloaders[name2]->get_outputs(param);
+  }
+
+  std::string filename = prefix + name1 + "_vs_" + name2;
+
+  const std::map<std::string, std::string> SIM_LABELS = {
+      {"pytorch", "PyTorch"},
+      {"gold", "Gold Model"},
+      {"accelerator", "Accelerator"},
+      {"soc", "SoC Simulation"},
+  };
+
+  spdlog::info("{} vs. {}\n", SIM_LABELS.at(name1), SIM_LABELS.at(name2));
 
   double rel_err = 0.0;
   const auto output_tensors = get_op_outputs(param);
@@ -322,10 +309,8 @@ int Simulation::check_outputs() {
   }
 
   for (int i = 0; i < output_tensors.size(); i++) {
-    std::string suffix = ".txt";
-    if (output_tensors.size() > 1) {
-      suffix = "_" + std::to_string(i) + ".txt";
-    }
+    std::string suffix =
+        (output_tensors.size() > 1 ? "_" + std::to_string(i) : "") + ".txt";
 
     const auto full_shape = get_shape(output_tensors[i], true, false);
 
