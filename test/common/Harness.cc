@@ -547,44 +547,6 @@ void Harness::record_done(const std::deque<BaseParams*>& params,
   }
 }
 
-std::deque<BaseParams*> offset_param_addresses(std::deque<BaseParams*> params,
-                                               int offset) {
-  std::deque<BaseParams*> new_params;
-  for (const auto base_param : params) {
-    if (auto* mp = dynamic_cast<MatrixParams*>(base_param)) {
-      auto* param = new MatrixParams(*mp);
-      param->input_offset += offset;
-      param->weight_offset += offset;
-      param->bias_offset += offset;
-      param->input_scale_offset += offset;
-      param->weight_scale_offset += offset;
-      param->output_offset += offset;
-      param->dq_scale_offset += offset;
-      param->dq_zero_point_offset += offset;
-#if SUPPORT_SPMM
-      param->spmm_indices_offset += offset;
-      param->spmm_indptr_offset += offset;
-      param->spmm_data_offset += offset;
-#endif
-      new_params.push_back(param);
-    } else if (auto* vp = dynamic_cast<VectorParams*>(base_param)) {
-      auto* param = new VectorParams(*vp);
-      param->vector_fetch_0_offset += offset;
-      param->vector_fetch_1_offset += offset;
-      param->vector_fetch_2_offset += offset;
-      param->vector_output_offset += offset;
-      param->mx_scale_offset += offset;
-      param->csr_data_offset += offset;
-      param->csr_indices_offset += offset;
-      param->csr_indptr_offset += offset;
-      new_params.push_back(param);
-    } else {
-      new_params.push_back(base_param);
-    }
-  }
-  return new_params;
-}
-
 void Harness::param_sender() {
   matrix_unit_params_in.ResetWrite();
   vector_unit_params_in.ResetWrite();
@@ -625,15 +587,14 @@ void Harness::param_sender() {
       const int num_tiles = get_tile_count(param);
       const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
 
-      auto params_offseted =
-          offset_param_addresses(accelerator_params, bank_size);
+      auto bank_2_params = get_ping_pong_params(accelerator_params, bank_size);
 
       for (int j = 0; j < num_tiles; j++) {
         if (single_pass && j > sync_threshold) {
           tile_done.SyncPop();
         }
 
-        auto params = j % 2 == 0 ? accelerator_params : params_offseted;
+        auto params = j % 2 == 0 ? accelerator_params : bank_2_params;
 
         if (has_csr_outputs) {
           int csr_tile_start;

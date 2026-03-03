@@ -47,3 +47,41 @@ void map_operation(const Operation& operation,
     map_vector_operations(param, mapped_params);
   }
 }
+
+std::deque<BaseParams*> get_ping_pong_params(std::deque<BaseParams*> params,
+                                             int offset) {
+  std::deque<BaseParams*> new_params;
+  for (const auto base_param : params) {
+    if (auto* mp = dynamic_cast<MatrixParams*>(base_param)) {
+      auto* param = new MatrixParams(*mp);
+      param->input_offset += offset;
+      param->weight_offset += offset;
+      param->bias_offset += offset;
+      param->input_scale_offset += offset;
+      param->weight_scale_offset += offset;
+      param->output_offset += offset;
+      param->dq_scale_offset += offset;
+      param->dq_zero_point_offset += offset;
+#if SUPPORT_SPMM
+      param->spmm_indices_offset += offset;
+      param->spmm_indptr_offset += offset;
+      param->spmm_data_offset += offset;
+#endif
+      new_params.push_back(param);
+    } else if (auto* vp = dynamic_cast<VectorParams*>(base_param)) {
+      auto* param = new VectorParams(*vp);
+      param->vector_fetch_0_offset += offset;
+      param->vector_fetch_1_offset += offset;
+      param->vector_fetch_2_offset += offset;
+      param->vector_output_offset += offset;
+      param->mx_scale_offset += offset;
+      param->csr_data_offset += offset;
+      param->csr_indices_offset += offset;
+      param->csr_indptr_offset += offset;
+      new_params.push_back(param);
+    } else {
+      new_params.push_back(base_param);
+    }
+  }
+  return new_params;
+}
