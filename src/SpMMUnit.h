@@ -36,8 +36,9 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   static constexpr double clock_period = 5.0;  // Default to 5 ns if not defined
 #endif
 
-  static constexpr int FEEDBACK_DEPTH = (clock_period < 5) ? 6 : 4;
-  static constexpr int FEEDBACK_LAST = FEEDBACK_DEPTH - 1;
+  static constexpr int FEEDBACK_DELAY =
+      (clock_period < 1 ? 9 : (clock_period < 5 ? 6 : 4));
+  static constexpr int FEEDBACK_LAST = FEEDBACK_DELAY - 1;
 
   static constexpr int NUM_META = port_width / Meta::width;
   static constexpr int NUM_DATA = port_width / Input::width;
@@ -111,6 +112,11 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   Connections::Combinational<Meta> CCS_INIT_S1(process_weight_nnz_enq);
   Connections::Combinational<Meta> CCS_INIT_S1(process_weight_nnz_deq);
 
+  sc_fifo<loop_t> fetch_input_indices_loop_bound;
+  sc_fifo<loop_t> fetch_input_data_loop_bound;
+  sc_fifo<loop_t> fetch_weight_loop_bound;
+  sc_fifo<loop_t> read_weight_scales_loop_bound;
+
   Connections::Out<MemoryRequest> CCS_INIT_S1(input_indices_req);
   Connections::In<ac_int<port_width, false>> CCS_INIT_S1(input_indices_resp);
 
@@ -169,7 +175,11 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   Connections::SyncOut CCS_INIT_S1(start);
   Connections::SyncOut CCS_INIT_S1(done);
 
-  SC_CTOR(SpMMUnit) {
+  SC_CTOR(SpMMUnit)
+      : fetch_input_indices_loop_bound(2),
+        fetch_input_data_loop_bound(2),
+        fetch_weight_loop_bound(2),
+        read_weight_scales_loop_bound(2) {
     params_deserializer.clk(clk);
     params_deserializer.rstn(rstn);
     params_deserializer.serial_params_in(serial_params_in);
@@ -474,6 +484,16 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
               fetch_input_data_end_enq.Push(end_index);
               process_input_data_start_enq.Push(start_index);
               process_input_data_end_enq.Push(end_index);
+
+              loop_t num_meta_packs_bound =
+                  (nnz.int_val + NUM_META - 1) / NUM_META - 1;
+              fetch_input_indices_loop_bound.write(num_meta_packs_bound);
+              fetch_weight_loop_bound.write(num_meta_packs_bound);
+              read_weight_scales_loop_bound.write(num_meta_packs_bound);
+
+              loop_t num_data_packs_bound =
+                  (nnz.int_val + NUM_DATA - 1) / NUM_DATA - 1;
+              fetch_input_data_loop_bound.write(num_data_packs_bound);
               if (loop_counters[1][1] == loop_bounds[1][1]) break;
             }
             if (loop_counters[1][0] == loop_bounds[1][0]) break;
@@ -516,12 +536,10 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
             for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
               Meta start = fetch_input_indices_start_deq.Pop();
               Meta end = fetch_input_indices_end_deq.Pop();
+              loop_t num_packs_bound = fetch_input_indices_loop_bound.read();
 
-              Meta nnz = end - start;
               // the row is entirely empty
-              if (nnz.int_val != 0) {
-                loop_t num_packs_bound =
-                    (nnz.int_val + NUM_META - 1) / NUM_META - 1;
+              if (start != end) {
                 for (loop_t i = 0;; i++) {
                   ac_int<32, false> address = start.int_val + i * NUM_META;
                   send_input_request<Meta, NUM_META>(
@@ -612,14 +630,10 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
             for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
               Meta start = fetch_input_data_start_deq.Pop();
               Meta end = fetch_input_data_end_deq.Pop();
-
-              Meta nnz = end - start;
+              loop_t num_packs_bound = fetch_input_data_loop_bound.read();
 
               // do nothing if the row is entirely empty
-              if (nnz.int_val != 0) {
-                loop_t num_packs_bound =
-                    (nnz.int_val + NUM_DATA - 1) / NUM_DATA - 1;
-
+              if (start != end) {
                 for (loop_t i = 0;; i++) {
                   ac_int<32, false> address = start.int_val + i * NUM_DATA;
                   send_input_request<Input, NUM_DATA>(params.spmm_data_offset,
@@ -720,8 +734,7 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
               loop_t k = k1 * K0 * width + k0 * width;
 
               Meta nnz = fetch_weight_nnz_deq.Pop();
-              loop_t num_packs_bound =
-                  (nnz.int_val + NUM_META - 1) / NUM_META - 1;
+              loop_t num_packs_bound = fetch_weight_loop_bound.read();
 
               // skip if no weights to fetch for this row
               if (nnz.int_val != 0) {
@@ -995,9 +1008,9 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
               loop_t k0 = loop_counters[1][params.weight_loop_idx[1]];
               loop_t x0 = loop_counters[1][params.x_loop_idx[1]];
               loop_t k = k1 * K0 * width + k0 * width;
+
               Meta nnz = read_weight_scale_nnz_deq.Pop();
-              loop_t num_packs_bound =
-                  (nnz.int_val + NUM_META - 1) / NUM_META - 1;
+              loop_t num_packs_bound = read_weight_scales_loop_bound.read();
 
               // skip if no weights to fetch for this row
               if (nnz.int_val != 0) {
@@ -1072,10 +1085,10 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
           for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
             for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
               loop_t nnz_bound = input_indptr_deq.Pop().int_val;
-              Pack1D<Output, width> acc_old[FEEDBACK_DEPTH];
+              Pack1D<Output, width> acc_old[FEEDBACK_DELAY];
 
 #pragma hls_unroll yes
-              for (int i = 0; i < FEEDBACK_DEPTH; i++) {
+              for (int i = 0; i < FEEDBACK_DELAY; i++) {
                 acc_old[i] = Pack1D<Output, width>::zero();
               }
               loop_t input_data_idx = 0;
@@ -1125,9 +1138,9 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
               Pack1D<Output, width> outputs;
 #pragma hls_unroll yes
               for (int i = 0; i < width; i++) {
-                Pack1D<Output, FEEDBACK_DEPTH> col;
+                Pack1D<Output, FEEDBACK_DELAY> col;
 #pragma hls_unroll yes
-                for (int j = 0; j < FEEDBACK_DEPTH; j++) {
+                for (int j = 0; j < FEEDBACK_DELAY; j++) {
                   col[j] = acc_old[j][i];
                 }
                 outputs[i] = add_tree(col);

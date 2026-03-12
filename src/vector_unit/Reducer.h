@@ -17,11 +17,18 @@ SC_MODULE(VectorReducer) {
   Connections::Combinational<VectorInstructions> repeat_inst;
   Connections::Combinational<Pack1D<T, width>> repeat_data;
 
-  static constexpr int N = 2;
-  static constexpr int LAST = N - 1;
+#ifdef CLOCK_PERIOD
+  static constexpr double clock_period = CLOCK_PERIOD;
+#else
+  static constexpr double clock_period = 5.0;  // Default to 5 ns if not defined
+#endif
+
+  static constexpr int FEEDBACK_DELAY = (clock_period < 1) ? 3 : 2;
+  static constexpr int LAST = FEEDBACK_DELAY - 1;
   static constexpr int ratio = VECTOR_UNIT_WIDTH / REDUCER_WIDTH;
 
-  static_assert(N > 0, "Pipeline size N must be greater than 0");
+  static_assert(FEEDBACK_DELAY > 0,
+                "Pipeline size FEEDBACK_DELAY must be greater than 0");
 
   SC_CTOR(VectorReducer) {
     SC_THREAD(run);
@@ -58,7 +65,7 @@ SC_MODULE(VectorReducer) {
         Pack1D<T, width> res;
 
         for (int i = 0; i < width; i++) {
-          auto acc_old = Pack1D<T, N>::fill(fill_value);
+          auto acc_old = Pack1D<T, FEEDBACK_DELAY>::fill(fill_value);
 
           for (decltype(inst.reduce_count) j = 0;; j++) {
             Pack1D<T, width> reduce_input = input.Pop();
