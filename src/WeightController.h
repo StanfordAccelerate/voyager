@@ -364,7 +364,7 @@ struct WeightController<std::tuple<WeightTypes...>, Bias, rows, cols,
       // extra loop to control reuse which only occurs during transpose and
       // when cols > rows
       int transpose_reuse_bound = 1;
-      constexpr int ratio = cols / rows;
+      constexpr int ratio = cols > rows ? cols / rows : 1;
       if (ratio > 1 && params.weight_transpose && C2 >= ratio) {
         // we can reuse the weights already in the buffer
         loop_bounds[0][params.reduction_loop_idx[0]] = C2 / ratio;
