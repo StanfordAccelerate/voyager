@@ -1,0 +1,223 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    runs-on: self-hosted
+    steps:
+      - name: Base Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 3
+          lfs: false
+      - name: Pull Submodules and LFS
+        uses: ./.github/actions/pull-extras 
+      - name: Setup Conda Environment
+        run: |
+          export PATH=$HOME/miniforge3/condabin:$PATH
+          source $(conda info --base)/etc/profile.d/conda.sh
+          
+          ENV_PATH="/sim/github-runner/envs/ci-env-${{ github.run_id }}"
+          conda env create -p $ENV_PATH -f $(pwd)/environment.yml
+          conda env update -p $ENV_PATH -f $(pwd)/utils/hls-tidy-plugin/environment.yml
+          conda activate $ENV_PATH
+          
+          pip uninstall -y interstellar voyager-compiler
+          pip install ./interstellar
+          pip install ./voyager-compiler
+
+  lint:
+    needs: setup
+    runs-on: self-hosted
+    steps:
+      - name: Base Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 3
+          lfs: false
+      
+      - name: Pull Submodules and LFS
+        uses: ./.github/actions/pull-extras
+      
+      - name: Setup Environment
+        uses: ./.github/actions/setup-cad-env
+      
+      - name: Build HLS Checks & Run Clang Tidy
+        run: |
+          source load_env.sh
+          cd utils/hls-tidy-plugin
+          mkdir -p build && cd build
+          CC=clang CXX=clang++ cmake .. -DLLVM_ENABLE_PROJECTS="clang;clang-tools-extra" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          make -j4
+          cd $PROJECT_ROOT
+          
+          make test/compiler/proto/param.pb.cc
+          make test/compiler/proto/tiling.pb.cc
+          
+          # E4M3
+          NETWORK=resnet18 DATATYPE=E4M3 IC_DIMENSION=16 OC_DIMENSION=16 CLOCK_PERIOD=5 TECHNOLOGY=generic compiledb make -n TestRunner-fast
+          clang-tidy "-checks=hls-*,-clang-*" -load=utils/hls-tidy-plugin/build/libCatapultHlsChecks.so -p=$PROJECT_ROOT -header-filter="src/" test/common/Harness.cc > clang_tidy_output_E4M3.txt 2>&1 || true
+          
+          # MXINT8
+          NETWORK=resnet18 DATATYPE=MXINT8 IC_DIMENSION=16 OC_DIMENSION=16 CLOCK_PERIOD=5 TECHNOLOGY=generic compiledb make -n TestRunner-fast
+          clang-tidy "-checks=hls-*,-clang-*" -load=utils/hls-tidy-plugin/build/libCatapultHlsChecks.so -p=$PROJECT_ROOT -header-filter="src/" test/common/Harness.cc > clang_tidy_output_MXINT8.txt 2>&1 || true
+          
+      - name: Generate GitHub PR Annotations
+        run: |
+          source load_env.sh
+          python .github/scripts/clang_tidy_to_github.py clang_tidy_output_E4M3.txt clang_tidy_output_MXINT8.txt
+
+      - name: Upload Raw Lint Logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-logs
+          path: clang_tidy_output_*.txt
+          retention-days: 7
+
+  systemc_simulation:
+    needs: setup
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { type: E4M3,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: P8_1,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: INT8,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: MXINT8, ic: 16, oc: 16, models: "resnet18,mobilebert_encoder,mobilenet_v2", dwc: "true" }
+          - { type: MXNF4,  ic: 64, oc: 64, models: "llama_prefill,llama_prefill_mp,llama_prefill_spmm,llama_decode,llama_decode_kivi,resnet18,resnet50,vit,bert", extra: "CONV2D_IM2COL=1 MAX_TILES=4 CACHE_SIZE=1048576 NUM_BANKS=8 SOC_SIM=1 DOUBLE_BUFFERED_ACCUM_BUFFER=true SUPPORT_MVM=true SUPPORT_SPMM=true" }
+    steps:
+      - name: Base Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 3
+          lfs: false
+      - name: Pull Submodules and LFS
+        uses: ./.github/actions/pull-extras      
+      - uses: ./.github/actions/setup-cad-env
+      - name: Run Regression
+        run: |
+          source load_env.sh          
+          DATATYPE=${{ matrix.type }} IC_DIMENSION=${{ matrix.ic }} OC_DIMENSION=${{ matrix.oc }} CLOCK_PERIOD=5 SUPPORT_DWC=${{ matrix.dwc || 'false' }} ${{ matrix.extra || '' }} python run_regression.py --models ${{ matrix.models }} --sims fast-systemc --num_processes 16 --uniquify_layers --skip_layers
+
+  rtl_simulation:
+    needs: setup
+    if: github.event_name == 'pull_request'
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { type: E4M3,   ic: 32, oc: 64, models: "resnet18,resnet50" }
+          - { type: E4M3,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: E4M3,   ic: 4,  oc: 8,  models: "resnet18,mobilebert_encoder", extra: "INPUT_BUFFER_SIZE=2048" }
+          - { type: P8_1,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: INT8,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: MXINT8, ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
+          - { type: MXNF4,  ic: 64, oc: 64, models: "llama_prefill,llama_prefill_mp,llama_prefill_spmm,llama_decode,llama_decode_kivi,resnet18,resnet50,vit,bert", extra: "CONV2D_IM2COL=1 MAX_TILES=4 CACHE_SIZE=1048576 NUM_BANKS=8 SOC_SIM=1 DOUBLE_BUFFERED_ACCUM_BUFFER=true SUPPORT_MVM=true SUPPORT_SPMM=true" }
+    steps:
+      - name: Base Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 3
+          lfs: false
+      - name: Pull Submodules and LFS
+        uses: ./.github/actions/pull-extras
+      - uses: ./.github/actions/setup-cad-env
+      - name: Run RTL Regression
+        run: |
+          source load_env.sh
+          DATATYPE=${{ matrix.type }} IC_DIMENSION=${{ matrix.ic }} OC_DIMENSION=${{ matrix.oc }} TECHNOLOGY=generic CLOCK_PERIOD=5 ${{ matrix.extra || '' }} python run_regression.py --models ${{ matrix.models }} --sims rtl --num_processes 16 --uniquify_layers --skip_layers
+
+      - name: Upload Regression Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: regression-results-${{ matrix.type }}-${{ matrix.ic }}x${{ matrix.oc }}
+          path: regression_results/latest/test_results.pkl
+          retention-days: 7
+
+  accuracy:
+    needs: setup
+    if: github.event_name == 'pull_request'
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ViT
+          - { model: vit, dataset: imagenet, type: CFLOAT }
+          - { model: vit, dataset: imagenet, type: INT8 }
+          - { model: vit, dataset: imagenet, type: MXINT8 }
+          # ResNet18
+          - { model: resnet18, dataset: imagenet, type: CFLOAT }
+          - { model: resnet18, dataset: imagenet, type: E4M3 }
+          - { model: resnet18, dataset: imagenet, type: INT8 }
+          - { model: resnet18, dataset: imagenet, type: MXINT8 }
+          # MobileBERT
+          - { model: mobilebert, dataset: sst2, type: CFLOAT }
+          - { model: mobilebert, dataset: sst2, type: E4M3 }
+          - { model: mobilebert, dataset: sst2, type: INT8 }
+          - { model: mobilebert, dataset: sst2, type: MXINT8 }
+    steps:
+      - name: Base Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 3
+          lfs: false
+      - name: Pull Submodules and LFS
+        uses: ./.github/actions/pull-extras
+      - uses: ./.github/actions/setup-cad-env
+      - name: Run Accuracy
+        run: |
+          source load_env.sh
+          DATATYPE=${{ matrix.type }} IC_DIMENSION=16 OC_DIMENSION=16 python run_regression.py --models ${{ matrix.model }} --dataset ${{ matrix.dataset }} --sims accuracy --num_processes 16
+
+  check_results:
+    needs: rtl_simulation
+    if: github.event_name == 'pull_request'
+    runs-on: self-hosted
+    steps:
+      - name: Base Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 3
+          lfs: false
+      - name: Pull Submodules and LFS
+        uses: ./.github/actions/pull-extras
+      - name: Setup Python
+        run: |
+          export PATH=$HOME/miniforge3/bin:$PATH
+          pip install pandas requests
+      - name: Run Check Pull Request Script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          export PATH=$HOME/miniforge3/bin:$PATH
+          python .github/scripts/check_pull_request.py
+
+  cleanup:
+    needs: [systemc_simulation, rtl_simulation, accuracy, check_results]
+    if: always()
+    runs-on: self-hosted
+    steps:
+      - name: Remove Conda Env
+        run: |
+          rm -rf /sim/github-runner/envs/ci-env-${{ github.run_id }}

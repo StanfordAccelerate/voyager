@@ -1,0 +1,32 @@
+name: 'Setup CAD & Conda Environment'
+description: 'Generates a sourceable script to load CAD modules and conda'
+runs:
+  using: "composite"
+  steps:
+    - name: Generate Environment Wrapper Script
+      shell: bash
+      run: |
+        cat << 'EOF' > load_env.sh
+
+        if [ -f /etc/profile.d/modules.sh ]; then
+          source /etc/profile.d/modules.sh
+        elif [ -f /etc/profile.d/lmod.sh ]; then
+          source /etc/profile.d/lmod.sh
+        fi
+
+        eval `modulecmd bash load base catapult/2024.2_2 vcs/T-2022.06-SP2 verdi/S-2021.09-SP1 dc_shell/U-2022.12-SP1`
+        export VG_GNU_PACKAGE=/cad/synopsys/vcs_gnu_package/S-2021.09/gnu_9/linux
+        source /cad/synopsys/vcs_gnu_package/S-2021.09/gnu_9/linux/source_me.sh
+        export LD_LIBRARY_PATH=/cad/mentor/2024.2_2/Mgc_home/lib:/cad/mentor/2024.2_2/Mgc_home/shared/lib:$LD_LIBRARY_PATH
+        
+        # Conda Setup
+        export PATH=$HOME/miniforge3/condabin:$PATH
+        source $(conda info --base)/etc/profile.d/conda.sh
+        conda activate /sim/github-runner/envs/ci-env-${{ github.run_id }}
+        
+        # Variables
+        export PROJECT_ROOT=$(pwd)
+        export CODEGEN_DIR=test/compiler
+        EOF
+        
+        chmod +x load_env.sh
