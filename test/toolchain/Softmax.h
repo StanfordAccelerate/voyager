@@ -2,13 +2,23 @@
 
 #include "test/toolchain/Common.h"
 
-void map_softmax(const codegen::Operation& param,
+void map_softmax(const voyager::Operation& operation, const ScalarEnv& env,
                  std::deque<BaseParams*>& mapped_params) {
-  const auto op_list = get_op_list(param);
-  const auto softmax_op = op_list[0];
+  const auto& op_list = get_prim_ops(operation);
+  const auto& softmax_op = get_anchor_op(operation);
 
-  const auto input = softmax_op.kwargs().at("input").tensor();
-  const auto output = get_op_outputs(param).back();
+  const Tensor& anchor_input = resolve(softmax_op, "input", env);
+  const voyager::PrimOp* input_producer =
+      get_fused_producer(operation, env, anchor_input);
+  const voyager::PrimOp* dequantize_op =
+      input_producer != nullptr &&
+              strip_namespace(input_producer->target()) == "dequantize"
+          ? input_producer
+          : nullptr;
+  const Tensor& input = dequantize_op == nullptr
+                            ? anchor_input
+                            : resolve(*dequantize_op, "input", env);
+  const auto output = resolve_outputs(operation, env).back();
 
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
@@ -29,7 +39,7 @@ void map_softmax(const codegen::Operation& param,
 
   const int packing_factor = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
-  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype);
   int input_dtype_width = get_type_width<VU_INPUT_TYPES>(input_dtype);
   int input_fetch_width = OC_DIMENSION * input_dtype_width;
 
@@ -37,10 +47,11 @@ void map_softmax(const codegen::Operation& param,
   int vector_dtype_width = get_type_width<VU_INPUT_TYPES>(vector_dtype);
   int vector_fetch_width = OC_DIMENSION * vector_dtype_width;
 
-  const int max_scratch_memory =
-      get_address(input) + input_size * input_dtype_width / 8;
-  const int sum_scratch_memory =
-      max_scratch_memory + reduced_size * OC_DIMENSION * vector_dtype_width / 8;
+  // The compiler reserves the scratchpad the two reduction passes stage their
+  // results in, so these are read off the operation. Deriving them from the
+  // input tile instead would land inside the input's own second bank.
+  const int max_scratch_memory = get_address(resolve(softmax_op, "max", env));
+  const int sum_scratch_memory = get_address(resolve(softmax_op, "sum", env));
 
   // ----------------------------------------------------------------------------
   // Pass 1: Calculate max and subtract max from tensor
@@ -91,7 +102,7 @@ void map_softmax(const codegen::Operation& param,
   inst1.inst_loop_count = input_size / VECTOR_UNIT_WIDTH;
   inst1.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst1.vdest = VectorInstructions::to_reduce;
-  set_dequantize_scale(input, inst1);
+  set_dequantize_scale(dequantize_op, env, inst1);
   vector_instruction_config->inst[1] = inst1;
 
   vector_instruction_config->num_inst = 2;
@@ -173,7 +184,7 @@ void map_softmax(const codegen::Operation& param,
   inst3.vector_op0 = VectorInstructions::op0_sub;
   inst3.vector_op1 = VectorInstructions::op1_exp;
   inst3.vdest = VectorInstructions::to_reduce;
-  set_dequantize_scale(input, inst3);
+  set_dequantize_scale(dequantize_op, env, inst3);
   vector_instruction_config->inst[1] = inst3;
 
   vector_instruction_config->num_inst = 2;
@@ -243,7 +254,7 @@ void map_softmax(const codegen::Operation& param,
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
@@ -263,8 +274,9 @@ void map_softmax(const codegen::Operation& param,
   inst4.vector_op1 = VectorInstructions::op1_exp;
   inst4.vector_op2 = VectorInstructions::op2_mul;
   inst4.vdest = VectorInstructions::to_output;
-  set_dequantize_scale(input, inst4);
-  set_quantize_params(param, vector_params, inst4, vector_instruction_config);
+  set_dequantize_scale(dequantize_op, env, inst4);
+  set_quantize_params(operation, env, vector_params, inst4,
+                      vector_instruction_config, mapped_params);
   vector_instruction_config->inst[0] = inst4;
 
   vector_instruction_config->num_inst = 1;

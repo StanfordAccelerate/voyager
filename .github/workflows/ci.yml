@@ -32,8 +32,7 @@ jobs:
           conda env update -p $ENV_PATH -f $(pwd)/utils/hls-tidy-plugin/environment.yml
           conda activate $ENV_PATH
           
-          pip uninstall -y interstellar voyager-compiler
-          pip install ./interstellar
+          pip uninstall -y voyager-compiler
           pip install ./voyager-compiler
 
   lint:
@@ -62,8 +61,7 @@ jobs:
           make -j4
           cd $PROJECT_ROOT
           
-          make test/compiler/proto/param.pb.cc
-          make test/compiler/proto/tiling.pb.cc
+          make test/compiler/proto/voyager_ir.pb.cc
           
           # E4M3
           NETWORK=resnet18 DATATYPE=E4M3 IC_DIMENSION=16 OC_DIMENSION=16 CLOCK_PERIOD=5 TECHNOLOGY=generic compiledb make -n TestRunner-fast
@@ -92,11 +90,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { type: E4M3,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: P8_1,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: INT8,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: MXINT8, ic: 16, oc: 16, models: "resnet18,mobilebert_encoder,mobilenet_v2", dwc: "true" }
-          - { type: MXNF4,  ic: 64, oc: 64, models: "llama_prefill,llama_prefill_mp,llama_prefill_spmm,llama_decode,llama_decode_kivi,resnet18,resnet50,vit,bert", extra: "CONV2D_IM2COL=1 MAX_TILES=4 CACHE_SIZE=1048576 NUM_BANKS=8 SOC_SIM=1 DOUBLE_BUFFERED_ACCUM_BUFFER=true SUPPORT_MVM=true SUPPORT_SPMM=true" }
+          - { type: E4M3,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: P8_1,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: INT8,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: MXINT8, ic: 16, oc: 16, models: "resnet18,mobilebert_encoder,mobilenet_v2", dwc: "true", extra: "CONV2D_IM2COL=1" }
+          - { type: MXNF4,  ic: 64, oc: 64, models: "llama_prefill,llama_prefill_mp,llama_prefill_spmm,llama_decode,llama_decode_kivi,resnet18,resnet50,vit,bert", extra: "CONV2D_IM2COL=1 MAX_TILES=4 SCRATCHPAD_SIZE=2097152 NUM_BANKS=16 SOC_SIM=1 DOUBLE_BUFFERED_ACCUM_BUFFER=true SUPPORT_MVM=true SUPPORT_SPMM=true" }
     steps:
       - name: Base Checkout
         uses: actions/checkout@v4
@@ -120,13 +118,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { type: E4M3,   ic: 32, oc: 64, models: "resnet18,resnet50" }
-          - { type: E4M3,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: E4M3,   ic: 4,  oc: 8,  models: "resnet18,mobilebert_encoder", extra: "INPUT_BUFFER_SIZE=2048" }
-          - { type: P8_1,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: INT8,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: MXINT8, ic: 16, oc: 16, models: "resnet18,mobilebert_encoder" }
-          - { type: MXNF4,  ic: 64, oc: 64, models: "llama_prefill,llama_prefill_mp,llama_prefill_spmm,llama_decode,llama_decode_kivi,resnet18,resnet50,vit,bert", extra: "CONV2D_IM2COL=1 MAX_TILES=4 CACHE_SIZE=1048576 NUM_BANKS=8 SOC_SIM=1 DOUBLE_BUFFERED_ACCUM_BUFFER=true SUPPORT_MVM=true SUPPORT_SPMM=true" }
+          - { type: E4M3,   ic: 32, oc: 64, models: "resnet18,resnet50", extra: "CONV2D_IM2COL=1" }
+          - { type: E4M3,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: E4M3,   ic: 4,  oc: 8,  models: "resnet18,mobilebert_encoder", extra: "INPUT_BUFFER_SIZE=2048 CONV2D_IM2COL=1" }
+          - { type: P8_1,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: INT8,   ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: MXINT8, ic: 16, oc: 16, models: "resnet18,mobilebert_encoder", extra: "CONV2D_IM2COL=1" }
+          - { type: MXNF4,  ic: 64, oc: 64, models: "llama_prefill,llama_prefill_mp,llama_prefill_spmm,llama_decode,llama_decode_kivi,resnet18,resnet50,vit,bert", extra: "CONV2D_IM2COL=1 MAX_TILES=4 SCRATCHPAD_SIZE=2097152 NUM_BANKS=16 SOC_SIM=1 DOUBLE_BUFFERED_ACCUM_BUFFER=true SUPPORT_MVM=true SUPPORT_SPMM=true" }
     steps:
       - name: Base Checkout
         uses: actions/checkout@v4

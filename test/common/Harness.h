@@ -10,14 +10,16 @@
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
 #include "test/common/AccessCounter.h"
-#include "test/common/DataLoader.h"
-#include "test/common/Network.h"
+#include "test/common/ArrayMemory.h"
+#include "test/common/Backend.h"
+#include "test/common/Interpreter.h"
+#include "test/common/Model.h"
 #include "test/common/Utils.h"
 
 #ifndef CFLOAT
 #include "Accelerator.h"
 
-SC_MODULE(Harness) {
+struct Harness : public sc_module, public Backend {
   sc_clock CCS_INIT_S1(clk);
   sc_signal<bool> CCS_INIT_S1(rstn);
 
@@ -244,18 +246,34 @@ SC_MODULE(Harness) {
   Connections::SyncChannel CCS_INIT_S1(vector_unit_start);
   Connections::SyncChannel CCS_INIT_S1(vector_unit_done);
 
-  Connections::SyncChannel CCS_INIT_S1(tile_done);
-  Connections::SyncChannel CCS_INIT_S1(operation_done);
-
-  std::deque<sc_time> start_times;
-  std::deque<sc_time> operation_start_times;
-
-  Harness(sc_module_name, std::vector<Operation>, DataLoader*);
+  Harness(sc_module_name name, const Model& model,
+          const Model::Selection& selection, MemoryInterface* memory);
   SC_HAS_PROCESS(Harness);
 
+  // Backend: run one accelerator operation on the DUT.
+  void execute(const voyager::Operation& op, const ScalarEnv& env) override;
+
+  // Backend: asynchronous commits. The walk pushes a commit's params and moves
+  // on -- the units' double-buffered controllers start fetching the next
+  // tile's operands while the current tile computes -- and two threads pace
+  // the start/done handshakes. wait_semaphore blocks the walk until the
+  // completion thread posts, which is the back-pressure that keeps the walk at
+  // most one ping-pong slot ahead of the hardware.
+  bool is_committed_async() const override { return true; }
+  void begin_commit() override;
+  void end_commit(bool has_post, const std::string& post_node,
+                  int64_t post_slot, int64_t post_amount) override;
+  void init_semaphore(const std::string& node, int64_t slot,
+                      int64_t value) override;
+  void post_semaphore(const std::string& node, int64_t slot,
+                      int64_t amount) override;
+  void wait_semaphore(const std::string& node, int64_t slot,
+                      int64_t amount) override;
+
  private:
-  std::vector<Operation> operations;
-  DataLoader* dataloader;
+  const Model& model;
+  Model::Selection selection;
+  MemoryInterface* memory;
   AccessCounter* access_counter;
 
 #ifdef SIM_Accelerator
@@ -266,18 +284,18 @@ SC_MODULE(Harness) {
 
   template <int width>
   void process_read_request(
-      Connections::Combinational<MemoryRequest> * request_out,
-      sc_fifo<ac_int<width, false>> * data_fifo);
+      Connections::Combinational<MemoryRequest>* request_out,
+      sc_fifo<ac_int<width, false>>* data_fifo);
 
   template <int width>
   void send_data_response(
-      sc_fifo<ac_int<width, false>> * data_fifo,
-      Connections::Combinational<ac_int<width, false>> * response);
+      sc_fifo<ac_int<width, false>>* data_fifo,
+      Connections::Combinational<ac_int<width, false>>* response);
 
   template <int width>
   void process_write_request(
-      Connections::Combinational<ac_int<width, false>> * data_out,
-      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> * address_out);
+      Connections::Combinational<ac_int<width, false>>* data_out,
+      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out);
 
   void read_matrix_unit_input_request();
   void send_matrix_unit_input_response();
@@ -352,14 +370,62 @@ SC_MODULE(Harness) {
   void store_sparse_tensor_output();
 
   void reset();
-  void param_sender();
-  void start_monitor();
-  void done_monitor();
 
-  void send_params(const std::deque<BaseParams*>& params);
-  void record_start(const std::deque<BaseParams*>& params,
-                    const Operation& operation, bool is_first);
-  void record_done(const std::deque<BaseParams*>& params,
-                   const Operation& operation, bool is_last);
+  // One params group in flight: which units it started, and what to do when
+  // it retires. A group with no units is a commit's post token -- it rides
+  // the queues behind the commit's groups so the post fires only after every
+  // group ahead of it has retired.
+  struct InvocationGroup {
+    bool matrix = false;
+    bool matrix_vector = false;
+    bool spmm = false;
+    bool dwc = false;
+    bool vector = false;
+    // Set on the first / last group of an operation, for the per-op logging
+    // and access summary. start_time is filled in by release_starts on the
+    // op_end group.
+    const voyager::Operation* op_begin = nullptr;
+    const voyager::Operation* op_end = nullptr;
+    sc_time start_time;
+    bool has_post = false;
+    std::string post_node;
+    int64_t post_slot = 0;
+    int64_t post_amount = 0;
+  };
+
+  // A counting semaphore the walk can block on while another thread posts.
+  struct SyncSemaphore {
+    int64_t count = 0;
+    sc_event posted;
+  };
+
+  std::map<std::pair<std::string, int64_t>, SyncSemaphore> sync_semaphores;
+  std::deque<InvocationGroup> start_queue;
+  std::deque<InvocationGroup> done_queue;
+  sc_event start_pushed;
+  sc_event done_pushed;
+  sc_event group_retired;
+  sc_time op_release_time;
+  long pending_groups = 0;
+  bool in_commit = false;
+
+  // Serialize one operation's params to the units and queue its invocation
+  // groups; does not wait for them to execute.
+  void dispatch_params(const voyager::Operation& op,
+                       const std::deque<BaseParams*>& params);
+
+  // Block the walk until every queued group has retired.
+  void drain();
+
+  // The thread that drives the DUT: it walks the graph exactly as the gold
+  // model does -- same loops, same conditionals, same DMAs -- and dispatches
+  // each accelerator operation through execute() above. Two companion threads
+  // pace the handshakes so consecutive tiles overlap in the datapath.
+  void run_walker();
+  void release_starts();
+  void retire_dones();
 };
+
+void run_accelerator(const Model& model, const Model::Selection& selection,
+                     MemoryInterface* memory);
 #endif

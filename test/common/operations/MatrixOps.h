@@ -313,18 +313,18 @@ template <typename Input, typename Weight, typename Psum, typename Buffer,
           typename Scale>
 inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
                     std::any weight_ptr, std::any weight_scale_ptr,
-                    std::any bias_ptr, const Operation& operation) {
-  Tiling tiling = get_tiling(operation);
+                    std::any bias_ptr, const voyager::Operation& operation,
+                    const ScalarEnv& env) {
+  Tiling tiling = get_tiling(operation, env);
 
   std::ostringstream oss;
   oss << "GEMM Tiling: " << tiling << std::endl;
   spdlog::debug(oss.str());
 
-  const auto op_list = get_op_list(operation.param);
-  const auto matrix_op = op_list.front();
+  const auto& matrix_op = get_anchor_op(operation);
 
   bool is_mx = matrix_op.target().find("mx") != std::string::npos;
-  int block_size = is_mx ? matrix_op.kwargs().at("block_size").int_value() : 0;
+  int block_size = is_mx ? arg_int(matrix_op, "block_size", env) : 0;
   bool fused_spmm = has_fused_spmm(matrix_op);
 
   return gemm<Input, Weight, Psum, Buffer, Scale>(
@@ -336,18 +336,19 @@ template <typename Input, typename Weight, typename Psum, typename Output,
           typename Scale, int N>
 inline Output* gemv_quantized(std::any input_ptr, std::any input_scale_ptr,
                               std::any weight_ptr, std::any weight_scale_ptr,
-                              std::any bias_ptr, const Operation& operation) {
+                              std::any bias_ptr,
+                              const voyager::Operation& operation,
+                              const ScalarEnv& env) {
   spdlog::debug("Performing matrix-vector multiply\n");
 
-  const auto op_list = get_op_list(operation.param);
-  const auto matrix_op = op_list.front();
+  const auto& matrix_op = get_anchor_op(operation);
 
-  const auto input = matrix_op.kwargs().at("input").tensor();
-  const auto output = get_op_outputs(operation.param).back();
+  const auto input = resolve(matrix_op, "input", env);
+  const auto output = resolve_outputs(operation, env).back();
 
   int block_size = 1;
-  if (matrix_op.kwargs().contains("block_size")) {
-    block_size = matrix_op.kwargs().at("block_size").int_value();
+  if (has_arg(matrix_op, "block_size")) {
+    block_size = arg_int(matrix_op, "block_size", env);
   }
 
   int C = get_size(input);
@@ -427,8 +428,11 @@ template <typename T>
 inline T* gemv_bfloat16(std::any input_ptr, std::any weight_ptr,
                         std::any bias_ptr,
                         const std::vector<int>& weight_shape) {
-  const int K = weight_shape[0];
-  const int C = weight_shape[1];
+  if (weight_shape.size() < 2) {
+    throw std::runtime_error("MVM weight must have at least two dimensions.");
+  }
+  const int K = weight_shape[weight_shape.size() - 2];
+  const int C = weight_shape.back();
 
   T* inputs = std::any_cast<T*>(input_ptr);
   T* weights = std::any_cast<T*>(weight_ptr);
@@ -443,15 +447,18 @@ inline T* gemv_bfloat16(std::any input_ptr, std::any weight_ptr,
     T sums[2] = {0, 0};
     int index = 0;
 
-    for (int i = 0; i < C; i += VECTOR_UNIT_WIDTH) {
-      T buffer[VECTOR_UNIT_WIDTH];
-      for (int j = 0; j < VECTOR_UNIT_WIDTH; j++) {
+    // Model the vector-unit reducer exactly: REDUCER_WIDTH-wide beats through
+    // the single-rounding fused add tree, accumulated in two interleaved
+    // registers (the reducer's feedback delay), as LayerNorm and Softmax do.
+    for (int i = 0; i < C; i += REDUCER_WIDTH) {
+      T buffer[REDUCER_WIDTH];
+      for (int j = 0; j < REDUCER_WIDTH; j++) {
         buffer[j] = inputs[i + j] * weights[k * C + i + j];
       }
-      sums[index++ % 2] += tree_reduce(buffer, VECTOR_UNIT_WIDTH);
+      sums[index++ % 2] += fused_tree_reduce<REDUCER_WIDTH>(buffer);
     }
 
-    outputs[k] = tree_reduce(sums, 2);
+    outputs[k] = fused_tree_reduce<2>(sums);
 
     if (biases != nullptr) {
       outputs[k] += biases[k];
@@ -475,35 +482,40 @@ template <typename Input, typename Psum, typename Buffer, typename Scale>
 // Buffer: output type
 inline Buffer* DwC(std::any input_ptr, std::any input_scale_ptr,
                    std::any weight_ptr, std::any weight_scale_ptr,
-                   std::any bias_ptr, const Operation& operation) {
+                   std::any bias_ptr, const voyager::Operation& operation,
+                   const ScalarEnv& env) {
   std::vector<int> BUFFER_DIM = {2, 9, 9};  // IC, X, Y
 
-  const auto param = operation.param;
-  const auto op_list = get_op_list(param);
-  const auto first_op = op_list.front();
-  bool is_mx = first_op.target().find("mx") != std::string::npos;
-  int block_size = is_mx ? first_op.kwargs().at("block_size").int_value() : 0;
+  const auto& op_list = get_prim_ops(operation);
+  const auto& first_op = *op_list.front();
+  bool is_mx =
+      strip_namespace(first_op.target()).find("mx") != std::string::npos;
+  int block_size = is_mx ? arg_int(first_op, "block_size", env) : 0;
 
-  const auto& stride_vals = first_op.kwargs().at("stride").int_list().values();
+  const auto& stride_vals = arg_ints(first_op, "stride", env);
   int stride_y = stride_vals[0];
   int stride_x = stride_vals[1];
 
-  int ibatch = first_op.kwargs().at("input").tensor().shape(0);
-  int ic = first_op.kwargs().at("input").tensor().shape(3);
-  int iy = first_op.kwargs().at("input").tensor().shape(1);  // input height
-  int ix = first_op.kwargs().at("input").tensor().shape(2);  // input weight
+  const auto input = resolve(first_op, "input", env);
+  const auto weight = resolve(first_op, "weight", env);
+  const auto padding = arg_ints(first_op, "padding", env);
 
-  int k_h = first_op.kwargs().at("weight").tensor().shape(2);
-  int k_w = first_op.kwargs().at("weight").tensor().shape(3);
+  int ibatch = input.shape[0];
+  int iy = input.shape[1];  // input height
+  int ix = input.shape[2];  // input weight
+  int ic = input.shape[3];
+
+  int k_h = weight.shape[2];
+  int k_w = weight.shape[3];
   int kernel_size = 3;
 
-  int x_pad = first_op.kwargs().at("padding").int_list().values()[1];
-  int y_pad = first_op.kwargs().at("padding").int_list().values()[0];
+  int y_pad = padding[0];
+  int x_pad = padding[1];
 
   int obatch = 1;
   int oc = ic;
-  int ox = floor((ix + 2 * x_pad - kernel_size) / stride_x) + 1;
   int oy = floor((iy + 2 * y_pad - kernel_size) / stride_y) + 1;
+  int ox = floor((ix + 2 * x_pad - kernel_size) / stride_x) + 1;
 
   Buffer* outputs = new Buffer[obatch * oc * ox * oy];
   Input* inputs = std::any_cast<Input*>(input_ptr);

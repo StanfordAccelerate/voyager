@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "src/datatypes/DataTypes.h"
+#include "test/common/GraphUtils.h"
 #include "test/common/Utils.h"
-#include "test/compiler/proto/param.pb.h"
 
 template <typename Input, typename Scale>
 Input* quantize(std::any input, std::any scale, std::vector<int> shape) {
@@ -16,8 +16,13 @@ Input* quantize(std::any input, std::any scale, std::vector<int> shape) {
 
   Input* outputs = new Input[size];
 
+  // A scalar quantize reaches the hardware as a multiply by a reciprocal
+  // immediate (set_vector_immediate), not as a division, and the two round
+  // differently. Mirror the immediate, as the elementwise div already does.
+  const Input inv_scale = 1.0 / (*scales);
+
   for (int i = 0; i < size; i++) {
-    outputs[i] = inputs[i] / (*scales);
+    outputs[i] = inputs[i] * inv_scale;
   }
 
   delete[] inputs;
@@ -117,8 +122,12 @@ Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
     }
 
     int flat_idx_b = get_flat_index(indices_b, scale_shape);
-    Input inv_scale = static_cast<Input>(scales[flat_idx_b]).reciprocal();
-    outputs[i] = inputs[i] * inv_scale;
+    const Input block_scale = static_cast<Input>(scales[flat_idx_b]);
+    // A zero scale needs no special case: reciprocal() saturates rather than
+    // returning an infinity, so an all-zero block still quantizes to zero and
+    // a block whose scale underflowed the scale type saturates. The hardware
+    // divides by whatever the scale pass stored, and does the same.
+    outputs[i] = inputs[i] * block_scale.reciprocal();
   }
 
   delete[] inputs;
@@ -128,8 +137,8 @@ Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
 
 template <typename Input, typename Output>
 bool dequantize(std::any input, std::any scale, Output*& output,
-                codegen::Tensor tensor) {
-  if (tensor.dtype() != DataTypes::TypeName<Input>::name()) {
+                Tensor tensor) {
+  if (tensor.dtype != DataTypes::TypeName<Input>::name()) {
     return false;
   }
 
@@ -150,27 +159,25 @@ bool dequantize(std::any input, std::any scale, Output*& output,
 }
 
 template <typename Output, typename... Ts>
-Output* dequantize_helper(std::any input, std::any scale,
-                          codegen::Tensor tensor) {
+Output* dequantize_helper(std::any input, std::any scale, Tensor tensor) {
   Output* output = nullptr;
   bool matched = (dequantize<Ts, Output>(input, scale, output, tensor) || ...);
   if (!matched) {
-    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
   }
   return output;
 }
 
 template <typename Output>
-Output* dequantize_tensor(std::any input, std::any scale,
-                          codegen::Tensor tensor) {
+Output* dequantize_tensor(std::any input, std::any scale, Tensor tensor) {
   return dequantize_helper<Output, SUPPORTED_TYPES>(input, scale, tensor);
 }
 
 template <typename Input, typename Scale, typename Vector, typename Output>
 bool dequantize_group(std::any input, std::any scale, std::any zero_point,
-                      Output*& output, codegen::Tensor tensor, int block_size,
+                      Output*& output, Tensor tensor, int block_size,
                       int axis) {
-  if (tensor.dtype() != DataTypes::TypeName<Input>::name()) {
+  if (tensor.dtype != DataTypes::TypeName<Input>::name()) {
     return false;
   }
 
@@ -228,7 +235,7 @@ bool dequantize_group(std::any input, std::any scale, std::any zero_point,
 
 template <typename Output, typename Scale, typename Vector, typename... Ts>
 Output* dequantize_group_helper(std::any input, std::any scale,
-                                std::any zero_point, codegen::Tensor tensor,
+                                std::any zero_point, Tensor tensor,
                                 int block_size, int axis) {
   Output* output = nullptr;
   bool matched =
@@ -236,14 +243,14 @@ Output* dequantize_group_helper(std::any input, std::any scale,
            input, scale, zero_point, output, tensor, block_size, axis) ||
        ...);
   if (!matched) {
-    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
   }
   return output;
 }
 
 template <typename Output, typename Scale, typename Vector>
 Output* dequantize_tensor_group(std::any input, std::any scale,
-                                std::any zero_point, codegen::Tensor tensor,
+                                std::any zero_point, Tensor tensor,
                                 int block_size, int axis) {
   return dequantize_group_helper<Output, Scale, Vector, SUPPORTED_TYPES>(
       input, scale, zero_point, tensor, block_size, axis);

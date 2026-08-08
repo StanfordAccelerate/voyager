@@ -62,10 +62,11 @@ inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
 }
 
 template <typename T>
-inline T* pad_tensor(std::any input_ptr, const codegen::OpOverload op) {
-  const auto input = op.kwargs().at("input").tensor();
+inline T* pad_tensor(std::any input_ptr, const voyager::PrimOp& op,
+                     const ScalarEnv& env) {
+  const auto input = resolve(op, "input", env);
   const auto input_shape = get_shape(input);
-  const auto pad_list = op.kwargs().at("pad").int_list().values();
+  const auto pad_list = arg_ints(op, "pad", env);
   std::vector<int> pad_list_vector(pad_list.begin(), pad_list.end());
   // const auto pad_amount = pad_list[pad_list.size() - 1];
 
@@ -103,21 +104,22 @@ inline T* permute(std::any input_ptr, const std::vector<int>& shape,
 }
 
 template <typename T>
-inline T* permute(std::any input_ptr, const codegen::OpOverload op) {
-  if (op.target() == "permute") {
-    const auto input = op.kwargs().at("input").tensor();
+inline T* permute(std::any input_ptr, const voyager::PrimOp& op,
+                  const ScalarEnv& env) {
+  if (strip_namespace(op.target()) == "permute") {
+    const auto input = resolve(op, "input", env);
     const auto input_shape = get_shape(input);
 
-    const auto dims = op.kwargs().at("dims").int_list().values();
+    const auto dims = arg_ints(op, "dims", env);
     std::vector<int> dims_vector(dims.begin(), dims.end());
 
     return permute<T>(input_ptr, input_shape, dims_vector);
-  } else if (op.target() == "transpose") {
-    const auto input = op.kwargs().at("input").tensor();
+  } else if (strip_namespace(op.target()) == "transpose") {
+    const auto input = resolve(op, "input", env);
     const auto input_shape = get_shape(input);
 
-    const int dim0 = op.kwargs().at("dim0").int_value();
-    const int dim1 = op.kwargs().at("dim1").int_value();
+    const int dim0 = arg_int(op, "dim0", env);
+    const int dim1 = arg_int(op, "dim1", env);
 
     std::vector<int> dims_vector;
     for (int i = 0; i < input_shape.size(); ++i) {
@@ -130,6 +132,48 @@ inline T* permute(std::any input_ptr, const codegen::OpOverload op) {
   }
 
   return std::any_cast<T*>(input_ptr);
+}
+
+template <typename T>
+inline T* expand(std::any input_ptr, const std::vector<int>& input_shape,
+                 const std::vector<int>& sizes) {
+  T* inputs = std::any_cast<T*>(input_ptr);
+
+  // Align the input shape to the expanded rank from the right, the way
+  // broadcasting does.
+  std::vector<int> aligned(sizes.size(), 1);
+  const int offset = sizes.size() - input_shape.size();
+  for (size_t i = 0; i < input_shape.size(); ++i) {
+    aligned[offset + i] = input_shape[i];
+  }
+
+  // A -1 keeps the input's dimension.
+  std::vector<int> output_shape(sizes);
+  for (size_t i = 0; i < output_shape.size(); ++i) {
+    if (output_shape[i] == -1) output_shape[i] = aligned[i];
+  }
+
+  const int size = get_size(output_shape);
+  T* outputs = new T[size];
+
+  for (int i = 0; i < size; ++i) {
+    std::vector<int> indices = get_indices(i, output_shape);
+    for (size_t d = 0; d < indices.size(); ++d) {
+      if (aligned[d] == 1) indices[d] = 0;
+    }
+    outputs[i] = inputs[get_flat_index(indices, aligned)];
+  }
+
+  delete[] inputs;
+
+  return outputs;
+}
+
+template <typename T>
+inline T* expand(std::any input_ptr, const voyager::PrimOp& op,
+                 const ScalarEnv& env) {
+  const auto input = resolve(op, "input", env);
+  return expand<T>(input_ptr, get_shape(input), arg_ints(op, "size", env));
 }
 
 template <typename T>
@@ -150,24 +194,26 @@ inline T* transpose(std::any input_ptr, const std::vector<int>& shape, int dim0,
 }
 
 template <typename T>
-inline T* transpose(std::any input_ptr, const codegen::OpOverload op) {
-  if (op.target() != "transpose") {
+inline T* transpose(std::any input_ptr, const voyager::PrimOp& op,
+                    const ScalarEnv& env) {
+  if (strip_namespace(op.target()) != "transpose") {
     return std::any_cast<T*>(input_ptr);
   }
 
-  const auto input = op.kwargs().at("input").tensor();
+  const auto input = resolve(op, "input", env);
   const auto input_shape = get_shape(input);
-  const int dim0 = op.kwargs().at("dim0").int_value();
-  const int dim1 = op.kwargs().at("dim1").int_value();
+  const int dim0 = arg_int(op, "dim0", env);
+  const int dim1 = arg_int(op, "dim1", env);
 
   return transpose<T>(input_ptr, input_shape, dim0, dim1);
 }
 
 template <typename T>
-inline T* reshape_if_needed(std::any input_ptr, const codegen::OpOverload op) {
-  if (op.target() == "transpose") {
+inline T* reshape_if_needed(std::any input_ptr, const voyager::PrimOp& op,
+                            const ScalarEnv& env) {
+  if (strip_namespace(op.target()) == "transpose") {
     return transpose<T>(input_ptr, op);
-  } else if (op.target() == "permute") {
+  } else if (strip_namespace(op.target()) == "permute") {
     return permute<T>(input_ptr, op);
   } else {
     return std::any_cast<T*>(input_ptr);

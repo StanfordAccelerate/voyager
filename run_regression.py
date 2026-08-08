@@ -1,8 +1,7 @@
 import argparse
-import concurrent
+import concurrent.futures
 import datetime
 import json
-import math
 import multiprocessing as mp
 import numpy as np
 import os
@@ -11,11 +10,6 @@ import pandas as pd
 import re
 import signal
 import sys
-from deepdiff import DeepDiff
-
-from google.protobuf import text_format
-from google.protobuf.json_format import MessageToDict
-from voyager_compiler.codegen import param_pb2
 
 ACCURACY_RESULTS = {
     "resnet18": {
@@ -169,6 +163,37 @@ def check_environment_vars(required_vars):
         raise ValueError(f"Please set {', '.join(unset_vars)} environment variables")
 
 
+def run_with_timeout(cmd, env, stdout_file, timeout, cwd=None):
+    """Run `cmd`, and on timeout kill every process it started.
+
+    `subprocess.run(timeout=...)` kills only the direct child. These tests
+    launch the simulator through `make`, so killing `make` leaves the
+    simulator running -- orphaned, holding a core, and invisible to the
+    sweep, which has already moved on. Giving the child its own session puts
+    the whole tree in one process group the timeout can signal.
+
+    Returns True if the command finished, False if it timed out.
+    """
+    with subprocess.Popen(
+        cmd,
+        cwd=cwd,
+        env=env,
+        stdout=stdout_file,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    ) as process:
+        try:
+            process.communicate(timeout=timeout)
+            return True
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                process.kill()
+            process.communicate()
+            return False
+
+
 def run_gold_model_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
@@ -177,15 +202,7 @@ def run_gold_model_unit_test(model, layer, output_folder):
     env_vars["SIMS"] = "gold,pytorch"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                ["make", "sim"],
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=5 * 60,
-            )
-        except subprocess.TimeoutExpired:
+        if not run_with_timeout(["make", "sim"], env_vars, stdout_file, 20 * 60):
             print(f"Test {model}_{layer} timed out")
             stdout_file.write("Test timed out")
 
@@ -248,15 +265,12 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
     env_vars["SIMS"] = "gold,accelerator"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                ["make", "fast-sim" if fast else "sim"],
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=4 * 60 * 60,
-            )
-        except subprocess.TimeoutExpired:
+        if not run_with_timeout(
+            ["make", "fast-sim" if fast else "sim"],
+            env_vars,
+            stdout_file,
+            4 * 60 * 60,
+        ):
             print(f"Test {model}_{layer} timed out")
             stdout_file.write("Test timed out")
 
@@ -332,16 +346,13 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, debug):
     # make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
         with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-            try:
-                subprocess.run(
-                    ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
-                    cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
-                    env=env_vars,
-                    stdout=stdout_file,
-                    stderr=subprocess.STDOUT,
-                    timeout=10 * 60 * 60,
-                )
-            except subprocess.TimeoutExpired:
+            if not run_with_timeout(
+                ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
+                env_vars,
+                stdout_file,
+                10 * 60 * 60,
+                cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+            ):
                 print(f"Test {model}_{layer} timed out")
                 stdout_file.write("Test timed out")
                 break
@@ -366,13 +377,15 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, debug):
         success = bool(re.search(r"Error\s+count:\s+0", content))
 
         if success:
+            # The harness prints runtimes of 1e6 ns and up in scientific
+            # notation.
             match = re.search(
-                r"^Total Runtime:\s+(\d+)\s*ns",
+                r"^Total Runtime:\s+([\d.]+(?:[eE][+-]?\d+)?)\s*ns",
                 content,
                 flags=re.IGNORECASE | re.MULTILINE,
             )
 
-            total_runtime = int(match.group(1)) if match else 0
+            total_runtime = int(float(match.group(1))) if match else 0
 
             # Capture runtime type and ideal runtime
             match = re.search(
@@ -384,9 +397,10 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, debug):
             runtime_type = match.group(1).lower()
             ideal_runtime = int(match.group(2))
 
-    # Calculate actual tiles (min of L2 tiles and max_tiles)
-    max_tiles = int(os.environ.get("MAX_TILES", "1"))
-    actual_tiles = min(num_tiles, max_tiles)
+    # Calculate actual tiles (min of L2 tiles and max_tiles). MAX_TILES bounds the
+    # tile loop; unset means the whole loop runs.
+    max_tiles = int(os.environ.get("MAX_TILES", "0"))
+    actual_tiles = min(num_tiles, max_tiles) if max_tiles > 0 else num_tiles
 
     return (
         model,
@@ -684,21 +698,18 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     if dataset == "squad":
         additional_args = ["1000"]  # limit number of samples to 1000 for squad dataset
     with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                [
-                    f"{build_folder}/cc/AccuracyTester",
-                    model,
-                    output_data_dir,
-                    str(num_processes),
-                    *additional_args,
-                ],
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=10 * 60 * 60,
-            )
-        except subprocess.TimeoutExpired:
+        if not run_with_timeout(
+            [
+                f"{build_folder}/cc/AccuracyTester",
+                model,
+                output_data_dir,
+                str(num_processes),
+                *additional_args,
+            ],
+            env_vars,
+            stdout_file,
+            10 * 60 * 60,
+        ):
             print(f"Test {model}_{dataset} timed out")
             stdout_file.write("Test timed out")
             return False
@@ -735,82 +746,30 @@ def add_layers(network, layers, layer_counts, tile_counts, uniquify, skip_layers
 
     skip_layers = [re.compile(p) for p in skip_layers] if skip_layers else []
 
-    if not uniquify:
-        with open(
-            f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/layers.txt",
-            "r",
-        ) as f:
-            all_layers = f.read().splitlines()
-            # Filter out layers that should be skipped
-            layers[network] = [
-                layer for layer in all_layers
-                if not any(p.fullmatch(layer) for p in skip_layers)
-            ]
-            layer_counts[network] = {layer: 1 for layer in layers[network]}
-    else:
-        # open the proto file
-        with open(
-            f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/model.txt",
-            "r",
-        ) as f:
-            contents = f.read()
-        params = param_pb2.Model()
-        text_format.Parse(contents, params)
-
-        # convert to json
-        params_dict = MessageToDict(params, preserving_proto_field_name=True)
-
-        def delete_nested_keys(data, key):
-            if isinstance(data, dict):
-                for k in list(data.keys()):
-                    if k == key:
-                        del data[k]
-                    else:
-                        delete_nested_keys(data[k], key)
-            elif isinstance(data, list):
-                for item in data:
-                    delete_nested_keys(item, key)
-
-        unique_layers = {}
-        for op in params_dict["ops"]:
-            # skip nop layers
-            if "op" in op and op["op"]["op"] == "nop":
+    # One layers.txt line per bufferized layer: display name, first and last
+    # emitted op of the layer's extent, equivalence group from the compiler's
+    # bufferization cache, and the tile loop's trip count. Uniquify keeps the
+    # first layer of each group.
+    seen_groups = {}
+    with open(
+        f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/layers.txt",
+        "r",
+    ) as f:
+        for line in f:
+            fields = line.split()
+            if not fields:
                 continue
-
-            name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
-
-            # Skip layers that are in the skip list
+            name, _start_op, _end_op, group, tiles = fields
             if any(p.fullmatch(name) for p in skip_layers):
                 print(f"Skipping layer {name}")
                 continue
-
-            # remove the name, memory, and node fields from the op
-            delete_nested_keys(op, "name")
-            delete_nested_keys(op, "memory")
-            delete_nested_keys(op, "scratchpad")
-            delete_nested_keys(op, "node")
-
-            if "op" in op:
-                kwargs = op["op"]["kwargs"]
-            else:
-                kwargs = op["fused_op"]["op_list"][0]["kwargs"]
-
-            l2_values = kwargs.get("l2_tiling", {}).get("int_list", {}).get("values", [])
-            l2_values = [int(v) for v in l2_values]
-            l2_count = math.prod(l2_values) if l2_values else 1
-
-            is_unique_layer = True
-            for op_name, op_val in unique_layers.items():
-                if not DeepDiff(op, op_val, ignore_order=True):
-                    layer_counts[network][op_name] += 1
-                    is_unique_layer = False
-                    break
-
-            if is_unique_layer:
-                unique_layers[name] = op
-                layers[network].append(name)
-                layer_counts[network][name] = 1
-                tile_counts[network][name] = l2_count
+            if uniquify and group in seen_groups:
+                layer_counts[network][seen_groups[group]] += 1
+                continue
+            seen_groups[group] = name
+            layers[network].append(name)
+            layer_counts[network][name] = 1
+            tile_counts[network][name] = int(tiles)
 
 
 def matches(value, rule_value):

@@ -12,8 +12,8 @@
 #include "spdlog/spdlog.h"
 #include "src/ArchitectureParams.h"
 #include "src/datatypes/DataTypes.h"
+#include "test/common/Tensor.h"
 #include "test/common/Utils.h"
-#include "test/compiler/proto/param.pb.h"
 
 // Abstract class for interfacing with memory models.
 class MemoryInterface {
@@ -22,33 +22,41 @@ class MemoryInterface {
   virtual ~MemoryInterface() {}
 
   template <typename T>
-  bool read_tensor_with_type(codegen::Tensor tensor, std::any& output) {
-    if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+  bool read_tensor_with_type(Tensor tensor, std::any& output) {
+    if (tensor.dtype != DataTypes::TypeName<T>::name()) {
       return false;
     }
 
     const uint64_t address = get_address(tensor);
     const int partition = get_partition(tensor);
-    const int size = get_size(tensor, false);
+    const int size = get_size(tensor);
 
-    int num_bytes = (size * T::width + 7) / 8;
+    // A pitched window gathers rows of `run` valid elements sitting `pitch`
+    // elements apart; a contiguous tensor is the pitch == run case.
+    const int64_t run = tensor.window_pitch > 0 ? tensor.shape.back() : size;
+    const int64_t pitch = tensor.window_pitch > 0 ? tensor.window_pitch : run;
+    const int64_t span = size > 0 ? (size / run - 1) * pitch + run : 0;
+
+    const int64_t num_bytes = (span * T::width + 7) / 8;
     char* buffer = new char[num_bytes];
     read_bytes_from_memory(address, partition, num_bytes, buffer);
 
     T* results = new T[size];
 
     for (int i = 0; i < size; i++) {
+      const int64_t u = (i / run) * pitch + i % run;
       // Data may be unaligned and span multiple bytes. We calculate the start
       // and end byte indices and the offset within the first byte. We then read
       // the bytes into a temporary ac_int and shift it to the correct position.
-      int start = i * T::width / 8;
-      int end = (i + 1) * T::width / 8;
-      int offset = (i * T::width) % 8;
+      const int64_t start = u * T::width / 8;
+      const int64_t end = ((u + 1) * T::width - 1) / 8;
+      const int offset = (u * T::width) % 8;
 
       ac_int<(T::width / 8 + 2) * 8> bits;
 
-      for (int j = start; j <= end; j++) {
-        bits.set_slc((j - start) * 8, static_cast<ac_int<8, false>>(buffer[j]));
+      for (int64_t j = start; j <= end; j++) {
+        bits.set_slc(static_cast<int>(j - start) * 8,
+                     static_cast<ac_int<8, false>>(buffer[j]));
       }
 
       results[i].set_bits(bits >> offset);
@@ -61,19 +69,19 @@ class MemoryInterface {
   }
 
   template <typename... Ts>
-  std::any read_tensor_helper(const codegen::Tensor& tensor) {
+  std::any read_tensor_helper(const Tensor& tensor) {
     std::any output;
     bool matched = (read_tensor_with_type<Ts>(tensor, output) || ...);
     if (!matched) {
-      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
     }
     return output;
   }
 
   template <typename T>
-  bool create_scalar_tensor(const codegen::Tensor& tensor, std::any& data,
+  bool create_scalar_tensor(const Tensor& tensor, std::any& data,
                             float* array) {
-    if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+    if (tensor.dtype != DataTypes::TypeName<T>::name()) {
       return false;
     }
 
@@ -87,21 +95,24 @@ class MemoryInterface {
   }
 
   template <typename... Ts>
-  std::any create_scalar_tensor_helper(const codegen::Tensor& tensor,
-                                       float* array) {
+  std::any create_scalar_tensor_helper(const Tensor& tensor, float* array) {
     std::any data;
     bool matched = (create_scalar_tensor<Ts>(tensor, data, array) || ...);
     if (!matched) {
-      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
     }
     return data;
   }
 
-  std::any read_tensor(const codegen::Tensor& tensor) {
-    int size = get_size(tensor, false);
-
-    // Read scalar from the file directly
-    if (size == 1) {
+  std::any read_tensor(const Tensor& tensor) {
+    // A config constant is never mapped into memory -- the graph never DMAs it,
+    // so it has no address to read from. It comes off disk instead.
+    if (tensor.is_constant) {
+      if (get_size(tensor) != 1) {
+        throw std::runtime_error(
+            "Config constant " + tensor.node +
+            " is not a scalar; it cannot be materialized as a tensor operand.");
+      }
       float* array = read_constant_param(tensor);
       return create_scalar_tensor_helper<SUPPORTED_TYPES>(tensor, array);
     }
@@ -110,15 +121,50 @@ class MemoryInterface {
   }
 
   template <typename T>
-  bool write_tensor_with_type(codegen::Tensor tensor, std::any data) {
-    if (tensor.dtype() != DataTypes::TypeName<T>::name()) {
+  bool write_tensor_with_type(Tensor tensor, std::any data) {
+    if (tensor.dtype != DataTypes::TypeName<T>::name()) {
       return false;
     }
 
     const uint64_t address = get_address(tensor);
     const int partition = get_partition(tensor);
-    const int size = get_size(tensor, false);
+    const int size = get_size(tensor);
     T* casted = std::any_cast<T*>(data);
+
+    // A pitched window scatters rows of `run` elements `pitch` apart; the
+    // bytes between the runs belong to the allocation, so read the span
+    // back first and modify only the window.
+    if (tensor.window_pitch > 0) {
+      const int64_t run = tensor.shape.back();
+      const int64_t pitch = tensor.window_pitch;
+      const int64_t span = (size / run - 1) * pitch + run;
+      const int64_t span_bytes = (span * T::width + 7) / 8;
+      char* buffer = new char[span_bytes];
+      read_bytes_from_memory(address, partition, span_bytes, buffer);
+
+      for (int i = 0; i < size; i++) {
+        const int64_t u = (i / run) * pitch + i % run;
+        const int64_t start = u * T::width / 8;
+        const int64_t end = ((u + 1) * T::width - 1) / 8;
+        const int offset = (u * T::width) % 8;
+
+        ac_int<(T::width / 8 + 2) * 8> bits;
+        for (int64_t j = start; j <= end; j++) {
+          bits.set_slc(static_cast<int>(j - start) * 8,
+                       static_cast<ac_int<8, false>>(buffer[j]));
+        }
+        bits.set_slc(
+            offset, static_cast<ac_int<T::width, false>>(casted[i].bits_rep()));
+        for (int64_t j = start; j <= end; j++) {
+          buffer[j] = static_cast<char>(
+              bits.template slc<8>(static_cast<int>(j - start) * 8));
+        }
+      }
+
+      write_bytes_to_memory(address, partition, span_bytes, buffer);
+      delete[] buffer;
+      return true;
+    }
 
     size_t total_bytes = (size * T::width + 7) / 8;
     char* buffer = new char[total_bytes];
@@ -154,14 +200,14 @@ class MemoryInterface {
   }
 
   template <typename... Ts>
-  void write_tensor_helper(const codegen::Tensor& tensor, std::any data) {
+  void write_tensor_helper(const Tensor& tensor, std::any data) {
     bool matched = (write_tensor_with_type<Ts>(tensor, data) || ...);
     if (!matched) {
-      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+      throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
     }
   }
 
-  void write_tensor(const codegen::Tensor& tensor, const std::any data) {
+  void write_tensor(const Tensor& tensor, const std::any data) {
     write_tensor_helper<SUPPORTED_TYPES>(tensor, data);
   }
 

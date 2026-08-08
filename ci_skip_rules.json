@@ -76,6 +76,7 @@
         "layers": [
             "index_copy_",
             "index_copy__1",
+            "sub",
             "transpose_int(_[0-9]+)?"
         ]
     },
@@ -123,6 +124,7 @@
             "quantize_default_1",
             "slice(_[0-9]+)?",
             "slice_tensor(_[0-9]+)?",
+            "sub",
             "transpose_int(_[0-9]+)?"
         ]
     },
@@ -148,6 +150,7 @@
             "matmul",
             "slice_tensor",
             "transpose",
+            "add(_[0-9]+)?",
             "add_scalar",
             "permute_default",
             "cos",

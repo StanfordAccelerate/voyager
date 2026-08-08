@@ -1,24 +1,22 @@
 #pragma once
 
 #include "spdlog/spdlog.h"
-#include "src/AccelTypes.h"
 #include "src/Params.h"
 #include "test/common/GoldModel.h"
+#include "test/common/GraphUtils.h"
 #include "test/common/MemoryInterface.h"
-#include "test/common/Network.h"
 #include "test/common/Tiling.h"
 #include "test/common/Utils.h"
-#include "test/compiler/proto/param.pb.h"
 #include "test/toolchain/ApproximationConstants.h"
 #include "test/toolchain/Common.h"
 #if SUPPORT_SPMM
 #include "test/toolchain/SpMM.h"
 #endif
 
-void set_vector_fetch_1(const codegen::Tensor& tensor, const Tiling& tiling,
+void set_vector_fetch_1(const Tensor& tensor, const Tiling& tiling,
                         VectorParams* vector_params) {
   int nonzero_dims = 0;
-  for (const int& dim : tensor.shape()) {
+  for (const int& dim : tensor.shape) {
     if (dim != 1) nonzero_dims++;
   }
 
@@ -26,7 +24,7 @@ void set_vector_fetch_1(const codegen::Tensor& tensor, const Tiling& tiling,
   vector_params->vector_fetch_1_mode = true;
   vector_params->vector_fetch_1_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
 
-  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype);
   const int dtype_width = get_type_width<VU_INPUT_TYPES>(dtype);
   const int fetch_width = OC_DIMENSION * dtype_width;
 
@@ -66,10 +64,10 @@ void set_vector_fetch_1(const codegen::Tensor& tensor, const Tiling& tiling,
   }
 }
 
-void set_vector_fetch_2(const codegen::Tensor& tensor, const Tiling& tiling,
+void set_vector_fetch_2(const Tensor& tensor, const Tiling& tiling,
                         VectorParams* vector_params) {
   int nonzero_dims = 0;
-  for (const int& dim : tensor.shape()) {
+  for (const int& dim : tensor.shape) {
     if (dim != 1) nonzero_dims++;
   }
 
@@ -77,7 +75,7 @@ void set_vector_fetch_2(const codegen::Tensor& tensor, const Tiling& tiling,
   vector_params->vector_fetch_2_mode = true;
   vector_params->vector_fetch_2_broadcast = nonzero_dims == 1 ? 0b011 : 0b000;
 
-  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype);
   const int dtype_width = get_type_width<VU_INPUT_TYPES>(dtype);
   const int fetch_width = OC_DIMENSION * dtype_width;
 
@@ -114,27 +112,6 @@ void set_vector_fetch_2(const codegen::Tensor& tensor, const Tiling& tiling,
       }
       loop_index++;
     }
-  }
-}
-
-void set_immediate(const float scalar, const int stage,
-                   const std::string opcode, VectorInstructions& inst) {
-  VECTOR_DATATYPE immediate = scalar;
-
-  if (opcode == "div" || opcode == "div_" || opcode == "quantize") {
-    immediate = 1.0 / scalar;
-  }
-
-  if (stage == 0) {
-    inst.vector_op0_src1 = VectorInstructions::from_immediate_0;
-    inst.immediate0 = immediate.bits_rep();
-  } else if (stage == 2) {
-    inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
-    inst.immediate1 = immediate.bits_rep();
-  } else {
-    inst.vector_op3_src1 = VectorInstructions::from_immediate_2;
-    inst.vector_op3 = VectorInstructions::op3_mul;
-    inst.immediate2 = immediate.bits_rep();
   }
 }
 
@@ -196,30 +173,40 @@ static bool should_use_direct_path(const VectorParams* vector_params) {
          output_bw <= available_bandwidth;
 }
 
-void map_matrix_operation(const Operation& operation,
+void map_matrix_operation(const voyager::Operation& operation,
+                          const ScalarEnv& env,
                           std::deque<BaseParams*>& mapped_params) {
   MatrixParams* matrix_params;
   DwCParams* dwc_params;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
 
-  const auto param = operation.param;
-  const auto op_list = get_op_list(param);
-  const auto matrix_op = op_list[0];
+  const auto& op_list = get_prim_ops(operation);
+  const auto& matrix_op = get_anchor_op(operation);
 
-  const auto input = matrix_op.kwargs().at("input").tensor();
-  const auto output = get_op_outputs(param).back();
+  const auto input = resolve(matrix_op, "input", env);
+  const auto output = resolve_outputs(operation, env).back();
 
   bool is_matmul = matrix_op.target().find("matmul") != std::string::npos;
   std::string weight_key = is_matmul ? "other" : "weight";
-  const auto weight = matrix_op.kwargs().at(weight_key).tensor();
+  const Tensor anchor_weight = resolve(matrix_op, weight_key, env);
+  const voyager::PrimOp* weight_producer =
+      get_fused_producer(operation, env, anchor_weight);
+  const voyager::PrimOp* weight_dequantize_op =
+      weight_producer != nullptr &&
+              strip_namespace(weight_producer->target()) == "dequantize"
+          ? weight_producer
+          : nullptr;
+  const Tensor weight = weight_dequantize_op == nullptr
+                            ? anchor_weight
+                            : resolve(*weight_dequantize_op, "input", env);
 
   bool is_mx_op = matrix_op.target().find("mx") != std::string::npos;
   bool is_fc = is_fc_layer(matrix_op);
   bool is_dwc = false;
 
   if (matrix_op.target().find("conv2d") != std::string::npos &&
-      matrix_op.kwargs().at("groups").int_value() > 1) {
+      arg_int(matrix_op, "groups", env) > 1) {
 #if SUPPORT_DWC
     is_dwc = true;
 #else
@@ -231,43 +218,41 @@ void map_matrix_operation(const Operation& operation,
 
   if (is_dwc) {
     dwc_params = new DwCParams;
-
-    const auto kwargs = matrix_op.kwargs();
-    const auto bias = kwargs.at("bias").tensor();
-    const auto output = get_op_outputs(param).back();
+    const auto bias = resolve(matrix_op, "bias", env);
+    const auto output = resolve_outputs(operation, env).back();
 
     dwc_params->input_offset = get_address(input);
     dwc_params->weight_offset = get_address(weight);
     dwc_params->bias_offset = get_address(bias);
     dwc_params->output_offset = get_address(output);
 
-    int Y = input.shape(1);
-    int X = input.shape(2);
-    int C = input.shape(3);
+    int Y = input.shape[1];
+    int X = input.shape[2];
+    int C = input.shape[3];
 
     dwc_params->bounds[0] = Y;
     dwc_params->bounds[1] = X;
     dwc_params->bounds[2] = C;
 
     if (is_mx_op) {
-      int block_size = kwargs.at("block_size").int_value();
+      int block_size = arg_int(matrix_op, "block_size", env);
       assert(block_size % UNROLLFACTOR == 0);
 
       dwc_params->use_mx = 1;
       dwc_params->block_size = log2(block_size);
       assert(1 << dwc_params->block_size == block_size);
 
-      const auto& input_scale = kwargs.at("input_scale").tensor();
-      const auto& weight_scale = kwargs.at("weight_scale").tensor();
+      const auto& input_scale = resolve(matrix_op, "input_scale", env);
+      const auto& weight_scale = resolve(matrix_op, "weight_scale", env);
       dwc_params->input_scale_offset = get_address(input_scale);
       dwc_params->weight_scale_offset = get_address(weight_scale);
     }
 
-    const auto paddings = kwargs.at("padding").int_list().values();
+    const auto paddings = arg_ints(matrix_op, "padding", env);
     int x_pad = paddings[1];
     int y_pad = paddings[0];
 
-    const int stride = kwargs.at("stride").int_list().values()[0];
+    const int stride = arg_ints(matrix_op, "stride", env)[0];
     dwc_params->stride = stride;
     assert(stride < 7);
 
@@ -278,9 +263,9 @@ void map_matrix_operation(const Operation& operation,
     assert(padded_X % stride == 0);
 
     int X0 = ((DWC_WIDTH - 2) / stride) * stride;
-    int X1 = (input.shape(2) + x_pad + x_pad - 2 + X0 - 1) /
+    int X1 = (input.shape[2] + x_pad + x_pad - 2 + X0 - 1) /
              X0;  // Padding lines, asym in future
-    int C1 = (input.shape(3) + UNROLLFACTOR - 1) / UNROLLFACTOR;
+    int C1 = (input.shape[3] + UNROLLFACTOR - 1) / UNROLLFACTOR;
 
     dwc_params->loops[0][0] = Y;
     dwc_params->loops[0][1] = X1;
@@ -302,8 +287,8 @@ void map_matrix_operation(const Operation& operation,
     dwc_params->fast_forward_mode = (X + 2 * x_pad - (X1 - 1) * X0) == 3;
 
     tiling = {
-        .loops = {{output.shape(1), output.shape(2),
-                   output.shape(3) / UNROLLFACTOR, 1, 1, 1},
+        .loops = {{output.shape[1], output.shape[2],
+                   output.shape[3] / UNROLLFACTOR, 1, 1, 1},
                   {1, 1, 1, 1, 1, 1}},
         .x_loop_idx = {0, 0},
         .y_loop_idx = {0, 1},
@@ -325,9 +310,13 @@ void map_matrix_operation(const Operation& operation,
       matrix_params->is_fc = true;
 
       auto weight_shape = get_shape(weight);
-      int K = weight_shape[0];
-      int C = weight_shape[1];
-      int C1 = is_mx_op ? matrix_op.kwargs().at("block_size").int_value() : 1;
+      if (weight_shape.size() < 2) {
+        throw std::runtime_error(
+            "MVM weight must have at least two dimensions.");
+      }
+      int K = weight_shape[weight_shape.size() - 2];
+      int C = weight_shape.back();
+      int C1 = is_mx_op ? arg_int(matrix_op, "block_size", env) : 1;
       int C2 = C / C1;
 
       auto k_loops = split_loops({K}, MAX_LOOP_VALUE);
@@ -348,7 +337,7 @@ void map_matrix_operation(const Operation& operation,
           .generic_replication = false,
       };
     } else {
-      tiling = get_tiling(operation);
+      tiling = get_tiling(operation, env);
     }
 
     std::ostringstream oss;
@@ -358,15 +347,14 @@ void map_matrix_operation(const Operation& operation,
     // Set input fields
     matrix_params->input_offset = get_address(input);
     matrix_params->input_dtype =
-        get_index_from_type_name<INPUT_DATATYPE>(input.dtype());
-    matrix_params->use_input_codebook =
-        matrix_op.kwargs().contains("input_code");
+        get_index_from_type_name<INPUT_DATATYPE>(input.dtype);
+    matrix_params->use_input_codebook = has_arg(matrix_op, "input_code");
 
     if (matrix_params->use_input_codebook) {
-      const auto code = matrix_op.kwargs().at("input_code").tensor();
-      const auto size = get_size(code);
+      const auto code = resolve(matrix_op, "input_code", env);
 
-      float* input_code = read_constant_param(code);
+      int size;
+      float* input_code = read_constant_param(code, &size);
 
       int zero_idx = -1;
       for (int i = 0; i < size; i++) {
@@ -413,21 +401,30 @@ void map_matrix_operation(const Operation& operation,
     // Set weight fields
     matrix_params->weight_offset = get_address(weight);
     matrix_params->weight_dtype =
-        get_index_from_type_name<WEIGHT_DATATYPE>(weight.dtype());
-    matrix_params->use_weight_codebook =
-        matrix_op.kwargs().contains("weight_code");
+        get_index_from_type_name<WEIGHT_DATATYPE>(weight.dtype);
+    matrix_params->use_weight_codebook = has_arg(matrix_op, "weight_code");
 
     if (matrix_params->use_weight_codebook) {
-      const auto code = matrix_op.kwargs().at("weight_code").tensor();
-      const auto size = get_size(code);
+      const auto code = resolve(matrix_op, "weight_code", env);
 
-      float* weight_code = read_constant_param(code);
+      int size;
+      float* weight_code = read_constant_param(code, &size);
       for (int i = 0; i < size; i++) {
         SA_WEIGHT_TYPE value = weight_code[i];
         matrix_params->weight_code[i] = value.bits_rep();
       }
 
       delete[] weight_code;
+    }
+
+    if (weight_dequantize_op != nullptr) {
+      matrix_params->weight_dequant = true;
+      matrix_params->dq_scale_offset =
+          get_address(resolve(*weight_dequantize_op, "scale", env));
+      if (has_arg(*weight_dequantize_op, "zero_point")) {
+        matrix_params->dq_zero_point_offset =
+            get_address(resolve(*weight_dequantize_op, "zero_point", env));
+      }
     }
 
     int weight_fetch_width;
@@ -455,13 +452,13 @@ void map_matrix_operation(const Operation& operation,
     matrix_params->is_mx_op = is_mx_op;
 
     if (is_mx_op) {
-      const int block_size = matrix_op.kwargs().at("block_size").int_value();
+      const int block_size = arg_int(matrix_op, "block_size", env);
       assert(block_size == std::max(IC_DIMENSION, OC_DIMENSION));
 
-      const auto input_scale = matrix_op.kwargs().at("input_scale").tensor();
+      const auto input_scale = resolve(matrix_op, "input_scale", env);
       matrix_params->input_scale_offset = get_address(input_scale);
 
-      const auto weight_scale = matrix_op.kwargs().at("weight_scale").tensor();
+      const auto weight_scale = resolve(matrix_op, "weight_scale", env);
       matrix_params->weight_scale_offset = get_address(weight_scale);
     }
 
@@ -501,7 +498,9 @@ void map_matrix_operation(const Operation& operation,
       }
     }
 
-    matrix_params->weight_transpose = weight.reshape().target() == "transpose";
+    // We switch to use DMA to load transposed weight instead of transposing
+    // inside the accelerator.
+    matrix_params->weight_transpose = false;
 
     if (matrix_params->weight_transpose) {
       // for transpose, we need to enforce that the innermost loop is the
@@ -590,77 +589,21 @@ void map_matrix_operation(const Operation& operation,
     matrix_params->input_x = tiling.input_x;
     matrix_params->input_y = tiling.input_y;
 
-    // Set input transpose
-    if (input.has_reshape()) {
-      const auto reshape_op = input.reshape();
-      const auto reshape_kwargs = reshape_op.kwargs();
-
-      if (reshape_op.target() == "permute") {
-        const auto int_list = reshape_kwargs.at("dims").int_list().values();
-        std::vector<int> dims(int_list.begin(), int_list.end());
-        const int ndim = input.shape_size();
-
-        if (is_transpose(dims)) {
-          matrix_params->input_transpose = true;
-        } else if (dims[ndim - 1] == ndim - 1) {
-          matrix_params->merge_heads = true;
-        } else {
-          throw std::invalid_argument("Unsupported permute operation!");
-        }
-      } else if (reshape_op.target() == "transpose") {
-        int dim0 = reshape_kwargs.at("dim0").int_value();
-        int dim1 = reshape_kwargs.at("dim1").int_value();
-        if (dim0 > dim1) {
-          std::swap(dim0, dim1);
-        }
-
-        if (dim0 == input.shape_size() - 2 && dim1 == input.shape_size() - 1) {
-          matrix_params->input_transpose = true;
-        } else if (dim1 != input.shape_size() - 1) {
-          matrix_params->merge_heads = true;
-        } else {
-          throw std::invalid_argument("Unsupported transpose operation!");
-        }
-      }
-
-      if (matrix_params->merge_heads) {
-        const auto input_shape = input.shape();
-        double result = std::log2(input_shape[input_shape.size() - 1]);
-        if (std::fmod(result, 1.0) != 0.0) {
-          throw std::runtime_error("Result is not an integer!");
-        }
-        matrix_params->head_size_lg2 = result;
-      }
-    }
-
     // Set bias
-    if (matrix_op.kwargs().contains("bias")) {
-      const auto bias = matrix_op.kwargs().at("bias").tensor();
+    if (has_arg(matrix_op, "bias")) {
+      const auto bias = resolve(matrix_op, "bias", env);
       matrix_params->has_bias = true;
       matrix_params->bias_offset = get_address(bias);
-    }
-
-    // Set weight dequantize parameters
-    if (weight.has_dequant()) {
-      matrix_params->weight_dequant = true;
-      const auto dequant = weight.dequant();
-      const auto scale = dequant.kwargs().at("scale").tensor();
-      matrix_params->dq_scale_offset = get_address(scale);
-      if (dequant.kwargs().contains("zero_point")) {
-        const auto zero_point = dequant.kwargs().at("zero_point").tensor();
-        matrix_params->dq_zero_point_offset = get_address(zero_point);
-      }
     }
   }
 
   // If there are no vector operations, we don't need to setup the vector
   // instruction config
-  if (!is_dwc && !is_fc && !has_fused_spmm(matrix_op) && op_list.size() == 1 &&
-      !output.has_reshape()) {
+  if (!is_dwc && !is_fc && !has_fused_spmm(matrix_op) && op_list.size() == 1) {
     matrix_params->output_to_memory = true;
     matrix_params->output_offset = get_address(output);
     matrix_params->output_dtype =
-        get_index_from_type_name<MU_OUTPUT_TYPES>(output.dtype());
+        get_index_from_type_name<MU_OUTPUT_TYPES>(output.dtype);
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
     const size_t output_bw =
         get_type_width<MU_OUTPUT_TYPES>(matrix_params->output_dtype) *
@@ -677,7 +620,7 @@ void map_matrix_operation(const Operation& operation,
     throw std::runtime_error(
         "Sparse matrix operations not supported in this build.");
 #else
-    map_spmm(operation, mapped_params, true);
+    map_spmm(operation, env, mapped_params, true);
 #endif
   }
 
@@ -720,19 +663,7 @@ void map_matrix_operation(const Operation& operation,
   }
 
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
-
-  // Transformer head permutation
-  if (output.has_reshape()) {
-    vector_params->transpose_for_scores = true;
-    const auto permuted_shape =
-        output.reshape().kwargs().at("output_shape").int_list().values();
-    double result = std::log2(permuted_shape[permuted_shape.size() - 1]);
-    if (std::fmod(result, 1.0) != 0.0) {
-      throw std::runtime_error("Result is not an integer!");
-    }
-    vector_params->head_size_lg2 = result;
-  }
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   vector_params->is_dwc = is_dwc;
 
@@ -763,145 +694,89 @@ void map_matrix_operation(const Operation& operation,
     }
   }
 
-  int stage = 0;
-  for (int i = 1; i < op_list.size(); i++) {
-    const auto op = op_list[i];
-    const std::string opcode = op.target();
-
-    // Dequantization doesn't take a stage in the pipeline
-    if (opcode == "dequantize") {
-      inst.vdequantize = true;
-
-      const auto other = op.kwargs().at("scale").tensor();
-      assert(get_size(other) == 1);
-
-      float* array = read_constant_param(other);
-      VECTOR_DATATYPE immediate = array[0];
-      inst.vector_dq_scale = immediate.bits_rep();
-
-      delete[] array;
+  std::vector<const voyager::PrimOp*> vector_ops;
+  bool after_anchor = false;
+  for (const voyager::PrimOp* op : op_list) {
+    if (!after_anchor) {
+      if (op->name() == matrix_op.name()) after_anchor = true;
       continue;
     }
 
-    if (poly_ops.count(opcode)) {
-      if (stage != 0) {
+    // A fused head-split transpose is realized by the output controller's
+    // address relayout, not by a pipeline stage.
+    if (strip_namespace(op->target()) == "transpose") {
+      const Tensor& transpose_input = resolve(*op, "input", env);
+      const int ndim = get_shape(transpose_input).size();
+      int dim0 = arg_int(*op, "dim0", env);
+      int dim1 = arg_int(*op, "dim1", env);
+      if (dim0 < 0) dim0 += ndim;
+      if (dim1 < 0) dim1 += ndim;
+      if (std::max(dim0, dim1) == ndim - 1) {
         throw std::runtime_error(
-            "Polynomial approximation must be the first vector operation!\n");
+            "Fused transpose of the last dimension cannot be mapped to the "
+            "output relayout.");
       }
 
-      // Grab kwargs that are relevant for some activation functions
-      std::map<std::string, float> kwargs;
-
-      for (const auto& [key, value] : op.kwargs()) {
-        if (value.has_float_value()) {
-          kwargs[key] = value.float_value();
-        }
+      const int head_size = get_shape(transpose_input).back();
+      const double head_size_lg2 = std::log2(head_size);
+      if (std::fmod(head_size_lg2, 1.0) != 0.0) {
+        throw std::runtime_error("Head size is not a power of two.");
       }
 
-      load_approx_params(opcode, vector_instruction_config, kwargs);
-      inst.vector_op0 = VectorInstructions::op0_poly;
-      inst.vector_op2 = VectorInstructions::op2_poly;
-
-      stage = 3;
+      vector_params->transpose_for_scores = true;
+      vector_params->head_size_lg2 = head_size_lg2;
       continue;
     }
 
-    for (; stage < vector_unit_ops.size(); stage++) {
-      // Stage 0 and 2 can only perform per-tensor quantization
-      if (opcode == "quantize") {
-        const auto scale = op.kwargs().at("scale").tensor();
-        const int size = get_size(scale);
-        if (stage != 3 && size > 1) {
-          continue;
-        }
-      }
-      if ((opcode == "add" || opcode == "add_") && stage == 0 &&
-          has_fused_spmm(matrix_op)) {
-        // stage 0 add is used for summing dense and sparse results
-        continue;
-      }
-
-      if (vector_unit_ops[stage].count(opcode)) {
-        break;
-      }
-    }
-
-    if (stage == vector_unit_ops.size()) {
-      throw std::runtime_error("Vector operation not supported!\n");
-    }
-
-    spdlog::debug("stage {} target: {}\n", stage, opcode);
-
-    switch (stage) {
-      case 0:
-        inst.vector_op0 = get_stage0_op(opcode);
-        break;
-      case 1:
-        inst.vector_op1 = get_stage1_op(opcode);
-        break;
-      case 2:
-        inst.vector_op2 = get_stage2_op(opcode);
-        break;
-      case 3:
-        inst.vector_op3 = get_stage3_op(opcode);
-        break;
-    }
-
-    if (opcode == "quantize_mx" || opcode == "quantize_mx_outlier") {
-      set_quantize_mx_params(param, vector_params, inst,
-                             vector_instruction_config);
-    } else if (op.kwargs().contains("other") || opcode == "quantize") {
-      std::string other_key = opcode == "quantize" ? "scale" : "other";
-      const auto other = op.kwargs().at(other_key);
-
-      if (other.has_float_value()) {
-        float scalar = other.float_value();
-        set_immediate(scalar, stage, opcode, inst);
-      } else if (other.has_int_value()) {
-        int scalar = other.int_value();
-        set_immediate(scalar, stage, opcode, inst);
-      } else if (other.has_tensor() && get_size(other.tensor()) == 1) {
-        float* array = read_constant_param(other.tensor());
-        set_immediate(array[0], stage, opcode, inst);
-        delete[] array;
-      } else {
-        auto self = op.kwargs().at("input").tensor();
-        auto tensor = other.tensor();
-        auto tensor_to_load = tensor.has_memory() ? tensor : self;
-
-        bool has_dequant = tensor_to_load.has_dequant();
-        VECTOR_DATATYPE scale = get_tensor_scalar_scale(tensor_to_load);
-
-        if (stage == 0) {
-          inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
-          set_vector_fetch_1(tensor_to_load, tiling, vector_params);
-
-          if (has_dequant) {
-            assert(inst.vector_op0 == VectorInstructions::op0_add ||
-                   inst.vector_op0 == VectorInstructions::op0_sub);
-            inst.immediate0 = scale.bits_rep();
-            inst.vector_op0 = VectorInstructions::op0_mac;
-          }
-        } else if (stage == 2) {
-          inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_fetch_2(tensor_to_load, tiling, vector_params);
-
-          if (has_dequant) {
-            assert(inst.vector_op2 == VectorInstructions::op2_add);
-            inst.immediate1 = scale.bits_rep();
-            inst.vector_op2 = VectorInstructions::op2_mac;
-          }
-        } else {
-          assert(inst.vector_op2_src1 !=
-                 VectorInstructions::from_vector_fetch_2);
-          inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_fetch_2(tensor_to_load, tiling, vector_params);
-        }
-      }
-    }
-
-    stage++;
+    vector_ops.push_back(op);
   }
+
+  auto map_tensor_operand = [&](const voyager::PrimOp& op, const ScalarEnv& env,
+                                const std::string& other_key, int stage,
+                                VectorInstructions& pipeline_inst) {
+    const Tensor& self = resolve(op, "input", env);
+    const Tensor& tensor = resolve(op, other_key, env);
+
+    // An operand a dequantize produced inside this fusion is not itself
+    // materialized, so fetch what that dequantize reads; the shared pipeline
+    // mapper applies the dequantize scale through the stage mac.
+    const voyager::PrimOp* producer =
+        get_fused_producer(operation, env, tensor);
+    const bool from_dequantize =
+        producer != nullptr &&
+        strip_namespace(producer->target()) == "dequantize";
+    const Tensor tensor_to_load = from_dequantize
+                                      ? resolve(*producer, "input", env)
+                                      : (tensor.materialized ? tensor : self);
+
+    if (stage == 0) {
+      pipeline_inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
+      set_vector_fetch_1(tensor_to_load, tiling, vector_params);
+    } else if (stage == 2) {
+      pipeline_inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
+      set_vector_fetch_2(tensor_to_load, tiling, vector_params);
+    } else {
+      if (pipeline_inst.vector_op2_src1 ==
+          VectorInstructions::from_vector_fetch_2) {
+        throw std::runtime_error(
+            "Vector pipeline stages 2 and 3 cannot fetch different side "
+            "operands.");
+      }
+      pipeline_inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
+      set_vector_fetch_2(tensor_to_load, tiling, vector_params);
+    }
+  };
+
+  auto is_stage_available = [&](const voyager::PrimOp& op, const ScalarEnv& env,
+                                int stage) {
+    return !((strip_namespace(op.target()) == "add" ||
+              strip_namespace(op.target()) == "add_") &&
+             stage == 0 && has_fused_spmm(matrix_op));
+  };
+
+  map_vector_pipeline_ops(operation, env, vector_ops, vector_params,
+                          vector_instruction_config, inst, mapped_params,
+                          map_tensor_operand, is_stage_available);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   if (!is_dwc && !is_fc) {

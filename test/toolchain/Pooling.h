@@ -3,25 +3,25 @@
 #include "test/common/Tiling.h"
 #include "test/toolchain/Common.h"
 
-void map_pool2d(const codegen::Operation& param,
+void map_pool2d(const voyager::Operation& operation, const ScalarEnv& env,
                 std::deque<BaseParams*>& mapped_params) {
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
 
-  const auto op_list = get_op_list(param);
-  const auto pooling_op = op_list.front();
+  const auto& op_list = get_prim_ops(operation);
+  const auto& pooling_op = get_anchor_op(operation);
 
-  const auto input = pooling_op.kwargs().at("input").tensor();
-  const auto output = get_op_outputs(param).back();
+  const auto input = resolve(pooling_op, "input", env);
+  const auto output = resolve_outputs(operation, env).back();
 
   const auto output_shape = get_shape(output);
   const int output_dim = output_shape[3];
 
-  const auto tiling = get_pool2d_tiling(pooling_op);
+  const auto tiling = get_pool2d_tiling(pooling_op, env);
 
   // input
-  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype);
   int input_dtype_width = get_type_width<VU_INPUT_TYPES>(input_dtype);
   int input_fetch_width = ACCUMULATOR_WIDTH * input_dtype_width;
 
@@ -69,7 +69,7 @@ void map_pool2d(const codegen::Operation& param,
   }
 
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   const int reduce_count = tiling.loops[1][tiling.y_loop_idx[1]] *
                            tiling.loops[1][tiling.x_loop_idx[1]];

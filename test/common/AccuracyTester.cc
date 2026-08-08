@@ -1,188 +1,158 @@
+// Full-network accuracy on a dataset, using the C++ gold model.
+//
+//   AccuracyTester <model> <dataset_dir> [<num_threads>] [<num_samples>]
+//
+// Each sample is one folder under <dataset_dir>, holding that sample's input
+// tensors; the ground truth is encoded in the folder name. A sample is a whole
+// independent inference, so samples run in parallel -- each on its own memory.
+//
+// This is the same graph walk as every other flow, with the gold-model backend.
+// It just runs it once per sample and reads the argmax instead of grading
+// buffers.
+
+#define NO_SYSC
+
 #include <algorithm>
-#include <cmath>
 #include <filesystem>
 #include <future>
+#include <iomanip>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#define NO_SYSC
 #include "src/ArchitectureParams.h"
-#include "src/datatypes/DataTypes.h"
 #include "test/common/ArrayMemory.h"
-#include "test/common/DataLoader.h"
+#include "test/common/Checker.h"
 #include "test/common/GoldModel.h"
-#include "test/common/Network.h"
+#include "test/common/Interpreter.h"
+#include "test/common/Model.h"
 #include "test/common/Utils.h"
-#include "test/compiler/proto/param.pb.h"
 
-/* Run inference on a single sample and return correct classification. */
-bool run_sample(std::string model_name, std::string data_dir,
-                std::string sample, Network network) {
-  uint64_t dram_size = network.get_max_dram_address();
-  std::vector<uint64_t> memory_sizes{dram_size};
-  auto memory = std::make_unique<ArrayMemory>(memory_sizes);
+namespace {
 
-  const auto model = network.model;
-
-  auto data_loader = std::make_unique<DataLoader>(memory.get(), false);
-
-  // Load inputs and parameters
-  std::string inputs_dir = data_dir + "/" + sample;
-  for (const auto& tensor : model.inputs()) {
-    data_loader->load_tensor(tensor, inputs_dir, false);
-  }
-
-  std::string params_dir = std::string(getenv("CODEGEN_DIR")) + "/networks/" +
-                           model_name + "/" + std::getenv("DATATYPE") +
-                           "/tensor_files";
-  for (const auto& tensor : model.parameters()) {
-    data_loader->load_tensor(tensor, params_dir, false);
-  }
-
-  // Run inference
-  const auto operations = network.get_operations(true);
-  for (const auto& operation : operations) {
-    const auto param = operation.param;
-    const auto kwargs = data_loader->get_args(param);
-    const auto outputs = run_gold_model(operation, kwargs);
-    const auto tensors = get_op_outputs(param);
-
-    assert(outputs.size() == tensors.size());
-
-    for (int i = 0; i < outputs.size(); i++) {
-      memory->write_tensor(tensors[i], outputs[i]);
-    }
-  }
-
-  // Extract final output
-  const auto last_op = model.ops(model.ops_size() - 1);
-  const auto output = data_loader->get_outputs(last_op).back();
-  auto output_ptr = std::any_cast<VECTOR_DATATYPE*>(output);
-
-  const int num_classes = get_size(last_op.output());
-
-  int max_index = 0;
-  for (int i = 1; i < num_classes; i++) {
-    if (output_ptr[i] > output_ptr[max_index]) {
-      max_index = i;
-    }
-  }
-
-  // Get ground truth from folder name
-  int ground_truth;
+// The label the dataset encodes in a sample's folder name.
+int ground_truth(const std::string& model_name, const std::string& sample) {
   if (model_name == "mobilebert" || model_name == "bert") {
-    // SST2: the last character of folder name is 0 or 1
-    ground_truth = sample.back() - '0';
-  } else if (model_name == "resnet18" || model_name == "resnet50" ||
-             model_name == "vit" || model_name == "mobilenet_v2") {
-    // ImageNet: split folder name by underscore, second part is ground truth
-    ground_truth = std::stoi(sample.substr(sample.find("_") + 1));
-  } else {
-    throw std::runtime_error("Error: Model not supported.");
+    // SST2: the last character of the folder name is 0 or 1.
+    return sample.back() - '0';
   }
-
-  return max_index == ground_truth;
+  if (model_name == "resnet18" || model_name == "resnet50" ||
+      model_name == "vit" || model_name == "mobilenet_v2") {
+    // ImageNet: the folder name is <index>_<label>.
+    return std::stoi(sample.substr(sample.find("_") + 1));
+  }
+  throw std::runtime_error("Accuracy is not supported for model " + model_name);
 }
 
-/* Test accuracy of model on a dataset using the C++ gold model. */
+// Runs inference on one sample and reports whether it classified correctly.
+//
+// `model` is read-only and shared; every sample gets its own memory,
+// interpreter and scalar state, so samples are independent.
+bool run_sample(const Model& model, const std::string& model_name,
+                const std::string& dataset_dir, const std::string& sample) {
+  ArrayMemory memory(model.memory_sizes());
+
+  // This sample's inputs, then the weights the graph reads out of DRAM.
+  const std::string sample_dir = dataset_dir + "/" + sample;
+  for (const auto& box : model.proto().inputs()) {
+    load_tensor(to_tensor(box), sample_dir, &memory);
+  }
+  for (const auto& box : model.proto().parameters()) {
+    if (is_constant(box)) continue;
+    load_tensor(to_tensor(box), model.data_dir, &memory);
+  }
+
+  GoldBackend backend(&memory);
+  Interpreter interpreter(model, &memory, &backend);
+  interpreter.run(model.selected_ops({}));
+
+  // The network's own output, read back from where the graph put it.
+  if (model.proto().outputs_size() == 0) {
+    throw std::runtime_error("Model declares no output to classify.");
+  }
+  const Tensor output = to_tensor(model.proto().outputs(0));
+  auto* scores = std::any_cast<VECTOR_DATATYPE*>(memory.read_tensor(output));
+
+  const int num_classes = get_size(output);
+  int best = 0;
+  for (int i = 1; i < num_classes; i++) {
+    if (scores[i] > scores[best]) best = i;
+  }
+  delete[] scores;
+
+  return best == ground_truth(model_name, sample);
+}
+
+}  // namespace
+
 int main(int argc, char* argv[]) {
-  // model name is first argument
-  std::string model_name = std::string(argv[1]);
-  // path to dataset is second argument
-  std::string data_dir = std::string(argv[2]);
-
-  int num_threads = 1;
-  if (argc > 3) {
-    num_threads = std::stoi(argv[3]);
+  if (argc < 3) {
+    std::cerr << "usage: AccuracyTester <model> <dataset_dir> "
+                 "[<num_threads>] [<num_samples>]\n";
+    return 1;
   }
 
-  int num_samples = -1;
-  if (argc > 4) {
-    num_samples = std::stoi(argv[4]);
-  }
+  const std::string model_name = argv[1];
+  const std::string dataset_dir = argv[2];
+  const int num_threads = argc > 3 ? std::stoi(argv[3]) : 1;
+  int num_samples = argc > 4 ? std::stoi(argv[4]) : -1;
 
-  // Print out model name, path, and number of threads
   std::cout << "*** Accuracy Tester ***" << std::endl;
   std::cout << "-----------------------" << std::endl;
   std::cout << "Model name: " << model_name << std::endl;
-  std::cout << "Dataset path: " << data_dir << std::endl;
+  std::cout << "Dataset path: " << dataset_dir << std::endl;
   std::cout << "Number of threads: " << num_threads << std::endl;
 
-  Network network(model_name);
-
-  if (!std::filesystem::exists(data_dir)) {
-    throw std::runtime_error("Error: Path does not exist.");
+  if (!std::filesystem::is_directory(dataset_dir)) {
+    throw std::runtime_error("Dataset path is not a directory: " + dataset_dir);
   }
 
-  if (!std::filesystem::is_directory(data_dir)) {
-    throw std::runtime_error("Error: Path is not a directory.");
-  }
+  Model model(model_name);
 
-  // iterate through all folders in data_dir
-  // each folder consists of two inputs
   std::vector<std::string> dataset;
-  std::filesystem::directory_iterator dir_it(data_dir);
-  for (const auto& entry : dir_it) {
-    if (entry.is_directory()) {
-      // get folder name
-      std::string directory = entry.path().filename().string();
+  for (const auto& entry : std::filesystem::directory_iterator(dataset_dir)) {
+    if (!entry.is_directory()) continue;
+    const std::string name = entry.path().filename().string();
+    if (name == "params") continue;
+    dataset.push_back(name);
+  }
+  std::sort(dataset.begin(), dataset.end());
 
-      // skip params folder
-      if (directory == "params") {
-        continue;
-      }
-      dataset.push_back(directory);
-    }
-  }
-  if (num_samples == -1) {
-    num_samples = dataset.size();
-  } else {
-    num_samples = std::min(num_samples, (int)dataset.size());
-  }
+  num_samples = num_samples < 0
+                    ? static_cast<int>(dataset.size())
+                    : std::min(num_samples, static_cast<int>(dataset.size()));
   std::cout << "Number of samples: " << num_samples << std::endl;
 
-  // Run num_threads samples in parallel
-  int num_batches = num_samples / num_threads;
-  num_batches += num_samples % num_threads == 0 ? 0 : 1;
-  int num_correct = 0;
-  int num_finished = 0;
+  int correct = 0;
+  int finished = 0;
 
-  for (int batch = 0; batch < num_batches; batch++) {
-    int start_index = batch * num_threads;
-    int end_index = std::min(start_index + num_threads, num_samples);
+  for (int start = 0; start < num_samples; start += num_threads) {
+    const int end = std::min(start + num_threads, num_samples);
 
     if (num_threads == 1) {
-      // Direct call for easier debugging
-      int sample_index = start_index;
-      bool result =
-          run_sample(model_name, data_dir, dataset[sample_index], network);
-      if (result) {
-        num_correct++;
-      }
-      num_finished++;
-
+      // Run inline, so a failing sample is debuggable.
+      correct += run_sample(model, model_name, dataset_dir, dataset[start]);
+      finished++;
     } else {
-      // Parallel execution
       std::vector<std::future<bool>> results;
-      for (int sample_index = start_index; sample_index < end_index;
-           ++sample_index) {
-        results.push_back(std::async(std::launch::async, run_sample, model_name,
-                                     data_dir, dataset[sample_index], network));
+      for (int i = start; i < end; i++) {
+        results.push_back(std::async(std::launch::async, run_sample,
+                                     std::cref(model), model_name, dataset_dir,
+                                     dataset[i]));
       }
-
       for (auto& result : results) {
-        if (result.get()) {
-          num_correct++;
-        }
-        num_finished++;
+        correct += result.get();
+        finished++;
       }
     }
 
-    std::cout << "Accuracy: " << num_correct << "/" << num_finished << " ("
+    std::cout << "Accuracy: " << correct << "/" << finished << " ("
               << std::fixed << std::setprecision(2)
-              << (static_cast<float>(num_correct) / num_finished * 100) << "%)"
+              << (static_cast<float>(correct) / finished * 100) << "%)"
               << std::endl;
   }
+
+  return 0;
 }

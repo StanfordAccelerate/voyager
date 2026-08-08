@@ -71,12 +71,13 @@ T* reduce(std::any input_tensor, std::vector<int> shape, int dim,
 }
 
 template <typename T>
-T* reduce(std::map<std::string, std::any>& kwargs,
-          const codegen::OpOverload op) {
-  const auto input = op.kwargs().at("input").tensor();
-  std::any input_ptr = kwargs[input.node()];
+T* reduce(std::map<std::string, std::any>& kwargs, const voyager::PrimOp& op,
+          const ScalarEnv& env) {
+  const auto input = resolve(op, "input", env);
+  std::any input_ptr = kwargs[input.node];
   const auto input_shape = get_shape(input);
-  const auto dim = op.kwargs().at("dim").int_list().values();
+  const auto dim = arg_ints(op, "dim", env);
   assert(dim.size() == 1);  // Only support reduction over one dimension for now
-  return reduce<T>(input_ptr, input_shape, dim[0], op.target());
+  return reduce<T>(input_ptr, input_shape, dim[0],
+                   strip_namespace(op.target()));
 }
