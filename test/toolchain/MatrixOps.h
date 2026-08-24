@@ -259,9 +259,6 @@ void map_matrix_operation(const voyager::Operation& operation,
     int padded_Y = Y + 2 * y_pad - 2;
     int padded_X = X + 2 * x_pad - 2;
 
-    assert(padded_Y % stride == 0);
-    assert(padded_X % stride == 0);
-
     int X0 = ((DWC_WIDTH - 2) / stride) * stride;
     int X1 = (input.shape[2] + x_pad + x_pad - 2 + X0 - 1) /
              X0;  // Padding lines, asym in future
@@ -275,9 +272,14 @@ void map_matrix_operation(const voyager::Operation& operation,
     dwc_params->loops[1][1] = X0;
     dwc_params->loops[1][2] = UNROLLFACTOR;
 
-    dwc_params->outloops[0] = padded_Y / stride;
-    dwc_params->outloops[1] = padded_X / stride;
+    // The window's last step starts inside the final stride, so a tile whose
+    // padded extent is not a multiple of the stride still yields that output.
+    dwc_params->outloops[0] = (padded_Y + stride - 1) / stride;
+    dwc_params->outloops[1] = (padded_X + stride - 1) / stride;
     dwc_params->outloops[2] = X0 / stride;
+
+    assert(dwc_params->outloops[0] == output.shape[1]);
+    assert(dwc_params->outloops[1] == output.shape[2]);
 
     dwc_params->padding[0][0] = y_pad;
     dwc_params->padding[0][1] = y_pad;

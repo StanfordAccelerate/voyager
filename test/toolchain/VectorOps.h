@@ -181,9 +181,9 @@ void map_vector_operations(const voyager::Operation& operation,
 
   if (is_dma_op(strip_namespace(op_list[0]->target()))) {
     for (const auto dim : input_shape) {
-      if (dim > MAX_LOOP_VALUE) {
+      if (dim > MAX_VECTOR_LOOP_VALUE) {
         spdlog::error("ERROR: input shape dimension is greater than {}: ",
-                      MAX_LOOP_VALUE);
+                      MAX_VECTOR_LOOP_VALUE);
         print_shape(input_shape);
         throw std::invalid_argument("Unsupported input shape dimension!");
       }
@@ -193,7 +193,7 @@ void map_vector_operations(const voyager::Operation& operation,
     // below clamps each to the window's run.
     input_shape.back() = input.window_pitch;
   } else {
-    input_shape = split_loops(input_shape, MAX_LOOP_VALUE);
+    input_shape = split_loops(input_shape, MAX_VECTOR_LOOP_VALUE);
     input_shape = adjust_loop_indices(input_shape, OC_DIMENSION);
   }
 
@@ -405,7 +405,7 @@ void map_vector_operations(const voyager::Operation& operation,
   vector_params->output_mode = 2;
 
   auto output_shape = get_shape(output);
-  output_shape = split_loops(output_shape, MAX_LOOP_VALUE);
+  output_shape = split_loops(output_shape, MAX_VECTOR_LOOP_VALUE);
   if (output_shape.size() > 6) {
     throw std::invalid_argument("Too many dimensions for vector operations!");
   }

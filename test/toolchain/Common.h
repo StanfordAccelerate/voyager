@@ -12,6 +12,12 @@
 
 constexpr int MAX_LOOP_VALUE = 65535;
 
+// The vector fetch unit walks its nest with counters narrower than the params
+// carry (VectorFetchUnit::LOOP_WIDTH), so its loops split shorter: an extent it
+// cannot count to is fetched short, and the pipeline then waits forever for the
+// rest of the tile.
+constexpr int MAX_VECTOR_LOOP_VALUE = (1 << 11) - 1;
+
 const voyager::PrimOp* get_fused_producer(const voyager::Operation& operation,
                                           const ScalarEnv& env,
                                           const Tensor& tensor) {
