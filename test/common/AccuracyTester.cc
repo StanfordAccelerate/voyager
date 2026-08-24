@@ -87,6 +87,9 @@ bool run_sample(const Model& model, const std::string& model_name,
 
 }  // namespace
 
+// Never called; satisfies libsystemc, which the shared IR objects link in.
+extern "C" int sc_main(int, char*[]) { return 0; }
+
 int main(int argc, char* argv[]) {
   if (argc < 3) {
     std::cerr << "usage: AccuracyTester <model> <dataset_dir> "

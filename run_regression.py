@@ -623,6 +623,35 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid datatype")
 
+    if env_vars["DATATYPE"] == "MXNF4":
+        quantization_args += ["--bank_width", str(oc_unroll // 2)]
+    elif env_vars["DATATYPE"] not in ("CFLOAT", "BF16"):
+        quantization_args += ["--bank_width", str(oc_unroll)]
+
+    # Keep in sync with codegen.mk's COMMON_FLAGS.
+    common_flags = [
+        "--layout_policy",
+        "systolic",
+        "--pe_array_size",
+        f"{ic_unroll},{oc_unroll}",
+        "--dump_tensors",
+        "--double_buffered_l2",
+        "--scratchpad_size",
+        env_vars.get("SCRATCHPAD_SIZE", "2097152"),
+        "--num_banks",
+        env_vars.get("NUM_BANKS", "16"),
+        "--input_buffer_size",
+        env_vars["INPUT_BUFFER_SIZE"],
+        "--weight_buffer_size",
+        env_vars["WEIGHT_BUFFER_SIZE"],
+        "--accum_buffer_size",
+        env_vars["ACCUM_BUFFER_SIZE"],
+    ]
+    if env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] in ("true", "1"):
+        common_flags.append("--double_buffered_accum_buffer")
+    if env_vars.get("CONV2D_IM2COL") == "1":
+        common_flags.append("--conv2d_im2col")
+
     subprocess.run(
         [
             "mkdir",
@@ -639,55 +668,13 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 model,
                 "--model_name_or_path",
                 model_path,
-                "--transform_layout",
-                "--hardware_unrolling",
-                f"{ic_unroll},{oc_unroll}",
                 *quantization_args,
+                *common_flags,
                 "--model_output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
                 "--dump_dataset",
                 "--dataset_output_dir",
                 output_data_dir,
-                "--dump_tensors",
-            ],
-            stdout=stdout_file,
-            stderr=subprocess.STDOUT,
-        )
-
-    subprocess.run(
-        [
-            "mkdir",
-            "-p",
-            f"{env_vars['CODEGEN_DIR']}/networks/{model}/{env_vars['DATATYPE']}/{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}",
-        ]
-    )
-
-    subprocess.run(
-        [
-            "protoc",
-            "--proto_path=test/compiler/proto/",
-            "--python_out=test/compiler/proto/",
-            f"test/compiler/proto/tiling.proto",
-        ]
-    )
-
-    with open(f"{output_folder}/{model}_{dataset}_tiler.log", "w") as stdout_file:
-        subprocess.run(
-            [
-                "python",
-                "test/compiler/run_tiler.py",
-                "--codegen_dir",
-                f"test/compiler/networks/{model}/{env_vars['DATATYPE']}",
-                "--IC_dimension",
-                env_vars["IC_DIMENSION"],
-                "--OC_dimension",
-                env_vars["OC_DIMENSION"],
-                "--input_buffer_size",
-                env_vars["INPUT_BUFFER_SIZE"],
-                "--weight_buffer_size",
-                env_vars["WEIGHT_BUFFER_SIZE"],
-                "--accum_buffer_size",
-                env_vars["ACCUM_BUFFER_SIZE"],
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,

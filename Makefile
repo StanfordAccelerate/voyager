@@ -393,7 +393,7 @@ $(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc test/compiler/pr
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(IR_OBJS) $(SPDLOG_OBJ_FILES)
-	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS) -pthread
 
 .PHONY: AccuracyTester
 AccuracyTester: check_env_var $(CC_BUILD_DIR)/AccuracyTester

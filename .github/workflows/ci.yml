@@ -182,7 +182,7 @@ jobs:
       - name: Run Accuracy
         run: |
           source load_env.sh
-          DATATYPE=${{ matrix.type }} IC_DIMENSION=16 OC_DIMENSION=16 python run_regression.py --models ${{ matrix.model }} --dataset ${{ matrix.dataset }} --sims accuracy --num_processes 16
+          DATATYPE=${{ matrix.type }} IC_DIMENSION=16 OC_DIMENSION=16 CONV2D_IM2COL=1 python run_regression.py --models ${{ matrix.model }} --dataset ${{ matrix.dataset }} --sims accuracy --num_processes 16
 
   check_results:
     needs: rtl_simulation
