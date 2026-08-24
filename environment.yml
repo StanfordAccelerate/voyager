@@ -6,9 +6,6 @@ dependencies:
   - python>=3.9,<3.11
   - pip
   - pip:
-      - torch==2.8.0
-      - torchvision==0.23.0
-      - torchaudio==2.8.0
       - deepdiff
       - xonsh
       - openpyxl
@@ -16,6 +13,5 @@ dependencies:
       - pandas
       - compiledb
       - -e voyager-compiler
-      - -e interstellar
 variables:
   CODEGEN_DIR: test/compiler
