@@ -164,7 +164,7 @@ void map_vector_operations(const voyager::Operation& operation,
   const voyager::PrimOp* head = op_list[0];
   for (const auto* prim : op_list) {
     if (strip_namespace(prim->target()) == "dequantize" &&
-        is_side_operand_dequantize(*prim, op_list)) {
+        is_side_operand_dequantize(operation, env, *prim, op_list)) {
       continue;
     }
     head = prim;

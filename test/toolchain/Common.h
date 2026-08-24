@@ -22,6 +22,24 @@ const voyager::PrimOp* get_fused_producer(const voyager::Operation& operation,
   return nullptr;
 }
 
+// Whether this fusion computes `tensor` in the datapath rather than reading it
+// from memory, looking through a fused dequantize to the codes it reads.
+bool is_datapath_value(const voyager::Operation& operation,
+                       const ScalarEnv& env, const Tensor& tensor) {
+  const voyager::PrimOp* producer = get_fused_producer(operation, env, tensor);
+  if (producer != nullptr &&
+      strip_namespace(producer->target()) == "dequantize") {
+    producer =
+        get_fused_producer(operation, env, resolve(*producer, "input", env));
+  }
+  return producer != nullptr;
+}
+
+bool is_commutative(const std::string& opcode) {
+  return opcode == "add" || opcode == "add_" || opcode == "mul" ||
+         opcode == "mul_";
+}
+
 void set_dequantize_scale(const voyager::PrimOp* dequantize_op,
                           const ScalarEnv& env, VectorInstructions& inst) {
   if (dequantize_op == nullptr ||
@@ -846,6 +864,7 @@ void set_vector_immediate(const float scalar, const int stage,
 // vdequantize scales only the pipeline input; a side operand is scaled by
 // its consumer through the stage mac instead.
 bool is_side_operand_dequantize(
+    const voyager::Operation& operation, const ScalarEnv& env,
     const voyager::PrimOp& dequantize,
     const std::vector<const voyager::PrimOp*>& op_list) {
   for (const voyager::PrimOp* op_ptr : op_list) {
@@ -854,6 +873,10 @@ bool is_side_operand_dequantize(
     for (const auto& [key, value] : op.kwargs()) {
       if (value.has_tensor_box() &&
           value.tensor_box().box().node() == dequantize.name()) {
+        if (is_commutative(strip_namespace(op.target()))) {
+          return !is_datapath_value(operation, env,
+                                    resolve(dequantize, "input", env));
+        }
         return key != "input";
       }
     }
@@ -884,7 +907,7 @@ void map_vector_pipeline_ops(const voyager::Operation& operation,
     // Dequantization is a modifier on the pipeline input, not a stage. A
     // side-operand dequantize is applied by its consumer below instead.
     if (opcode == "dequantize") {
-      if (is_side_operand_dequantize(op, op_list)) continue;
+      if (is_side_operand_dequantize(operation, env, op, op_list)) continue;
 
       const Tensor& scale = resolve(op, "scale", env);
       if (get_size(scale) != 1) {
@@ -967,7 +990,15 @@ void map_vector_pipeline_ops(const voyager::Operation& operation,
                              vector_instruction_config, mapped_params,
                              mx_scale_fetch);
     } else if (has_arg(op, "other") || opcode == "quantize") {
-      const std::string other_key = opcode == "quantize" ? "scale" : "other";
+      std::string other_key = opcode == "quantize" ? "scale" : "other";
+
+      // A commutative op may name the pipeline's own value in either operand;
+      // the side operand is the one the datapath does not produce.
+      if (is_commutative(opcode) && has_tensor(op, other_key) &&
+          is_datapath_value(operation, env, resolve(op, other_key, env)) &&
+          !is_datapath_value(operation, env, resolve(op, "input", env))) {
+        other_key = "input";
+      }
 
       if (!has_tensor(op, other_key)) {
         set_vector_immediate(arg_float(op, other_key, env), stage, opcode,
