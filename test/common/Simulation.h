@@ -36,7 +36,7 @@
 class Simulation {
  public:
   Simulation();
-  ~Simulation();
+  virtual ~Simulation();
 
   void load_data();
 
@@ -55,6 +55,13 @@ class Simulation {
 
   // The top-level operations to run, and which of them MAX_TILES bounds.
   Model::Selection selection;
+
+ protected:
+  // The simulator memories are plain host arrays by default; the SoC
+  // testbench overrides this so the "accelerator" simulator's memory is
+  // backed by the DUT's physical scratchpad through the VPI backdoor.
+  virtual ArrayMemory* make_memory(const std::string& sim,
+                                   const std::vector<uint64_t>& sizes);
 
  private:
   std::vector<std::string> sims;

@@ -56,6 +56,20 @@ class Backend {
     count -= amount;
   }
 
+  // --- Data-movement interception -----------------------------------------
+  //
+  // The interpreter itself performs the program's data movement: async_copy
+  // transfers, the materialization of voyager::zeros data buffers, and the
+  // zero-fill of integer allocations. A backend that does not execute the
+  // program in place -- the SoC schedule recorder, which replays these
+  // effects into the DUT's scratchpad later -- overrides
+  // intercepts_data_ops() and receives each such op through data_op()
+  // instead of the interpreter touching memory. Semaphore accounting is not
+  // affected: posts and waits already flow through the backend.
+  virtual bool intercepts_data_ops() const { return false; }
+  virtual void data_op(const voyager::Operation& op,
+                       const voyager::PrimOp& prim, const ScalarEnv& env) {}
+
   // --- Committed (async) regions ------------------------------------------
   //
   // A `commit` dispatches a region asynchronously so a matrix tile's ramp-up

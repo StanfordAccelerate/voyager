@@ -5,6 +5,7 @@
 # SCRATCHPAD_SIZE is the whole physical L2 SRAM; COMMON_FLAGS always passes
 # --double_buffered_l2, so a ping-ponged buffer gets half of it per slot.
 SCRATCHPAD_SIZE ?= 2097152
+SCRATCHPAD_OFFSET ?= 0
 NUM_BANKS ?= 16
 
 # One input beat in bytes: the PE array's column count times the activation
@@ -20,7 +21,7 @@ INT8_32_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_
 BLOCK_SIZE := $(shell [ $(IC_DIMENSION) -gt $(OC_DIMENSION) ] && echo $(IC_DIMENSION) || echo $(OC_DIMENSION))
 MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE) --weight int8,qs=microscaling,bs=$(BLOCK_SIZE) --force_scale_power_of_two --bf16 --bank_width $(BYTE_BANK_WIDTH)
 MXNF4_FLAGS := --activation nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16 --residual fp8_e4m3 --quantize_fc --bank_width $(NIBBLE_BANK_WIDTH)
-COMMON_FLAGS := --layout_policy systolic --pe_array_size $(IC_DIMENSION),$(OC_DIMENSION) --dump_tensors --double_buffered_l2 --scratchpad_size $(SCRATCHPAD_SIZE) --num_banks $(NUM_BANKS) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE)
+COMMON_FLAGS := --layout_policy systolic --pe_array_size $(IC_DIMENSION),$(OC_DIMENSION) --dump_tensors --double_buffered_l2 --scratchpad_size $(SCRATCHPAD_SIZE) --scratchpad_offset $(SCRATCHPAD_OFFSET) --num_banks $(NUM_BANKS) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE)
 EXTRA_COMPILER_FLAGS ?=
 
 CONTEXT ?= 1024

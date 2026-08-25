@@ -210,8 +210,12 @@ void Interpreter::execute_prim(const voyager::Operation& op,
         // planner hands that padding to a buffer whose lifetime is disjoint
         // from this one, and zeroing it would clobber that buffer -- and
         // mark its bytes written, which grades a region neither side owns.
-        for (uint32_t bank = 0; bank < banks_of(box); bank++) {
-          zero_buffer(to_tensor(box, bank), 1, 0, memory_);
+        if (backend_->intercepts_data_ops()) {
+          backend_->data_op(op, prim, env_);
+        } else {
+          for (uint32_t bank = 0; bank < banks_of(box); bank++) {
+            zero_buffer(to_tensor(box, bank), 1, 0, memory_);
+          }
         }
       }
     }
@@ -226,7 +230,11 @@ void Interpreter::execute_prim(const voyager::Operation& op,
     return;
   }
   if (target == "voyager::async_copy") {
-    run_async_copy(prim, env_, memory_);
+    if (backend_->intercepts_data_ops()) {
+      backend_->data_op(op, prim, env_);
+    } else {
+      run_async_copy(prim, env_, memory_);
+    }
     // The completed transfer signals its slot semaphore, post_count times: a
     // tile loaded once but consumed by several commits posts once per consumer.
     const auto sem = prim.kwargs().find("semaphore");
@@ -361,6 +369,10 @@ void Interpreter::execute_zeros(const voyager::Operation& op,
     for (int64_t slot = 0; slot < slots; slot++) {
       backend_->init_semaphore(box.node(), slot, 0);
     }
+    return;
+  }
+  if (backend_->intercepts_data_ops()) {
+    backend_->data_op(op, prim, env_);
     return;
   }
   zero_buffer(to_tensor(box), banks_of(box), bank_stride_of(box), memory_);

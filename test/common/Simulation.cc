@@ -67,6 +67,11 @@ Simulation::~Simulation() {
   for (const auto& [sim, array] : memories) delete array;
 }
 
+ArrayMemory* Simulation::make_memory(const std::string& sim,
+                                     const std::vector<uint64_t>& sizes) {
+  return new ArrayMemory(sizes);
+}
+
 void Simulation::load_data() {
   const auto sizes = model.memory_sizes();
   spdlog::info("Model memory requirements:\n");
@@ -76,7 +81,7 @@ void Simulation::load_data() {
                sizes[1] / (1024 * 1024));
 
   for (const auto& sim : sims) {
-    auto* array = new ArrayMemory(sizes);
+    auto* array = make_memory(sim, sizes);
     memories[sim] = array;
 
     // Loads the reference output tensors from disk so there's something to
@@ -127,16 +132,15 @@ void Simulation::run_gold() {
   Interpreter interpreter(model, array, &backend);
   interpreter.run(selection);
 
-  const long clock_period_ns = getenv_int("CLOCK_PERIOD", 5);
   const std::string name = getenv("TESTS", model_name);
 
   if (interpreter.matrix_cycles() > 0) {
-    spdlog::info("{}, matrix unit ideal runtime: {} ns\n", name,
-                 interpreter.matrix_cycles() * clock_period_ns);
+    spdlog::info("{}, matrix unit ideal runtime: {} cycles\n", name,
+                 interpreter.matrix_cycles());
   }
   if (interpreter.vector_cycles() > 0) {
-    spdlog::info("{}, vector unit ideal runtime: {} ns\n", name,
-                 interpreter.vector_cycles() * clock_period_ns);
+    spdlog::info("{}, vector unit ideal runtime: {} cycles\n", name,
+                 interpreter.vector_cycles());
   }
 }
 

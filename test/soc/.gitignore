@@ -1,0 +1,6 @@
+# Generated per-network firmware (GenerateSoCBinaries output) and build junk.
+__pycache__/
+firmware/networks/
+firmware/common/voyager_params.h
+*.o
+*.riscv
