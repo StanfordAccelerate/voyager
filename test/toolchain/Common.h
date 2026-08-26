@@ -60,7 +60,7 @@ void set_dequantize_scale(const voyager::PrimOp* dequantize_op,
   }
 
   float* scale_value = read_constant_param(scale);
-  const VECTOR_DATATYPE immediate = scale_value[0];
+  VECTOR_DATATYPE immediate = scale_value[0];
   delete[] scale_value;
 
   inst.vdequantize = true;
@@ -922,7 +922,7 @@ void map_vector_pipeline_ops(const voyager::Operation& operation,
       }
 
       float* array = read_constant_param(scale);
-      const VECTOR_DATATYPE immediate = array[0];
+      VECTOR_DATATYPE immediate = array[0];
       delete[] array;
 
       inst.vdequantize = true;
@@ -987,7 +987,7 @@ void map_vector_pipeline_ops(const voyager::Operation& operation,
     }
 
     if (opcode == "neg") {
-      const VECTOR_DATATYPE immediate = 0;
+      VECTOR_DATATYPE immediate = 0;
       inst.immediate0 = immediate.bits_rep();
       inst.vector_op0_src0 = VectorInstructions::from_immediate_0;
       inst.vector_op0_src1 = pipeline_input;
@@ -1041,7 +1041,7 @@ void map_vector_pipeline_ops(const voyager::Operation& operation,
           }
 
           float* array = read_constant_param(scale);
-          const VECTOR_DATATYPE dq_scale = array[0];
+          VECTOR_DATATYPE dq_scale = array[0];
           delete[] array;
 
           if (stage == 0 && (inst.vector_op0 == VectorInstructions::op0_add ||
