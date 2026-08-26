@@ -426,6 +426,9 @@ struct Harness : public sc_module, public Backend {
   void retire_dones();
 };
 
+#endif
+
+// Declared outside the CFLOAT guard to mirror the definition: for CFloat it
+// compiles (the harness itself cannot) and aborts if actually called.
 void run_accelerator(const Model& model, const Model::Selection& selection,
                      MemoryInterface* memory);
-#endif
