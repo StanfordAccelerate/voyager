@@ -256,13 +256,6 @@ uint32_t banks_of(const voyager::TensorBox& box);
 Tensor to_tensor(const voyager::TensorBox& box, int64_t bank = 0);
 uint64_t bank_stride_of(const voyager::TensorBox& box);
 
-// Windowed references (a voyager.subview folded into an operand) carry the
-// view's own shape in box.shape, so resolving one needs the allocation's
-// declared dims. The loaded Model installs its box index here at load;
-// nothing else mutates it.
-void set_declared_boxes(
-    const std::map<std::string, const voyager::TensorBox*>* boxes);
-
 // Resolves a TensorBoxRef -- a box plus an optional bank window -- into the
 // concrete buffer it denotes right now.
 //
@@ -333,7 +326,9 @@ inline bool is_fc_layer(const voyager::PrimOp& op) {
   }
 
   // The operand states its own shape, so this needs no memory resolution.
-  const auto& shape = op.kwargs().at("input").tensor_box().box().shape();
+  const auto& ref = op.kwargs().at("input").tensor_box();
+  const auto& shape =
+      ref.output_shape_size() > 0 ? ref.output_shape() : ref.box().shape();
 
   int dim = 1;
   for (int i = 0; i < shape.size() - 1; i++) {

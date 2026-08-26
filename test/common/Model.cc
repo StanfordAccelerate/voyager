@@ -82,9 +82,6 @@ Model::Model(const std::string& model_name) {
   }
 
   collect_boxes();
-  // Windowed references carry only the view's shape; resolution reads the
-  // declared dims from this index.
-  set_declared_boxes(&boxes_);
   load_layers(dir);
 }
 

@@ -126,10 +126,10 @@ Tensor to_tensor(const voyager::TensorBox& box, int64_t bank) {
 
 namespace {
 
-// A windowed TensorBoxRef selects one bank of a software-pipelined allocation,
-// and nothing else. The referenced dimensions are [bank_count, *box.shape]:
-// dimension 0 picks the bank (possibly at runtime) and every other dimension
-// spans the whole extent.
+// A whole-bank TensorBoxRef selects one bank of a software-pipelined
+// allocation, and nothing else. A banked box's referenced dimensions are
+// [bank_count, *box.shape]: dimension 0 picks the bank (possibly at runtime)
+// and every other dimension spans the whole extent.
 //
 // That is what makes an operand expressible as a plain base address plus a
 // contiguous shape, which is all the kernels and the accelerator's params
@@ -149,27 +149,31 @@ int64_t select_bank(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
         "GraphUtils.cc rather than mis-addressing it.");
   };
 
-  const int rank = ref.box().shape_size();
-  if (ref.offsets_size() != rank + 1 || ref.sizes_size() != rank + 1 ||
-      ref.strides_size() != rank + 1) {
+  const int bank_dims = banks_of(ref.box()) > 1 ? 1 : 0;
+  const int rank = ref.box().shape_size() + bank_dims;
+  if (ref.offsets_size() != rank || ref.sizes_size() != rank ||
+      ref.strides_size() != rank) {
     reject("rank is not bank_count + box rank");
   }
-  if (ref.sizes(0) != 1) reject("selects more than one bank");
+  if (bank_dims == 1 && ref.sizes(0) != 1) {
+    reject("selects more than one bank");
+  }
 
-  for (int d = 0; d < rank + 1; d++) {
+  for (int d = 0; d < rank; d++) {
     if (ref.strides(d) != 1)
       reject("stride != 1 on dimension " + std::to_string(d));
   }
-  for (int d = 1; d < rank + 1; d++) {
+  for (int d = bank_dims; d < rank; d++) {
     const auto& offset = ref.offsets(d);
     if (offset.value_case() != voyager::ScalarValue::kIntValue ||
         offset.int_value() != 0) {
       reject("nonzero offset on dimension " + std::to_string(d));
     }
-    if (ref.sizes(d) != ref.box().shape(d - 1)) {
+    if (ref.sizes(d) != ref.box().shape(d - bank_dims)) {
       reject("partial extent on dimension " + std::to_string(d));
     }
   }
+  if (bank_dims == 0) return 0;
 
   const int64_t bank = eval_int(ref.offsets(0), env);
   const uint32_t banks = banks_of(ref.box());
@@ -181,16 +185,11 @@ int64_t select_bank(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
   return bank;
 }
 
-// The declarations Model indexed, for resolving windowed references. A ref's
-// own box is authoritative for banking and address, but its shape is the
-// view's, so the underlying dims must come from here.
-const std::map<std::string, const voyager::TensorBox*>* declared_boxes =
-    nullptr;
-
-const voyager::TensorBox* declared_box(const std::string& node) {
-  if (declared_boxes == nullptr) return nullptr;
-  const auto found = declared_boxes->find(node);
-  return found == declared_boxes->end() ? nullptr : found->second;
+// The operand's own shape, when the ref carries one distinct from the box's.
+void take_output_shape(Tensor& tensor, const voyager::TensorBoxRef& ref) {
+  if (ref.output_shape_size() > 0) {
+    tensor.shape.assign(ref.output_shape().begin(), ref.output_shape().end());
+  }
 }
 
 // The whole-bank convention select_bank enforces, as a non-throwing
@@ -198,22 +197,23 @@ const voyager::TensorBox* declared_box(const std::string& node) {
 bool is_whole_bank_ref(const voyager::TensorBoxRef& ref) {
   if (ref.offsets_size() == 0) return true;
 
-  const int rank = ref.box().shape_size();
-  if (ref.offsets_size() != rank + 1 || ref.sizes_size() != rank + 1 ||
-      ref.strides_size() != rank + 1) {
+  const int bank_dims = banks_of(ref.box()) > 1 ? 1 : 0;
+  const int rank = ref.box().shape_size() + bank_dims;
+  if (ref.offsets_size() != rank || ref.sizes_size() != rank ||
+      ref.strides_size() != rank) {
     return false;
   }
-  if (ref.sizes(0) != 1) return false;
-  for (int d = 0; d < rank + 1; d++) {
+  if (bank_dims == 1 && ref.sizes(0) != 1) return false;
+  for (int d = 0; d < rank; d++) {
     if (ref.strides(d) != 1) return false;
   }
-  for (int d = 1; d < rank + 1; d++) {
+  for (int d = bank_dims; d < rank; d++) {
     const auto& offset = ref.offsets(d);
     if (offset.value_case() != voyager::ScalarValue::kIntValue ||
         offset.int_value() != 0) {
       return false;
     }
-    if (ref.sizes(d) != ref.box().shape(d - 1)) return false;
+    if (ref.sizes(d) != ref.box().shape(d - bank_dims)) return false;
   }
   return true;
 }
@@ -233,11 +233,11 @@ std::vector<int64_t> row_major_strides(const std::vector<int64_t>& shape) {
 }
 
 // A windowed reference: a voyager.subview the compiler folded into the
-// operand. Its offsets/sizes/strides window the allocation's referenced dims
-// -- [slot, *dims] for a pipelined buffer -- while box.shape is the view's
-// own shape, so the underlying dims come from the declaration. Only a window
-// expressible as a base address plus a contiguous run resolves; a genuinely
-// strided sub-window still rejects loudly.
+// operand. Its offsets/sizes/strides window the source's dims carried in
+// box.shape -- [slot, *dims] for a pipelined buffer -- and output_shape is
+// the operand's own shape. Only a window expressible as a base address plus
+// a contiguous run resolves; a genuinely strided sub-window still rejects
+// loudly.
 Tensor resolve_window(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
                       const std::string& op_name) {
   const voyager::TensorBox& box = ref.box();
@@ -249,9 +249,6 @@ Tensor resolve_window(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
         "). A strided sub-window cannot be expressed as a base address plus "
         "a contiguous shape, so it cannot be lowered.");
   };
-
-  const voyager::TensorBox* decl = declared_box(box.node());
-  if (decl == nullptr) reject("no declaration to window");
 
   const int rank = ref.offsets_size();
   if (ref.sizes_size() != rank || ref.strides_size() != rank) {
@@ -276,16 +273,11 @@ Tensor resolve_window(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
     }
   }
 
-  // Right-align the declared dims under the window; a view may add leading
-  // singleton dims but never drops a declared one.
   const int dims_rank = rank - bank_dims;
-  if (decl->shape_size() > dims_rank) {
-    reject("window rank is smaller than the declaration's");
+  if (box.shape_size() != dims_rank) {
+    reject("window rank does not match the box's dims");
   }
-  std::vector<int64_t> dims(dims_rank, 1);
-  for (int d = 0; d < decl->shape_size(); d++) {
-    dims[dims_rank - decl->shape_size() + d] = decl->shape(d);
-  }
+  const std::vector<int64_t> dims(box.shape().begin(), box.shape().end());
 
   const std::vector<int64_t> strides = row_major_strides(dims);
   int64_t element_offset = 0;
@@ -295,15 +287,14 @@ Tensor resolve_window(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
     const int64_t offset = eval_int(ref.offsets(bank_dims + d), env);
     const int64_t size = ref.sizes(bank_dims + d);
     if (offset < 0 || offset + size > dims[d]) {
-      reject("window exceeds the declaration on dimension " +
-             std::to_string(d));
+      reject("window exceeds the box on dimension " + std::to_string(d));
     }
     element_offset += offset * strides[d];
 
     // Base + contiguous shape can express the window only if every dim
-    // inside the outermost non-unit one spans its whole declared extent. A
-    // partial innermost run alone is a pitched window: its rows sit a whole
-    // declared row apart, which Tensor::window_pitch carries.
+    // inside the outermost non-unit one spans its whole extent. A partial
+    // innermost run alone is a pitched window: its rows sit a whole source
+    // row apart, which Tensor::window_pitch carries.
     if (outer_seen && size != dims[d]) {
       if (d != dims_rank - 1) reject("strided sub-window");
       pitched = true;
@@ -312,6 +303,7 @@ Tensor resolve_window(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
   }
 
   Tensor tensor = to_tensor(box, bank);
+  take_output_shape(tensor, ref);
   const size_t width = get_width(tensor);
   if ((element_offset * width) % 8 != 0) {
     reject("window does not start on a byte boundary");
@@ -453,6 +445,7 @@ Tensor resolve(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
     Tensor tensor;
     tensor.node = box.node();
     tensor.shape.assign(box.shape().begin(), box.shape().end());
+    take_output_shape(tensor, ref);
     tensor.dtype = box.dtype();
     tensor.materialized = false;
     tensor.is_constant = is_constant(box);
@@ -462,15 +455,10 @@ Tensor resolve(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
   if (!is_whole_bank_ref(ref)) return resolve_window(ref, env, op_name);
 
   const int64_t bank = select_bank(ref, env, op_name);
-  // The reference carries the operand's own shape: the allocation's shape
-  // regrouped by whatever view the operation was traced against. The copy's
-  // sizes and indices are counted in those dimensions.
-  return to_tensor(box, bank);
-}
-
-void set_declared_boxes(
-    const std::map<std::string, const voyager::TensorBox*>* boxes) {
-  declared_boxes = boxes;
+  // The copy's sizes and indices are counted in the operand's own dims.
+  Tensor tensor = to_tensor(box, bank);
+  take_output_shape(tensor, ref);
+  return tensor;
 }
 
 Tensor resolve(const voyager::PrimOp& op, const std::string& key,
@@ -506,37 +494,40 @@ int64_t semaphore_slots(const voyager::TensorBox& box) {
 
 int64_t resolve_bank(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
                      const std::string& op_name) {
-  // The ref carries the operand's own shape, which for a semaphore is empty;
-  // the array's dims are on the declaration.
-  const voyager::TensorBox* decl = declared_box(ref.box().node());
-  const int dims = decl == nullptr ? 0 : decl->shape_size();
+  const voyager::TensorBox& box = ref.box();
+  const int dims = box.shape_size();
   if (dims == 0 || ref.offsets_size() == 0)
     return select_bank(ref, env, op_name);
 
   const auto reject = [&](const std::string& why) {
-    throw std::runtime_error("Semaphore TensorBoxRef " + ref.box().node() +
+    throw std::runtime_error("Semaphore TensorBoxRef " + box.node() +
                              " in operation " + op_name + " (" + why + ").");
   };
 
   // [bank, *dims], one counter selected.
-  if (ref.offsets_size() != dims + 1 || ref.sizes_size() != dims + 1) {
-    reject("rank is not 1 + the declared rank of the semaphore array");
+  const int bank_dims = banks_of(box) > 1 ? 1 : 0;
+  if (ref.offsets_size() != dims + bank_dims ||
+      ref.sizes_size() != dims + bank_dims) {
+    reject("rank is not bank_count + the semaphore array's rank");
   }
   for (int d = 0; d < ref.sizes_size(); d++) {
     if (ref.sizes(d) != 1) reject("selects more than one counter");
   }
 
-  const int64_t bank = eval_int(ref.offsets(0), env);
-  const uint32_t banks = banks_of(ref.box());
-  if (bank < 0 || bank >= static_cast<int64_t>(banks)) {
-    reject("bank index " + std::to_string(bank) + " is out of range for " +
-           std::to_string(banks) + " banks");
+  int64_t bank = 0;
+  if (bank_dims == 1) {
+    bank = eval_int(ref.offsets(0), env);
+    const uint32_t banks = banks_of(box);
+    if (bank < 0 || bank >= static_cast<int64_t>(banks)) {
+      reject("bank index " + std::to_string(bank) + " is out of range for " +
+             std::to_string(banks) + " banks");
+    }
   }
 
   int64_t index = 0;
   for (int d = 0; d < dims; d++) {
-    const int64_t extent = decl->shape(d);
-    const int64_t offset = eval_int(ref.offsets(d + 1), env);
+    const int64_t extent = box.shape(d);
+    const int64_t offset = eval_int(ref.offsets(d + bank_dims), env);
     if (offset < 0 || offset >= extent) {
       reject("index " + std::to_string(offset) +
              " is out of range on "
@@ -547,7 +538,7 @@ int64_t resolve_bank(const voyager::TensorBoxRef& ref, const ScalarEnv& env,
   }
 
   int64_t elements = 1;
-  for (const auto dim : decl->shape()) elements *= dim;
+  for (const auto dim : box.shape()) elements *= dim;
   return bank * elements + index;
 }
 
