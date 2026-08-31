@@ -63,27 +63,27 @@ $(CODEGEN_DIR)/networks/bert/%/model.txt:
 
 $(CODEGEN_DIR)/networks/llama_prefill/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_kivi/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_kivi $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_decode_kivi $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --enable_mixed_precision &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxnf4_attn_head_int6 &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_prefill_spmm/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --enable_mixed_precision --outlier_pct 0.01 &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxnf4_outlier &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llm_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --enable_mixed_precision &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxnf4_attn_head_int6 &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/vit/%/model.txt:
 	mkdir -p $(dir $@)
