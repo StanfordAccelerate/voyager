@@ -5,8 +5,9 @@
 #include "test/toolchain/ApproximationConstants.h"
 
 template <typename T>
-inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
-  T* inputs = std::any_cast<T*>(input_ptr);
+inline std::shared_ptr<T[]> softmax(std::any input_ptr,
+                                    const std::vector<int> shape) {
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   int num_rows = 1;
   for (int i = 0; i < shape.size() - 1; i++) {
@@ -14,7 +15,7 @@ inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
   }
   int num_cols = shape[shape.size() - 1];
 
-  T* outputs = new T[num_rows * num_cols];
+  std::shared_ptr<T[]> outputs(new T[num_rows * num_cols]);
 
   for (int i = 0; i < num_rows; i++) {
     int offset = i * num_cols;
@@ -55,14 +56,13 @@ inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
     }
   }
 
-  delete[] inputs;
-
   return outputs;
 }
 
 template <typename T>
-inline T* softmax(std::map<std::string, std::any> kwargs,
-                  const voyager::PrimOp& op, const ScalarEnv& env) {
+inline std::shared_ptr<T[]> softmax(std::map<std::string, std::any> kwargs,
+                                    const voyager::PrimOp& op,
+                                    const ScalarEnv& env) {
   const auto input = resolve(op, "input", env);
   std::any input_ptr = kwargs[input.node];
   const auto input_shape = get_shape(input);

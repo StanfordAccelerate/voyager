@@ -35,9 +35,9 @@ T reduce_op(const T& a, const T& b, const std::string& op) {
 }
 
 template <typename T>
-T* reduce(std::any input_tensor, std::vector<int> shape, int dim,
-          const std::string& op) {
-  T* inputs = std::any_cast<T*>(input_tensor);
+std::shared_ptr<T[]> reduce(std::any input_tensor, std::vector<int> shape,
+                            int dim, const std::string& op) {
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_tensor).get();
 
   if (dim < 0) {
     dim += shape.size();
@@ -49,7 +49,7 @@ T* reduce(std::any input_tensor, std::vector<int> shape, int dim,
   std::vector<int> output_shape(shape);
   output_shape[dim] = 1;
 
-  T* outputs = new T[output_size];
+  std::shared_ptr<T[]> outputs(new T[output_size]);
 
   for (int i = 0; i < output_size; i++) {
     auto indices = get_indices(i, output_shape);
@@ -71,8 +71,8 @@ T* reduce(std::any input_tensor, std::vector<int> shape, int dim,
 }
 
 template <typename T>
-T* reduce(std::map<std::string, std::any>& kwargs, const voyager::PrimOp& op,
-          const ScalarEnv& env) {
+std::shared_ptr<T[]> reduce(std::map<std::string, std::any>& kwargs,
+                            const voyager::PrimOp& op, const ScalarEnv& env) {
   const auto input = resolve(op, "input", env);
   std::any input_ptr = kwargs[input.node];
   const auto input_shape = get_shape(input);

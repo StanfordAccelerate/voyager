@@ -17,19 +17,21 @@ inline void fused_multiply_add(T1 a, T1 b, T2& c) {
 
 template <typename Input, typename Weight, typename Psum, typename Buffer,
           typename Scale>
-inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
-                    std::any weight_ptr, std::any weight_scale_ptr,
-                    std::any bias_ptr, Tiling tiling, const int block_size,
-                    bool has_fused_spmm) {
+inline std::shared_ptr<Buffer[]> gemm(
+    std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
+    std::any weight_scale_ptr, std::any bias_ptr, Tiling tiling,
+    const int block_size, bool has_fused_spmm) {
   spdlog::debug("Performing GEMM\n");
 
-  Input* inputs = std::any_cast<Input*>(input_ptr);
-  Scale* input_scales = std::any_cast<Scale*>(input_scale_ptr);
+  Input* inputs = std::any_cast<std::shared_ptr<Input[]>&>(input_ptr).get();
+  Scale* input_scales =
+      std::any_cast<std::shared_ptr<Scale[]>&>(input_scale_ptr).get();
 
-  Weight* weights = std::any_cast<Weight*>(weight_ptr);
-  Scale* weight_scales = std::any_cast<Scale*>(weight_scale_ptr);
+  Weight* weights = std::any_cast<std::shared_ptr<Weight[]>&>(weight_ptr).get();
+  Scale* weight_scales =
+      std::any_cast<std::shared_ptr<Scale[]>&>(weight_scale_ptr).get();
 
-  Buffer* biases = std::any_cast<Buffer*>(bias_ptr);
+  Buffer* biases = std::any_cast<std::shared_ptr<Buffer[]>&>(bias_ptr).get();
 
   int X = tiling.loops[0][tiling.x_loop_idx[0]] *
           tiling.loops[1][tiling.x_loop_idx[1]];
@@ -95,10 +97,10 @@ inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
     assert(tiling.loops[1][j] != 0);
   }
 
-  Buffer* outputs = new Buffer[X * Y * K];
+  std::shared_ptr<Buffer[]> outputs(new Buffer[X * Y * K]);
 
   // only used for replication
-  Psum* accumulations = new Psum[X * Y * K];
+  std::unique_ptr<Psum[]> accumulations(new Psum[X * Y * K]);
   for (int i = 0; i < X * Y * K; i++) {
     accumulations[i] = Psum(0.0);
   }
@@ -289,32 +291,15 @@ inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
 
   spdlog::debug("GEMM done\n");
 
-  delete[] inputs;
-  if (!has_fused_spmm) {
-    delete[] weights;
-  }
-
-  if (input_scales != nullptr) {
-    delete[] input_scales;
-  }
-
-  if (weight_scales != nullptr && !has_fused_spmm) {
-    delete[] weight_scales;
-  }
-
-  if (biases != nullptr) {
-    delete[] biases;
-  }
-
   return outputs;
 }
 
 template <typename Input, typename Weight, typename Psum, typename Buffer,
           typename Scale>
-inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
-                    std::any weight_ptr, std::any weight_scale_ptr,
-                    std::any bias_ptr, const voyager::Operation& operation,
-                    const ScalarEnv& env) {
+inline std::shared_ptr<Buffer[]> gemm(
+    std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
+    std::any weight_scale_ptr, std::any bias_ptr,
+    const voyager::Operation& operation, const ScalarEnv& env) {
   Tiling tiling = get_tiling(operation, env);
 
   std::ostringstream oss;
@@ -334,11 +319,10 @@ inline Buffer* gemm(std::any input_ptr, std::any input_scale_ptr,
 
 template <typename Input, typename Weight, typename Psum, typename Output,
           typename Scale, int N>
-inline Output* gemv_quantized(std::any input_ptr, std::any input_scale_ptr,
-                              std::any weight_ptr, std::any weight_scale_ptr,
-                              std::any bias_ptr,
-                              const voyager::Operation& operation,
-                              const ScalarEnv& env) {
+inline std::shared_ptr<Output[]> gemv_quantized(
+    std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
+    std::any weight_scale_ptr, std::any bias_ptr,
+    const voyager::Operation& operation, const ScalarEnv& env) {
   spdlog::debug("Performing matrix-vector multiply\n");
 
   const auto& matrix_op = get_anchor_op(operation);
@@ -356,13 +340,15 @@ inline Output* gemv_quantized(std::any input_ptr, std::any input_scale_ptr,
   int num_tiles = (C + N - 1) / N;
   int num_blocks = N / block_size;
 
-  Input* inputs = std::any_cast<Input*>(input_ptr);
-  Weight* weights = std::any_cast<Weight*>(weight_ptr);
-  Output* biases = std::any_cast<Output*>(bias_ptr);
-  Scale* input_scales = std::any_cast<Scale*>(input_scale_ptr);
-  Scale* weight_scales = std::any_cast<Scale*>(weight_scale_ptr);
+  Input* inputs = std::any_cast<std::shared_ptr<Input[]>&>(input_ptr).get();
+  Weight* weights = std::any_cast<std::shared_ptr<Weight[]>&>(weight_ptr).get();
+  Output* biases = std::any_cast<std::shared_ptr<Output[]>&>(bias_ptr).get();
+  Scale* input_scales =
+      std::any_cast<std::shared_ptr<Scale[]>&>(input_scale_ptr).get();
+  Scale* weight_scales =
+      std::any_cast<std::shared_ptr<Scale[]>&>(weight_scale_ptr).get();
 
-  Output* outputs = new Output[K];
+  std::shared_ptr<Output[]> outputs(new Output[K]);
   for (int i = 0; i < K; i++) {
     outputs[i] = biases != nullptr ? biases[i] : Output::zero();
   }
@@ -406,39 +392,24 @@ inline Output* gemv_quantized(std::any input_ptr, std::any input_scale_ptr,
     }
   }
 
-  delete[] inputs;
-  delete[] weights;
-
-  if (biases != nullptr) {
-    delete[] biases;
-  }
-
-  if (input_scales != nullptr) {
-    delete[] input_scales;
-  }
-
-  if (weight_scales != nullptr) {
-    delete[] weight_scales;
-  }
-
   return outputs;
 }
 
 template <typename T>
-inline T* gemv_bfloat16(std::any input_ptr, std::any weight_ptr,
-                        std::any bias_ptr,
-                        const std::vector<int>& weight_shape) {
+inline std::shared_ptr<T[]> gemv_bfloat16(
+    std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
+    const std::vector<int>& weight_shape) {
   if (weight_shape.size() < 2) {
     throw std::runtime_error("MVM weight must have at least two dimensions.");
   }
   const int K = weight_shape[weight_shape.size() - 2];
   const int C = weight_shape.back();
 
-  T* inputs = std::any_cast<T*>(input_ptr);
-  T* weights = std::any_cast<T*>(weight_ptr);
-  T* biases = std::any_cast<T*>(bias_ptr);
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
+  T* weights = std::any_cast<std::shared_ptr<T[]>&>(weight_ptr).get();
+  T* biases = std::any_cast<std::shared_ptr<T[]>&>(bias_ptr).get();
 
-  T* outputs = new T[K];
+  std::shared_ptr<T[]> outputs(new T[K]);
   for (int i = 0; i < K; i++) {
     outputs[i] = 0.0;
   }
@@ -463,13 +434,6 @@ inline T* gemv_bfloat16(std::any input_ptr, std::any weight_ptr,
     if (biases != nullptr) {
       outputs[k] += biases[k];
     }
-  }
-
-  delete[] inputs;
-  delete[] weights;
-
-  if (biases != nullptr) {
-    delete[] biases;
   }
 
   return outputs;
@@ -517,14 +481,16 @@ inline Buffer* DwC(std::any input_ptr, std::any input_scale_ptr,
   int oy = floor((iy + 2 * y_pad - kernel_size) / stride_y) + 1;
   int ox = floor((ix + 2 * x_pad - kernel_size) / stride_x) + 1;
 
-  Buffer* outputs = new Buffer[obatch * oc * ox * oy];
-  Input* inputs = std::any_cast<Input*>(input_ptr);
-  Scale* input_scales = std::any_cast<Scale*>(input_scale_ptr);
+  std::shared_ptr<Buffer[]> outputs(new Buffer[obatch * oc * ox * oy]);
+  Input* inputs = std::any_cast<std::shared_ptr<Input[]>&>(input_ptr).get();
+  Scale* input_scales =
+      std::any_cast<std::shared_ptr<Scale[]>&>(input_scale_ptr).get();
 
-  Input* weights = std::any_cast<Input*>(weight_ptr);
-  Scale* weight_scales = std::any_cast<Scale*>(weight_scale_ptr);
+  Input* weights = std::any_cast<std::shared_ptr<Input[]>&>(weight_ptr).get();
+  Scale* weight_scales =
+      std::any_cast<std::shared_ptr<Scale[]>&>(weight_scale_ptr).get();
 
-  Buffer* biases = std::any_cast<Buffer*>(bias_ptr);
+  Buffer* biases = std::any_cast<std::shared_ptr<Buffer[]>&>(bias_ptr).get();
 
   spdlog::debug(
       "Input shape: [{} {} {} {}], Weight shape: [{} {} {} {}], Output shape: "
@@ -636,16 +602,6 @@ inline Buffer* DwC(std::any input_ptr, std::any input_scale_ptr,
       }
     }
   }
-
-  delete[] inputs;
-  if (input_scales != nullptr) {
-    delete[] input_scales;
-  }
-  delete[] weights;
-  if (weight_scales != nullptr) {
-    delete[] weight_scales;
-  }
-  delete[] biases;
 
   spdlog::debug("DwC done\n");
   return outputs;

@@ -322,13 +322,12 @@ void Interpreter::execute_scalar(const voyager::Operation& op,
     // assignment to pick one; which conversions it will consider is a point
     // the C++17 compilers here disagree on.
     std::any data = memory_->read_tensor(input);
-    if (DataTypes::int32** value = std::any_cast<DataTypes::int32*>(&data)) {
-      result = static_cast<int64_t>((*value)->int_val.to_int64());
-      delete[] *value;
-    } else if (DataTypes::int64** value =
-                   std::any_cast<DataTypes::int64*>(&data)) {
-      result = static_cast<int64_t>((*value)->int_val.to_int64());
-      delete[] *value;
+    if (auto* value =
+            std::any_cast<std::shared_ptr<DataTypes::int32[]>>(&data)) {
+      result = static_cast<int64_t>((*value)[0].int_val.to_int64());
+    } else if (auto* value =
+                   std::any_cast<std::shared_ptr<DataTypes::int64[]>>(&data)) {
+      result = static_cast<int64_t>((*value)[0].int_val.to_int64());
     } else {
       throw std::runtime_error("Scalar operation " + op.name() +
                                " reads a tensor of non-index dtype " +

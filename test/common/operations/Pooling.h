@@ -13,9 +13,11 @@ constexpr double accumulator_clock_period = 5.0;
 constexpr int ACCUMULATOR_SUM_N = (accumulator_clock_period < 5) ? 4 : 2;
 
 template <typename T>
-T* pooling(std::any input_ptr, const std::vector<int>& input_shape,
-           const std::vector<int>& output_shape, int stride, int kernel_size,
-           int padding, const bool is_max_pool) {
+std::shared_ptr<T[]> pooling(std::any input_ptr,
+                             const std::vector<int>& input_shape,
+                             const std::vector<int>& output_shape, int stride,
+                             int kernel_size, int padding,
+                             const bool is_max_pool) {
   int input_height = input_shape[1];
   int input_width = input_shape[2];
   int input_depth = input_shape[3];
@@ -31,9 +33,10 @@ T* pooling(std::any input_ptr, const std::vector<int>& input_shape,
                 input_depth);
   spdlog::debug("Padding: {}\n", padding);
 
-  T* inputs = std::any_cast<T*>(input_ptr);
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
-  T* output = new T[output_height * output_width * input_depth];
+  std::shared_ptr<T[]> output(
+      new T[output_height * output_width * input_depth]);
 
   for (int y = 0; y < output_height; ++y) {
     for (int x = 0; x < output_width; ++x) {
@@ -83,14 +86,13 @@ T* pooling(std::any input_ptr, const std::vector<int>& input_shape,
     }
   }
 
-  delete[] inputs;
-
   return output;
 }
 
 template <typename T>
-T* adaptive_avg_pool2d(std::map<std::string, std::any>& kwargs,
-                       const voyager::PrimOp& op, const ScalarEnv& env) {
+std::shared_ptr<T[]> adaptive_avg_pool2d(
+    std::map<std::string, std::any>& kwargs, const voyager::PrimOp& op,
+    const ScalarEnv& env) {
   assert(strip_namespace(op.target()) == "adaptive_avg_pool2d");
 
   const auto input = resolve(op, "input", env);
@@ -114,8 +116,9 @@ T* adaptive_avg_pool2d(std::map<std::string, std::any>& kwargs,
 }
 
 template <typename T>
-T* max_pool2d(std::map<std::string, std::any>& kwargs,
-              const voyager::PrimOp& op, const ScalarEnv& env) {
+std::shared_ptr<T[]> max_pool2d(std::map<std::string, std::any>& kwargs,
+                                const voyager::PrimOp& op,
+                                const ScalarEnv& env) {
   assert(strip_namespace(op.target()) == "max_pool2d");
   const auto input = resolve(op, "input", env);
   std::any input_ptr = kwargs[input.node];

@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <fstream>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -41,7 +42,7 @@ class MemoryInterface {
     char* buffer = new char[num_bytes];
     read_bytes_from_memory(address, partition, num_bytes, buffer);
 
-    T* results = new T[size];
+    std::shared_ptr<T[]> results(new T[size]);
 
     for (int i = 0; i < size; i++) {
       const int64_t u = (i / run) * pitch + i % run;
@@ -85,7 +86,7 @@ class MemoryInterface {
       return false;
     }
 
-    T* scalar = new T[1];
+    std::shared_ptr<T[]> scalar(new T[1]);
     scalar[0] = array[0];
     data = scalar;
 
@@ -129,7 +130,7 @@ class MemoryInterface {
     const uint64_t address = get_address(tensor);
     const int partition = get_partition(tensor);
     const int size = get_size(tensor);
-    T* casted = std::any_cast<T*>(data);
+    T* casted = std::any_cast<std::shared_ptr<T[]>&>(data).get();
 
     // A pitched window scatters rows of `run` elements `pitch` apart; the
     // bytes between the runs belong to the allocation, so read the span

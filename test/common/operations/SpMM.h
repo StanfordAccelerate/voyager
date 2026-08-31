@@ -32,11 +32,10 @@ inline T balanced_tree_reduce(const T* values) {
 
 template <typename Meta, typename Vector, typename Weight, typename Output,
           typename Scale>
-inline Output* spmm_csr(std::any data_ptr, std::any indices_ptr,
-                        std::any indptr_ptr, std::any weight_ptr,
-                        std::any weight_scale_ptr,
-                        const voyager::PrimOp& operation,
-                        const ScalarEnv& env) {
+inline std::shared_ptr<Output[]> spmm_csr(
+    std::any data_ptr, std::any indices_ptr, std::any indptr_ptr,
+    std::any weight_ptr, std::any weight_scale_ptr,
+    const voyager::PrimOp& operation, const ScalarEnv& env) {
   bool is_matmul = operation.target().find("matmul") != std::string::npos;
   std::string weight_key = is_matmul ? "other" : "weight";
   const auto weight_tensor = resolve(operation, weight_key, env);
@@ -54,14 +53,15 @@ inline Output* spmm_csr(std::any data_ptr, std::any indices_ptr,
     block_size = arg_int(operation, "block_size", env);
   }
 
-  Vector* data = std::any_cast<Vector*>(data_ptr);
-  Meta* indices = std::any_cast<Meta*>(indices_ptr);
-  Meta* indptr = std::any_cast<Meta*>(indptr_ptr);
+  Vector* data = std::any_cast<std::shared_ptr<Vector[]>&>(data_ptr).get();
+  Meta* indices = std::any_cast<std::shared_ptr<Meta[]>&>(indices_ptr).get();
+  Meta* indptr = std::any_cast<std::shared_ptr<Meta[]>&>(indptr_ptr).get();
 
-  Weight* weight = std::any_cast<Weight*>(weight_ptr);
-  Scale* scale = std::any_cast<Scale*>(weight_scale_ptr);
+  Weight* weight = std::any_cast<std::shared_ptr<Weight[]>&>(weight_ptr).get();
+  Scale* scale =
+      std::any_cast<std::shared_ptr<Scale[]>&>(weight_scale_ptr).get();
 
-  Output* outputs = new Output[output_size];
+  std::shared_ptr<Output[]> outputs(new Output[output_size]);
   for (int i = 0; i < output_size; i++) {
     outputs[i] = 0.0;
   }
@@ -121,14 +121,6 @@ inline Output* spmm_csr(std::any data_ptr, std::any indices_ptr,
       }
       outputs[r * K + k] = balanced_tree_reduce<FEEDBACK_DELAY>(folded);
     }
-  }
-
-  delete[] data;
-  delete[] indices;
-  delete[] indptr;
-  delete[] weight;
-  if (scale != nullptr) {
-    delete[] scale;
   }
 
   spdlog::debug("SpMM done\n");

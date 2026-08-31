@@ -73,14 +73,15 @@ bool run_sample(const Model& model, const std::string& model_name,
     throw std::runtime_error("Model declares no output to classify.");
   }
   const Tensor output = to_tensor(model.proto().outputs(0));
-  auto* scores = std::any_cast<VECTOR_DATATYPE*>(memory.read_tensor(output));
+
+  const auto scores = std::any_cast<std::shared_ptr<VECTOR_DATATYPE[]>>(
+      memory.read_tensor(output));
 
   const int num_classes = get_size(output);
   int best = 0;
   for (int i = 1; i < num_classes; i++) {
     if (scores[i] > scores[best]) best = i;
   }
-  delete[] scores;
 
   return best == ground_truth(model_name, sample);
 }

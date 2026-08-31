@@ -30,8 +30,8 @@ bool type_cast_helper(std::any& input_ptr, float* codebook, Tensor tensor) {
 
   int size = get_size(tensor);
 
-  T* inputs = std::any_cast<T*>(input_ptr);
-  U* outputs = new U[size];
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
+  std::shared_ptr<U[]> outputs(new U[size]);
 
   for (int i = 0; i < size; i++) {
     if (codebook != nullptr) {
@@ -55,8 +55,6 @@ bool type_cast_helper(std::any& input_ptr, float* codebook, Tensor tensor) {
       outputs[i] = static_cast<U>(inputs[i]);
     }
   }
-
-  delete[] inputs;
 
   input_ptr = outputs;
 
@@ -131,7 +129,7 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
                                   const std::string& key) {
     const Tensor tensor = resolve(op, key, env);
     std::any ptr = kwargs[tensor.node];
-    if (ptr.type() != typeid(Vector*)) {
+    if (ptr.type() != typeid(std::shared_ptr<Vector[]>)) {
       cast_input<Vector, SUPPORTED_TYPES>(ptr, tensor);
     }
     return ptr;
@@ -153,7 +151,7 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
       const auto weight = resolve(op, weight_key, env);
       std::any weight_ptr = operand(op, weight_key);
 
-      std::any bias_ptr = static_cast<AccumBuffer*>(nullptr);
+      std::any bias_ptr = std::shared_ptr<AccumBuffer[]>();
       if (has_arg(op, "bias")) {
         bias_ptr = operand(op, "bias");
       }
@@ -173,8 +171,8 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
       }
 
       // Fetch microscaling scales
-      std::any input_scale_ptr = static_cast<Scale*>(nullptr);
-      std::any weight_scale_ptr = static_cast<Scale*>(nullptr);
+      std::any input_scale_ptr = std::shared_ptr<Scale[]>();
+      std::any weight_scale_ptr = std::shared_ptr<Scale[]>();
 
       bool is_mx_op = target.find("mx") != std::string::npos;
       if (is_mx_op) {
@@ -222,8 +220,9 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
           // Combine GEMM output with SpMM output
           int output_size = get_size(get_shape(output_tensors[0]));
           for (int i = 0; i < output_size; i++) {
-            std::any_cast<Vector*>(output_ptr)[i] +=
-                std::any_cast<Vector*>(spmm_output_ptr)[i];
+            std::any_cast<std::shared_ptr<Vector[]>&>(output_ptr).get()[i] +=
+                std::any_cast<std::shared_ptr<Vector[]>&>(spmm_output_ptr)
+                    .get()[i];
           }
         }
       }
@@ -278,7 +277,8 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
       output_ptr = pad_tensor<Vector>(vector_operand(op, "input"), op, env);
     } else if (unary_ops.find(target) != unary_ops.end()) {
       const auto input_shape = get_shape(resolve(op, "input", env));
-      Vector* input_ptr = std::any_cast<Vector*>(vector_operand(op, "input"));
+      const auto input_ptr =
+          std::any_cast<std::shared_ptr<Vector[]>>(vector_operand(op, "input"));
 
       // Grab kwargs that are relevant for some activation functions
       std::map<std::string, Vector> filtered_kwargs;
@@ -287,15 +287,16 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
           filtered_kwargs[key] = Vector(value);
         }
       }
-      output_ptr = perform_unary_operation(input_ptr, input_shape, target,
+      output_ptr = perform_unary_operation(input_ptr.get(), input_shape, target,
                                            filtered_kwargs);
     } else if (arithmetics.find(target) != arithmetics.end()) {
       const auto input_shape = get_shape(resolve(op, "input", env));
-      Vector* input_ptr = std::any_cast<Vector*>(vector_operand(op, "input"));
+      const auto input_ptr =
+          std::any_cast<std::shared_ptr<Vector[]>>(vector_operand(op, "input"));
 
       // The addend is either an immediate, a scalar constant read off disk, or
       // a whole buffer.
-      Vector* other_ptr;
+      std::shared_ptr<Vector[]> other_ptr;
       std::vector<int> other_shape;
       const bool other_is_tensor = has_tensor(op, "other");
       const Tensor other =
@@ -303,7 +304,7 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
 
       if (!other_is_tensor || other.is_constant) {
         other_shape = {1};
-        other_ptr = new Vector[1];
+        other_ptr.reset(new Vector[1]);
         if (other_is_tensor) {
           float* array = read_constant_param(other);
           other_ptr[0] = array[0];
@@ -313,11 +314,12 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
         }
       } else {
         other_shape = get_shape(other);
-        other_ptr = std::any_cast<Vector*>(vector_operand(op, "other"));
+        other_ptr = std::any_cast<std::shared_ptr<Vector[]>>(
+            vector_operand(op, "other"));
       }
 
-      output_ptr = perform_vector_operation(input_ptr, input_shape, other_ptr,
-                                            other_shape, target);
+      output_ptr = perform_vector_operation(
+          input_ptr.get(), input_shape, other_ptr.get(), other_shape, target);
     } else if (target == "quantize") {
       if constexpr (std::is_same<Vector, CFloat>::value) {
         spdlog::error(
@@ -410,7 +412,7 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
         // produces the systolic array's weight type directly -- which is the
         // dtype the compiler declares for its result.
         if (has_arg(op, "block_size")) {
-          std::any zero_point = static_cast<Scale*>(nullptr);
+          std::any zero_point = std::shared_ptr<Scale[]>();
           if (has_arg(op, "zero_point")) {
             zero_point = operand(op, "zero_point");
           }
@@ -485,12 +487,14 @@ void run_host_operation(const voyager::Operation& operation,
       const int64_t alpha =
           has_arg(prim, "alpha") ? arg_int(prim, "alpha", env) : 1;
       const int64_t addend = alpha * arg_int(prim, "other", env);
-      if (DataTypes::int32** values = std::any_cast<DataTypes::int32*>(&data)) {
+      if (auto* values =
+              std::any_cast<std::shared_ptr<DataTypes::int32[]>>(&data)) {
         for (int i = 0; i < get_size(src); i++) {
           (*values)[i].int_val = (*values)[i].int_val.to_int64() + addend;
         }
-      } else if (DataTypes::int64** values =
-                     std::any_cast<DataTypes::int64*>(&data)) {
+      } else if (auto* values =
+                     std::any_cast<std::shared_ptr<DataTypes::int64[]>>(
+                         &data)) {
         for (int i = 0; i < get_size(src); i++) {
           (*values)[i].int_val = (*values)[i].int_val.to_int64() + addend;
         }

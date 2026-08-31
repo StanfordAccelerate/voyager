@@ -3,15 +3,16 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T* slice(std::any input_ptr, const std::vector<int> shape, uint64_t dim,
-                uint64_t start, uint64_t end, uint64_t step) {
+inline std::shared_ptr<T[]> slice(std::any input_ptr,
+                                  const std::vector<int> shape, uint64_t dim,
+                                  uint64_t start, uint64_t end, uint64_t step) {
   dim = dim < 0 ? dim + shape.size() : dim;
   int num_elements = (end - start) / step;
 
-  const auto inputs = std::any_cast<T*>(input_ptr);
+  const auto inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   const int size = get_size(shape);
-  T* outputs = new T[size];
+  std::shared_ptr<T[]> outputs(new T[size]);
 
   for (int i = 0; i < size; i++) {
     std::vector<int> indices(shape.size(), 0);
@@ -34,10 +35,10 @@ inline T* slice(std::any input_ptr, const std::vector<int> shape, uint64_t dim,
 }
 
 template <typename T>
-inline T* slice(std::any input_ptr, const voyager::PrimOp& op,
-                const ScalarEnv& env) {
+inline std::shared_ptr<T[]> slice(std::any input_ptr, const voyager::PrimOp& op,
+                                  const ScalarEnv& env) {
   if (strip_namespace(op.target()) != "slice") {
-    return std::any_cast<T*>(input_ptr);
+    return std::any_cast<std::shared_ptr<T[]>&>(input_ptr);
   }
   const auto input = resolve(op, "input", env);
   const auto shape = get_shape(input);

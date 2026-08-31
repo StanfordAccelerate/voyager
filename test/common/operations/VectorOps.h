@@ -46,11 +46,11 @@ inline T poly_approx(T x, const T maxes[NUM_MAXES],
 }
 
 template <typename T>
-inline T* perform_unary_operation(T* input, const std::vector<int> shape,
-                                  const std::string opcode,
-                                  const std::map<std::string, T> kwargs) {
+inline std::shared_ptr<T[]> perform_unary_operation(
+    T* input, const std::vector<int> shape, const std::string opcode,
+    const std::map<std::string, T> kwargs) {
   int result_size = get_size(shape);
-  T* result = new T[result_size];
+  std::shared_ptr<T[]> result(new T[result_size]);
 
   for (int i = 0; i < result_size; ++i) {
     if (opcode == "relu" || opcode == "relu_") {
@@ -168,8 +168,6 @@ inline T* perform_unary_operation(T* input, const std::vector<int> shape,
     }
   }
 
-  delete[] input;
-
   return result;
 }
 
@@ -229,11 +227,9 @@ inline std::vector<int> pad_shape(const std::vector<int>& shape, size_t size) {
 }
 
 template <typename T>
-inline T* perform_vector_operation(const T* input1,
-                                   const std::vector<int>& shape1,
-                                   const T* input2,
-                                   const std::vector<int>& shape2,
-                                   std::string opcode) {
+inline std::shared_ptr<T[]> perform_vector_operation(
+    const T* input1, const std::vector<int>& shape1, const T* input2,
+    const std::vector<int>& shape2, std::string opcode) {
   auto result_shape = broadcast_shape(shape1, shape2);
 
   auto shape_a = pad_shape(shape1, result_shape.size());
@@ -242,7 +238,7 @@ inline T* perform_vector_operation(const T* input1,
   int num_dims = result_shape.size();
 
   int total_elements = get_size(result_shape);
-  T* result = new T[total_elements];
+  std::shared_ptr<T[]> result(new T[total_elements]);
 
   for (int i = 0; i < total_elements; ++i) {
     std::vector<int> indices = get_indices(i, result_shape);
@@ -291,9 +287,6 @@ inline T* perform_vector_operation(const T* input1,
       throw std::invalid_argument("Invalid opcode: " + opcode);
     }
   }
-
-  delete[] input1;
-  delete[] input2;
 
   return result;
 }

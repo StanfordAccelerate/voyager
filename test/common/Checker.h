@@ -70,8 +70,8 @@ long compare_arrays(std::any matrix_a, const std::string& name_a,
   size_t diff_lines = 0;
   size_t omitted_diff_lines = 0;
 
-  T1* matrix_a_ptr = std::any_cast<T1*>(matrix_a);
-  T2* matrix_b_ptr = std::any_cast<T2*>(matrix_b);
+  T1* matrix_a_ptr = std::any_cast<std::shared_ptr<T1[]>&>(matrix_a).get();
+  T2* matrix_b_ptr = std::any_cast<std::shared_ptr<T2[]>&>(matrix_b).get();
 
   size_t num_valid = 0;
   long mismatched = 0;

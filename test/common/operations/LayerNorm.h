@@ -3,14 +3,15 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T* layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
-                     const std::vector<int> input_shape,
-                     const std::vector<int> normalized_shape) {
-  T* inputs = std::any_cast<T*>(input_ptr);
-  T* weights = std::any_cast<T*>(weight_ptr);
-  T* bias = std::any_cast<T*>(bias_ptr);
+inline std::shared_ptr<T[]> layer_norm(
+    std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
+    const std::vector<int> input_shape,
+    const std::vector<int> normalized_shape) {
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
+  T* weights = std::any_cast<std::shared_ptr<T[]>&>(weight_ptr).get();
+  T* bias = std::any_cast<std::shared_ptr<T[]>&>(bias_ptr).get();
 
-  T* output = new T[get_size(input_shape)];
+  std::shared_ptr<T[]> output(new T[get_size(input_shape)]);
 
   const int outer_dim = get_size(normalized_shape);
   const int inner_dim = get_size(input_shape) / outer_dim;
@@ -85,21 +86,22 @@ inline T* layer_norm(std::any input_ptr, std::any weight_ptr, std::any bias_ptr,
 }
 
 template <typename T>
-inline T* layer_norm(std::map<std::string, std::any>& kwargs,
-                     const voyager::PrimOp& op, const ScalarEnv& env) {
+inline std::shared_ptr<T[]> layer_norm(std::map<std::string, std::any>& kwargs,
+                                       const voyager::PrimOp& op,
+                                       const ScalarEnv& env) {
   assert(strip_namespace(op.target()) == "layer_norm");
 
   const auto input = resolve(op, "input", env);
   std::any input_ptr = kwargs[input.node];
 
-  std::any weight_ptr = static_cast<T*>(nullptr);
+  std::any weight_ptr = std::shared_ptr<T[]>();
 
   if (has_arg(op, "weight")) {
     const auto weight = resolve(op, "weight", env);
     weight_ptr = kwargs[weight.node];
   }
 
-  std::any bias_ptr = static_cast<T*>(nullptr);
+  std::any bias_ptr = std::shared_ptr<T[]>();
 
   if (has_arg(op, "bias")) {
     const auto bias = resolve(op, "bias", env);

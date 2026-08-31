@@ -3,10 +3,13 @@
 #include "test/common/operations/Common.h"
 
 template <typename Vector, typename Scale>
-Vector* calculate_mx_qparam(std::any input_tensor, std::vector<int> shape,
-                            float quant_max, int block_size, int axis,
-                            bool force_scale_power_of_two) {
-  Vector* inputs = std::any_cast<Vector*>(input_tensor);
+std::shared_ptr<Vector[]> calculate_mx_qparam(std::any input_tensor,
+                                              std::vector<int> shape,
+                                              float quant_max, int block_size,
+                                              int axis,
+                                              bool force_scale_power_of_two) {
+  Vector* inputs =
+      std::any_cast<std::shared_ptr<Vector[]>&>(input_tensor).get();
 
   // Handle the case of convolutional layers
   if (axis == 1 && shape.size() == 4) {
@@ -24,8 +27,8 @@ Vector* calculate_mx_qparam(std::any input_tensor, std::vector<int> shape,
   std::vector<int> output_shape(shape);
   output_shape[axis] = (shape[axis] + block_size - 1) / block_size;
 
-  Vector* amax_arr = new Vector[result_size];
-  std::fill(amax_arr, amax_arr + result_size, 0);
+  std::unique_ptr<Vector[]> amax_arr(new Vector[result_size]);
+  std::fill(amax_arr.get(), amax_arr.get() + result_size, 0);
 
   for (int i = 0; i < input_size; i++) {
     auto indices = get_indices(i, shape);
@@ -35,7 +38,7 @@ Vector* calculate_mx_qparam(std::any input_tensor, std::vector<int> shape,
     amax_arr[index] = std::max(amax_arr[index], Vector(abs(inputs[i])));
   }
 
-  Vector* scales = new Vector[result_size];
+  std::shared_ptr<Vector[]> scales(new Vector[result_size]);
 
   for (int i = 0; i < result_size; i++) {
     Vector scale;
@@ -66,8 +69,9 @@ Vector* calculate_mx_qparam(std::any input_tensor, std::vector<int> shape,
 }
 
 template <typename Vector, typename Scale>
-Vector* calculate_mx_qparam(std::map<std::string, std::any>& kwargs,
-                            const voyager::PrimOp& op, const ScalarEnv& env) {
+std::shared_ptr<Vector[]> calculate_mx_qparam(
+    std::map<std::string, std::any>& kwargs, const voyager::PrimOp& op,
+    const ScalarEnv& env) {
   const auto input = resolve(op, "input", env);
   std::any input_ptr = kwargs[input.node];
   const auto input_shape = get_shape(input);

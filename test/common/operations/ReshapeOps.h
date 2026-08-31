@@ -3,13 +3,14 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
-                     const std::vector<int>& pad_list) {
+inline std::shared_ptr<T[]> pad_tensor(std::any input_ptr,
+                                       const std::vector<int>& input_shape,
+                                       const std::vector<int>& pad_list) {
   for (int i = 0; i < pad_list.size(); i++) {
     spdlog::debug("Padding tensor with amount: {}\n", pad_list[i]);
   }
 
-  T* inputs = std::any_cast<T*>(input_ptr);
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   std::vector<int> output_shape(input_shape);
   int pad_dim = pad_list.size() / 2;
@@ -24,7 +25,7 @@ inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
         output_start[i] + output_end[i];
   }
 
-  T* outputs = new T[get_size(output_shape)];
+  std::shared_ptr<T[]> outputs(new T[get_size(output_shape)]);
 
   for (int i = 0; i < get_size(output_shape); i++) {
     std::vector<int> indices(output_shape.size(), 0);
@@ -56,14 +57,13 @@ inline T* pad_tensor(std::any input_ptr, const std::vector<int>& input_shape,
     }
   }
 
-  delete[] inputs;
-
   return outputs;
 }
 
 template <typename T>
-inline T* pad_tensor(std::any input_ptr, const voyager::PrimOp& op,
-                     const ScalarEnv& env) {
+inline std::shared_ptr<T[]> pad_tensor(std::any input_ptr,
+                                       const voyager::PrimOp& op,
+                                       const ScalarEnv& env) {
   const auto input = resolve(op, "input", env);
   const auto input_shape = get_shape(input);
   const auto pad_list = arg_ints(op, "pad", env);
@@ -74,9 +74,10 @@ inline T* pad_tensor(std::any input_ptr, const voyager::PrimOp& op,
 }
 
 template <typename T>
-inline T* permute(std::any input_ptr, const std::vector<int>& shape,
-                  const std::vector<int> dims) {
-  T* inputs = std::any_cast<T*>(input_ptr);
+inline std::shared_ptr<T[]> permute(std::any input_ptr,
+                                    const std::vector<int>& shape,
+                                    const std::vector<int> dims) {
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   std::vector<int> permuted_shape(dims.size());
   for (size_t i = 0; i < dims.size(); ++i) {
@@ -84,7 +85,7 @@ inline T* permute(std::any input_ptr, const std::vector<int>& shape,
   }
 
   const int size = get_size(shape);
-  T* outputs = new T[size];
+  std::shared_ptr<T[]> outputs(new T[size]);
 
   for (int i = 0; i < size; ++i) {
     std::vector<int> indices = get_indices(i, shape);
@@ -98,14 +99,13 @@ inline T* permute(std::any input_ptr, const std::vector<int>& shape,
     outputs[permuted_index] = inputs[i];
   }
 
-  delete[] inputs;
-
   return outputs;
 }
 
 template <typename T>
-inline T* permute(std::any input_ptr, const voyager::PrimOp& op,
-                  const ScalarEnv& env) {
+inline std::shared_ptr<T[]> permute(std::any input_ptr,
+                                    const voyager::PrimOp& op,
+                                    const ScalarEnv& env) {
   if (strip_namespace(op.target()) == "permute") {
     const auto input = resolve(op, "input", env);
     const auto input_shape = get_shape(input);
@@ -131,13 +131,14 @@ inline T* permute(std::any input_ptr, const voyager::PrimOp& op,
     return permute<T>(input_ptr, input_shape, dims_vector);
   }
 
-  return std::any_cast<T*>(input_ptr);
+  return std::any_cast<std::shared_ptr<T[]>&>(input_ptr);
 }
 
 template <typename T>
-inline T* expand(std::any input_ptr, const std::vector<int>& input_shape,
-                 const std::vector<int>& sizes) {
-  T* inputs = std::any_cast<T*>(input_ptr);
+inline std::shared_ptr<T[]> expand(std::any input_ptr,
+                                   const std::vector<int>& input_shape,
+                                   const std::vector<int>& sizes) {
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   // Align the input shape to the expanded rank from the right, the way
   // broadcasting does.
@@ -154,7 +155,7 @@ inline T* expand(std::any input_ptr, const std::vector<int>& input_shape,
   }
 
   const int size = get_size(output_shape);
-  T* outputs = new T[size];
+  std::shared_ptr<T[]> outputs(new T[size]);
 
   for (int i = 0; i < size; ++i) {
     std::vector<int> indices = get_indices(i, output_shape);
@@ -164,21 +165,21 @@ inline T* expand(std::any input_ptr, const std::vector<int>& input_shape,
     outputs[i] = inputs[get_flat_index(indices, aligned)];
   }
 
-  delete[] inputs;
-
   return outputs;
 }
 
 template <typename T>
-inline T* expand(std::any input_ptr, const voyager::PrimOp& op,
-                 const ScalarEnv& env) {
+inline std::shared_ptr<T[]> expand(std::any input_ptr,
+                                   const voyager::PrimOp& op,
+                                   const ScalarEnv& env) {
   const auto input = resolve(op, "input", env);
   return expand<T>(input_ptr, get_shape(input), arg_ints(op, "size", env));
 }
 
 template <typename T>
-inline T* transpose(std::any input_ptr, const std::vector<int>& shape, int dim0,
-                    int dim1) {
+inline std::shared_ptr<T[]> transpose(std::any input_ptr,
+                                      const std::vector<int>& shape, int dim0,
+                                      int dim1) {
   const int ndim = shape.size();
   dim0 = dim0 < 0 ? dim0 + ndim : dim0;
   dim1 = dim1 < 0 ? dim1 + ndim : dim1;
@@ -194,10 +195,11 @@ inline T* transpose(std::any input_ptr, const std::vector<int>& shape, int dim0,
 }
 
 template <typename T>
-inline T* transpose(std::any input_ptr, const voyager::PrimOp& op,
-                    const ScalarEnv& env) {
+inline std::shared_ptr<T[]> transpose(std::any input_ptr,
+                                      const voyager::PrimOp& op,
+                                      const ScalarEnv& env) {
   if (strip_namespace(op.target()) != "transpose") {
-    return std::any_cast<T*>(input_ptr);
+    return std::any_cast<std::shared_ptr<T[]>&>(input_ptr);
   }
 
   const auto input = resolve(op, "input", env);
@@ -209,13 +211,14 @@ inline T* transpose(std::any input_ptr, const voyager::PrimOp& op,
 }
 
 template <typename T>
-inline T* reshape_if_needed(std::any input_ptr, const voyager::PrimOp& op,
-                            const ScalarEnv& env) {
+inline std::shared_ptr<T[]> reshape_if_needed(std::any input_ptr,
+                                              const voyager::PrimOp& op,
+                                              const ScalarEnv& env) {
   if (strip_namespace(op.target()) == "transpose") {
     return transpose<T>(input_ptr, op);
   } else if (strip_namespace(op.target()) == "permute") {
     return permute<T>(input_ptr, op);
   } else {
-    return std::any_cast<T*>(input_ptr);
+    return std::any_cast<std::shared_ptr<T[]>&>(input_ptr);
   }
 }
