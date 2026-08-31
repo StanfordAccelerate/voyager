@@ -5,8 +5,9 @@
 #include "test/toolchain/ApproximationConstants.h"
 
 template <typename T>
-inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
-  T* inputs = std::any_cast<T*>(input_ptr);
+inline std::shared_ptr<T[]> softmax(std::any input_ptr,
+                                    const std::vector<int> shape) {
+  T* inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   int num_rows = 1;
   for (int i = 0; i < shape.size() - 1; i++) {
@@ -14,7 +15,7 @@ inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
   }
   int num_cols = shape[shape.size() - 1];
 
-  T* outputs = new T[num_rows * num_cols];
+  std::shared_ptr<T[]> outputs(new T[num_rows * num_cols]);
 
   for (int i = 0; i < num_rows; i++) {
     int offset = i * num_cols;
@@ -30,21 +31,24 @@ inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
 
     for (int j = 0; j < num_cols; j++) {
       T normalized = static_cast<T>(inputs[offset + j] - max);
-      outputs[offset + j] = std::exp(normalized);
+      // std::exp would take the implicit operator float() and return the true
+      // exponential; the pipeline's op1_exp is vexp, which is ac_exp_pwl on
+      // every lane. Take the same piecewise fit the hardware takes.
+      outputs[offset + j] = normalized.exponential();
     }
 
     T sums[2] = {0, 0};
     int index = 0;
 
-    for (int j = 0; j < num_cols; j += VECTOR_UNIT_WIDTH) {
-      T buffer[VECTOR_UNIT_WIDTH];
-      for (int k = 0; k < VECTOR_UNIT_WIDTH; k++) {
+    for (int j = 0; j < num_cols; j += REDUCER_WIDTH) {
+      T buffer[REDUCER_WIDTH];
+      for (int k = 0; k < REDUCER_WIDTH; k++) {
         buffer[k] = j + k < num_cols ? outputs[offset + j + k] : T(0.0);
       }
-      sums[index++ % 2] += tree_reduce(buffer, VECTOR_UNIT_WIDTH);
+      sums[index++ % 2] += fused_tree_reduce<REDUCER_WIDTH>(buffer);
     }
 
-    T sum = tree_reduce(sums, 2);
+    T sum = fused_tree_reduce<2>(sums);
     T divisor = sum.reciprocal();
 
     for (int j = 0; j < num_cols; j++) {
@@ -52,16 +56,15 @@ inline T* softmax(std::any input_ptr, const std::vector<int> shape) {
     }
   }
 
-  delete[] inputs;
-
   return outputs;
 }
 
 template <typename T>
-inline T* softmax(std::map<std::string, std::any> kwargs,
-                  const codegen::OpOverload op) {
-  const auto input = op.kwargs().at("input").tensor();
-  std::any input_ptr = kwargs[input.node()];
+inline std::shared_ptr<T[]> softmax(std::map<std::string, std::any> kwargs,
+                                    const voyager::PrimOp& op,
+                                    const ScalarEnv& env) {
+  const auto input = resolve(op, "input", env);
+  std::any input_ptr = kwargs[input.node];
   const auto input_shape = get_shape(input);
   return softmax<T>(input_ptr, input_shape);
 }

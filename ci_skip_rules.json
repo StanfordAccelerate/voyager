@@ -1,134 +1,9 @@
 [
     {
-        "datatype": "*",
-        "model": [
-            "bert",
-            "resnet18",
-            "resnet50",
-            "mobilebert_encoder",
-            "mobilenet_v2",
-	        "llama_prefill_spmm"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": "*",
-        "layers": [
-            "pad_default(_[0-9]+)?",
-            "slice(_[0-9]+)?",
-            "slice_csr_tensor(_[0-9]+)?",
-            "slice_tensor(_[0-9]+)?",
-            "quantize_default_1"
-        ]
-    },
-    {
-        "datatype": "*",
-        "model": [
-            "vit"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": "*",
-        "layers": [
-            "pad_default",
-            "slice_tensor(_[0-9]+)?"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": [
-            "llama_prefill",
-            "llama_prefill_mp"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 32,
-        "layers": [
-            "slice(_[0-9]+)?",
-            "slice_tensor(_[0-9]+)?",
-            "permute_default"
-        ]
-    },
-    {
         "datatype": "MXNF4",
         "model": [
             "llama_decode",
-            "llama_decode_mp"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 32,
-        "layers": [
-            "index_copy_",
-            "index_copy__1",
-            "transpose_int(_[0-9]+)?"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": [
-            "llama_prefill",
-            "llama_prefill_mp"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 64,
-        "layers": [
-            "permute_default",
-            "permute_default_1",
-            "quantize_default",
-            "quantize_default_1",
-            "slice(_[0-9]+)?",
-            "slice_tensor(_[0-9]+)?"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": [
-            "llama_decode",
-            "llama_decode_mp"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 64,
-        "layers": [
-            "index_copy_",
-            "index_copy__1",
-            "permute_default",
-            "permute_default_1",
-            "quantize_default",
-            "quantize_default_1",
-            "slice(_[0-9]+)?",
-            "slice_tensor(_[0-9]+)?",
-            "transpose_int(_[0-9]+)?"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": [
+            "llama_decode_mp",
             "llama_decode_kivi"
         ],
         "sim_type": [
@@ -137,51 +12,20 @@
             "fast-systemc",
             "rtl"
         ],
-        "block_size": 64,
+        "block_size": "*",
         "layers": [
             "quantize_default",
-            "embedding",
-            "quantize_default_1",
-            "to_1",
-            "pad_default",
-            "pad_default_1",
+            "add",
+            "add_1",
+            "le",
+            "where",
             "matmul",
-            "slice_tensor",
-            "transpose",
-            "add_scalar",
-            "permute_default",
             "cos",
             "mul",
             "sin",
             "mul_1",
-            "add_scalar(_[0-9]+)?",
-            "index_copy_(_[0-9]+)?",
-            "slice(_[0-9]+)?",
-            "transpose(_[0-9]+)?",
-            "transpose_int(_[0-9]+)?"
-        ]
-    },
-    {
-        "datatype": "MXNF4",
-        "model": [
-            "resnet18",
-            "resnet50",
-            "vit",
-            "bert"
-        ],
-        "sim_type": [
-            "gold_model",
-            "systemc",
-            "fast-systemc",
-            "rtl"
-        ],
-        "block_size": 64,
-        "layers": [
-            "cat(_[0-9]+)?",
-            "pad(_[0-9]+)?",
-            "pad_default(_[0-9]+)?",
-            "slice(_[0-9]+)?",
-            "slice_tensor(_[0-9]+)?"
+            "add_6",
+            "sub"
         ]
     }
 ]

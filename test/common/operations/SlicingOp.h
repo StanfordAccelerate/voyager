@@ -3,15 +3,16 @@
 #include "test/common/operations/Common.h"
 
 template <typename T>
-inline T* slice(std::any input_ptr, const std::vector<int> shape, uint64_t dim,
-                uint64_t start, uint64_t end, uint64_t step) {
+inline std::shared_ptr<T[]> slice(std::any input_ptr,
+                                  const std::vector<int> shape, uint64_t dim,
+                                  uint64_t start, uint64_t end, uint64_t step) {
   dim = dim < 0 ? dim + shape.size() : dim;
   int num_elements = (end - start) / step;
 
-  const auto inputs = std::any_cast<T*>(input_ptr);
+  const auto inputs = std::any_cast<std::shared_ptr<T[]>&>(input_ptr).get();
 
   const int size = get_size(shape);
-  T* outputs = new T[size];
+  std::shared_ptr<T[]> outputs(new T[size]);
 
   for (int i = 0; i < size; i++) {
     std::vector<int> indices(shape.size(), 0);
@@ -34,22 +35,18 @@ inline T* slice(std::any input_ptr, const std::vector<int> shape, uint64_t dim,
 }
 
 template <typename T>
-inline T* slice(std::any input_ptr, const codegen::OpOverload op) {
-  if (op.target() != "slice") {
-    return std::any_cast<T*>(input_ptr);
+inline std::shared_ptr<T[]> slice(std::any input_ptr, const voyager::PrimOp& op,
+                                  const ScalarEnv& env) {
+  if (strip_namespace(op.target()) != "slice") {
+    return std::any_cast<std::shared_ptr<T[]>&>(input_ptr);
   }
-
-  const auto kwargs = op.kwargs();
-
-  const auto input = kwargs.at("input").tensor();
+  const auto input = resolve(op, "input", env);
   const auto shape = get_shape(input);
 
-  uint64_t dim = kwargs.at("dim").int_value();
-  uint64_t start =
-      kwargs.contains("start") ? kwargs.at("start").int_value() : 0;
-  uint64_t end =
-      kwargs.contains("end") ? kwargs.at("end").int_value() : shape[dim];
-  uint64_t step = kwargs.contains("step") ? kwargs.at("step").int_value() : 1;
+  uint64_t dim = arg_int(op, "dim", env);
+  uint64_t start = has_arg(op, "start") ? arg_int(op, "start", env) : 0;
+  uint64_t end = has_arg(op, "end") ? arg_int(op, "end", env) : shape[dim];
+  uint64_t step = has_arg(op, "step") ? arg_int(op, "step", env) : 1;
 
   dim = dim < 0 ? dim + shape.size() : dim;
   end = end > shape[dim] ? shape[dim] : end;

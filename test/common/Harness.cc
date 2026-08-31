@@ -4,20 +4,24 @@
 #include <systemc.h>
 
 #include <cassert>
+#include <cstdlib>
+#include <memory>
 
 #include "AccelTypes.h"
 #include "sysc/kernel/sc_time.h"
 
 #ifndef CFLOAT
+#include "test/common/GoldModel.h"
 #include "test/toolchain/MapOperation.h"
 
-Harness::Harness(sc_module_name name, std::vector<Operation> operations,
-                 DataLoader* dataloader)
+Harness::Harness(sc_module_name name, const Model& model,
+                 const Model::Selection& selection, MemoryInterface* memory)
     : sc_module(name),
-      clk("clk", std::stod(std::getenv("CLOCK_PERIOD")), SC_NS, 0.5, 0, SC_NS,
+      clk("clk", std::stod(getenv("CLOCK_PERIOD", "1")), SC_NS, 0.5, 0, SC_NS,
           true),
-      operations(operations),
-      dataloader(dataloader) {
+      model(model),
+      selection(selection),
+      memory(memory) {
   accelerator.clk(clk);
   accelerator.rstn(rstn);
   accelerator.matrix_unit_params_in(matrix_unit_params_in);
@@ -176,9 +180,9 @@ Harness::Harness(sc_module_name name, std::vector<Operation> operations,
   REGISTER_FN(store_mx_scale_output)
   REGISTER_FN(store_sparse_tensor_output)
 
-  REGISTER_FN(param_sender)
-  REGISTER_FN(start_monitor)
-  REGISTER_FN(done_monitor)
+  REGISTER_FN(run_walker)
+  REGISTER_FN(release_starts)
+  REGISTER_FN(retire_dones)
 
   access_counter = new AccessCounter();
 // do not set access counters for an RTL simulation
@@ -196,9 +200,10 @@ void Harness::process_read_request(
 
   constexpr int num_bytes = width / 8;
 
-  const auto array_memory = (ArrayMemory*)(dataloader->memory);
-  const int mem_idx = is_soc_sim() ? 1 : 0;
-  char* memory = array_memory->memories[mem_idx];
+  // Every datapath operand lives on chip: the graph's async_copies stage it
+  // there before the operation runs, and stage the results back out.
+  const auto array_memory = (ArrayMemory*)(this->memory);
+  char* memory = array_memory->memories[SRAM_PARTITION];
 
   wait();
 
@@ -246,10 +251,6 @@ void Harness::process_write_request(
 
   constexpr int num_bytes = width / 8;
 
-  const auto array_memory = (ArrayMemory*)(dataloader->memory);
-  const int mem_idx = is_soc_sim() ? 1 : 0;
-  char* memory = array_memory->memories[mem_idx];
-
   wait();
 
   while (true) {
@@ -258,9 +259,12 @@ void Harness::process_write_request(
 
     access_counter->increment(std::string(name()) + "_" + "outputs", num_bytes);
 
+    char bytes[num_bytes];
     for (int i = 0; i < num_bytes; i++) {
-      memory[address + i] = data.template slc<8>(i * 8);
+      bytes[i] = data.template slc<8>(i * 8);
     }
+    this->memory->write_bytes_to_memory(address, SRAM_PARTITION, num_bytes,
+                                        bytes);
   }
 }
 
@@ -367,14 +371,37 @@ T* get_param(const std::deque<BaseParams*>& params, int& index) {
   return nullptr;
 }
 
-void Harness::send_params(const std::deque<BaseParams*>& params) {
+// Serialize one operation's params and queue its invocation groups.
+//
+// The old harness drove each group to completion before sending the next:
+// params, start, done, one group at a time, which serialized every tile's
+// buffer loads against the previous tile's drain. Here the walk only pushes
+// params -- the units' deserializers hand them to the double-buffered
+// controllers, so the next tile's input and weight fetches begin while the
+// current tile computes -- and queues a descriptor per group; the
+// release_starts and retire_dones threads pace the handshakes.
+//
+// Only consecutive operations overlap. Groups within one operation are the
+// passes of a multi-pass op -- softmax and layer_norm expand into three
+// vector passes, a strided quantize_mx into a scale pass and a main pass --
+// and each pass reads what the previous one wrote. So every group after the
+// first drains the pipeline before its params go out, exactly as the old
+// harness gated each pass on the previous one's done.
+void Harness::dispatch_params(const voyager::Operation& op,
+                              const std::deque<BaseParams*>& params) {
   int idx = 0;
+  bool first = true;
   while (idx < params.size()) {
+    if (!first) drain();
+
+    InvocationGroup group;
+
     if (auto* matrix_params = get_param<MatrixParams>(params, idx)) {
 #if SUPPORT_MVM
       if (matrix_params->is_fc) {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &matrix_vector_unit_params_in);
+        group.matrix_vector = true;
       } else
 #endif
 #if SUPPORT_SPMM
@@ -383,18 +410,22 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
         if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
           send_serialized_params<MatrixParams, 64>(*dense_params,
                                                    &matrix_unit_params_in);
+          group.matrix = true;
         }
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &spmm_unit_params_in);
+        group.spmm = true;
       } else
 #endif
       {
         send_serialized_params<MatrixParams, 64>(*matrix_params,
                                                  &matrix_unit_params_in);
+        group.matrix = true;
       }
     } else if (auto* dwc_params = get_param<DwCParams>(params, idx)) {
 #if SUPPORT_DWC
       send_serialized_params<DwCParams, 64>(*dwc_params, &dwc_unit_params_in);
+      group.dwc = true;
 #else
       throw std::runtime_error("DWC support is not enabled.");
 #endif
@@ -407,226 +438,25 @@ void Harness::send_params(const std::deque<BaseParams*>& params) {
       auto* vector_config = get_param<VectorInstructionConfig>(params, idx);
       send_serialized_params<VectorInstructionConfig, 64>(
           *vector_config, &vector_unit_params_in);
+      group.vector = true;
     }
 
-    // Wait for last operation to finish
-    if (idx < params.size() - 1) {
-      operation_done.SyncPop();
-    }
+    group.op_begin = first ? &op : nullptr;
+    first = false;
+    if (idx >= params.size()) group.op_end = &op;
+
+    pending_groups++;
+    start_queue.push_back(group);
+    start_pushed.notify(SC_ZERO_TIME);
   }
 }
 
-void Harness::record_start(const std::deque<BaseParams*>& params,
-                           const Operation& operation, bool is_first) {
-  int idx = 0;
-  while (idx < params.size()) {
-    if (auto* matrix_params = get_param<MatrixParams>(params, idx)) {
-#if SUPPORT_MVM
-      if (matrix_params->is_fc) {
-        matrix_vector_unit_start.SyncPop();
-      } else
-#endif
-#if SUPPORT_SPMM
-          if (matrix_params->is_spmm) {
-        if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
-          matrix_unit_start.SyncPop();
-        }
-        spmm_unit_start.SyncPop();
-      } else
-#endif
-      {
-        matrix_unit_start.SyncPop();
-      }
-
-      auto start = sc_time_stamp();
-      start_times.push_back(start);
-
-      if (is_first) {
-        operation_start_times.push_back(start);
-        is_first = false;
-      }
-
-      CCS_LOG("----- Accelerator Layer '" << operation.name
-                                          << "' Started. -----");
-
-    } else if (auto* dwc_params = get_param<DwCParams>(params, idx)) {
-#if SUPPORT_DWC
-      dwc_unit_start.SyncPop();
-#endif
-
-      auto start = sc_time_stamp();
-      start_times.push_back(start);
-
-      if (is_first) {
-        operation_start_times.push_back(start);
-        is_first = false;
-      }
-
-      CCS_LOG("----- Accelerator Layer '" << operation.name
-                                          << "' Started. -----");
-    }
-
-    if (auto* vector_params = get_param<VectorParams>(params, idx)) {
-      vector_unit_start.SyncPop();
-
-      // Skip VectorInstructionConfig which always follows VectorParams
-      idx++;
-
-      // Vector op is the first op
-      if (idx == 2) {
-        auto start = sc_time_stamp();
-        start_times.push_back(start);
-
-        if (is_first) {
-          operation_start_times.push_back(start);
-          is_first = false;
-        }
-
-        CCS_LOG("----- Accelerator Layer '" << operation.name
-                                            << "' Started. -----");
-      }
-    }
-  }
-}
-
-void Harness::record_done(const std::deque<BaseParams*>& params,
-                          const Operation& operation, bool is_last) {
-  int idx = 0;
-  while (idx < params.size()) {
-    if (auto* matrix_params = get_param<MatrixParams>(params, idx)) {
-#if SUPPORT_MVM
-      if (matrix_params->is_fc) {
-        matrix_vector_unit_done.SyncPop();
-      } else
-#endif
-#if SUPPORT_SPMM
-          if (matrix_params->is_spmm) {
-        if (auto* dense_params = get_param<MatrixParams>(params, idx)) {
-          matrix_unit_done.SyncPop();
-        }
-        spmm_unit_done.SyncPop();
-      } else
-#endif
-      {
-        matrix_unit_done.SyncPop();
-      }
-    } else if (auto* dwc_params = get_param<DwCParams>(params, idx)) {
-#if SUPPORT_DWC
-      dwc_unit_done.SyncPop();
-#endif
-    }
-
-    if (auto* vector_params = get_param<VectorParams>(params, idx)) {
-      vector_unit_done.SyncPop();
-      idx++;
-    }
-
-    sc_time end = sc_time_stamp();
-    CCS_LOG("----- Accelerator Layer '" << operation.name
-                                        << "' Finished. -----");
-
-    sc_time start = start_times.front();
-    start_times.pop_front();
-
-    int runtime = end.to_default_time_units() - start.to_default_time_units();
-    std::cout << "Runtime: " << runtime << " ns" << std::endl;
-    access_counter->print_summary(operation.tiling, operation.has_valid_tiling);
-
-    if (idx < params.size() - 1) {
-      operation_done.SyncPush();
-    }
-
-    if (is_last && idx == params.size()) {
-      auto start = operation_start_times.front();
-      operation_start_times.pop_front();
-
-      int total_runtime =
-          end.to_default_time_units() - start.to_default_time_units();
-      std::cout << "Total Runtime: " << total_runtime << " ns" << std::endl;
-    }
-  }
-}
-
-void Harness::param_sender() {
-  matrix_unit_params_in.ResetWrite();
-  vector_unit_params_in.ResetWrite();
-#if SUPPORT_MVM
-  matrix_vector_unit_params_in.ResetWrite();
-#endif
-#if SUPPORT_SPMM
-  spmm_unit_params_in.ResetWrite();
-#endif
-#if SUPPORT_DWC
-  dwc_unit_params_in.ResetWrite();
-#endif
-  operation_done.ResetRead();
-  tile_done.ResetRead();
-
-  wait();
-
-  for (int i = 0; i < operations.size(); i++) {
-    const auto operation = operations.at(i);
-    const auto param = operation.param;
-
-    std::deque<BaseParams*> accelerator_params;
-    map_operation(operation, accelerator_params);
-
-    const auto op_list = get_op_list(param);
-    bool has_csr_outputs = op_list.back().target() == "quantize_mx_outlier";
-
-    const auto outputs = get_op_outputs(param);
-
-    const bool single_pass = contain_matrix_param(accelerator_params) ||
-                             accelerator_params.size() < 4;
-
-    // Max tile index allowed to be in-flight before a synchronization wait is
-    // required.
-    const int sync_threshold = has_csr_outputs ? 0 : 1;
-
-    if (is_soc_sim()) {
-      const int num_tiles = get_tile_count(param);
-      const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
-
-      auto bank_2_params = get_ping_pong_params(accelerator_params, bank_size);
-
-      for (int j = 0; j < num_tiles; j++) {
-        if (single_pass && j > sync_threshold) {
-          tile_done.SyncPop();
-        }
-
-        auto params = j % 2 == 0 ? accelerator_params : bank_2_params;
-
-        if (has_csr_outputs) {
-          int csr_tile_start;
-          int csr_tile_end;
-          dataloader->read_csr_tiled_bounds(outputs[2], j - 1, 1,
-                                            csr_tile_start, csr_tile_end);
-
-          for (auto& param : params) {
-            if (auto* cfg = dynamic_cast<VectorInstructionConfig*>(param)) {
-              cfg->outlier_filter.indptr_offset = j > 0 ? csr_tile_end : 0;
-              break;
-            }
-          }
-        }
-
-        spdlog::debug("Sending tile {} params\n", j);
-        send_params(params);
-      }
-
-      // drain out remaining done signals
-      if (single_pass) {
-        for (int j = 0; j < std::min(num_tiles, sync_threshold + 1); j++) {
-          tile_done.SyncPop();
-        }
-      }
-    } else {
-      send_params(accelerator_params);
-    }
-  }
-}
-
-void Harness::start_monitor() {
+// Release each queued group's units in program order. SyncPop completes when
+// the unit offers its start handshake -- the matrix unit raises it from the
+// processor at the front of its pipeline, so a release can land while the
+// previous group still drains through the accumulation buffer and output
+// controller behind it.
+void Harness::release_starts() {
   matrix_unit_start.ResetRead();
   vector_unit_start.ResetRead();
 #if SUPPORT_MVM
@@ -641,27 +471,46 @@ void Harness::start_monitor() {
 
   wait();
 
-  for (int i = 0; i < operations.size(); i++) {
-    const auto operation = operations.at(i);
-    const auto param = operation.param;
+  while (true) {
+    while (start_queue.empty()) wait(start_pushed);
+    InvocationGroup group = start_queue.front();
+    start_queue.pop_front();
 
-    std::deque<BaseParams*> accelerator_params;
-    map_operation(operation, accelerator_params);
-
-    if (is_soc_sim()) {
-      const int num_tiles = get_tile_count(param);
-      for (int j = 0; j < num_tiles; j++) {
-        spdlog::debug("Waiting for tile {} to start\n", j);
-        bool is_first = j == 0;
-        record_start(accelerator_params, operation, is_first);
-      }
-    } else {
-      record_start(accelerator_params, operation, true);
+    if (group.op_begin != nullptr) {
+      op_release_time = sc_time_stamp();
+      CCS_LOG("----- Accelerator Layer '" << group.op_begin->name()
+                                          << "' Started. -----");
     }
+
+    // Popping every start before any done (in retire_dones) preserves
+    // concurrency within a group -- a fused SpMM runs its dense matrix and
+    // sparse passes at once.
+    if (group.matrix) matrix_unit_start.SyncPop();
+#if SUPPORT_MVM
+    if (group.matrix_vector) matrix_vector_unit_start.SyncPop();
+#endif
+#if SUPPORT_SPMM
+    if (group.spmm) spmm_unit_start.SyncPop();
+#endif
+#if SUPPORT_DWC
+    if (group.dwc) dwc_unit_start.SyncPop();
+#endif
+    if (group.vector) vector_unit_start.SyncPop();
+
+    // An operation's groups are contiguous, so the release time captured at
+    // its op_begin group is still current at its op_end group.
+    if (group.op_end != nullptr) group.start_time = op_release_time;
+
+    done_queue.push_back(group);
+    done_pushed.notify(SC_ZERO_TIME);
   }
 }
 
-void Harness::done_monitor() {
+// Retire groups in the order they started: pop the done handshakes, then fire
+// whatever the group carried -- a commit's post, and the per-op logging. A
+// post token is safe to fire here because everything queued ahead of it has
+// already retired.
+void Harness::retire_dones() {
   matrix_unit_done.ResetRead();
   vector_unit_done.ResetRead();
 #if SUPPORT_MVM
@@ -674,66 +523,190 @@ void Harness::done_monitor() {
   dwc_unit_done.ResetRead();
 #endif
 
-  operation_done.ResetWrite();
-  tile_done.ResetWrite();
+  wait();
+
+  while (true) {
+    while (done_queue.empty()) wait(done_pushed);
+    InvocationGroup group = done_queue.front();
+    done_queue.pop_front();
+
+    if (group.matrix) matrix_unit_done.SyncPop();
+#if SUPPORT_MVM
+    if (group.matrix_vector) matrix_vector_unit_done.SyncPop();
+#endif
+#if SUPPORT_SPMM
+    if (group.spmm) spmm_unit_done.SyncPop();
+#endif
+#if SUPPORT_DWC
+    if (group.dwc) dwc_unit_done.SyncPop();
+#endif
+    if (group.vector) vector_unit_done.SyncPop();
+
+    if (group.has_post) {
+      post_semaphore(group.post_node, group.post_slot, group.post_amount);
+    }
+
+    if (group.op_end != nullptr) {
+      const sc_time end = sc_time_stamp();
+      CCS_LOG("----- Accelerator Layer '" << group.op_end->name()
+                                          << "' Finished. -----");
+      // to_default_time_units returns a double; print whole nanoseconds so
+      // large values do not switch to scientific notation.
+      std::cout << "Runtime: "
+                << static_cast<long long>(
+                       end.to_default_time_units() -
+                       group.start_time.to_default_time_units())
+                << " ns" << std::endl;
+      if (group.op_end->has_tiling()) {
+        access_counter->print_summary(group.op_end->tiling(), true);
+      }
+    }
+
+    pending_groups--;
+    if (pending_groups == 0) group_retired.notify(SC_ZERO_TIME);
+  }
+}
+
+void Harness::drain() {
+  while (pending_groups > 0) wait(group_retired);
+}
+
+void Harness::begin_commit() { in_commit = true; }
+
+// A commit's post must not fire until the whole region has retired. The walk
+// reaches end_commit as soon as it has pushed the params, so the post rides
+// the queues as a unit-less token behind the region's groups.
+void Harness::end_commit(bool has_post, const std::string& post_node,
+                         int64_t post_slot, int64_t post_amount) {
+  in_commit = false;
+  if (!has_post) return;
+
+  InvocationGroup token;
+  token.has_post = true;
+  token.post_node = post_node;
+  token.post_slot = post_slot;
+  token.post_amount = post_amount;
+
+  pending_groups++;
+  start_queue.push_back(token);
+  start_pushed.notify(SC_ZERO_TIME);
+}
+
+void Harness::init_semaphore(const std::string& node, int64_t slot,
+                             int64_t value) {
+  auto& semaphore = sync_semaphores[{node, slot}];
+  semaphore.count = value;
+}
+
+void Harness::post_semaphore(const std::string& node, int64_t slot,
+                             int64_t amount) {
+  auto& semaphore = sync_semaphores[{node, slot}];
+  semaphore.count += amount;
+  semaphore.posted.notify(SC_ZERO_TIME);
+}
+
+// Called from the walk; blocks until retire_dones (or an async_copy on the
+// walk itself) has posted enough credits. This is the back-pressure that
+// keeps the walk at most one ping-pong slot ahead of the hardware.
+void Harness::wait_semaphore(const std::string& node, int64_t slot,
+                             int64_t amount) {
+  auto& semaphore = sync_semaphores[{node, slot}];
+  while (semaphore.count < amount) wait(semaphore.posted);
+  semaphore.count -= amount;
+}
+
+// Drives the DUT. The bufferized graph already states the tile loops, the
+// reduction conditionals and every DMA, so there is nothing left for the
+// harness to synthesize: it walks the graph exactly as the gold model does and,
+// when the walk reaches an accelerator operation, hands it to the hardware
+// instead of to a kernel.
+void Harness::run_walker() {
+  matrix_unit_params_in.ResetWrite();
+  vector_unit_params_in.ResetWrite();
+#if SUPPORT_MVM
+  matrix_vector_unit_params_in.ResetWrite();
+#endif
+#if SUPPORT_SPMM
+  spmm_unit_params_in.ResetWrite();
+#endif
+#if SUPPORT_DWC
+  dwc_unit_params_in.ResetWrite();
+#endif
 
   wait();
 
-  for (int i = 0; i < operations.size(); i++) {
-    const auto operation = operations.at(i);
-    const auto param = operation.param;
+  const sc_time start = sc_time_stamp();
 
-    std::deque<BaseParams*> accelerator_params;
-    map_operation(operation, accelerator_params);
+  Interpreter interpreter(model, memory, this);
+  interpreter.run(selection);
 
-    if (is_soc_sim()) {
-      const int num_tiles = get_tile_count(param);
-      const int bank_size = getenv_int("CACHE_SIZE", 8 * 1024 * 1024);
+  // The walk returning only means every group was queued; wait for the
+  // hardware to retire them all before stamping the runtime.
+  drain();
 
-      const bool single_pass = contain_matrix_param(accelerator_params) ||
-                               accelerator_params.size() < 4;
-
-      dataloader->load_scratchpad(param, 0, 0);
-
-      if (num_tiles > 1) {
-        dataloader->load_scratchpad(param, 1, bank_size);
-      }
-
-      for (int j = 0; j < num_tiles; j++) {
-        spdlog::debug("Waiting for tile {} to finish\n", j);
-        bool is_last = j == num_tiles - 1;
-        record_done(accelerator_params, operation, is_last);
-
-        int offset = j % 2 == 0 ? 0 : bank_size;
-        dataloader->store_scratchpad(param, j, offset);
-
-        if (j + 2 < num_tiles) {
-          dataloader->load_scratchpad(param, j + 2, offset);
-        }
-
-        if (single_pass) {
-          tile_done.SyncPush();
-        }
-      }
-    } else {
-      record_done(accelerator_params, operation, true);
-    }
-  }
+  const sc_time end = sc_time_stamp();
+  std::cout << "Total Runtime: "
+            << static_cast<long long>(end.to_default_time_units() -
+                                      start.to_default_time_units())
+            << " ns" << std::endl;
 
   sc_stop();
 }
 
+void Harness::execute(const voyager::Operation& op, const ScalarEnv& env) {
+  const std::vector<Tensor> outputs = resolve_outputs(op, env);
+
+  // Anything the compiler tagged "cpu" runs on the control processor, not the
+  // datapath -- a slice, a host-side pad. Those still need a kernel, so let the
+  // gold model do them in place, exactly as it does in the gold flow. Host ops
+  // are not sequenced by the semaphore protocol, so quiesce the datapath
+  // first.
+  if (!is_datapath(op)) {
+    drain();
+    run_host_operation(op, env, memory);
+    return;
+  }
+
+  std::deque<BaseParams*> params;
+  map_operation(op, env, params);
+
+#ifndef __SYNTHESIS__
+  if (std::getenv("PRINT_PARAMS")) {
+    std::cout << "===== params for " << op.name() << " (" << params.size()
+              << ") =====" << std::endl;
+    for (auto* p : params) {
+      if (auto* mp = dynamic_cast<MatrixParams*>(p)) std::cout << *mp;
+      if (auto* vp = dynamic_cast<VectorParams*>(p)) std::cout << *vp;
+    }
+  }
 #endif
 
-void run_accelerator(std::vector<Operation> operations,
-                     DataLoader* dataloader) {
+  // A synchronous operation is a barrier on both sides: it waits on none of
+  // the semaphores the in-flight commits will post, so only a drain orders its
+  // fetches after their writes, and the interpreter posts Operation.semaphore
+  // the moment execute returns.
+  if (!in_commit) drain();
+  dispatch_params(op, params);
+  if (!in_commit) drain();
+
+  for (auto* param : params) delete param;
+}
+
+#endif  // CFLOAT: the harness instantiates the SystemC Accelerator, which the
+        // CFloat datatype cannot compile. run_accelerator below just aborts.
+
+void run_accelerator(const Model& model, const Model::Selection& selection,
+                     MemoryInterface* memory) {
 #ifdef CFLOAT
   spdlog::error(
       "The SystemC model does not support the CFloat datatype. Only the gold "
       "model should be used for CFloat.\n");
   std::abort();
 #else
-  Harness harness("harness", operations, dataloader);
+  // CONNECTIONS_FAST_SIM makes Harness larger than the default process stack
+  // (about 12 MiB for a 64x64 MX build). Construct it on the heap so entering
+  // run_accelerator cannot overflow the stack before the constructor runs.
+  auto harness = std::make_unique<Harness>("harness", model, selection, memory);
   sc_start();
 #endif
 }

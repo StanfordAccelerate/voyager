@@ -695,9 +695,6 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
     fetch_weight_input_indices_deq.ResetRead();
     weight_req.Reset();
     fetch_weight_nnz_deq.ResetRead();
-#if SUPPORT_MX
-    weight_scale_req.Reset();
-#endif
 
     wait();
 

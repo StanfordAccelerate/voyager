@@ -1,21 +1,27 @@
 import argparse
-import concurrent
+import concurrent.futures
 import datetime
 import json
-import math
 import multiprocessing as mp
-import numpy as np
 import os
 import subprocess
 import pandas as pd
 import re
 import signal
 import sys
-from deepdiff import DeepDiff
 
-from google.protobuf import text_format
-from google.protobuf.json_format import MessageToDict
-from voyager_compiler.codegen import param_pb2
+from regression_common import (
+    IDEAL_RUNTIME_PATTERN,
+    PASS_PATTERN,
+    actual_tile_count,
+    add_layers,
+    check_environment_vars,
+    get_build_folder,
+    get_skip_layers,
+    print_test_results,
+    run_with_timeout,
+    set_default_env_vars,
+)
 
 ACCURACY_RESULTS = {
     "resnet18": {
@@ -63,112 +69,6 @@ ACCURACY_RESULTS = {
 }
 
 
-def set_default_env_vars(env_vars):
-    env_vars.setdefault("INPUT_BUFFER_SIZE", "1024")
-    env_vars.setdefault("WEIGHT_BUFFER_SIZE", "1024")
-    env_vars.setdefault("ACCUM_BUFFER_SIZE", "1024")
-    env_vars.setdefault("DOUBLE_BUFFERED_ACCUM_BUFFER", "false")
-    env_vars.setdefault("SUPPORT_MVM", "false")
-    env_vars.setdefault("SUPPORT_SPMM", "false")
-
-
-def get_build_folder(env_vars):
-    return (
-        f"build/"
-        f"{env_vars['DATATYPE']}_"
-        f"{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_"
-        f"{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_"
-        f"{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}_"
-        f"{env_vars['SUPPORT_MVM']}_"
-        f"{env_vars['SUPPORT_SPMM']}"
-    )
-
-
-def utilization(df):
-    count = df["Count"].to_numpy()
-    full_tiles = df["L2 Tiles"].to_numpy()
-    actual_tiles = df["Actual Tiles"].to_numpy()
-    ideal = df["Ideal"].to_numpy()
-    runtime = df["Runtime"].to_numpy()
-
-    # Precompute common factor
-    weight = (full_tiles * count) / actual_tiles
-
-    numerator = np.sum(ideal * weight)
-    denominator = np.sum(runtime * weight)
-
-    return numerator / denominator if denominator != 0 else np.nan
-
-
-def print_test_results(test_results, layers, output_folder):
-    columns = [
-        "Model",
-        "Layer",
-        "Status",
-        "Runtime",
-        "Ideal",
-        "RuntimeType",
-        "Count",
-        "L2 Tiles",
-        "Actual Tiles",
-    ]
-    if len(test_results[0]) == 3:
-        columns = columns[:3]
-
-    # convert list of tuples to DataFrame
-    df = pd.DataFrame(test_results, columns=columns)
-    sorted_df = []
-
-    # get models
-    models = df["Model"].unique()
-
-    for model in models:
-        print("=" * 10 + f" {model} " + "=" * 10)
-
-        # Create an explicit copy of the DataFrame
-        model_df = df[df["Model"] == model].copy()
-
-        # sort according to order in layers
-        model_df["Layer"]= pd.Categorical(model_df["Layer"], layers[model])
-        model_df.sort_values("Layer", inplace=True)
-        # turn categorial back to string
-        model_df["Layer"] = model_df["Layer"].astype(str)
-        sorted_df.append(model_df)
-
-        passed = model_df[model_df["Status"] == True]
-        failed = model_df[model_df["Status"] == False]
-
-        print("Passed:")
-        print(passed["Layer"].to_string(index=False) if not passed.empty else "None")
-        print("Failed:")
-        print(failed["Layer"].to_string(index=False) if not failed.empty else "None")
-
-        # if runtime column exists, print runtime of each layer
-        if "Runtime" in model_df.columns:
-            print("Runtime:")
-            print(model_df[columns[1:]].to_string(index=False), flush=True)
-
-            utilization_all    = utilization(model_df)
-            utilization_matrix = utilization(model_df[model_df["RuntimeType"] == "matrix"])
-
-            print(f"Utilization: {utilization_all:.3f}")
-            print(f"Matrix Utilization: {utilization_matrix:.3f}")
-
-    # concatentate all DataFrames into a single DataFrame and save to pickle and excel
-    combined_df = pd.concat(sorted_df)
-    combined_df.to_pickle(f"{output_folder}/test_results.pkl")
-    combined_df.to_excel(f"{output_folder}/test_results.xlsx", index=False)
-
-    # return True if all tests passed
-    return len(df[df["Status"] == False]) == 0
-
-
-def check_environment_vars(required_vars):
-    unset_vars = [var for var in required_vars if var not in os.environ]
-    if len(unset_vars) > 0:
-        raise ValueError(f"Please set {', '.join(unset_vars)} environment variables")
-
-
 def run_gold_model_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
@@ -177,15 +77,7 @@ def run_gold_model_unit_test(model, layer, output_folder):
     env_vars["SIMS"] = "gold,pytorch"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                ["make", "sim"],
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=5 * 60,
-            )
-        except subprocess.TimeoutExpired:
+        if not run_with_timeout(["make", "sim"], env_vars, stdout_file, 20 * 60):
             print(f"Test {model}_{layer} timed out")
             stdout_file.write("Test timed out")
 
@@ -248,15 +140,12 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
     env_vars["SIMS"] = "gold,accelerator"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                ["make", "fast-sim" if fast else "sim"],
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=4 * 60 * 60,
-            )
-        except subprocess.TimeoutExpired:
+        if not run_with_timeout(
+            ["make", "fast-sim" if fast else "sim"],
+            env_vars,
+            stdout_file,
+            4 * 60 * 60,
+        ):
             print(f"Test {model}_{layer} timed out")
             stdout_file.write("Test timed out")
 
@@ -332,16 +221,13 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, debug):
     # make target", but the target exists), so we retry up to 3 times
     for attempt in range(3):
         with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
-            try:
-                subprocess.run(
-                    ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
-                    cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
-                    env=env_vars,
-                    stdout=stdout_file,
-                    stderr=subprocess.STDOUT,
-                    timeout=10 * 60 * 60,
-                )
-            except subprocess.TimeoutExpired:
+            if not run_with_timeout(
+                ["make", "-f", "scverify/Verify_concat_sim_rtl_v_vcs.mk", "sim"],
+                env_vars,
+                stdout_file,
+                10 * 60 * 60,
+                cwd=f"{build_folder}/Catapult/{env_vars['TECHNOLOGY']}/clock_{env_vars['CLOCK_PERIOD']}/Accelerator/Accelerator.v1",
+            ):
                 print(f"Test {model}_{layer} timed out")
                 stdout_file.write("Test timed out")
                 break
@@ -363,30 +249,27 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, debug):
             content = file.read()
 
         # Check if "Error count: 0" exists
-        success = bool(re.search(r"Error\s+count:\s+0", content))
+        success = bool(re.search(PASS_PATTERN, content))
 
         if success:
+            # The harness prints runtimes of 1e6 ns and up in scientific
+            # notation.
             match = re.search(
-                r"^Total Runtime:\s+(\d+)\s*ns",
+                r"^Total Runtime:\s+([\d.]+(?:[eE][+-]?\d+)?)\s*ns",
                 content,
                 flags=re.IGNORECASE | re.MULTILINE,
             )
 
-            total_runtime = int(match.group(1)) if match else 0
+            total_runtime = int(float(match.group(1))) if match else 0
 
-            # Capture runtime type and ideal runtime
-            match = re.search(
-                r"(matrix|vector)\s+unit\s+ideal\s+runtime:\s+(\d+)\s*ns",
-                content,
-                flags=re.IGNORECASE,
-            )
+            # Capture runtime type and ideal runtime. The harness measures in
+            # ns while the compiler's ideal is in cycles, so scale the ideal by
+            # the clock period to make the utilization report unit-consistent.
+            match = re.search(IDEAL_RUNTIME_PATTERN, content, flags=re.IGNORECASE)
 
             runtime_type = match.group(1).lower()
-            ideal_runtime = int(match.group(2))
-
-    # Calculate actual tiles (min of L2 tiles and max_tiles)
-    max_tiles = int(os.environ.get("MAX_TILES", "1"))
-    actual_tiles = min(num_tiles, max_tiles)
+            clock_period = float(os.environ.get("CLOCK_PERIOD", "5.0"))
+            ideal_runtime = int(round(int(match.group(2)) * clock_period))
 
     return (
         model,
@@ -397,7 +280,7 @@ def run_rtl_test(model, layer, layer_count, num_tiles, output_folder, debug):
         runtime_type,
         layer_count,
         num_tiles,
-        actual_tiles,
+        actual_tile_count(num_tiles),
     )
 
 
@@ -609,6 +492,35 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     else:
         raise ValueError("Invalid datatype")
 
+    if env_vars["DATATYPE"] == "MXNF4":
+        quantization_args += ["--bank_width", str(oc_unroll // 2)]
+    elif env_vars["DATATYPE"] not in ("CFLOAT", "BF16"):
+        quantization_args += ["--bank_width", str(oc_unroll)]
+
+    # Keep in sync with codegen.mk's COMMON_FLAGS.
+    common_flags = [
+        "--layout_policy",
+        "systolic",
+        "--pe_array_size",
+        f"{ic_unroll},{oc_unroll}",
+        "--dump_tensors",
+        "--double_buffered_l2",
+        "--scratchpad_size",
+        env_vars.get("SCRATCHPAD_SIZE", "2097152"),
+        "--num_banks",
+        env_vars.get("NUM_BANKS", "16"),
+        "--input_buffer_size",
+        env_vars["INPUT_BUFFER_SIZE"],
+        "--weight_buffer_size",
+        env_vars["WEIGHT_BUFFER_SIZE"],
+        "--accum_buffer_size",
+        env_vars["ACCUM_BUFFER_SIZE"],
+    ]
+    if env_vars["DOUBLE_BUFFERED_ACCUM_BUFFER"] in ("true", "1"):
+        common_flags.append("--double_buffered_accum_buffer")
+    if env_vars.get("CONV2D_IM2COL") == "1":
+        common_flags.append("--conv2d_im2col")
+
     subprocess.run(
         [
             "mkdir",
@@ -625,55 +537,13 @@ def run_accuracy(model, dataset, num_processes, output_folder):
                 model,
                 "--model_name_or_path",
                 model_path,
-                "--transform_layout",
-                "--hardware_unrolling",
-                f"{ic_unroll},{oc_unroll}",
                 *quantization_args,
+                *common_flags,
                 "--model_output_dir",
                 "test/compiler/networks/" + model + "/" + env_vars["DATATYPE"],
                 "--dump_dataset",
                 "--dataset_output_dir",
                 output_data_dir,
-                "--dump_tensors",
-            ],
-            stdout=stdout_file,
-            stderr=subprocess.STDOUT,
-        )
-
-    subprocess.run(
-        [
-            "mkdir",
-            "-p",
-            f"{env_vars['CODEGEN_DIR']}/networks/{model}/{env_vars['DATATYPE']}/{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}",
-        ]
-    )
-
-    subprocess.run(
-        [
-            "protoc",
-            "--proto_path=test/compiler/proto/",
-            "--python_out=test/compiler/proto/",
-            f"test/compiler/proto/tiling.proto",
-        ]
-    )
-
-    with open(f"{output_folder}/{model}_{dataset}_tiler.log", "w") as stdout_file:
-        subprocess.run(
-            [
-                "python",
-                "test/compiler/run_tiler.py",
-                "--codegen_dir",
-                f"test/compiler/networks/{model}/{env_vars['DATATYPE']}",
-                "--IC_dimension",
-                env_vars["IC_DIMENSION"],
-                "--OC_dimension",
-                env_vars["OC_DIMENSION"],
-                "--input_buffer_size",
-                env_vars["INPUT_BUFFER_SIZE"],
-                "--weight_buffer_size",
-                env_vars["WEIGHT_BUFFER_SIZE"],
-                "--accum_buffer_size",
-                env_vars["ACCUM_BUFFER_SIZE"],
             ],
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
@@ -684,21 +554,18 @@ def run_accuracy(model, dataset, num_processes, output_folder):
     if dataset == "squad":
         additional_args = ["1000"]  # limit number of samples to 1000 for squad dataset
     with open(f"{output_folder}/{model}_{dataset}.log", "w") as stdout_file:
-        try:
-            subprocess.run(
-                [
-                    f"{build_folder}/cc/AccuracyTester",
-                    model,
-                    output_data_dir,
-                    str(num_processes),
-                    *additional_args,
-                ],
-                env=env_vars,
-                stdout=stdout_file,
-                stderr=subprocess.STDOUT,
-                timeout=10 * 60 * 60,
-            )
-        except subprocess.TimeoutExpired:
+        if not run_with_timeout(
+            [
+                f"{build_folder}/cc/AccuracyTester",
+                model,
+                output_data_dir,
+                str(num_processes),
+                *additional_args,
+            ],
+            env_vars,
+            stdout_file,
+            10 * 60 * 60,
+        ):
             print(f"Test {model}_{dataset} timed out")
             stdout_file.write("Test timed out")
             return False
@@ -726,127 +593,6 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         gold_accuracy = final_accuracy
 
     return abs(final_accuracy - gold_accuracy) < 1
-
-
-def add_layers(network, layers, layer_counts, tile_counts, uniquify, skip_layers=None):
-    layers[network] = []
-    layer_counts[network] = {}
-    tile_counts[network] = {}
-
-    skip_layers = [re.compile(p) for p in skip_layers] if skip_layers else []
-
-    if not uniquify:
-        with open(
-            f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/layers.txt",
-            "r",
-        ) as f:
-            all_layers = f.read().splitlines()
-            # Filter out layers that should be skipped
-            layers[network] = [
-                layer for layer in all_layers
-                if not any(p.fullmatch(layer) for p in skip_layers)
-            ]
-            layer_counts[network] = {layer: 1 for layer in layers[network]}
-    else:
-        # open the proto file
-        with open(
-            f"test/compiler/networks/{network}/{os.environ['DATATYPE']}/model.txt",
-            "r",
-        ) as f:
-            contents = f.read()
-        params = param_pb2.Model()
-        text_format.Parse(contents, params)
-
-        # convert to json
-        params_dict = MessageToDict(params, preserving_proto_field_name=True)
-
-        def delete_nested_keys(data, key):
-            if isinstance(data, dict):
-                for k in list(data.keys()):
-                    if k == key:
-                        del data[k]
-                    else:
-                        delete_nested_keys(data[k], key)
-            elif isinstance(data, list):
-                for item in data:
-                    delete_nested_keys(item, key)
-
-        unique_layers = {}
-        for op in params_dict["ops"]:
-            # skip nop layers
-            if "op" in op and op["op"]["op"] == "nop":
-                continue
-
-            name = op["op"]["name"] if "op" in op else op["fused_op"]["name"]
-
-            # Skip layers that are in the skip list
-            if any(p.fullmatch(name) for p in skip_layers):
-                print(f"Skipping layer {name}")
-                continue
-
-            # remove the name, memory, and node fields from the op
-            delete_nested_keys(op, "name")
-            delete_nested_keys(op, "memory")
-            delete_nested_keys(op, "scratchpad")
-            delete_nested_keys(op, "node")
-
-            if "op" in op:
-                kwargs = op["op"]["kwargs"]
-            else:
-                kwargs = op["fused_op"]["op_list"][0]["kwargs"]
-
-            l2_values = kwargs.get("l2_tiling", {}).get("int_list", {}).get("values", [])
-            l2_values = [int(v) for v in l2_values]
-            l2_count = math.prod(l2_values) if l2_values else 1
-
-            is_unique_layer = True
-            for op_name, op_val in unique_layers.items():
-                if not DeepDiff(op, op_val, ignore_order=True):
-                    layer_counts[network][op_name] += 1
-                    is_unique_layer = False
-                    break
-
-            if is_unique_layer:
-                unique_layers[name] = op
-                layers[network].append(name)
-                layer_counts[network][name] = 1
-                tile_counts[network][name] = l2_count
-
-
-def matches(value, rule_value):
-    if isinstance(rule_value, list):
-        return value in rule_value
-    else:
-        if rule_value == "*":
-            return True
-        else:
-            return value == rule_value
-
-
-def get_skip_layers(skip_rules, model, datatype, sim_type, block_size):
-    best_rule = None
-    best_specificity = -1
-
-    for rule in skip_rules:
-        if (
-            matches(model, rule["model"])
-            and matches(datatype, rule["datatype"])
-            and matches(sim_type, rule["sim_type"])
-            and matches(block_size, rule["block_size"])
-        ):
-            # Calculate specificity score (higher is more specific)
-            # Exact match = 2, list match = 1, wildcard = 0
-            specificity = 0
-            specificity += 2 if rule["datatype"] != "*" else 0
-            specificity += 1 if isinstance(rule["model"], list) else (2 if rule["model"] != "*" else 0)
-            specificity += 1 if isinstance(rule["sim_type"], list) else (2 if rule["sim_type"] != "*" else 0)
-            specificity += 2 if rule["block_size"] != "*" else 0
-
-            if specificity > best_specificity:
-                best_specificity = specificity
-                best_rule = rule
-
-    return set(best_rule["layers"]) if best_rule else set()
 
 
 def main():

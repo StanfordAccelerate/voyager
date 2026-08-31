@@ -2,13 +2,23 @@
 
 #include "test/toolchain/Common.h"
 
-void map_layer_norm(const codegen::Operation& param,
+void map_layer_norm(const voyager::Operation& operation, const ScalarEnv& env,
                     std::deque<BaseParams*>& mapped_params) {
-  const auto op_list = get_op_list(param);
-  const auto layer_norm_op = op_list[0];
+  const auto& op_list = get_prim_ops(operation);
+  const auto& layer_norm_op = get_anchor_op(operation);
 
-  const auto input = layer_norm_op.kwargs().at("input").tensor();
-  const auto output = get_op_outputs(param).back();
+  const Tensor& anchor_input = resolve(layer_norm_op, "input", env);
+  const voyager::PrimOp* input_producer =
+      get_fused_producer(operation, env, anchor_input);
+  const voyager::PrimOp* dequantize_op =
+      input_producer != nullptr &&
+              strip_namespace(input_producer->target()) == "dequantize"
+          ? input_producer
+          : nullptr;
+  const Tensor& input = dequantize_op == nullptr
+                            ? anchor_input
+                            : resolve(*dequantize_op, "input", env);
+  const auto output = resolve_outputs(operation, env).back();
 
   VectorParams* vector_params;
   VectorInstructionConfig* vector_instruction_config;
@@ -28,7 +38,7 @@ void map_layer_norm(const codegen::Operation& param,
 
   constexpr int vu_unit_ratio = OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
-  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype);
   int input_dtype_width = get_type_width<VU_INPUT_TYPES>(input_dtype);
   int input_fetch_width = OC_DIMENSION * input_dtype_width;
 
@@ -36,14 +46,15 @@ void map_layer_norm(const codegen::Operation& param,
   int vector_dtype_width = get_type_width<VU_INPUT_TYPES>(vector_dtype);
   int vector_fetch_width = OC_DIMENSION * vector_dtype_width;
 
+  // The compiler reserves the scratchpad the four passes stage their
+  // intermediates in, so these are read off the operation. Deriving them from
+  // the input tile instead would land inside the input's own second bank.
   const int mean_scratch_address =
-      get_address(input) + input_size * input_dtype_width / 8;
+      get_address(resolve(layer_norm_op, "mean", env));
   const int var_scratch_address =
-      mean_scratch_address +
-      reduced_size * OC_DIMENSION * vector_dtype_width / 8;
+      get_address(resolve(layer_norm_op, "variance", env));
   const int intermediate_address =
-      var_scratch_address +
-      reduced_size * OC_DIMENSION * vector_dtype_width / 8;
+      get_address(resolve(layer_norm_op, "normalized", env));
 
   // ======================================================================
   // Pass 1: compute mean
@@ -99,7 +110,7 @@ void map_layer_norm(const codegen::Operation& param,
   VECTOR_DATATYPE immediate = 1.0 / reduction_dim;
   inst1.immediate0 = immediate.bits_rep();
   inst1.vdest = VectorInstructions::to_reduce;
-  set_dequantize_scale(input, inst1);
+  set_dequantize_scale(dequantize_op, env, inst1);
   vector_instruction_config->inst[1] = inst1;
 
   vector_instruction_config->num_inst = 2;
@@ -182,7 +193,7 @@ void map_layer_norm(const codegen::Operation& param,
   inst3.vector_op0 = VectorInstructions::op0_sub;
   inst3.vector_op2 = VectorInstructions::op2_sqr;
   inst3.vdest = VectorInstructions::to_reduce;
-  set_dequantize_scale(input, inst3);
+  set_dequantize_scale(dequantize_op, env, inst3);
   vector_instruction_config->inst[1] = inst3;
 
   vector_instruction_config->num_inst = 2;
@@ -270,7 +281,7 @@ void map_layer_norm(const codegen::Operation& param,
   inst4.vector_op0 = VectorInstructions::op0_sub;
   inst4.vector_op2 = VectorInstructions::op2_mul;
   inst4.vdest = VectorInstructions::to_output;
-  set_dequantize_scale(input, inst4);
+  set_dequantize_scale(dequantize_op, env, inst4);
   vector_instruction_config->inst[0] = inst4;
 
   vector_instruction_config->num_inst = 1;
@@ -305,8 +316,8 @@ void map_layer_norm(const codegen::Operation& param,
   vector_params->vector_fetch_0_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Fetch weights
-  const auto weight = layer_norm_op.kwargs().at("weight").tensor();
-  int weight_dtype = get_index_from_type_name<VU_INPUT_TYPES>(weight.dtype());
+  const auto weight = resolve(layer_norm_op, "weight", env);
+  int weight_dtype = get_index_from_type_name<VU_INPUT_TYPES>(weight.dtype);
   int weight_dtype_width = get_type_width<VU_INPUT_TYPES>(weight_dtype);
   int weight_fetch_width = OC_DIMENSION * weight_dtype_width;
 
@@ -327,10 +338,10 @@ void map_layer_norm(const codegen::Operation& param,
   vector_params->vector_fetch_1_loops[1][2] = reduction_dim / OC_DIMENSION;
 
   // Fetch bias
-  const bool has_bias = layer_norm_op.kwargs().contains("bias");
+  const bool has_bias = has_arg(layer_norm_op, "bias");
   if (has_bias) {
-    const auto bias = layer_norm_op.kwargs().at("bias").tensor();
-    int bias_dtype = get_index_from_type_name<VU_INPUT_TYPES>(bias.dtype());
+    const auto bias = resolve(layer_norm_op, "bias", env);
+    int bias_dtype = get_index_from_type_name<VU_INPUT_TYPES>(bias.dtype);
     int bias_dtype_width = get_type_width<VU_INPUT_TYPES>(bias_dtype);
     int bias_fetch_width = OC_DIMENSION * bias_dtype_width;
 
@@ -354,7 +365,7 @@ void map_layer_norm(const codegen::Operation& param,
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   for (int i = 0; i < 3; i++) {
     vector_params->output_loops[0][i] = 1;
@@ -375,7 +386,8 @@ void map_layer_norm(const codegen::Operation& param,
     inst5.vector_op2 = VectorInstructions::op2_add;
   }
   inst5.vdest = VectorInstructions::to_output;
-  set_quantize_params(param, vector_params, inst5, vector_instruction_config);
+  set_quantize_params(operation, env, vector_params, inst5,
+                      vector_instruction_config, mapped_params);
   vector_instruction_config->inst[0] = inst5;
 
   vector_instruction_config->num_inst = 1;

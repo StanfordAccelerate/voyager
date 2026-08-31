@@ -3,7 +3,7 @@
 #include <map>
 #include <string>
 
-#include "test/compiler/proto/tiling.pb.h"
+#include "test/compiler/proto/voyager_ir.pb.h"
 
 class AccessCounter {
  public:

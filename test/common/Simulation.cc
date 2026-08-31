@@ -1,373 +1,186 @@
 #include "test/common/Simulation.h"
 
 #include <algorithm>
-#include <cstdlib>
 #include <sstream>
 #include <stdexcept>
-#include <string>
-#include <vector>
 
-#define SPDLOG_EOL ""
 #include "spdlog/cfg/env.h"
 #include "spdlog/spdlog.h"
-#include "test/common/ArrayMemory.h"
-#include "test/common/DataLoader.h"
 #include "test/common/GoldModel.h"
-#include "test/common/Network.h"
+#include "test/common/Interpreter.h"
 #include "test/common/Utils.h"
 
-Simulation::Simulation() {
+namespace {
+
+std::vector<std::string> split(const std::string& text, char delimiter) {
+  std::vector<std::string> parts;
+  std::istringstream stream(text);
+  std::string item;
+  while (std::getline(stream, item, delimiter)) {
+    if (!item.empty()) parts.push_back(item);
+  }
+  return parts;
+}
+
+// Did the run write any byte of this tensor? Used to keep only the buffers a
+// (possibly short) run actually produced.
+bool wrote_any(ArrayMemory* memory, const Tensor& tensor) {
+  if (!memory->tracking()) return false;
+  return memory->any_written(tensor.partition, tensor.address,
+                             get_num_bytes(tensor));
+}
+
+}  // namespace
+
+Simulation::Simulation()
+    : model_name(getenv("NETWORK", "resnet18")), model(model_name) {
   spdlog::cfg::load_env_levels();
   spdlog::set_pattern("%v");
 
-  model = get_env_var("NETWORK");
-  if (model.empty()) {
-    model = "resnet18";
-  }
+  out_dir = getenv("OUT_DIR", "./test_outputs/");
 
-  std::string tests_str(get_env_var("TESTS"));
-  if (tests_str.empty()) {
-    tests_str = "submodule_0";
-  }
-
-  split_string(tests_str, ',', std::back_inserter(tests));
-  if (tests.size() > 2) {
-    throw std::runtime_error("Incorrect number of tests specified.");
-  }
-
-  std::string sims_str(get_env_var("SIMS"));
-  if (sims_str.empty()) {
-    sims_str = "gold,pytorch";
-  }
-
-  split_string(sims_str, ',', std::back_inserter(sims));
+  sims = split(getenv("SIMS", "gold,pytorch"), ',');
   if (sims.size() != 2) {
-    throw std::runtime_error("Incorrect number of simulators specified.");
+    throw std::runtime_error("SIMS must name exactly two simulators.");
   }
 
-  std::string tolerance_str(get_env_var("TOLERANCE"));
-  if (!tolerance_str.empty()) {
-    tolerance = std::stof(tolerance_str);
-  }
+  // Simulator comparisons must agree exactly; only a comparison against the
+  // float reference tensors gets tolerances.
+  const bool vs_reference = uses("pytorch");
+  rtol = std::stof(getenv("RTOL", vs_reference ? "0.05" : "0"));
+  atol = std::stof(getenv("ATOL", vs_reference ? "0.1" : "0"));
 
-  out_dir = get_env_var("OUT_DIR");
-  if (out_dir.empty()) {
-    out_dir = "./test_outputs/";
-  }
+  model.print_summary();
 
-  // Get list of operations to run
-  network = new Network(model);
-  operations = network->get_operations(tests);
+  // TESTS names a layer; its layers.txt extent is the smallest runnable thing
+  // and is self-contained (allocs, credit fills, tile loop, drain), so the
+  // selection runs as-is.
+  selection = model.selected_ops(split(getenv("TESTS", ""), ','));
+  spdlog::info("Running {} top-level operation(s)\n", selection.ops.size());
 
-  spdlog::info("Starting new simulation with config:\n");
-  spdlog::info("> Model: {}\n", model);
-  spdlog::info("> Tests: ");
-  for (const std::string& t : tests) spdlog::info("{} ", t);
-  spdlog::info("\n");
-  spdlog::info("> Sims: ");
-  for (const std::string& s : sims) spdlog::info("{} ", s);
-  spdlog::info("\n");
-  spdlog::info("> Tolerance: {}\n", tolerance);
-  spdlog::info("> Output dir: {}\n", out_dir);
+  partial_run = getenv_int("MAX_TILES", 0) > 0;
+  check_all_writes = uses("gold") && uses("accelerator");
+  model.live_sets(selection.ops, &live_in, &live_out, check_all_writes);
 }
 
 Simulation::~Simulation() {
-  for (const auto& [key, memory] : memories) {
-    delete memory;
-  }
+  for (const auto& [sim, array] : memories) delete array;
+}
 
-  for (const auto& [key, dataloader] : dataloaders) {
-    delete dataloader;
-  }
+ArrayMemory* Simulation::make_memory(const std::string& sim,
+                                     const std::vector<uint64_t>& sizes) {
+  return new ArrayMemory(sizes);
 }
 
 void Simulation::load_data() {
-  // Calculate dynamic memory sizes based on network parameters
-  uint64_t dram_size = network->get_max_dram_address();
-  uint64_t sram_size = 16 * 1024 * 1024;
-  uint64_t output_size = network->get_max_output_size();
-
+  const auto sizes = model.memory_sizes();
   spdlog::info("Model memory requirements:\n");
-  spdlog::info("> Max DRAM address: {} bytes ({} MB)\n", dram_size,
-               dram_size / (1024 * 1024));
-  spdlog::info("> Max output size: {} bytes ({} MB)\n", output_size,
-               output_size / (1024 * 1024));
+  spdlog::info("> DRAM: {} bytes ({} MB)\n", sizes[0],
+               sizes[0] / (1024 * 1024));
+  spdlog::info("> SRAM: {} bytes ({} MB)\n", sizes[1],
+               sizes[1] / (1024 * 1024));
 
-  // Add some padding to ensure we don't run out of memory (10% extra)
-  dram_size = static_cast<uint64_t>(dram_size * 1.1);
-  output_size = static_cast<uint64_t>(output_size * 1.1);
+  for (const auto& sim : sims) {
+    auto* array = make_memory(sim, sizes);
+    memories[sim] = array;
 
-  spdlog::info("Memory sizes with 10% margin:\n");
-  spdlog::info("> DRAM: {} bytes ({} MB)\n", dram_size,
-               dram_size / (1024 * 1024));
-  spdlog::info("> SRAM: {} bytes ({} MB)\n", sram_size,
-               sram_size / (1024 * 1024));
-  spdlog::info("> Reference: {} bytes ({} MB)\n", output_size,
-               output_size / (1024 * 1024));
+    // Loads the reference output tensors from disk so there's something to
+    // compare against.
+    if (sim == "pytorch") {
+      for (const auto* box : live_out) {
+        load_tensor(to_tensor(*box), model.data_dir, array);
+      }
+      continue;
+    }
 
-  std::vector<uint64_t> memory_sizes{dram_size, sram_size, output_size};
+    for (const auto* box : model.resident_inputs()) {
+      load_tensor(to_tensor(*box), model.data_dir, array);
+    }
+    for (const auto* box : live_in) {
+      load_tensor(to_tensor(*box), model.data_dir, array);
+    }
 
-  if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
-    memories["gold"] = new ArrayMemory(memory_sizes);
-    dataloaders["gold"] = new DataLoader(memories["gold"], false);
-  }
-
-  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    memories["accelerator"] = new ArrayMemory(memory_sizes);
-    dataloaders["accelerator"] = new DataLoader(memories["accelerator"], true);
-  }
-
-  std::string project_root = std::string(getenv("PROJECT_ROOT"));
-  std::string datatype = std::string(getenv("DATATYPE"));
-  std::string data_dir = project_root + "/" +
-                         std::string(getenv("CODEGEN_DIR")) + "/networks/" +
-                         model + "/" + datatype + "/tensor_files";
-
-  const auto operations = network->get_operations(tests, false);
-
-  for (const auto& [key, dataloader] : dataloaders) {
-    dataloader->load_inputs(operations, data_dir);
-    dataloader->load_outputs(operations.back().param, data_dir);
+    // Arm tracking after the preload so the write mask reflects the run's own
+    // writes, not the input/parameter setup.
+    // A full gold/reference run must prove that every expected byte was
+    // produced. Partial runs and gold/accelerator comparisons also use the
+    // masks to compare only corresponding writes.
+    if (sim == "gold" || partial_run || check_all_writes) {
+      array->track_writes();
+    }
   }
 
   spdlog::info("Data loaded successfully\n");
 }
 
-void Simulation::print_ideal_runtime(const Operation operation) {
-  const auto param = operation.param;
-  const auto op_list = get_op_list(param);
-  const auto& first_op = op_list.front();
-  const auto& kwargs = first_op.kwargs();
-  const auto output = get_op_outputs(param).back();
-
-  long cycles;
-
-  const long clock_period_ns = getenv_int("CLOCK_PERIOD", 1);
-  const int num_tiles = is_soc_sim() ? get_tile_count(param) : 1;
-
-  if (is_gemm_op(first_op.target())) {
-    bool is_matmul = first_op.target().find("matmul") != std::string::npos;
-    std::string weight_key = is_matmul ? "other" : "weight";
-    const auto weight = first_op.kwargs().at(weight_key).tensor();
-    const auto weight_shape = get_shape(weight);
-    const auto output_shape = get_shape(output);
-
-    // the total number of operations is X * Y * C * FX * FY * K.
-    long num_macs = get_size(output) * get_size(weight) * num_tiles;
-
-    if (is_fc_layer(first_op)) {
-      auto input = first_op.kwargs().at("input").tensor();
-      int K = weight_shape[0];
-      if (input.dtype() == "bfloat16") {
-        cycles = num_macs / K / VECTOR_UNIT_WIDTH;
-      } else {
-        cycles = num_macs / K / MV_UNIT_WIDTH;
-      }
-    } else {
-      int K = weight_shape[weight_shape.size() - 1];
-      cycles = num_macs / K / (IC_DIMENSION * OC_DIMENSION);
-    }
-
-    spdlog::info("{}, matrix unit ideal runtime: {} ns\n", get_op_name(param),
-                 cycles * clock_period_ns);
-  } else {
-    long num_ops = get_size(output);
-    cycles = num_ops / VECTOR_UNIT_WIDTH * num_tiles;
-
-    if (first_op.target() == "softmax") {
-      cycles *= 3;
-    } else if (first_op.target() == "layer_norm") {
-      cycles *= 4;
-    } else if (first_op.target() == "calculate_mx_qparam") {
-      const int block_size = first_op.kwargs().at("block_size").int_value();
-      cycles *= block_size;
-    } else if (first_op.target() == "max_pool2d") {
-      const auto kernel_size = kwargs.at("kernel_size").int_list().values();
-      for (const auto& k : kernel_size) {
-        cycles *= k;
-      }
-    } else if (first_op.target() == "adaptive_avg_pool2d") {
-      const auto input_shape = get_shape(kwargs.at("input").tensor());
-      const auto output_shape = get_shape(output);
-      int kernel_y = input_shape[1] / output_shape[1];
-      int kernel_x = input_shape[2] / output_shape[2];
-      cycles *= (kernel_y * kernel_x);
-    }
-
-    spdlog::info("{}, vector unit ideal runtime: {} ns\n", get_op_name(param),
-                 cycles * clock_period_ns);
-  }
+bool Simulation::uses(const std::string& sim) const {
+  return contains(sims, sim);
 }
 
-void Simulation::run() {
-  // Run gold model
-  if (std::find(sims.begin(), sims.end(), "gold") != sims.end()) {
-    for (const auto& operation : operations) {
-      const auto param = operation.param;
-      print_ideal_runtime(operation);
-
-      const auto tensors = get_op_outputs(param);
-      const auto dataloader = dataloaders["gold"];
-      const auto memory = (ArrayMemory*)dataloader->memory;
-
-      if (is_soc_sim()) {
-        const int num_tiles = get_tile_count(param);
-        std::cerr << "Number of tiles to run: " << num_tiles << std::endl;
-
-        // for SoC simulation, run operation num_tiles times
-        for (int i = 0; i < num_tiles; i++) {
-          dataloader->load_scratchpad(param, i);
-
-          const auto kwargs = dataloader->get_args(param, i);
-          const auto outputs = run_gold_model(operation, kwargs);
-
-          assert(outputs.size() == tensors.size());
-
-          for (int i = 0; i < outputs.size(); i++) {
-            memory->write_tensor(tensors[i], outputs[i]);
-          }
-
-          dataloader->store_scratchpad(param, i);
-        }
-      } else {
-        const auto kwargs = dataloader->get_args(param);
-        const auto outputs = run_gold_model(operation, kwargs);
-
-        assert(outputs.size() == tensors.size());
-
-        for (int i = 0; i < outputs.size(); i++) {
-          memory->write_tensor(tensors[i], outputs[i]);
-        }
-      }
-    }
+ArrayMemory* Simulation::memory(const std::string& sim) const {
+  const auto found = memories.find(sim);
+  if (found == memories.end()) {
+    throw std::runtime_error("SIMS does not name the simulator " + sim);
   }
+  return found->second;
+}
 
-  // Run accelerator
-  if (std::find(sims.begin(), sims.end(), "accelerator") != sims.end()) {
-    run_accelerator(operations, dataloaders["accelerator"]);
+void Simulation::run_gold() {
+  ArrayMemory* array = memory("gold");
+
+  GoldBackend backend(array);
+  Interpreter interpreter(model, array, &backend);
+  interpreter.run(selection);
+
+  const std::string name = getenv("TESTS", model_name);
+
+  if (interpreter.matrix_cycles() > 0) {
+    spdlog::info("{}, matrix unit ideal runtime: {} cycles\n", name,
+                 interpreter.matrix_cycles());
+  }
+  if (interpreter.vector_cycles() > 0) {
+    spdlog::info("{}, vector unit ideal runtime: {} cycles\n", name,
+                 interpreter.vector_cycles());
   }
 }
 
 int Simulation::check_outputs() {
-  std::string prefix;
-  if (operations.size() == 1) {
-    prefix = out_dir + model + '.' + operations.front().name + '.';
-  } else {
-    prefix = out_dir + model + '.' + operations.front().name + "_to_" +
-             operations.back().name + '.';
+  // Drop buffers the run did not retire at all. A short MAX_TILES walk can
+  // legitimately leave later pipeline checkpoints untouched; buffers that did
+  // retire remain element-masked below. Gold's write mask is the source of
+  // truth for both partial reference checks and gold/accelerator comparisons.
+  if (uses("gold") && (check_all_writes || partial_run)) {
+    ArrayMemory* gold = memory("gold");
+    live_out.erase(std::remove_if(live_out.begin(), live_out.end(),
+                                  [&](const voyager::TensorBox* box) {
+                                    return !wrote_any(gold, to_tensor(*box));
+                                  }),
+                   live_out.end());
   }
 
-  const auto param = operations.back().param;
+  if (live_out.empty()) {
+    spdlog::error(
+        "No output of the selection has a reference to compare to.\n");
+    return 1;
+  }
 
-  std::vector<std::string> active_sims;
-  for (const auto& name : {"soc", "accelerator", "gold", "pytorch"}) {
-    if (contains(sims, name)) {
-      active_sims.push_back(name);
+  // Compare the more-real simulator against the more-trusted one; when grading
+  // all writes, gold comes first because it owns the write mask.
+  std::vector<std::string> ordered;
+  if (check_all_writes) {
+    ordered = {"gold", "accelerator"};
+  } else {
+    for (const auto& sim : {"accelerator", "gold", "pytorch"}) {
+      if (uses(sim)) ordered.push_back(sim);
     }
   }
 
-  std::string name1 = active_sims[0];
-  std::string name2 = active_sims[1];
+  const std::string tests = getenv("TESTS", "");
+  const std::string prefix =
+      model_name + "." + (tests.empty() ? "all" : tests) + ".";
 
-  std::vector<std::any> outputs1, outputs2;
-  if (name2 == "pytorch") {
-    outputs1 = dataloaders[name1]->get_outputs(param);
-    outputs2 = dataloaders[name1]->get_reference_outputs(param);
-  } else {
-    outputs1 = dataloaders[name1]->get_outputs(param);
-    outputs2 = dataloaders[name2]->get_outputs(param);
-  }
-
-  std::string filename = prefix + name1 + "_vs_" + name2;
-
-  const std::map<std::string, std::string> SIM_LABELS = {
-      {"pytorch", "PyTorch"},
-      {"gold", "Gold Model"},
-      {"accelerator", "Accelerator"},
-      {"soc", "SoC Simulation"},
-  };
-
-  spdlog::info("{} vs. {}\n", SIM_LABELS.at(name1), SIM_LABELS.at(name2));
-
-  double rel_err = 0.0;
-  const auto output_tensors = get_op_outputs(param);
-  const int num_tiles_executed = get_tile_count(param);
-
-  // HACK For sparse outputs, we only want to compare the non-zero values
-  const int num_outputs = output_tensors.size();
-  int csr_data_size;
-  if (num_outputs > 2) {
-    const int indptr_size = get_size(output_tensors[2]);
-    const int last_index = (indptr_size - 1) * num_tiles_executed;
-    std::cerr << "indptr size: " << indptr_size << " last index: " << last_index
-              << "\n";
-
-    // Try to get the index of last CSR column indices
-    const auto indptr = std::any_cast<SPMM_META_DATATYPE*>(outputs2[2]);
-    csr_data_size = indptr[last_index];
-    std::cerr << "num_data: " << csr_data_size << "\n";
-  }
-
-  for (int i = 0; i < output_tensors.size(); i++) {
-    std::string suffix =
-        (output_tensors.size() > 1 ? "_" + std::to_string(i) : "") + ".txt";
-
-    const auto full_shape = get_shape(output_tensors[i], true, false);
-
-    std::vector<uint8_t> valid;
-    if (num_outputs > 2 && i < 2) {
-      valid.resize(get_size(full_shape), 0);
-      std::fill_n(valid.begin(), csr_data_size, 1);
-    } else if (is_soc_sim()) {
-      const auto tile_shape = get_shape(output_tensors[i], true, true);
-      build_valid_mask(full_shape, tile_shape, num_tiles_executed, valid);
-    } else {
-      valid.resize(get_size(full_shape), 1);
-    }
-
-    rel_err += compare_arrays<SUPPORTED_TYPES>(output_tensors[i], outputs1[i],
-                                               name1, outputs2[i], name2,
-                                               filename + suffix, valid);
-  }
-
-  int error_count = 0;
-  if (rel_err > tolerance) {
-    error_count += rel_err < 1.0 ? 1 : static_cast<int>(rel_err);
-  }
-  spdlog::info("Rela. error: {}\n", rel_err);
-  spdlog::info("Error count: {}\n", error_count);
-
-  return error_count;
-}
-
-// Iterate over string and return vector of substrings cut at delim
-template <typename T>
-void Simulation::split_string(const std::string& in_string, char delim,
-                              T result) {
-  std::istringstream ss(in_string);
-  std::string item;
-  while (std::getline(ss, item, delim)) {
-    *result++ = item;
-  }
-}
-
-// Return environment variable
-std::string Simulation::get_env_var(std::string const& name) {
-  const char* val = std::getenv(name.c_str());
-  return val == NULL ? std::string() : std::string(val);
-}
-
-void Simulation::print_help() {
-  spdlog::info(
-      "\nConfigure simulator by using environment variables."
-      "\n NETWORK - Type of network to run {mobilebert, resnet}"
-      "\n TESTS - Layers in network to run. Either single or tuple: "
-      "<first>,<last>."
-      "\n SIMS - Simulators / models to compare {accelerator, "
-      "customposit, universal, fp32, file}."
-      "\n TASK - MobileBERT run time (forward, backward, e2e)."
-      "\n TOLERANCE - Relative normalized error in % we allow "
-      "(default 10)."
-      "\n DATA_DIR - Path to binary input data."
-      "\n OUT_DIR - Path to output data.\n");
+  const bool require_complete = !partial_run && uses("gold") && uses("pytorch");
+  return compare_memories(live_out, model, memory(ordered[0]), ordered[0],
+                          memory(ordered[1]), ordered[1], out_dir, prefix, rtol,
+                          atol, require_complete);
 }

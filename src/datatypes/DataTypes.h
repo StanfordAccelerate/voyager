@@ -23,6 +23,9 @@
 
 namespace DataTypes {
 typedef Int<1, true> int1;
+// A torch bool: one unsigned bit, named "bool" in the compiler's programs
+// (e.g. the result of a comparison feeding aten::where).
+typedef Int<1, false> uint1;
 typedef Int<2, false> uint2;
 typedef Int<2, true> int2;
 typedef Int<4, true> int4;
@@ -57,6 +60,11 @@ struct TypeName {
 template <>
 struct TypeName<int1> {
   static std::string name() { return "int1"; }
+};
+
+template <>
+struct TypeName<uint1> {
+  static std::string name() { return "bool"; }
 };
 
 template <>
@@ -154,6 +162,7 @@ struct TypeName<posit8> {
 // clang-format off
 #define SUPPORTED_TYPES          \
   DataTypes::int1,               \
+  DataTypes::uint1,              \
   DataTypes::uint2,              \
   DataTypes::int2,               \
   DataTypes::int4,               \

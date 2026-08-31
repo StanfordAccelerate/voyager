@@ -3,6 +3,13 @@
 #include "spdlog/spdlog.h"
 #include "test/common/Utils.h"
 
+// Used only inside this file: get_tiling picks between them.
+namespace {
+Tiling get_interstellar_tiling(const voyager::Tiling& tiling);
+Tiling get_conv2d_tiling(const voyager::PrimOp& param, const ScalarEnv& env);
+Tiling get_linear_tiling(const voyager::PrimOp& op, const ScalarEnv& env);
+}  // namespace
+
 std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   os << "Loops: " << std::endl;
   for (int i = 0; i < 2; i++) {
@@ -36,45 +43,47 @@ std::ostream& operator<<(std::ostream& os, const Tiling& tiling) {
   return os;
 }
 
-Tiling get_tiling(const Operation& operation) {
-  const auto param = operation.param;
-  const auto op_list = get_op_list(param);
-  const auto first_op = op_list[0];
+Tiling get_tiling(const voyager::Operation& operation, const ScalarEnv& env) {
+  const auto& first_op = *get_prim_ops(operation)[0];
 
   // get environment variable
   const char* env_var = std::getenv("MANUAL_TILING");
   bool manual_tiling = env_var ? std::stoi(env_var) : false;
 
+  const bool is_conv = strip_namespace(first_op.target()) == "conv2d" ||
+                       strip_namespace(first_op.target()) == "conv2d_mx";
+
   Tiling tiling;
-  if (manual_tiling || !operation.has_valid_tiling) {
+  if (manual_tiling || !operation.has_tiling()) {
     spdlog::info("Using manual tiling for operation {} with target {}\n",
-                 operation.name, first_op.target());
-    if (first_op.target() == "conv2d" || first_op.target() == "conv2d_mx") {
-      tiling = get_conv2d_tiling(first_op);
+                 operation.name(), strip_namespace(first_op.target()));
+    if (is_conv) {
+      tiling = get_conv2d_tiling(first_op, env);
     } else {
-      tiling = get_linear_tiling(first_op);
+      tiling = get_linear_tiling(first_op, env);
     }
   } else {
-    tiling = get_interstellar_tiling(operation.tiling);
-    if (first_op.kwargs().contains("stride")) {
-      auto stride = first_op.kwargs().at("stride").int_list().values();
+    tiling = get_interstellar_tiling(operation.tiling());
+    if (has_arg(first_op, "stride")) {
+      auto stride = arg_ints(first_op, "stride", env);
       tiling.stride = stride[0];
     } else {
       tiling.stride = 1;
     }
 
-    if (first_op.kwargs().contains("padding")) {
-      auto padding = first_op.kwargs().at("padding").int_list().values();
+    if (has_arg(first_op, "padding")) {
+      auto padding = arg_ints(first_op, "padding", env);
       tiling.padding = padding[0];
     } else {
       tiling.padding = 0;
     }
   }
 
-  const auto input = first_op.kwargs().at("input").tensor();
+  const auto input = resolve(first_op, "input", env);
   const auto input_shape = get_shape(input);
 
-  if (first_op.target() == "conv2d" || first_op.target() == "conv2d_mx") {
+  if (strip_namespace(first_op.target()) == "conv2d" ||
+      strip_namespace(first_op.target()) == "conv2d_mx") {
     tiling.input_y = input_shape[1];
     tiling.input_x = input_shape[2];
   } else {
@@ -85,8 +94,12 @@ Tiling get_tiling(const Operation& operation) {
   return tiling;
 }
 
+namespace {
 Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
-  Tiling accelerator_tiling;
+  // `= {}` value-initializes every field to 0/false. A plain `Tiling t;` would
+  // leave the scalar fields indeterminate, since Tiling is an aggregate with no
+  // constructor. Fields not assigned below therefore read as 0, not garbage.
+  Tiling accelerator_tiling = {};
 
   // Interstellar does not emit tilings with replication
   accelerator_tiling.resnet_replication = false;
@@ -111,7 +124,7 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   int loop_index = 5;
   // L1 level
   for (int i = 0; i < tiling.level_tilings(0).loop_bounds_size(); i++) {
-    if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::Loop::IC) {
+    if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::LOOP_IC) {
       // set this later
       accelerator_tiling.loops[1][0] =
           tiling.level_tilings(0).loop_bounds(i).bound();
@@ -120,19 +133,19 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
       // all other loops need to be set in reverse order
       accelerator_tiling.loops[1][loop_index] =
           tiling.level_tilings(0).loop_bounds(i).bound();
-      if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::Loop::FX) {
+      if (tiling.level_tilings(0).loop_bounds(i).loop() == voyager::LOOP_FX) {
         accelerator_tiling.fx_loop_idx = loop_index;
       } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-                 voyager::Loop::FY) {
+                 voyager::LOOP_FY) {
         accelerator_tiling.fy_loop_idx[1] = loop_index;
       } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-                 voyager::Loop::OC) {
+                 voyager::LOOP_OC) {
         accelerator_tiling.weight_loop_idx[1] = loop_index;
       } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-                 voyager::Loop::OX) {
+                 voyager::LOOP_OX) {
         accelerator_tiling.x_loop_idx[1] = loop_index;
       } else if (tiling.level_tilings(0).loop_bounds(i).loop() ==
-                 voyager::Loop::OY) {
+                 voyager::LOOP_OY) {
         accelerator_tiling.y_loop_idx[1] = loop_index;
       }
 
@@ -193,10 +206,12 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   accelerator_tiling.fy_loop_idx[0] = 4;
 
   int offset = 1;
-  if (tiling.level_tilings(1).loop_bounds_size() > 0 &&
-      tiling.level_tilings(1).loop_bounds(0).loop() != voyager::Loop::IC) {
-    // if the first loop is not IC, then we need to manually set the IC loop to
-    // 1
+  if (tiling.level_tilings(1).loop_bounds_size() == 0 ||
+      tiling.level_tilings(1).loop_bounds(0).loop() != voyager::LOOP_IC) {
+    // The outer level has no IC (reduction) loop, either because it is empty or
+    // because its first loop is something else. Reserve position 3 for the
+    // (trivial) reduction loop so the output loops Y/X/OC land in the outer
+    // three positions (0..2).
     accelerator_tiling.loops[0][3] = 1;
     accelerator_tiling.reduction_loop_idx[0] = 3;
     offset++;
@@ -205,16 +220,16 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   for (int i = 0; i < tiling.level_tilings(1).loop_bounds_size(); i++) {
     accelerator_tiling.loops[0][4 - offset - i] =
         tiling.level_tilings(1).loop_bounds(i).bound();
-    if (tiling.level_tilings(1).loop_bounds(i).loop() == voyager::Loop::OC) {
+    if (tiling.level_tilings(1).loop_bounds(i).loop() == voyager::LOOP_OC) {
       accelerator_tiling.weight_loop_idx[0] = 4 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
-               voyager::Loop::OX) {
+               voyager::LOOP_OX) {
       accelerator_tiling.x_loop_idx[0] = 4 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
-               voyager::Loop::OY) {
+               voyager::LOOP_OY) {
       accelerator_tiling.y_loop_idx[0] = 4 - offset - i;
     } else if (tiling.level_tilings(1).loop_bounds(i).loop() ==
-               voyager::Loop::IC) {
+               voyager::LOOP_IC) {
       accelerator_tiling.reduction_loop_idx[0] = 4 - offset - i;
     }
   }
@@ -238,15 +253,15 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
 
   return accelerator_tiling;
 }
+}  // namespace
 
-Tiling get_conv2d_tiling(const codegen::OpOverload param) {
-  const auto kwargs = param.kwargs();
-
-  const auto input = kwargs.at("input").tensor();
-  const auto weight = kwargs.at("weight").tensor();
-  const auto paddings = kwargs.at("padding").int_list().values();
-  const auto dilation = kwargs.at("dilation").int_list().values();
-  const auto strides = kwargs.at("stride").int_list().values();
+namespace {
+Tiling get_conv2d_tiling(const voyager::PrimOp& param, const ScalarEnv& env) {
+  const auto input = resolve(param, "input", env);
+  const auto weight = resolve(param, "weight", env);
+  const auto paddings = arg_ints(param, "padding", env);
+  const auto dilation = arg_ints(param, "dilation", env);
+  const auto strides = arg_ints(param, "stride", env);
 
   const auto input_shape = get_shape(input);
   const auto weight_shape = get_shape(weight);
@@ -482,14 +497,16 @@ Tiling get_conv2d_tiling(const codegen::OpOverload param) {
       .padding = padding,
   };
 }
+}  // namespace
 
-Tiling get_linear_tiling(const codegen::OpOverload op) {
-  const auto kwargs = op.kwargs();
-  const auto input_shape = get_shape(kwargs.at("input").tensor());
+namespace {
+Tiling get_linear_tiling(const voyager::PrimOp& op, const ScalarEnv& env) {
+  const auto input_shape = get_shape(resolve(op, "input", env));
 
-  bool is_matmul = op.target().find("matmul") != std::string::npos;
+  bool is_matmul =
+      strip_namespace(op.target()).find("matmul") != std::string::npos;
   std::string weight_key = is_matmul ? "other" : "weight";
-  const auto weight_shape = get_shape(kwargs.at(weight_key).tensor());
+  const auto weight_shape = get_shape(resolve(op, weight_key, env));
 
   int x1 = 1, k1 = 1, c1 = 1;
   int x0 = get_size(input_shape) / input_shape.back();
@@ -514,7 +531,8 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
 
   // torch.matmul weight is also an activation, thus does not need to be
   // transposed
-  if (op.target() == "matmul" || op.target() == "matmul_mx") {
+  if (strip_namespace(op.target()) == "matmul" ||
+      strip_namespace(op.target()) == "matmul_mx") {
     int size = weight_shape.size();
     c0 = weight_shape[size - 2] / IC_DIMENSION;
     k0 = weight_shape[size - 1] / OC_DIMENSION;
@@ -574,10 +592,10 @@ Tiling get_linear_tiling(const codegen::OpOverload op) {
       .resnet_replication = false,
   };
 }
+}  // namespace
 
-Tiling get_pool2d_tiling(const codegen::OpOverload op) {
-  const auto kwargs = op.kwargs();
-  const auto input_shape = get_shape(kwargs.at("input").tensor());
+Tiling get_pool2d_tiling(const voyager::PrimOp& op, const ScalarEnv& env) {
+  const auto input_shape = get_shape(resolve(op, "input", env));
 
   int Y = input_shape[1];
   int X = input_shape[2];
@@ -585,10 +603,11 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
 
   int x0, y0, stride, padding, x1, y1, k0, actual_padding;
 
-  Tiling tiling;
+  Tiling tiling =
+      {};  // value-initialize every field to 0; see get_interstellar_tiling
 
-  if (kwargs.contains("output_size")) {
-    const auto output_size = kwargs.at("output_size").int_list().values();
+  if (has_arg(op, "output_size")) {
+    const auto output_size = arg_ints(op, "output_size", env);
     int output_h = output_size[0];
     int output_w = output_size[1];
 
@@ -601,9 +620,9 @@ Tiling get_pool2d_tiling(const codegen::OpOverload op) {
     k0 = K / ACCUMULATOR_WIDTH;
     actual_padding = 0;
   } else {
-    const auto kernel_size = kwargs.at("kernel_size").int_list().values();
-    const auto strides = kwargs.at("stride").int_list().values();
-    const auto paddings = kwargs.at("padding").int_list().values();
+    const auto kernel_size = arg_ints(op, "kernel_size", env);
+    const auto strides = arg_ints(op, "stride", env);
+    const auto paddings = arg_ints(op, "padding", env);
 
     y0 = kernel_size[0];
     x0 = kernel_size[1];

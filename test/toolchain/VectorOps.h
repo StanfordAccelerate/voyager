@@ -49,9 +49,12 @@ inline std::vector<int> broadcast_shape(std::vector<int>& shape1,
   return result_shape;
 }
 
-void set_vector_fetch_1(const codegen::Tensor& tensor,
-                        std::vector<int> output_shape,
+void set_vector_fetch_1(const Tensor& tensor, std::vector<int> output_shape,
                         VectorParams* vector_params) {
+  if (tensor.window_pitch > 0) {
+    throw std::runtime_error(
+        "A pitched window cannot be fetched as a side operand.");
+  }
   vector_params->vector_fetch_1_offset = get_address(tensor);
   vector_params->vector_fetch_1_mode = true;
 
@@ -64,7 +67,7 @@ void set_vector_fetch_1(const codegen::Tensor& tensor,
         input_shape[i] == 1 && output_shape[i] != 1;
   }
 
-  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype);
   const int dtype_width = get_type_width<VU_INPUT_TYPES>(dtype);
   const int fetch_width = OC_DIMENSION * dtype_width;
 
@@ -93,9 +96,12 @@ void set_vector_fetch_1(const codegen::Tensor& tensor,
   }
 }
 
-void set_vector_fetch_2(const codegen::Tensor& tensor,
-                        std::vector<int> output_shape,
+void set_vector_fetch_2(const Tensor& tensor, std::vector<int> output_shape,
                         VectorParams* vector_params) {
+  if (tensor.window_pitch > 0) {
+    throw std::runtime_error(
+        "A pitched window cannot be fetched as a side operand.");
+  }
   vector_params->vector_fetch_2_offset = get_address(tensor);
   vector_params->vector_fetch_2_mode = true;
 
@@ -107,7 +113,7 @@ void set_vector_fetch_2(const codegen::Tensor& tensor,
     vector_params->vector_fetch_2_broadcast[i] = input_shape[i] == 1;
   }
 
-  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype());
+  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(tensor.dtype);
   const int dtype_width = get_type_width<VU_INPUT_TYPES>(dtype);
   const int fetch_width = OC_DIMENSION * dtype_width;
 
@@ -136,29 +142,11 @@ void set_vector_fetch_2(const codegen::Tensor& tensor,
   }
 }
 
-void set_vector_immediate(const float scalar, const int stage,
-                          const std::string opcode, VectorInstructions& inst) {
-  VECTOR_DATATYPE immediate = scalar;
-
-  if (opcode == "div" || opcode == "div_" || opcode == "quantize") {
-    immediate = 1.0 / scalar;
-  }
-
-  if (stage == 0) {
-    inst.vector_op0_src1 = VectorInstructions::from_immediate_0;
-    inst.immediate0 = immediate.bits_rep();
-  } else if (stage == 2) {
-    inst.vector_op2_src1 = VectorInstructions::from_immediate_1;
-    inst.immediate1 = immediate.bits_rep();
-  } else {
-    inst.vector_op3_src1 = VectorInstructions::from_immediate_2;
-    inst.vector_op3 = VectorInstructions::op3_mul;
-    inst.immediate2 = immediate.bits_rep();
-  }
-}
-
-void map_vector_operations(const codegen::Operation& param,
+void map_vector_operations(const voyager::Operation& operation,
+                           const ScalarEnv& env,
                            std::deque<BaseParams*>& mapped_params) {
+  const auto& original_op_list = get_prim_ops(operation);
+
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
@@ -167,27 +155,45 @@ void map_vector_operations(const codegen::Operation& param,
   constexpr int BUFSIZE =
       std::min({1024 / OC_DIMENSION, OC_DIMENSION, VECTOR_UNIT_WIDTH});
 
-  auto op_list = get_op_list(param);
+  auto op_list = get_prim_ops(operation);
 
-  const auto input = op_list[0].kwargs().at("input").tensor();
+  // A leading side-operand dequantize is not the head of the chain: its
+  // result rejoins the pipeline as a later stage's side operand, and that
+  // consumer binds it through a side fetch. The value flowing down the
+  // pipeline is the next op's input.
+  const voyager::PrimOp* head = op_list[0];
+  for (const auto* prim : op_list) {
+    if (strip_namespace(prim->target()) == "dequantize" &&
+        is_side_operand_dequantize(operation, env, *prim, op_list)) {
+      continue;
+    }
+    head = prim;
+    break;
+  }
+
+  const auto input = resolve(*head, "input", env);
   vector_params->vector_fetch_0_offset = get_address(input);
   vector_params->vector_fetch_0_mode = 2;
 
   // Use the original shape without permute/slice
-  auto input_shape = get_shape(input, false);
+  auto input_shape = get_shape(input);
   const int input_ndim = input_shape.size();
 
-  if (input.has_reshape() || is_dma_op(op_list[0].target())) {
+  if (is_dma_op(strip_namespace(op_list[0]->target()))) {
     for (const auto dim : input_shape) {
-      if (dim > MAX_LOOP_VALUE) {
+      if (dim > MAX_VECTOR_LOOP_VALUE) {
         spdlog::error("ERROR: input shape dimension is greater than {}: ",
-                      MAX_LOOP_VALUE);
+                      MAX_VECTOR_LOOP_VALUE);
         print_shape(input_shape);
         throw std::invalid_argument("Unsupported input shape dimension!");
       }
     }
+  } else if (input.window_pitch > 0) {
+    // A pitched window: the fetch walks the underlying rows, and the slice
+    // below clamps each to the window's run.
+    input_shape.back() = input.window_pitch;
   } else {
-    input_shape = split_loops(input_shape, MAX_LOOP_VALUE);
+    input_shape = split_loops(input_shape, MAX_VECTOR_LOOP_VALUE);
     input_shape = adjust_loop_indices(input_shape, OC_DIMENSION);
   }
 
@@ -201,25 +207,24 @@ void map_vector_operations(const codegen::Operation& param,
   vector_params->vector_fetch_0_loops[1][1] = input_shape[4];
   vector_params->vector_fetch_0_loops[1][2] = input_shape[5] / OC_DIMENSION;
 
-  codegen::OpOverload reshape_op;
-  if (input.has_reshape()) {
-    reshape_op = input.reshape();
-  } else if (is_dma_op(op_list[0].target())) {
+  const voyager::PrimOp* reshape_op = nullptr;
+  if (is_dma_op(strip_namespace(op_list[0]->target()))) {
     reshape_op = op_list[0];
     op_list.erase(op_list.begin());
   }
 
-  const auto reshape_kwargs = reshape_op.kwargs();
+  const std::string reshape_target =
+      reshape_op ? strip_namespace(reshape_op->target()) : "";
 
-  if (reshape_op.target() == "slice") {
+  if (reshape_target == "slice") {
     vector_params->has_slicing = true;
 
-    auto start = reshape_kwargs.at("start").int_value();
-    auto end = reshape_kwargs.at("end").int_value();
-    auto step = reshape_kwargs.at("step").int_value();
-    auto dim = reshape_kwargs.at("dim").int_value();
+    auto start = arg_int(*reshape_op, "start", env);
+    auto end = arg_int(*reshape_op, "end", env);
+    auto step = arg_int(*reshape_op, "step", env);
+    auto dim = arg_int(*reshape_op, "dim", env);
 
-    auto shape = get_shape(input, false);
+    auto shape = get_shape(input);
 
     dim = dim < 0 ? dim + shape.size() : dim;
     end = end > shape[dim] ? shape[dim] : end;
@@ -241,10 +246,9 @@ void map_vector_operations(const codegen::Operation& param,
       vector_params->vector_fetch_0_slice_start /= OC_DIMENSION;
       vector_params->vector_fetch_0_slice_end /= OC_DIMENSION;
     }
-  } else if (reshape_op.target() == "permute") {
-    const auto int_list = reshape_kwargs.at("dims").int_list().values();
-    std::vector<int> dims(int_list.begin(), int_list.end());
-    const int ndim = input.shape_size();
+  } else if (reshape_target == "permute") {
+    const std::vector<int> dims = arg_ints(*reshape_op, "dims", env);
+    const int ndim = input.shape.size();
 
     if (is_transpose(dims)) {
       vector_params->has_transpose = true;
@@ -253,9 +257,9 @@ void map_vector_operations(const codegen::Operation& param,
     } else {
       throw std::invalid_argument("Unsupported permute operation!");
     }
-  } else if (reshape_op.target() == "transpose") {
-    int dim0 = reshape_kwargs.at("dim0").int_value();
-    int dim1 = reshape_kwargs.at("dim1").int_value();
+  } else if (reshape_target == "transpose") {
+    int dim0 = arg_int(*reshape_op, "dim0", env);
+    int dim1 = arg_int(*reshape_op, "dim1", env);
 
     dim0 = dim0 < 0 ? dim0 + input_ndim : dim0;
     dim1 = dim1 < 0 ? dim1 + input_ndim : dim1;
@@ -273,25 +277,45 @@ void map_vector_operations(const codegen::Operation& param,
     }
   }
 
+  // A pitched window (a strided voyager.subview) fetches like a fused slice
+  // of the last dimension: the loops walk the underlying rows and the slice
+  // clamps each to the window's run.
+  if (input.window_pitch > 0) {
+    vector_params->has_slicing = true;
+
+    const int64_t col = input.window_col;
+    const int64_t run = input.shape.back();
+    if (col % OC_DIMENSION != 0 || run % OC_DIMENSION != 0) {
+      throw std::invalid_argument(
+          "Window bounds for the last dimension must be multiples of "
+          "OC_DIMENSION!");
+    }
+
+    vector_params->vector_fetch_0_slice_dim = 5;
+    vector_params->vector_fetch_0_slice_start = col / OC_DIMENSION;
+    vector_params->vector_fetch_0_slice_step = 1;
+    vector_params->vector_fetch_0_slice_end = run / OC_DIMENSION;
+
+    vector_params->vector_fetch_0_offset =
+        get_address(input) - col * get_width(input) / 8;
+  }
+
   if (vector_params->has_permute) {
     if (input_shape[input_shape.size() - 1] % OC_DIMENSION != 0) {
       throw std::invalid_argument(
           "Last dimension of input shape must be a multiple of OC_DIMENSION!");
     }
 
-    std::vector<int> dims;
-    if (reshape_kwargs.contains("dims")) {
-      auto int_list = reshape_op.kwargs().at("dims").int_list().values();
-      dims = std::vector<int>(int_list.begin(), int_list.end());
+    if (has_arg(*reshape_op, "dims")) {
+      const std::vector<int> dims = arg_ints(*reshape_op, "dims", env);
 
       for (int i = 0; i < dims.size(); i++) {
         vector_params->vector_fetch_0_permute_dims[i + padded_dims] =
             dims[i] + padded_dims;
       }
-    } else if (reshape_kwargs.contains("dim0") &&
-               reshape_kwargs.contains("dim1")) {
-      int dim0 = reshape_kwargs.at("dim0").int_value();
-      int dim1 = reshape_kwargs.at("dim1").int_value();
+    } else if (has_arg(*reshape_op, "dim0") && has_arg(*reshape_op, "dim1")) {
+      int dim0 = arg_int(*reshape_op, "dim0", env);
+      int dim1 = arg_int(*reshape_op, "dim1", env);
       std::swap(vector_params->vector_fetch_0_permute_dims[dim0 + padded_dims],
                 vector_params->vector_fetch_0_permute_dims[dim1 + padded_dims]);
     } else {
@@ -302,7 +326,7 @@ void map_vector_operations(const codegen::Operation& param,
   // TODO: use tiling to set address generator
   Tiling tiling;
   if (vector_params->has_transpose) {
-    auto input_shape = get_shape(input, false);
+    auto input_shape = get_shape(input);
     input_shape = squeeze_shape(input_shape);
     int padded_dims = pad_shape_to_ndim(input_shape, 3);
 
@@ -365,7 +389,7 @@ void map_vector_operations(const codegen::Operation& param,
     packing_factor = 1;
   }
 
-  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  const int dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype);
   const int dtype_width = get_type_width<VU_INPUT_TYPES>(dtype);
   const int fetch_width = data_stride * dtype_width;
 
@@ -376,12 +400,12 @@ void map_vector_operations(const codegen::Operation& param,
       (fetch_width + OC_PORT_WIDTH - 1) / OC_PORT_WIDTH;
   vector_params->vector_fetch_0_packing_factor = packing_factor;
 
-  const auto output = get_op_outputs(param).back();
+  const auto output = resolve_outputs(operation, env).back();
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
 
   auto output_shape = get_shape(output);
-  output_shape = split_loops(output_shape, MAX_LOOP_VALUE);
+  output_shape = split_loops(output_shape, MAX_VECTOR_LOOP_VALUE);
   if (output_shape.size() > 6) {
     throw std::invalid_argument("Too many dimensions for vector operations!");
   }
@@ -430,7 +454,7 @@ void map_vector_operations(const codegen::Operation& param,
   }
 
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   // Set input broadcasting based on output shape
   if (!vector_params->has_permute && !vector_params->has_slicing &&
@@ -449,173 +473,87 @@ void map_vector_operations(const codegen::Operation& param,
   inst.vector_op0_src0 = VectorInstructions::from_vector_fetch_0;
   inst.vdest = VectorInstructions::to_output;
 
-  if (input.has_dequant()) {
-    VECTOR_DATATYPE scale = get_tensor_scalar_scale(input);
-    inst.vdequantize = true;
-    inst.vector_dq_scale = scale.bits_rep();
-  }
+  auto map_tensor_operand = [&](const voyager::PrimOp& op, const ScalarEnv& env,
+                                const std::string& other_key, int stage,
+                                VectorInstructions& pipeline_inst) {
+    Tensor self = resolve(op, "input", env);
+    Tensor tensor = resolve(op, other_key, env);
 
-  int stage = 0;
+    auto input_shape = get_shape(self);
+    auto other_shape = get_shape(tensor);
 
-  for (int i = 0; i < op_list.size(); i++) {
-    const auto op = op_list[i];
-    const std::string opcode = op.target();
-
-    // Dequantization doesn't take a stage in the pipeline
-    if (opcode == "dequantize") {
-      const auto other = op.kwargs().at("scale").tensor();
-      assert(get_size(other) == 1);
-
-      float* array = read_constant_param(other);
-      VECTOR_DATATYPE immediate = array[0];
-      inst.vdequantize = true;
-      inst.vector_dq_scale = immediate.bits_rep();
-
-      delete[] array;
-      continue;
+    if (strip_namespace(op.target()) == "quantize") {
+      if (input_shape.size() < 3) pad_shape_to_ndim(input_shape, 3);
+      if (other_shape.size() < 3) pad_shape_to_ndim(other_shape, 3);
+      auto result = factor_out_non_broadcastable_dim(input_shape, other_shape);
+      input_shape = result.first;
+      other_shape = result.second;
     }
 
-    if (poly_ops.count(opcode)) {
-      if (stage != 0) {
+    auto output_shape = broadcast_shape(input_shape, other_shape);
+    update_tensor_shape(self, input_shape);
+    update_tensor_shape(tensor, other_shape);
+
+    // An operand a dequantize produced inside this fusion is not itself
+    // materialized, so fetch what that dequantize reads; the shared pipeline
+    // mapper applies the dequantize scale through the stage mac. Elementwise,
+    // so the raw codes keep the side operand's shape.
+    const voyager::PrimOp* producer =
+        get_fused_producer(operation, env, tensor);
+    Tensor tensor_to_load = tensor.materialized ? tensor : self;
+    if (producer != nullptr &&
+        strip_namespace(producer->target()) == "dequantize") {
+      tensor_to_load = resolve(*producer, "input", env);
+      update_tensor_shape(tensor_to_load, other_shape);
+    }
+
+    if (stage == 0) {
+      pipeline_inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
+      set_vector_fetch_1(tensor_to_load, output_shape, vector_params);
+    } else if (stage == 2) {
+      pipeline_inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
+      set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
+    } else {
+      if (pipeline_inst.vector_op2_src1 ==
+          VectorInstructions::from_vector_fetch_2) {
         throw std::runtime_error(
-            "Polynomial approximation must be the first vector operation!\n");
+            "Vector pipeline stages 2 and 3 cannot fetch different side "
+            "operands.");
       }
-
-      // Grab kwargs that are relevant for some activation functions
-      std::map<std::string, float> kwargs;
-
-      for (const auto& [key, value] : op.kwargs()) {
-        if (value.has_float_value()) {
-          kwargs[key] = value.float_value();
-        }
-      }
-
-      load_approx_params(opcode, vector_instruction_config, kwargs);
-      inst.vector_op0 = VectorInstructions::op0_poly;
-      inst.vector_op2 = VectorInstructions::op2_poly;
-
-      stage = 3;
-      continue;
+      pipeline_inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
+      set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
     }
+  };
 
-    for (; stage < vector_unit_ops.size(); stage++) {
-      // Stage 0 and 2 can only perform per-tensor quantization
-      if (opcode == "quantize") {
-        const auto scale = op.kwargs().at("scale").tensor();
-        const int size = get_size(scale);
-        if (stage != 3 && size > 1) {
-          continue;
-        }
-      }
+  auto is_stage_available = [](const voyager::PrimOp&, const ScalarEnv&, int) {
+    return true;
+  };
+  // A microscaled quantize whose block is strided leaves its scale to a pass
+  // of its own; this pass divides by what that pass wrote, so bind it the way
+  // a quantize with a tensor scale is bound.
+  Tensor mx_scale_fetch;
+  mx_scale_fetch.materialized = false;
 
-      if (vector_unit_ops[stage].count(opcode)) {
-        break;
-      }
-    }
+  map_vector_pipeline_ops(operation, env, op_list, vector_params,
+                          vector_instruction_config, inst, mapped_params,
+                          map_tensor_operand, is_stage_available, 0,
+                          &mx_scale_fetch);
 
-    if (stage == vector_unit_ops.size()) {
-      throw std::runtime_error("Vector operation not supported!\n");
-    }
+  if (mx_scale_fetch.materialized) {
+    // The scale broadcasts over the quantize's own view of the data. The
+    // anchor's input is the shape before the relayout the quantize sits
+    // behind, and against that shape the block count multiplies into the fetch
+    // walk instead of collapsing into it.
+    auto data_shape = get_shape(resolve(*op_list.back(), "input", env));
+    auto scale_shape = get_shape(mx_scale_fetch);
+    if (data_shape.size() < 3) pad_shape_to_ndim(data_shape, 3);
+    if (scale_shape.size() < 3) pad_shape_to_ndim(scale_shape, 3);
 
-    spdlog::debug("stage {} target: {}\n", stage, opcode);
+    auto factored = factor_out_non_broadcastable_dim(data_shape, scale_shape);
+    auto fetch_shape = broadcast_shape(factored.first, factored.second);
 
-    switch (stage) {
-      case 0:
-        inst.vector_op0 = get_stage0_op(opcode);
-        break;
-      case 1:
-        inst.vector_op1 = get_stage1_op(opcode);
-        break;
-      case 2:
-        inst.vector_op2 = get_stage2_op(opcode);
-        break;
-      case 3:
-        inst.vector_op3 = get_stage3_op(opcode);
-        break;
-    }
-
-    if (opcode == "neg") {
-      const auto self = op.kwargs().at("input").tensor();
-      const auto output_shape = squeeze_shape(get_shape(self));
-
-      VECTOR_DATATYPE immediate = 0;
-      inst.immediate0 = immediate.bits_rep();
-      inst.vector_op0_src0 = VectorInstructions::from_immediate_0;
-      inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_0;
-    } else if (opcode == "quantize_mx" || opcode == "quantize_mx_outlier") {
-      set_quantize_mx_params(param, vector_params, inst,
-                             vector_instruction_config);
-    } else if (op.kwargs().contains("other") || opcode == "quantize") {
-      std::string other_key = opcode == "quantize" ? "scale" : "other";
-      const auto other = op.kwargs().at(other_key);
-
-      if (other.has_float_value()) {
-        float scalar = other.float_value();
-        set_immediate(scalar, stage, opcode, inst);
-      } else if (other.has_int_value()) {
-        int scalar = other.int_value();
-        set_immediate(scalar, stage, opcode, inst);
-      } else if (other.has_tensor() && get_size(other.tensor()) == 1) {
-        float* array = read_constant_param(other.tensor());
-        set_immediate(array[0], stage, opcode, inst);
-        delete[] array;
-      } else {
-        auto self = op.kwargs().at("input").tensor();
-        auto tensor = other.tensor();
-
-        auto input_shape = get_shape(self);
-        auto other_shape = get_shape(tensor);
-
-        if (opcode == "quantize") {
-          if (input_shape.size() < 3) pad_shape_to_ndim(input_shape, 3);
-          if (other_shape.size() < 3) pad_shape_to_ndim(other_shape, 3);
-          auto result =
-              factor_out_non_broadcastable_dim(input_shape, other_shape);
-          input_shape = result.first;
-          other_shape = result.second;
-        }
-
-        auto output_shape = broadcast_shape(input_shape, other_shape);
-        update_tensor_shape(self, input_shape);
-        update_tensor_shape(tensor, other_shape);
-        auto tensor_to_load = tensor.has_memory() ? tensor : self;
-
-        bool has_dequant = tensor_to_load.has_dequant();
-        VECTOR_DATATYPE scale = get_tensor_scalar_scale(tensor_to_load);
-
-        if (stage == 0) {
-          inst.vector_op0_src1 = VectorInstructions::from_vector_fetch_1;
-          set_vector_fetch_1(tensor_to_load, output_shape, vector_params);
-
-          if (has_dequant) {
-            assert(inst.vector_op0 == VectorInstructions::op0_add ||
-                   inst.vector_op0 == VectorInstructions::op0_sub);
-            inst.immediate0 = scale.bits_rep();
-            inst.vector_op0 = VectorInstructions::op0_mac;
-          }
-        } else if (stage == 2) {
-          inst.vector_op2_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
-
-          if (has_dequant) {
-            assert(inst.vector_op2 == VectorInstructions::op2_add);
-            inst.immediate1 = scale.bits_rep();
-            inst.vector_op2 = VectorInstructions::op2_mac;
-          }
-        } else {
-          assert(inst.vector_op2_src1 !=
-                 VectorInstructions::from_vector_fetch_2);
-          inst.vector_op3_src1 = VectorInstructions::from_vector_fetch_2;
-          set_vector_fetch_2(tensor_to_load, output_shape, vector_params);
-        }
-      }
-    }
-
-    // We also need to set the codebook config in case quantizing a tensor
-    // using pre-computed scales
-    set_codebook_config(op, vector_params, vector_instruction_config);
-
-    stage++;
+    update_tensor_shape(mx_scale_fetch, factored.second);
+    set_vector_fetch_2(mx_scale_fetch, fetch_shape, vector_params);
   }
 
   // total output count
