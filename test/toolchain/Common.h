@@ -800,9 +800,17 @@ void set_quantize_mx_params(const voyager::Operation& operation,
     config.outlier_threshold = threshold.bits_rep();
 
     // The running CSR base: entries this tile appends continue the packed
-    // stream where the previous tile ended.
-    config.indptr_offset =
+    // stream where the previous tile ended. Reject a negative base rather
+    // than let the unsigned field wrap: a run-time value is never negative,
+    // and the C emitter's affine probes rely on out-of-range perturbations
+    // being refused instead of wrapping into a non-affine serialization.
+    const int64_t indptr_offset =
         has_arg(op, "indptr_offset") ? arg_int(op, "indptr_offset", env) : 0;
+    if (indptr_offset < 0) {
+      throw std::runtime_error(opcode + ": negative indptr_offset " +
+                               std::to_string(indptr_offset));
+    }
+    config.indptr_offset = indptr_offset;
 
     const auto quantize_input = resolve(op, "input", env);
     const auto quantize_shape = get_shape(quantize_input);

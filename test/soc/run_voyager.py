@@ -59,6 +59,18 @@ def _terminate_process(proc: subprocess.Popen, timeout: float = 5) -> int:
         return proc.wait()
 
 
+def elf_symbol_address(elf, symbol):
+    """The address of `symbol` in `elf`, from the RISC-V nm."""
+    listing = subprocess.run(
+        ["riscv64-unknown-elf-nm", elf], capture_output=True, text=True, check=True
+    ).stdout
+    for entry in listing.splitlines():
+        fields = entry.split()
+        if len(fields) == 3 and fields[2] == symbol:
+            return int(fields[0], 16)
+    raise RuntimeError(f"{elf}: no symbol {symbol}")
+
+
 def run_rtl_simulation(
     model,
     layer,
@@ -82,8 +94,13 @@ def run_rtl_simulation(
         "+dramsim",
         "+dramsim_ini_dir=../../generators/testchipip/src/main/resources/dramsim2_ini",
         "+ntb_random_seed_automatic",
-        "+verbose"
     ]
+
+    # +verbose adds the core's commit trace to the .err file: gigabytes per
+    # JTAG run (the core spends hours in the debug module's program buffer)
+    # and nothing the driver reads. Opt in with SIM_VERBOSE=1.
+    if env_vars.get("SIM_VERBOSE"):
+        cmd.append("+verbose")
 
     # Extra runtime args, e.g. EXTRA_SIM_FLAGS="+vcs+initreg+0" to zero-init
     # all state (mirrors the SystemC harness) instead of the default random.
@@ -103,9 +120,25 @@ def run_rtl_simulation(
 
     env_vars["RISCV_BINARY"] = riscv_binary
 
+    # Full JTAG mode: the emitter lists the scratchpad regions the grade
+    # needs; GDB reads back only those and the checker loads them.
+    if jtag_sim == "full":
+        env_vars["SCRATCHPAD_DUMP_LIST"] = (
+            f"{VOYAGER_DIR}/test/soc/firmware/networks/{model}/{config_path}"
+            f"/{layer}_scratchpad_dump.txt"
+        )
+    else:
+        # The testbench services the firmware's requests out of a mailbox in
+        # the firmware's own memory; its address is wherever the linker put
+        # it in this layer's ELF.
+        env_vars["HOST_MAILBOX"] = hex(elf_symbol_address(riscv_binary, "host_mailbox"))
+
     if jtag_sim is None:
         cmd.extend([
-            "+max-cycles=10000000",
+            # 10M cycles is 9 ms at CLOCK_PERIOD=0.9, which a large MAX_TILES
+            # can outrun -- a layer that hits the cap reports no error count at
+            # all, which reads like a failure rather than a truncated run.
+            "+max-cycles=" + env_vars.get("MAX_CYCLES", "10000000"),
             "+permissive-off",
             riscv_binary,
         ])
@@ -507,6 +540,18 @@ def main():
     # since we use GDB for data loading and output checking there
     if args.jtag_mode == "full":
         env_vars["JTAG_SIM"] = "1"
+        # The image holds two ping-pong tiles and nothing restages the slots
+        # afterwards, so the firmware may not run further than that.
+        max_tiles = min(int(env_vars.get("MAX_TILES", "2")), 2)
+        env_vars["MAX_TILES"] = str(max_tiles)
+        print(f"[JTAG] full mode: MAX_TILES={max_tiles}")
+        # run_jtag.gdb dumps [SRAM_BASE + SOC_MEM_OFFSET, + 2 * CACHE_SIZE)
+        # and jtag_sim_checker reads it back at the same offset: everything
+        # above the program's reservation, as two halves.
+        env_vars.setdefault("SOC_MEM_OFFSET", str(scratchpad_offset))
+        env_vars.setdefault(
+            "CACHE_SIZE", str((scratchpad_size - scratchpad_offset) // 2)
+        )
     if args.jtag_mode == "vpi":
         env_vars["SKIP_GDB_LOAD"] = "1"
     if args.jtag_mode is not None and args.semihosting:
@@ -544,6 +589,12 @@ def main():
             sim_cxxflags.append(f"-D{val}" if var == "DATATYPE" else f"-D{var}={val}")
     if args.gl_netlist is not None:
         sim_cxxflags.append("-DGL_SIM")
+    # The DPI-compiled gold model sizes its clock-dependent accumulator
+    # depths (Pooling.h ACCUMULATOR_SUM_N, SpMM.h FEEDBACK_DELAY) from the
+    # CLOCK_PERIOD macro, defaulting to 5.0 when it is absent; the RTL is
+    # scheduled at the run's clock, so the two must agree.
+    if (clock_period := env_vars.get("CLOCK_PERIOD")) is not None:
+        sim_cxxflags.append(f"-DCLOCK_PERIOD={clock_period}")
     env_vars.setdefault("EXTRA_SIM_CXXFLAGS", " ".join(sim_cxxflags))
 
     # We need to pass these preprocessor defines to the simulator during compilation
@@ -679,20 +730,39 @@ def main():
             env_vars["NETWORK"] = network
             env_vars["TESTS"] = ",".join(layers[network])
 
-            if args.jtag_mode == "full":
-                # Provide tensor data directory for scratchpad pre-loading
-                env_vars["DATA_DIR"] = (
-                    f"{env_vars['PROJECT_ROOT']}/{env_vars['CODEGEN_DIR']}"
-                    f"/networks/{network}/{env_vars['DATATYPE']}/tensor_files"
-                )
-
+            gen_start = time.time() - 1
             subprocess.run(
                 ["make",  "-C", f"{VOYAGER_DIR}/test/soc/", "GenerateSoCBinaries"],
                 env=env_vars,
                 stdout=log_file,
                 stderr=subprocess.STDOUT,
-                check=True,
             )
+
+            # A layer the emitter cannot map is reported as "Skipping ..." and
+            # makes GenerateSoCBinaries exit non-zero. Failing the whole network
+            # on that costs every other layer its coverage, so keep the ones
+            # that actually emitted -- freshly, so a stale .c from an earlier
+            # run cannot stand in for a layer that just failed.
+            firmware_dir = (
+                f"{VOYAGER_DIR}/test/soc/firmware/networks/{network}/{config_path}"
+            )
+            emitted, dropped = [], []
+            for layer in layers[network]:
+                path = f"{firmware_dir}/{layer}.c"
+                if os.path.exists(path) and os.path.getmtime(path) >= gen_start:
+                    emitted.append(layer)
+                else:
+                    dropped.append(layer)
+            if dropped:
+                print(
+                    f"{network}: {len(dropped)} layer(s) did not emit, excluded: "
+                    + ", ".join(dropped)
+                )
+            if not emitted:
+                raise RuntimeError(
+                    f"{network}: no layer emitted; see {log_file.name}"
+                )
+            layers[network] = emitted
 
             # Compile the SoC C code
             for layer in layers[network]:
@@ -702,15 +772,20 @@ def main():
                 # Suppress printf which stalls without a frontend server (all JTAG modes).
                 if args.jtag_mode is not None and not args.semihosting:
                     extra_cflags.append("-DSUPPRESS_PRINTF")
-                # Skip the semaphore wait in full JTAG mode due to the disabled Voyager backend,
-                # or in GL simulation due to unreliable semaphore register path resolution.
-                if args.jtag_mode == "full" or args.gl_netlist is not None:
-                    extra_cflags.append("-DDISABLE_SEMAPHORE_WAIT")
+                # Full JTAG mode has no testbench: the image is preloaded, so
+                # the firmware's requests and waits compile to nothing.
+                if args.jtag_mode == "full":
+                    extra_cflags.append("-DNO_TESTBENCH")
                 # PLIC ids run in device order, so a config without the UART
                 # (which takes id 1) moves Voyager down to it. The firmware
                 # defaults to the id the UART-bearing configs give it.
                 if (int_id := env_vars.get("VOYAGER_INT_ID")) is not None:
                     extra_cflags.append(f"-DVOYAGER_INT_ID={int_id}")
+                # A caller's EXTRA_CFLAGS must extend this list, not be
+                # clobbered by it: the command-line assignment below overrides
+                # the environment for make.
+                if (env_cflags := env_vars.get("EXTRA_CFLAGS")):
+                    extra_cflags.append(env_cflags)
                 if extra_cflags:
                     cmd.append(f"EXTRA_CFLAGS={' '.join(extra_cflags)}")
 

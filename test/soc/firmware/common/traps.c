@@ -7,8 +7,11 @@
 #include "mmio.h"
 
 void enable_interrupts() {
-  // clear any stale sticky bits before unmasking
-  reg_write16(VOYAGER_INT_STATUS, 0xFFFF);
+  // Clear any stale sticky bits before unmasking -- except the semaphore
+  // change flags 15:8, which run_voyager_operation.c owns: 11:8 report the
+  // units' start credits being consumed, 15 flips with the testbench
+  // doorbell (host_request.c) and is never read.
+  reg_write16(VOYAGER_INT_STATUS, 0x00FF);
   // Enable all three interrupts in the Voyager hardware
   reg_write16(VOYAGER_INT_ENABLE, INT_BANK0 | INT_BANK1 | INT_DONE);
 
@@ -29,9 +32,11 @@ void handle_trap(void) {
   uint32_t id = reg_read32(PLIC_CLAIM);
 
   if (id == VOYAGER_INT_ID) {
-    // Clear Voyager's internal bit
+    // Clear Voyager's internal bit. Never 15:8, the semaphore change flags:
+    // a blanket W1C here would swallow a unit's start observation and hang
+    // the credit that waits for it.
     uint16_t status = reg_read16(VOYAGER_INT_STATUS);
-    reg_write16(VOYAGER_INT_STATUS, status);  // W1C
+    reg_write16(VOYAGER_INT_STATUS, status & 0x00FF);  // W1C
   }
 
   reg_write32(PLIC_CLAIM, id);

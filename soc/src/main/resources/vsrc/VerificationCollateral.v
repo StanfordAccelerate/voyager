@@ -9,6 +9,7 @@
 `define MATRIX_VECTOR_UNIT_DONE_VLD  `VOYAGER(__accelerator_matrix_vector_unit_done_vld)
 `define SPMM_UNIT_START_VLD          `VOYAGER(__accelerator_spmm_unit_start_vld)
 `define SPMM_UNIT_DONE_VLD           `VOYAGER(__accelerator_spmm_unit_done_vld)
+`define HOST_DOORBELL                `VOYAGER(_semaphores_7)
 `else
 `define VOYAGER TestDriver.testHarness.chiptop0.system.voyager
 `define MATRIX_UNIT_START_VLD        `VOYAGER.accelerator.matrix_unit.start_vld
@@ -19,12 +20,17 @@
 `define MATRIX_VECTOR_UNIT_DONE_VLD  `VOYAGER.accelerator.matrix_vector_unit.done_vld
 `define SPMM_UNIT_START_VLD          `VOYAGER.accelerator.spmm_unit.start_vld
 `define SPMM_UNIT_DONE_VLD           `VOYAGER.accelerator.spmm_unit.done_vld
+// Hardware semaphore 7: the firmware posts one credit per request it writes
+// into its mailbox (host_request.h).
+`define HOST_DOORBELL                `VOYAGER.semaphores_7
 `endif
 
 import "DPI-C" context function void load_memory();
-// unit encoding matches Step::Unit: 0=matrix, 1=vector, 2=mvm, 3=spmm
-import "DPI-C" context function void check_outputs(input int unit);
+// unit encoding: 0=matrix, 1=vector, 2=mvm, 3=spmm (host_request.h)
 import "DPI-C" context function void unit_started(input int unit);
+import "DPI-C" context function void unit_done(input int unit);
+import "DPI-C" context function void unit_retired(input int unit);
+import "DPI-C" context function void host_doorbell();
 
 module VoyagerVerification (
     input clock,
@@ -32,6 +38,19 @@ module VoyagerVerification (
 );
 
     wire _source_clk = TestDriver.testHarness.source.clk;
+
+    // Source-clock cycles between a unit's done and unit_retired(): the
+    // testbench reads a tile back (a store-back request) only once its last
+    // writes have landed. 100 cycles (1 us) was not enough for llama's
+    // mlp_up_proj on the 2026-09 params: the final 64-byte row of every tile
+    // but the last was still in flight behind the next tile's fetches (Error
+    // count 456 at MAX_TILES=16, 119 at 4; 0 once the copies waited).
+    // Override with +done_settle=<cycles>.
+    int done_settle_cycles;
+    initial begin
+        if (!$value$plusargs("done_settle=%d", done_settle_cycles))
+            done_settle_cycles = 1000;
+    end
     logic matrix_unit_start_vld_q;
     logic vector_unit_start_vld_q;
 `ifdef SUPPORT_MVM
@@ -40,6 +59,7 @@ module VoyagerVerification (
 `ifdef SUPPORT_SPMM
     logic spmm_unit_start_vld_q;
 `endif
+    logic [7:0] doorbell_q;
 
     initial begin
         @(posedge clock);  // move past time 0 to avoid signal glitch
@@ -63,9 +83,6 @@ module VoyagerVerification (
 
             fork
                 begin
-                    // Off-edge for the same reason as check_outputs below:
-                    // the grant pump answers by depositing the next start
-                    // credit into the semaphore registers via VPI.
                     @(negedge _source_clk);
                     unit_started(unit);
                 end
@@ -77,14 +94,16 @@ module VoyagerVerification (
 
             fork
                 begin
-                    // Wait for data to be written to memory.
-                    repeat (100) @(posedge _source_clk);
-                    // Deliver the tick off-edge: check_outputs() deposits into
-                    // the semaphore registers via VPI, and a deposit in the
-                    // same time slot as the register's posedge NBA update is
-                    // scheduler-order dependent.
+                    // Delivered off-edge, like every DPI event below: the
+                    // testbench deposits into the SRAM macros via VPI, and a
+                    // deposit in the same time slot as a posedge NBA update
+                    // is scheduler-order dependent.
                     @(negedge _source_clk);
-                    check_outputs(unit);
+                    unit_done(unit);
+                    // Wait for data to be written to memory.
+                    repeat (done_settle_cycles) @(posedge _source_clk);
+                    @(negedge _source_clk);
+                    unit_retired(unit);
                 end
             join_none
         end
@@ -100,6 +119,7 @@ module VoyagerVerification (
 `ifdef SUPPORT_SPMM
             spmm_unit_start_vld_q <= 1'b0;
 `endif
+            doorbell_q <= 8'd0;
         end else begin
             matrix_unit_start_vld_q <= `MATRIX_UNIT_START_VLD;
             vector_unit_start_vld_q <= `VECTOR_UNIT_START_VLD;
@@ -131,6 +151,17 @@ module VoyagerVerification (
                               `SPMM_UNIT_DONE_VLD,
                               spmm_unit_start_vld_q);
 `endif
+
+            // The doorbell is a counter: any change means new requests.
+            doorbell_q <= `HOST_DOORBELL;
+            if (`HOST_DOORBELL != doorbell_q) begin
+                fork
+                    begin
+                        @(negedge _source_clk);
+                        host_doorbell();
+                    end
+                join_none
+            end
         end
     end
 

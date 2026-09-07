@@ -109,11 +109,20 @@ COMMON_OBJS := \
 
 SOC_OBJS := \
 	$(CC_BUILD_DIR)/EmitC.o \
-	$(CC_BUILD_DIR)/ScheduleRecorder.o
+	$(CC_BUILD_DIR)/HostRequests.o
+
+# Full JTAG mode: the scratchpad image the emitter writes next to each
+# program (derived from the schedule ScheduleRecorder records), and the
+# checker that grades the dump GDB reads back.
+JTAG_OBJS := \
+	$(CC_BUILD_DIR)/JtagPreload.o \
+	$(CC_BUILD_DIR)/ScheduleRecorder.o \
+	$(CC_BUILD_DIR)/Simulation.o
 
 GENERATE_SOC_BINARIES_OBJS := \
 	$(CC_BUILD_DIR)/GenerateSoCBinaries.o \
 	$(SOC_OBJS) \
+	$(JTAG_OBJS) \
 	$(COMMON_OBJS)
 
 $(CC_BUILD_DIR)/GenerateSoCBinaries: toolchain $(GENERATE_SOC_BINARIES_OBJS)
@@ -122,6 +131,16 @@ $(CC_BUILD_DIR)/GenerateSoCBinaries: toolchain $(GENERATE_SOC_BINARIES_OBJS)
 GenerateSoCBinaries: $(CC_BUILD_DIR)/GenerateSoCBinaries
 	$<
 
+JTAG_CHECKER_OBJS := \
+	$(CC_BUILD_DIR)/JtagSimChecker.o \
+	$(JTAG_OBJS) \
+	$(COMMON_OBJS)
+
+$(CC_BUILD_DIR)/jtag_sim_checker: toolchain $(JTAG_CHECKER_OBJS)
+	$(CC) -o $@ $(JTAG_CHECKER_OBJS) $(LDLIBS) $(LDFLAGS)
+
+jtag_sim_checker: $(CC_BUILD_DIR)/jtag_sim_checker
+
 $(CC_BUILD_DIR)/%.o: $(ACCEL_DIR)/test/common/%.cc
 	@mkdir -p $(CC_BUILD_DIR)
 	$(CC) $(C17FLAGS) -c -o $@ $<
@@ -129,6 +148,16 @@ $(CC_BUILD_DIR)/%.o: $(ACCEL_DIR)/test/common/%.cc
 $(CC_BUILD_DIR)/%.o: $(ACCEL_DIR)/test/soc/%.cc
 	@mkdir -p $(CC_BUILD_DIR)
 	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/%.o: $(ACCEL_DIR)/test/soc/jtag/%.cc
+	@mkdir -p $(CC_BUILD_DIR)
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+# JtagMemory's layout is shared by three objects; a stale one corrupts the
+# heap (the class grew, the old object did not).
+$(CC_BUILD_DIR)/JtagPreload.o $(CC_BUILD_DIR)/JtagSimChecker.o \
+$(CC_BUILD_DIR)/GenerateSoCBinaries.o: $(ACCEL_DIR)/test/soc/jtag/JtagPreload.h
+$(CC_BUILD_DIR)/JtagSimChecker.o: $(ACCEL_DIR)/test/soc/jtag/JtagSimChecker.h
 
 # ============================================================
 # Cleanup
@@ -139,4 +168,4 @@ $(CC_BUILD_DIR)/%.o: $(ACCEL_DIR)/test/soc/%.cc
 clean:
 	rm -rf $(CC_BUILD_DIR)
 
-.PHONY: network-proto toolchain clean
+.PHONY: network-proto toolchain jtag_sim_checker clean

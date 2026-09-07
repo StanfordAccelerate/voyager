@@ -1,5 +1,6 @@
 #include <systemc.h>
 
+#include <cstdio>
 #include <cstdlib>
 #include <experimental/filesystem>
 #include <fstream>
@@ -12,6 +13,7 @@
 #include "test/common/Model.h"
 #include "test/common/Utils.h"
 #include "test/soc/EmitC.h"
+#include "test/soc/jtag/JtagPreload.h"
 
 namespace {
 
@@ -76,6 +78,11 @@ int sc_main(int argc, char* argv[]) {
   Model model(network);
   CEmitter emitter(model);
 
+  // Full JTAG mode: also emit the scratchpad image GDB loads alongside the
+  // program, since no testbench will stage the operands.
+  const bool jtag_sim = std::getenv("JTAG_SIM") != nullptr;
+  if (jtag_sim) setenv("SIMS", "gold,accelerator", /*overwrite=*/0);
+
   bool ok = true;
   for (const auto& name : split_names(tests)) {
     std::cout << "Emitting " << name << std::endl;
@@ -88,8 +95,21 @@ int sc_main(int argc, char* argv[]) {
         out << program;
       }
       // Emitted firmware follows the repo's formatting rule too; best-effort.
-      std::system(("clang-format -i --style=file " + path + " 2>/dev/null")
-                      .c_str());
+      std::system(
+          ("clang-format -i --style=file " + path + " 2>/dev/null").c_str());
+      if (jtag_sim) {
+        // JtagPreload is a Simulation, which takes its layer from TESTS.
+        setenv("TESTS", name.c_str(), /*overwrite=*/1);
+        try {
+          JtagPreload preload;
+          preload.emit(base_path, name);
+        } catch (...) {
+          // Without its image the layer cannot link; do not leave a
+          // program behind that would pass for a fresh emission.
+          std::remove(path.c_str());
+          throw;
+        }
+      }
     } catch (const std::exception& error) {
       std::cerr << "Skipping " << name << ": " << error.what() << std::endl;
       ok = false;

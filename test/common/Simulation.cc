@@ -93,9 +93,12 @@ void Simulation::load_data() {
       continue;
     }
 
-    for (const auto* box : model.resident_inputs()) {
-      load_tensor(to_tensor(*box), model.data_dir, array);
-    }
+    // Only what the selection reads before writing: its inputs and
+    // parameters, and the checkpoints earlier layers left in DRAM. Loading
+    // every resident input of the model instead converts gigabytes of float
+    // dumps element by element (llama's embedding table and lm_head weight
+    // alone are 2.1 GB each) -- fourteen minutes per llama sim, for tensors
+    // a single layer never touches.
     for (const auto* box : live_in) {
       load_tensor(to_tensor(*box), model.data_dir, array);
     }

@@ -55,7 +55,13 @@ ifeq ($(JTAG_SIM),1)
 SCRATCHPAD_DATA_OBJ := $(SRC:.c=_scratchpad_data.o)
 endif
 
-COMMON_OBJS := common/run_voyager_operation.o common/traps.o common/patch_bits.o
+COMMON_OBJS := common/run_voyager_operation.o common/traps.o common/patch_bits.o common/host_request.o
+
+# The JTAG modes toggle -D defines through EXTRA_CFLAGS. Make cannot
+# see a flag change, so stamp the flags and rebuild everything when they
+# differ -- otherwise a common object built for the previous mode survives.
+CFLAGS_STAMP := common/.cflags
+$(shell echo '$(CFLAGS)' | cmp -s - $(CFLAGS_STAMP) || echo '$(CFLAGS)' > $(CFLAGS_STAMP))
 
 ifeq ($(SEMIHOSTING),1)
 COMMON_OBJS += common/semihost_write.o
@@ -70,7 +76,7 @@ all: $(BIN)
 dump: $(DUMP)
 
 clean:
-	rm -f $(OBJ) $(BIN) $(DUMP) $(COMMON_OBJS) $(SCRATCHPAD_DATA_OBJ) common/semihost_write.o
+	rm -f $(OBJ) $(BIN) $(DUMP) $(COMMON_OBJS) $(SCRATCHPAD_DATA_OBJ) common/semihost_write.o $(CFLAGS_STAMP)
 
 .PHONY: all dump clean
 
@@ -78,19 +84,22 @@ clean:
 # Build rules
 #################################
 
-common/run_voyager_operation.o: common/run_voyager_operation.c common/run_voyager_operation.h common/voyager_address.h common/voyager_params.h
+common/run_voyager_operation.o: common/run_voyager_operation.c common/run_voyager_operation.h common/voyager_address.h common/voyager_params.h $(CFLAGS_STAMP)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-common/traps.o: common/traps.c common/traps.h
+common/traps.o: common/traps.c common/traps.h $(CFLAGS_STAMP)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-common/patch_bits.o: common/patch_bits.c common/patch_bits.h
+common/patch_bits.o: common/patch_bits.c common/patch_bits.h $(CFLAGS_STAMP)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-common/semihost_write.o: common/semihost_write.c
+common/host_request.o: common/host_request.c common/host_request.h common/run_voyager_operation.h common/voyager_address.h $(CFLAGS_STAMP)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(OBJ): %.o: %.c common/run_voyager_operation.h common/voyager_address.h common/voyager_params.h
+common/semihost_write.o: common/semihost_write.c $(CFLAGS_STAMP)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJ): %.o: %.c common/run_voyager_operation.h common/host_request.h common/voyager_address.h common/voyager_params.h $(CFLAGS_STAMP)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %_scratchpad_data.o: %_scratchpad_data.c

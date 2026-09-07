@@ -142,6 +142,25 @@ void set_vector_fetch_2(const Tensor& tensor, std::vector<int> output_shape,
   }
 }
 
+// Cut a vector op's shape into loop counters no larger than
+// MAX_VECTOR_LOOP_VALUE. The last dimension is walked in packs of
+// OC_DIMENSION, so the counter it feeds holds shape.back() / OC_DIMENSION,
+// not the element count: cap the pack count. Capping the elements cut a
+// 4096-wide row (64 packs) into two loops, which is harmless for an
+// elementwise op but lands the packs in the x loop, and the CSR indptr
+// writer of a quantize_mx_outlier then counts them as rows and waits for
+// pointers that never come.
+std::vector<int> split_vector_loops(std::vector<int> shape) {
+  if (shape.back() % OC_DIMENSION == 0) {
+    shape.back() /= OC_DIMENSION;
+    shape = split_loops(shape, MAX_VECTOR_LOOP_VALUE);
+    shape.back() *= OC_DIMENSION;
+  } else {
+    shape = split_loops(shape, MAX_VECTOR_LOOP_VALUE);
+  }
+  return adjust_loop_indices(shape, OC_DIMENSION);
+}
+
 void map_vector_operations(const voyager::Operation& operation,
                            const ScalarEnv& env,
                            std::deque<BaseParams*>& mapped_params) {
@@ -193,8 +212,7 @@ void map_vector_operations(const voyager::Operation& operation,
     // below clamps each to the window's run.
     input_shape.back() = input.window_pitch;
   } else {
-    input_shape = split_loops(input_shape, MAX_VECTOR_LOOP_VALUE);
-    input_shape = adjust_loop_indices(input_shape, OC_DIMENSION);
+    input_shape = split_vector_loops(input_shape);
   }
 
   // Pad the shape to 6 dimensions with 1s
@@ -404,13 +422,10 @@ void map_vector_operations(const voyager::Operation& operation,
   vector_params->vector_output_offset = get_address(output);
   vector_params->output_mode = 2;
 
-  auto output_shape = get_shape(output);
-  output_shape = split_loops(output_shape, MAX_VECTOR_LOOP_VALUE);
+  auto output_shape = split_vector_loops(get_shape(output));
   if (output_shape.size() > 6) {
     throw std::invalid_argument("Too many dimensions for vector operations!");
   }
-
-  output_shape = adjust_loop_indices(output_shape, OC_DIMENSION);
 
   const int padding = 6 - output_shape.size();
   for (int i = 0; i < padding; i++) {

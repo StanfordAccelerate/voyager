@@ -1,4 +1,4 @@
-#include "test/soc/ScheduleRecorder.h"
+#include "test/soc/jtag/ScheduleRecorder.h"
 
 #include <stdexcept>
 
@@ -28,8 +28,17 @@ void count_unit_passes(const std::deque<BaseParams*>& params,
 #endif
 #if SUPPORT_SPMM
       if (!routed && matrix->is_spmm) {
-        throw std::runtime_error(
-            "SpMM dispatches are not supported by the SoC MVP flow.");
+        // A fused dense pass, when the deque holds one next, joins this group
+        // rather than starting its own.
+        if (idx < params.size() &&
+            dynamic_cast<MatrixParams*>(params[idx]) != nullptr) {
+          idx++;
+          passes[Step::kMatrix]++;
+          group.compute_unit = Step::kMatrix;
+        }
+        passes[Step::kSpmm]++;
+        group.spmm = true;
+        routed = true;
       }
 #endif
       if (!routed) {
@@ -66,6 +75,51 @@ void ScheduleRecorder::data_op(const voyager::Operation& op,
   step.prim = &prim;
   step.env = env;
   steps_->push_back(std::move(step));
+}
+
+namespace {
+
+// Whether any scalar the prim reads is one the replay will recompute.
+bool reads_deferred(const voyager::PrimOp& prim,
+                    const std::set<std::string>& deferred) {
+  for (const auto& [key, argument] : prim.kwargs()) {
+    if (argument.arg_type_case() != voyager::Argument::kScalar) continue;
+    const voyager::ScalarValue& value = argument.scalar();
+    if (value.value_case() == voyager::ScalarValue::kNode &&
+        deferred.count(value.node()) > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+}  // namespace
+
+void ScheduleRecorder::scalar_read(const voyager::Operation& op,
+                                   const voyager::PrimOp& prim,
+                                   const ScalarEnv& env) {
+  Step step;
+  step.kind = Step::kScalarRead;
+  step.op = &op;
+  step.prim = &prim;
+  step.env = env;
+  steps_->push_back(std::move(step));
+  if (op.outputs_size() == 1) deferred_.insert(op.outputs(0).name());
+}
+
+void ScheduleRecorder::scalar_op(const voyager::Operation& op,
+                                 const voyager::PrimOp& prim,
+                                 const ScalarEnv& env) {
+  // Only the cone below a deferred read needs recomputing; every other scalar
+  // is a loop index the recording walk already got right.
+  if (op.outputs_size() != 1 || !reads_deferred(prim, deferred_)) return;
+  Step step;
+  step.kind = Step::kScalarOp;
+  step.op = &op;
+  step.prim = &prim;
+  step.env = env;
+  steps_->push_back(std::move(step));
+  deferred_.insert(op.outputs(0).name());
 }
 
 void ScheduleRecorder::execute(const voyager::Operation& op,

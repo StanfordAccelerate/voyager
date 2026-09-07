@@ -310,6 +310,20 @@ void Interpreter::execute_scalar(const voyager::Operation& op,
     // A data-dependent scalar: the sparse flow reads CSR bookkeeping (an
     // indptr entry) out of memory to size and address the tiles that follow.
     // Read it in the box's own dtype -- these are integer indices.
+    if (backend_->intercepts_scalar_reads()) {
+      // A recording backend has not written that memory yet; it takes the
+      // read and performs it at replay. The walk continues on a placeholder,
+      // which is sound because everything downstream of this value is either
+      // replayed against the value read then, or patched by the firmware from
+      // live memory at run time.
+      backend_->scalar_read(op, prim, env_);
+      if (op.outputs_size() != 1) {
+        throw std::runtime_error("Scalar operation " + op.name() +
+                                 " must have exactly one result.");
+      }
+      env_.define(op.outputs(0).name(), int64_t{0});
+      return;
+    }
     const Tensor input = resolve(prim, "input", env_);
     if (get_size(input) != 1) {
       throw std::runtime_error("Scalar operation " + op.name() +
@@ -333,20 +347,14 @@ void Interpreter::execute_scalar(const voyager::Operation& op,
                                " reads a tensor of non-index dtype " +
                                input.dtype + ".");
     }
-  } else if (strip_namespace(prim.target()) == "sym_ite") {
-    const bool predicate = to_bool(eval(prim.kwargs().at("b").scalar(), env_));
-    result = eval(prim.kwargs().at(predicate ? "t" : "f").scalar(), env_);
   } else {
-    const auto input = prim.kwargs().find("input");
-    const auto other = prim.kwargs().find("other");
-    if (input == prim.kwargs().end() || other == prim.kwargs().end()) {
-      throw std::runtime_error("Scalar operation " + op.name() + " (" +
-                               strip_namespace(prim.target()) +
-                               ") is not binary.");
+    result = eval_scalar_prim(prim, env_);
+    // A recording backend needs the ops downstream of a deferred read as well
+    // as the read itself: their values are derived from a placeholder here and
+    // have to be recomputed when the real one is available.
+    if (backend_->intercepts_scalar_reads()) {
+      backend_->scalar_op(op, prim, env_);
     }
-    result = apply_scalar_op(strip_namespace(prim.target()),
-                             eval(input->second.scalar(), env_),
-                             eval(other->second.scalar(), env_));
   }
 
   if (op.outputs_size() != 1) {
@@ -354,6 +362,22 @@ void Interpreter::execute_scalar(const voyager::Operation& op,
                              " must have exactly one result.");
   }
   env_.define(op.outputs(0).name(), result);
+}
+
+Scalar eval_scalar_prim(const voyager::PrimOp& prim, const ScalarEnv& env) {
+  const std::string target = strip_namespace(prim.target());
+  if (target == "sym_ite") {
+    const bool predicate = to_bool(eval(prim.kwargs().at("b").scalar(), env));
+    return eval(prim.kwargs().at(predicate ? "t" : "f").scalar(), env);
+  }
+  const auto input = prim.kwargs().find("input");
+  const auto other = prim.kwargs().find("other");
+  if (input == prim.kwargs().end() || other == prim.kwargs().end()) {
+    throw std::runtime_error("Scalar operation " + prim.name() + " (" + target +
+                             ") is not binary.");
+  }
+  return apply_scalar_op(target, eval(input->second.scalar(), env),
+                         eval(other->second.scalar(), env));
 }
 
 void Interpreter::execute_zeros(const voyager::Operation& op,

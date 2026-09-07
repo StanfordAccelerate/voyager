@@ -32,5 +32,5 @@ class VoyagerVerification extends BlackBox with HasBlackBoxPath {
   addPath(s"$voyagerDir/test/common/Simulation.cc")
   addPath(s"$voyagerDir/test/compiler/proto/voyager_ir.pb.cc")
   addPath(s"$voyagerDir/test/toolchain/MapOperation.cc")
-  addPath(s"$voyagerDir/test/soc/ScheduleRecorder.cc")
+  addPath(s"$voyagerDir/test/soc/HostRequests.cc")
 }

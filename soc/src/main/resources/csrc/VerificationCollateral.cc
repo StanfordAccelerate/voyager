@@ -7,7 +7,7 @@ SoCSimulation* sim = NULL;
 
 bool running_a_network() {
   /* In full JTAG mode (JTAG_SIM=1) GDB performs the data loading and output
-   * checking, so the DPI replay must stay out of the way. */
+   * checking, so the DPI testbench must stay out of the way. */
   if (std::getenv("JTAG_SIM")) return false;
 
   /* If the TESTS and NETWORK environment variables are set, then we are
@@ -30,21 +30,35 @@ extern "C" void load_memory() {
   }
 }
 
-extern "C" void check_outputs(int unit) {
+/* Randomized register init can pulse a unit's done_vld, or flip the doorbell
+ * semaphore, before reset even asserts; nothing real happens before
+ * load_memory() has run, so events that arrive first are ignored. */
+
+extern "C" void host_doorbell() {
   if (running_a_network()) {
-    /* Randomized register init can pulse a unit's done_vld before reset even
-     * asserts; a real done cannot occur before load_memory() has run, so
-     * ignore ticks that arrive first. */
     if (sim == NULL) return;
-    sim->tick(unit);
+    sim->doorbell();
   }
 }
 
 extern "C" void unit_started(int unit) {
   if (running_a_network()) {
-    /* Same guard as check_outputs: randomized init can glitch start_vld. */
     if (sim == NULL) return;
-    sim->start_fired(unit);
+    sim->unit_started(unit);
+  }
+}
+
+extern "C" void unit_done(int unit) {
+  if (running_a_network()) {
+    if (sim == NULL) return;
+    sim->unit_done(unit);
+  }
+}
+
+extern "C" void unit_retired(int unit) {
+  if (running_a_network()) {
+    if (sim == NULL) return;
+    sim->unit_retired(unit);
   }
 }
 

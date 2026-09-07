@@ -25,7 +25,9 @@
             "sin",
             "mul_1",
             "add_6",
-            "sub"
+            "sub",
+            "key_cache_0_fold",
+            "value_cache_0_fold"
         ]
     }
 ]

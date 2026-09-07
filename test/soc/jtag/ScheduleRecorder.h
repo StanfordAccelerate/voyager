@@ -1,6 +1,7 @@
 #pragma once
 
 #include <deque>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -18,19 +19,23 @@
 // paced by the DUT's done events.
 struct Step {
   enum Kind {
-    kCopy,     // voyager::async_copy: perform via run_async_copy(prim, env)
-    kZero,     // voyager::zeros data buffer, or an integer alloc's zero-fill
-    kHostOp,   // a "cpu"-tagged tensor op: run the gold kernel in place
-    kInit,     // set a semaphore counter to `amount`
-    kWait,     // consume `amount` credits; stalls the replay until available
-    kPost,     // add `amount` credits; a retire post matures only once every
-               //   dispatch recorded before it has fully retired
-    kDispatch  // firmware sends the params; expect done events per unit
+    kCopy,        // voyager::async_copy: perform via run_async_copy(prim, env)
+    kZero,        // voyager::zeros data buffer, or an integer alloc's zero-fill
+    kHostOp,      // a "cpu"-tagged tensor op: run the gold kernel in place
+    kScalarRead,  // aten::_local_scalar_dense: read the cell at replay time
+    kScalarOp,    // a scalar derived from one: recompute it at replay time
+    kInit,        // set a semaphore counter to `amount`
+    kWait,        // consume `amount` credits; stalls the replay until available
+    kPost,        // add `amount` credits; a retire post matures only once every
+                  //   dispatch recorded before it has fully retired
+    kDispatch     // firmware sends the params; expect done events per unit
   };
 
   Kind kind;
 
-  // kCopy / kZero / kHostOp: the op and the scalar env it executed under.
+  // kCopy / kZero / kHostOp / kScalarRead: the op and the scalar env it
+  // executed under. A kScalarRead's value is not recorded -- the replay reads
+  // it from live memory and binds it for the steps that follow.
   const voyager::Operation* op = nullptr;
   const voyager::PrimOp* prim = nullptr;
   ScalarEnv env;
@@ -48,10 +53,11 @@ struct Step {
 
   // kDispatch: the invocation groups in the order Harness::dispatch_params
   // would push them. The replay's start-release engine grants each group's
-  // unit starts in this order (compute unit first, then vector), mirroring
-  // Harness::release_starts.
+  // unit starts in Harness::release_starts' order: compute unit, then SpMM,
+  // then vector. A fused SpMM group starts both its dense and sparse passes.
   struct Group {
-    int compute_unit = -1;  // kMatrix or kMvm; -1 for a vector-only group
+    int compute_unit = -1;  // kMatrix or kMvm; -1 for none
+    bool spmm = false;
     bool vector = false;
   };
   std::vector<Group> groups;
@@ -86,6 +92,14 @@ class ScheduleRecorder : public Backend {
   void data_op(const voyager::Operation& op, const voyager::PrimOp& prim,
                const ScalarEnv& env) override;
 
+  bool intercepts_scalar_reads() const override { return true; }
+
+  void scalar_read(const voyager::Operation& op, const voyager::PrimOp& prim,
+                   const ScalarEnv& env) override;
+
+  void scalar_op(const voyager::Operation& op, const voyager::PrimOp& prim,
+                 const ScalarEnv& env) override;
+
   void execute(const voyager::Operation& op, const ScalarEnv& env) override;
 
   void init_semaphore(const std::string& node, int64_t slot,
@@ -102,4 +116,9 @@ class ScheduleRecorder : public Backend {
  private:
   std::vector<Step>* steps_;
   bool in_commit_ = false;
+
+  // Scalars whose value descends from a read deferred to replay time. The
+  // recording walk computed them from a placeholder, so the replay has to
+  // recompute them in this order before the copies that consume them.
+  std::set<std::string> deferred_;
 };

@@ -18,7 +18,7 @@
 #include <stdexcept>
 
 #include "test/common/Utils.h"
-#include "test/soc/ScheduleRecorder.h"
+#include "test/soc/firmware/common/host_request.h"
 #include "test/toolchain/MapOperation.h"
 // clang-format on
 
@@ -55,6 +55,7 @@ enum ParamKind { kMatrixParams, kVectorParams, kVectorConfig };
 struct SerializedParam {
   ParamKind kind;
   bool is_fc = false;
+  bool is_spmm = false;
   std::vector<unsigned char> bytes;
 };
 
@@ -66,6 +67,7 @@ std::vector<SerializedParam> serialize_params(
     if (auto* mp = dynamic_cast<MatrixParams*>(base)) {
       sp.kind = kMatrixParams;
       sp.is_fc = mp->is_fc;
+      sp.is_spmm = mp->is_spmm;
       sp.bytes = serialize_one(*mp);
     } else if (auto* vp = dynamic_cast<VectorParams*>(base)) {
       sp.kind = kVectorParams;
@@ -128,13 +130,50 @@ std::vector<BitRun> diff_runs(const std::vector<SerializedParam>& a,
   return runs;
 }
 
+// A field's movement per unit of one scalar, exactly. A whole number is
+// den == 1; a field written in coarser units than the scalar counts in
+// (slice_start is a column / OC_DIMENSION) needs the fraction.
+struct Ratio {
+  int64_t num = 0;
+  int64_t den = 1;
+};
+
+int64_t gcd_i64(int64_t a, int64_t b) {
+  if (a < 0) a = -a;
+  if (b < 0) b = -b;
+  while (b != 0) {
+    const int64_t t = a % b;
+    a = b;
+    b = t;
+  }
+  return a == 0 ? 1 : a;
+}
+
+Ratio make_ratio(int64_t num, int64_t den) {
+  if (den < 0) {
+    num = -num;
+    den = -den;
+  }
+  const int64_t g = gcd_i64(num, den);
+  return Ratio{num / g, den / g};
+}
+
+Ratio add_ratio(const Ratio& a, const Ratio& b) {
+  return make_ratio(a.num * b.den + b.num * a.den, a.den * b.den);
+}
+
+// Used when two runs merge into one wider field.
+Ratio shift_ratio(const Ratio& a, size_t shift) {
+  return make_ratio(a.num << shift, a.den);
+}
+
 // One runtime-patched field of one params blob.
 struct PatchField {
   size_t param_idx;
   size_t off;
   size_t len;
-  int64_t base;                          // value in the baseline blob
-  std::map<std::string, int64_t> coeff;  // ssa scalar -> per-unit delta
+  int64_t base;                        // value in the baseline blob
+  std::map<std::string, Ratio> coeff;  // ssa scalar -> per-unit delta
 };
 
 std::string sanitize(const std::string& name) {
@@ -144,40 +183,36 @@ std::string sanitize(const std::string& name) {
   return out;
 }
 
-void collect_scalar_names(const voyager::ScalarValue& value,
-                          std::set<std::string>* names) {
-  if (value.value_case() == voyager::ScalarValue::kNode) {
-    names->insert(value.node());
+// The prim inside `region`, at any nesting, whose output is `name`.
+const voyager::PrimOp* find_scalar_prim(const voyager::Region& region,
+                                        const std::string& name);
+
+const voyager::PrimOp* find_scalar_prim_in_op(const voyager::Operation& op,
+                                              const std::string& name) {
+  if (op.op_type_case() == voyager::Operation::kPrim) {
+    for (const auto& output : op.outputs()) {
+      if (output.name() == name) return &op.prim();
+    }
+    return nullptr;
   }
+  if (op.op_type_case() == voyager::Operation::kCond) {
+    if (const auto* p = find_scalar_prim(op.cond().true_region(), name)) {
+      return p;
+    }
+    return find_scalar_prim(op.cond().false_region(), name);
+  }
+  if (op.op_type_case() == voyager::Operation::kAsync) {
+    return find_scalar_prim(op.async().body(), name);
+  }
+  return nullptr;
 }
 
-void collect_ref_names(const voyager::TensorBoxRef& ref,
-                       std::set<std::string>* names) {
-  for (const auto& offset : ref.offsets()) collect_scalar_names(offset, names);
-}
-
-void collect_argument_names(const voyager::Argument& argument,
-                            std::set<std::string>* names) {
-  switch (argument.arg_type_case()) {
-    case voyager::Argument::kTensorBox:
-      collect_ref_names(argument.tensor_box(), names);
-      break;
-    case voyager::Argument::kTensorBoxList:
-      for (const auto& ref : argument.tensor_box_list().values()) {
-        collect_ref_names(ref, names);
-      }
-      break;
-    case voyager::Argument::kScalar:
-      collect_scalar_names(argument.scalar(), names);
-      break;
-    case voyager::Argument::kScalarList:
-      for (const auto& value : argument.scalar_list().values()) {
-        collect_scalar_names(value, names);
-      }
-      break;
-    default:
-      break;
+const voyager::PrimOp* find_scalar_prim(const voyager::Region& region,
+                                        const std::string& name) {
+  for (const auto& op : region.ops()) {
+    if (const auto* p = find_scalar_prim_in_op(op, name)) return p;
   }
+  return nullptr;
 }
 
 }  // namespace
@@ -237,6 +272,7 @@ std::string CEmitter::scalar_expr(const voyager::ScalarValue& value) const {
 }
 
 void CEmitter::line(int indent, const std::string& text) {
+  if (surveying_) return;  // the survey walk's output is discarded
   for (int i = 0; i < indent; i++) body_ << "\t";
   body_ << text << "\n";
 }
@@ -244,6 +280,52 @@ void CEmitter::line(int indent, const std::string& text) {
 // ---------------------------------------------------------------------------
 // Structure queries
 // ---------------------------------------------------------------------------
+
+// Whether any conditional in this subtree guards a dispatch. Only such a layer
+// can have a dispatch the emitter reaches speculatively, and only such a layer
+// is worth surveying -- the survey walks the tile loop for real, evaluating
+// arms the single emitting walk never enters concretely, which is needless
+// exposure anywhere it cannot pay off.
+bool CEmitter::cond_guards_dispatch(const voyager::Operation& op) const {
+  switch (op.op_type_case()) {
+    case voyager::Operation::kCond:
+      for (const auto& child : op.cond().true_region().ops()) {
+        if (contains_dispatch(child)) return true;
+      }
+      for (const auto& child : op.cond().false_region().ops()) {
+        if (contains_dispatch(child)) return true;
+      }
+      // A nested conditional may still guard one.
+      for (const auto& child : op.cond().true_region().ops()) {
+        if (cond_guards_dispatch(child)) return true;
+      }
+      for (const auto& child : op.cond().false_region().ops()) {
+        if (cond_guards_dispatch(child)) return true;
+      }
+      return false;
+    case voyager::Operation::kLoop: {
+      const auto& body = op.loop().has_for_loop()
+                             ? op.loop().for_loop().body()
+                             : op.loop().while_loop().body();
+      for (const auto& child : body.ops()) {
+        if (cond_guards_dispatch(child)) return true;
+      }
+      if (op.loop().has_while_loop()) {
+        for (const auto& child : op.loop().while_loop().condition().ops()) {
+          if (cond_guards_dispatch(child)) return true;
+        }
+      }
+      return false;
+    }
+    case voyager::Operation::kAsync:
+      for (const auto& child : op.async().body().ops()) {
+        if (cond_guards_dispatch(child)) return true;
+      }
+      return false;
+    default:
+      return false;
+  }
+}
 
 bool CEmitter::contains_dispatch(const voyager::Operation& op) const {
   switch (op.op_type_case()) {
@@ -282,20 +364,58 @@ bool CEmitter::contains_dispatch(const voyager::Operation& op) const {
   }
 }
 
+bool CEmitter::contains_work(const voyager::Operation& op) const {
+  switch (op.op_type_case()) {
+    case voyager::Operation::kPrim: {
+      const auto& prim = op.prim();
+      const std::string& target = prim.target();
+      if (host_ordinals_.count(&prim) > 0) return true;
+      if (target == "voyager::zeros" || target == "voyager::fill" ||
+          target == "voyager::async_wait") {
+        return true;
+      }
+      return is_host_bookkeeping(prim) || is_datapath(op);
+    }
+    case voyager::Operation::kFused:
+      return is_datapath(op);
+    case voyager::Operation::kLoop: {
+      const auto& body = op.loop().has_for_loop()
+                             ? op.loop().for_loop().body()
+                             : op.loop().while_loop().body();
+      for (const auto& child : body.ops()) {
+        if (contains_work(child)) return true;
+      }
+      if (op.loop().has_while_loop()) {
+        for (const auto& child : op.loop().while_loop().condition().ops()) {
+          if (contains_work(child)) return true;
+        }
+      }
+      return false;
+    }
+    case voyager::Operation::kCond:
+      for (const auto& child : op.cond().true_region().ops()) {
+        if (contains_work(child)) return true;
+      }
+      for (const auto& child : op.cond().false_region().ops()) {
+        if (contains_work(child)) return true;
+      }
+      return false;
+    case voyager::Operation::kAsync:
+      if (op.async().dependencies_size() > 0 || op.async().has_post()) {
+        return true;
+      }
+      for (const auto& child : op.async().body().ops()) {
+        if (contains_work(child)) return true;
+      }
+      return false;
+    default:
+      return false;
+  }
+}
+
 std::set<std::string> CEmitter::collect_ref_scalars(
     const voyager::Operation& op) const {
-  std::set<std::string> names;
-  for (const auto* prim : get_prim_ops(op)) {
-    for (const auto& [key, argument] : prim->kwargs()) {
-      collect_argument_names(argument, &names);
-    }
-  }
-  for (const auto& output : op.outputs()) {
-    if (output.has_destination()) {
-      collect_ref_names(output.destination(), &names);
-    }
-  }
-  return names;
+  return request_scalar_names(op);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,10 +501,27 @@ void CEmitter::emit_operation(const voyager::Operation& op, int indent) {
     case voyager::Operation::kPrim: {
       const auto& prim = op.prim();
       const std::string& target = prim.target();
-      if (target == "voyager::alloc" || target == "voyager::zeros" ||
-          target == "voyager::fill" || target == "voyager::async_copy" ||
-          target == "voyager::async_wait") {
-        return;  // the testbench's job
+      // Data movement and host tensor ops: requests to the testbench.
+      const auto host = host_ordinals_.find(&prim);
+      if (host != host_ordinals_.end()) {
+        emit_host_request(op, prim, host->second, indent);
+        return;
+      }
+      // Address assignment is the compiler's; a float allocation's contents
+      // are junk nothing reads before writing (the integer ones are zero
+      // fills, in the table above).
+      if (target == "voyager::alloc") return;
+      if (target == "voyager::zeros") {
+        emit_semaphore_zeros(op, indent);
+        return;
+      }
+      if (target == "voyager::fill") {
+        emit_semaphore_fill(op, prim, indent);
+        return;
+      }
+      if (target == "voyager::async_wait") {
+        emit_async_wait(op, prim, indent);
+        return;
       }
       if (target == "voyager::delinearize_index" ||
           target == "voyager::increment_indices") {
@@ -399,18 +536,20 @@ void CEmitter::emit_operation(const voyager::Operation& op, int indent) {
         emit_scalar_prim(op, prim, indent);
         return;
       }
+      if (is_host_bookkeeping(prim)) {
+        emit_host_bookkeeping(op, prim, indent);
+        return;
+      }
       if (is_datapath(op)) {
         emit_dispatch(op, indent);
       }
-      // A host-side tensor op (slice/pad the control processor would run):
-      // the testbench executes it against the DUT scratchpad.
       return;
     }
     case voyager::Operation::kFused:
       if (is_datapath(op)) emit_dispatch(op, indent);
       return;
     case voyager::Operation::kLoop:
-      if (!contains_dispatch(op)) return;
+      if (!contains_work(op)) return;
       if (op.loop().has_for_loop()) {
         emit_for(op, op.loop().for_loop(), indent);
       } else {
@@ -418,22 +557,191 @@ void CEmitter::emit_operation(const voyager::Operation& op, int indent) {
       }
       return;
     case voyager::Operation::kCond:
-      if (contains_dispatch(op) || op.outputs_size() > 0) {
+      if (contains_work(op) || op.outputs_size() > 0) {
         emit_cond(op, op.cond(), indent);
       }
       return;
-    case voyager::Operation::kAsync: {
-      // Dependencies and post are hardware semaphores the testbench manages;
-      // the CPU just streams the body's dispatches.
-      const bool was_in_commit = in_commit_;
-      in_commit_ = true;
-      emit_ops(op.async().body().ops(), indent);
-      in_commit_ = was_in_commit;
+    case voyager::Operation::kAsync:
+      emit_async(op, indent);
       return;
-    }
     default:
       return;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Semaphores and requests
+// ---------------------------------------------------------------------------
+
+std::pair<std::string, std::string> CEmitter::sem_cells(
+    const voyager::TensorBox& box) {
+  auto it = sem_names_.find(box.node());
+  if (it == sem_names_.end()) {
+    std::string stem = "__sem_" + sanitize(box.node());
+    int& count = name_counts_[stem];
+    if (count > 0) stem += "_x" + std::to_string(count);
+    count++;
+    const int64_t slots = semaphore_slots(box);
+    // Cache-line apart from anything the firmware writes: the testbench's
+    // increments are read-modify-writes of a whole macro row.
+    decls_ << "static volatile int64_t " << stem << "_tb[" << slots
+           << "] __attribute__((aligned(64)));\n";
+    decls_ << "static int64_t " << stem << "_fw[" << slots << "];\n\n";
+    it = sem_names_.emplace(box.node(), stem).first;
+  }
+  return {it->second + "_tb", it->second + "_fw"};
+}
+
+std::string CEmitter::sem_slot_expr(const voyager::TensorBoxRef& ref,
+                                    const std::string& who) const {
+  const voyager::TensorBox& box = ref.box();
+  const int dims = box.shape_size();
+  const bool banked = banks_of(box) > 1;
+  if (dims == 0 || ref.offsets_size() == 0) {
+    // select_bank: a scalar semaphore has one slot per bank.
+    if (ref.offsets_size() == 0 || !banked) return "0LL";
+    return "(" + scalar_expr(ref.offsets(0)) + ")";
+  }
+  // A semaphore array: [bank, *dims] flattened bank-major.
+  const int bank_dims = banked ? 1 : 0;
+  if (ref.offsets_size() != dims + bank_dims) {
+    throw std::runtime_error(who + ": semaphore ref rank does not match " +
+                             box.node());
+  }
+  std::string index = "0LL";
+  int64_t elements = 1;
+  for (int d = 0; d < dims; d++) {
+    index = "(" + index + ") * " + std::to_string(box.shape(d)) + "LL + (" +
+            scalar_expr(ref.offsets(d + bank_dims)) + ")";
+    elements *= box.shape(d);
+  }
+  const std::string bank =
+      banked ? "(" + scalar_expr(ref.offsets(0)) + ")" : "0LL";
+  return bank + " * " + std::to_string(elements) + "LL + (" + index + ")";
+}
+
+void CEmitter::emit_semaphore_zeros(const voyager::Operation& op, int indent) {
+  if (op.outputs_size() != 1 || !op.outputs(0).has_tensor_box() ||
+      !is_semaphore(op.outputs(0).tensor_box())) {
+    throw std::runtime_error("voyager::zeros " + op.name() +
+                             " declares neither a buffer nor a semaphore.");
+  }
+  const auto& box = op.outputs(0).tensor_box();
+  const auto [tb, fw] = sem_cells(box);
+  const std::string slots = std::to_string(semaphore_slots(box)) + "LL";
+  line(indent, "/* " + op.name() + ": semaphore " + box.node() + " */");
+  line(indent, "for (int64_t __s = 0; __s < " + slots + "; __s++) {");
+  line(indent + 1, tb + "[__s] = 0;");
+  line(indent + 1, fw + "[__s] = 0;");
+  line(indent, "}");
+}
+
+void CEmitter::emit_semaphore_fill(const voyager::Operation& op,
+                                   const voyager::PrimOp& prim, int indent) {
+  if (op.outputs_size() != 1 || !op.outputs(0).has_tensor_box() ||
+      !is_semaphore(op.outputs(0).tensor_box())) {
+    throw std::runtime_error("voyager::fill " + op.name() +
+                             " targets a buffer that is not a semaphore.");
+  }
+  const auto& box = op.outputs(0).tensor_box();
+  const auto [tb, fw] = sem_cells(box);
+  const std::string value = scalar_expr(prim.kwargs().at("value").scalar());
+  const std::string slots = std::to_string(semaphore_slots(box)) + "LL";
+  // A fill seeds credits: it adds to every slot rather than setting it.
+  line(indent, "/* " + op.name() + ": seed semaphore " + box.node() + " */");
+  line(indent, "for (int64_t __s = 0; __s < " + slots + "; __s++) {");
+  line(indent + 1, fw + "[__s] += (" + value + ");");
+  line(indent, "}");
+}
+
+void CEmitter::emit_async_wait(const voyager::Operation& op,
+                               const voyager::PrimOp& prim, int indent) {
+  const auto& ref = prim.kwargs().at("semaphore").tensor_box();
+  const auto [tb, fw] = sem_cells(ref.box());
+  const std::string slot = sem_slot_expr(ref, "async_wait " + op.name());
+  line(indent, "host_wait(&" + tb + "[" + slot + "], &" + fw + "[" + slot +
+                   "]); /* " + op.name() + " */");
+}
+
+void CEmitter::emit_async(const voyager::Operation& op, int indent) {
+  // A commit: wait every dependency, run the body's dispatches without
+  // draining, and have the testbench credit the post once the units have
+  // retired everything issued so far.
+  const auto& async = op.async();
+  for (const auto& dep : async.dependencies()) {
+    const auto [tb, fw] = sem_cells(dep.box());
+    const std::string slot = sem_slot_expr(dep, "commit " + op.name());
+    line(indent, "host_wait(&" + tb + "[" + slot + "], &" + fw + "[" + slot +
+                     "]); /* " + op.name() + " depends on " + dep.box().node() +
+                     " */");
+  }
+  const bool was_in_commit = in_commit_;
+  in_commit_ = true;
+  emit_ops(async.body().ops(), indent);
+  in_commit_ = was_in_commit;
+  if (async.has_post()) {
+    const auto [tb, fw] = sem_cells(async.post().box());
+    const std::string slot = sem_slot_expr(async.post(), "commit " + op.name());
+    line(indent, "host_post(&" + tb + "[" + slot + "], 1LL); /* " + op.name() +
+                     " retires */");
+  }
+}
+
+void CEmitter::emit_host_request(const voyager::Operation& op,
+                                 const voyager::PrimOp& prim, size_t ordinal,
+                                 int indent) {
+  const HostOp& host = host_table_.at(ordinal);
+  const std::string ord = std::to_string(ordinal) + "ULL";
+  if (host.kind == HostOp::kZero) {
+    line(indent, "host_zero(" + ord + "); /* " + op.name() + " */");
+    return;
+  }
+
+  // The prim's scalar operands, by value, in request_scalar_names' order,
+  // stored straight into the mailbox slot: this core has no data cache, so
+  // staging them anywhere first costs a bus transaction per value.
+  const std::set<std::string> names = request_scalar_names(op);
+  if (names.size() > HOST_REQ_MAX_ARGS) {
+    throw std::runtime_error(
+        op.name() + " references " + std::to_string(names.size()) +
+        " scalars; host_request.h allows " + std::to_string(HOST_REQ_MAX_ARGS));
+  }
+  std::string slot = "host_slot()";
+  if (!names.empty()) {
+    line(indent, "{");
+    indent++;
+    line(indent, "volatile host_request_t *__r = host_slot();");
+    size_t i = 0;
+    for (const auto& name : names) {
+      line(indent,
+           "__r->args[" + std::to_string(i++) + "] = " + ref(name) + ";");
+    }
+    slot = "__r";
+  }
+  const std::string count = std::to_string(names.size());
+
+  if (host.kind == HostOp::kCopy) {
+    // The copy's completion credits its slot semaphore post_count times.
+    std::string cell = "(volatile int64_t *)0";
+    const auto sem = prim.kwargs().find("semaphore");
+    if (sem != prim.kwargs().end()) {
+      const auto& ref = sem->second.tensor_box();
+      const auto [tb, fw] = sem_cells(ref.box());
+      cell =
+          "&" + tb + "[" + sem_slot_expr(ref, "async_copy " + op.name()) + "]";
+    }
+    std::string amount = "1LL";
+    const auto post_count = prim.kwargs().find("post_count");
+    if (post_count != prim.kwargs().end()) {
+      amount = scalar_expr(post_count->second.scalar());
+    }
+    line(indent, "host_copy(" + slot + ", " + ord + ", " + count + ", " + cell +
+                     ", " + amount + "); /* " + op.name() + " */");
+  } else {
+    line(indent, "host_op(" + slot + ", " + ord + ", " + count + "); /* " +
+                     op.name() + ": " + strip_namespace(prim.target()) + " */");
+  }
+  if (!names.empty()) line(indent - 1, "}");
 }
 
 void CEmitter::emit_scalar_prim(const voyager::Operation& op,
@@ -443,6 +751,11 @@ void CEmitter::emit_scalar_prim(const voyager::Operation& op,
                              " with multiple outputs.");
   }
   const std::string target = strip_namespace(prim.target());
+
+  if (target == "_local_scalar_dense") {
+    emit_scalar_load(op, prim, indent);
+    return;
+  }
 
   std::string expr;
   if (target == "sym_ite") {
@@ -488,6 +801,195 @@ void CEmitter::emit_scalar_prim(const voyager::Operation& op,
   const std::string c_name = declare(op.outputs(0).name(), indent, false);
   line(indent, "int64_t " + c_name + " = " + expr + ";");
   env_.define(op.outputs(0).name(), value);
+  scalar_def_[op.outputs(0).name()] = &prim;
+}
+
+int64_t CEmitter::derived_step(const std::string& ssa_name, int depth) const {
+  if (depth > 8) return 0;  // pathological chain; fall back to searching
+  const auto counter = loop_counter_steps_.find(ssa_name);
+  if (counter != loop_counter_steps_.end()) return counter->second;
+  const auto found = scalar_def_.find(ssa_name);
+  // Neither a known counter nor a scalar this walk defined: not derivable.
+  // A guessed step the mapper rejects would be misread as invariance.
+  if (found == scalar_def_.end()) return 0;
+
+  const voyager::PrimOp& prim = *found->second;
+  const std::string target = strip_namespace(prim.target());
+  // A delinearized index wraps at its basis, but it only ever moves by whole
+  // units, so its run-time values lie on the unit grid -- and a scalar scaled
+  // off it (a column offset, getitem * 512) on that scale's grid, which is
+  // what a fractional field coefficient needs to divide exactly.
+  if (target == "delinearize_index") return 1;
+  if (target != "mul" && target != "add" && target != "sub") return 0;
+  if (prim.kwargs().count("input") == 0 || prim.kwargs().count("other") == 0) {
+    return 0;
+  }
+
+  const voyager::ScalarValue& a = prim.kwargs().at("input").scalar();
+  const voyager::ScalarValue& b = prim.kwargs().at("other").scalar();
+  const bool a_node = a.value_case() == voyager::ScalarValue::kNode;
+  const bool b_node = b.value_case() == voyager::ScalarValue::kNode;
+  if (a_node == b_node) return 0;  // both varying or both constant
+
+  const voyager::ScalarValue& varying = a_node ? a : b;
+  const voyager::ScalarValue& constant = a_node ? b : a;
+  const int64_t inner = derived_step(varying.node(), depth + 1);
+  if (inner == 0) return 0;
+  // Adding a constant shifts the sequence; only scaling changes its step.
+  if (target != "mul") return inner;
+  const int64_t factor = to_int(eval(constant, env_));
+  return factor == 0 ? 0 : inner * factor;
+}
+
+CEmitter::CellWindow CEmitter::cell_window(const voyager::TensorBoxRef& ref,
+                                           const std::string& who) const {
+  const voyager::TensorBox& box = ref.box();
+  if (!box.has_memory() ||
+      box.memory().level() != voyager::MEMORY_LEVEL_SCRATCHPAD) {
+    throw std::runtime_error(who + " touches a box outside the scratchpad.");
+  }
+
+  CellWindow cell;
+  // Byte-aligned integer cells only.
+  if (box.dtype() == "int32") {
+    cell.c_type = "int32_t";
+    cell.width = 4;
+  } else if (box.dtype() == "int64") {
+    cell.c_type = "int64_t";
+    cell.width = 8;
+  } else {
+    throw std::runtime_error(who + " touches unsupported dtype " + box.dtype());
+  }
+
+  // resolve_window's addressing: an optional leading slot dimension strides
+  // by the bank pitch, the rest row-major over the box's shape.
+  const int rank = ref.offsets_size();
+  const int bank_dims = box.bank_count() > 1 ? 1 : 0;
+  // No offsets names the whole box, as select_bank reads it.
+  if (rank != 0 && box.shape_size() != rank - bank_dims) {
+    throw std::runtime_error(who + ": ref rank does not match the box.");
+  }
+  for (int d = 0; d < rank; d++) {
+    if (ref.strides(d) != 1) {
+      throw std::runtime_error(who + ": strided window.");
+    }
+  }
+  std::vector<int64_t> byte_strides(rank, 0);
+  if (bank_dims == 1) {
+    byte_strides[0] = static_cast<int64_t>(box.bank_stride_bytes());
+  }
+  int64_t running = cell.width;
+  for (int d = rank - 1; d >= bank_dims; d--) {
+    byte_strides[d] = running;
+    running *= box.shape(d - bank_dims);
+  }
+
+  cell.base = static_cast<int64_t>(box.memory().address());
+  for (int d = 0; d < rank; d++) {
+    const auto& offset = ref.offsets(d);
+    if (offset.value_case() == voyager::ScalarValue::kIntValue) {
+      cell.base += offset.int_value() * byte_strides[d];
+    } else {
+      cell.runtime_terms += " + " + std::to_string(byte_strides[d]) + "LL * (" +
+                            scalar_expr(offset) + ")";
+    }
+  }
+
+  // The window's extent: contiguous only, i.e. every dimension but the last
+  // spans one element (a cell, or one row of cells).
+  cell.count = 1;
+  if (rank == 0) {
+    for (int d = 0; d < box.shape_size(); d++) cell.count *= box.shape(d);
+  } else {
+    for (int d = 0; d < ref.sizes_size(); d++) {
+      const int64_t size = ref.sizes(d);
+      if (size != 1 && d != ref.sizes_size() - 1) {
+        throw std::runtime_error(who + ": non-contiguous window.");
+      }
+      cell.count *= size;
+    }
+  }
+  return cell;
+}
+
+void CEmitter::emit_host_bookkeeping(const voyager::Operation& op,
+                                     const voyager::PrimOp& prim, int indent) {
+  const std::string who = "host op " + op.name();
+  const auto input = prim.kwargs().find("input");
+  if (input == prim.kwargs().end() || !input->second.has_tensor_box()) {
+    throw std::runtime_error(who + ": input is not a tensor box.");
+  }
+  const CellWindow src = cell_window(input->second.tensor_box(), who);
+
+  if (op.outputs_size() != 1) {
+    throw std::runtime_error(who + ": expected one output.");
+  }
+  const auto& output = op.outputs(0);
+  CellWindow dst;
+  if (output.has_destination()) {
+    dst = cell_window(output.destination(), who);
+  } else if (output.has_tensor_box()) {
+    voyager::TensorBoxRef whole;
+    *whole.mutable_box() = output.tensor_box();
+    dst = cell_window(whole, who);
+  } else {
+    throw std::runtime_error(who + ": output has no box.");
+  }
+  if (src.count != dst.count || src.width != dst.width) {
+    throw std::runtime_error(who + " must preserve dtype and size.");
+  }
+
+  const std::string target = strip_namespace(prim.target());
+  const std::string s =
+      "((volatile " + src.c_type + " *)(uintptr_t)(SRAM_BASE + " +
+      std::to_string(src.base) + "LL" + src.runtime_terms + "))";
+  const std::string d =
+      "((volatile " + dst.c_type + " *)(uintptr_t)(SRAM_BASE + " +
+      std::to_string(dst.base) + "LL" + dst.runtime_terms + "))";
+  std::string rhs;
+  if (target == "clone") {
+    rhs = s + "[__i]";
+  } else if (target == "add") {
+    const std::string other = scalar_expr(prim.kwargs().at("other").scalar());
+    std::string alpha = "1LL";
+    const auto a = prim.kwargs().find("alpha");
+    if (a != prim.kwargs().end()) alpha = scalar_expr(a->second.scalar());
+    rhs = s + "[__i] + (" + dst.c_type + ")((" + alpha + ") * (" + other + "))";
+  } else {
+    throw std::runtime_error(who + ": unsupported host op " + target);
+  }
+
+  // In place, after the dispatch whose results it reads has retired.
+  line(indent, "/* " + op.name() + ": " + target + " on " +
+                   std::to_string(src.count) + " index cell(s) */");
+  line(indent, "wait_for_accelerator_done();");
+  line(indent, "for (int64_t __i = 0; __i < " + std::to_string(src.count) +
+                   "LL; __i++) {");
+  line(indent + 1, d + "[__i] = " + rhs + ";");
+  line(indent, "}");
+}
+
+void CEmitter::emit_scalar_load(const voyager::Operation& op,
+                                const voyager::PrimOp& prim, int indent) {
+  const auto& argument = prim.kwargs().at("input");
+  if (!argument.has_tensor_box()) {
+    throw std::runtime_error("_local_scalar_dense " + op.name() +
+                             ": input is not a tensor box.");
+  }
+  const CellWindow cell =
+      cell_window(argument.tensor_box(), "_local_scalar_dense " + op.name());
+  if (cell.count != 1) {
+    throw std::runtime_error("_local_scalar_dense " + op.name() +
+                             " reads more than one element.");
+  }
+
+  const std::string c_name = declare(op.outputs(0).name(), indent, false);
+  line(indent, "int64_t " + c_name + " = (int64_t)*(volatile " + cell.c_type +
+                   " *)(uintptr_t)(SRAM_BASE + " + std::to_string(cell.base) +
+                   "LL" + cell.runtime_terms + ");");
+  // The cells this op reads are zeroed before the first tile.
+  env_.define(op.outputs(0).name(), int64_t{0});
+  scalar_def_[op.outputs(0).name()] = &prim;
 }
 
 void CEmitter::emit_delinearize(const voyager::Operation& op,
@@ -522,6 +1024,8 @@ void CEmitter::emit_delinearize(const voyager::Operation& op,
                      std::to_string(basis[d]) + "LL;");
     line(indent, rem + " /= " + std::to_string(basis[d]) + "LL;");
     env_.define(op.outputs(d).name(), index[d]);
+    // Not a scaled counter: it wraps at its basis.
+    scalar_def_[op.outputs(d).name()] = &prim;
   }
 }
 
@@ -559,6 +1063,7 @@ void CEmitter::emit_for(const voyager::Operation& op,
   env_.push();
 
   const std::string iv = declare(loop.iv(), indent, false);
+  loop_counter_steps_[loop.iv()] = step;
   env_.define(loop.iv(), start);
 
   std::vector<std::string> iter_vars;
@@ -578,6 +1083,43 @@ void CEmitter::emit_for(const voyager::Operation& op,
   bind(loop.iv(), iv);
   for (int i = 0; i < loop.iter_args_size(); i++) {
     bind(loop.iter_args(i).name(), iter_vars[i]);
+  }
+
+  if (surveying_ && outermost) {
+    // The emitted C loop is written once, from the iteration-0 environment, so
+    // a dispatch whose guard is false only at iteration 0 would never be seen.
+    // Walk the tile loop for real here -- carrying iter_args across iterations
+    // the way the interpreter does -- so concrete_env_ records those too. Only
+    // the outermost loop, which MAX_TILES bounds; inner loops keep the single
+    // walk rather than making the survey quadratic.
+    if (loop.body().yields_size() != loop.iter_args_size()) {
+      throw std::runtime_error("Loop " + op.name() +
+                               " yield/iter_arg mismatch.");
+    }
+    // An unbounded tile loop can be hundreds of iterations; a guard that has
+    // not come true in this many will fall back to the emission-point
+    // environment rather than making generation quadratic.
+    constexpr int kSurveyLimit = 64;
+    int surveyed = 0;
+    for (int64_t v = start;
+         (step > 0 ? v < end : v > end) && surveyed < kSurveyLimit;
+         v += step, surveyed++) {
+      env_.define(loop.iv(), v);
+      emit_ops(loop.body().ops(), indent + 1);
+      std::vector<Scalar> yields;
+      for (int i = 0; i < loop.body().yields_size(); i++) {
+        yields.push_back(eval(loop.body().yields(i), env_));
+      }
+      for (int i = 0; i < loop.iter_args_size(); i++) {
+        env_.define(loop.iter_args(i).name(), yields[i]);
+      }
+    }
+    // Leave the environment as the single-walk path would, so what follows the
+    // loop sees the same state in both walks.
+    env_.define(loop.iv(), start);
+    for (int i = 0; i < loop.iter_args_size(); i++) {
+      env_.define(loop.iter_args(i).name(), init_vals[i]);
+    }
   }
 
   emit_ops(loop.body().ops(), indent + 1);
@@ -639,6 +1181,31 @@ void CEmitter::emit_while(const voyager::Operation& op,
       max_tiles_ > 0 && bounded_ && bounded_->count(&op) && outermost;
   const std::string trips = declare("__trips_" + op.name(), indent, false);
   if (bounded) line(indent, "int64_t " + trips + " = 0;");
+
+  // A carried value the body yields as add(itself, constant) advances by
+  // that constant. Derived before the body is walked, since the dispatches
+  // inside it are probed during that walk.
+  for (int i = 0; i < loop.iter_args_size(); i++) {
+    const voyager::ScalarValue& yield = loop.body().yields(i);
+    if (yield.value_case() != voyager::ScalarValue::kNode) continue;
+    const voyager::PrimOp* def = find_scalar_prim(loop.body(), yield.node());
+    if (def == nullptr || strip_namespace(def->target()) != "add") continue;
+    if (def->kwargs().count("input") == 0 ||
+        def->kwargs().count("other") == 0) {
+      continue;
+    }
+    const voyager::ScalarValue& a = def->kwargs().at("input").scalar();
+    const voyager::ScalarValue& b = def->kwargs().at("other").scalar();
+    const std::string& carried = loop.iter_args(i).name();
+    if (a.value_case() == voyager::ScalarValue::kNode && a.node() == carried &&
+        b.value_case() == voyager::ScalarValue::kIntValue) {
+      loop_counter_steps_[carried] = b.int_value();
+    } else if (b.value_case() == voyager::ScalarValue::kNode &&
+               b.node() == carried &&
+               a.value_case() == voyager::ScalarValue::kIntValue) {
+      loop_counter_steps_[carried] = a.int_value();
+    }
+  }
 
   line(indent, "while (1) {");
   loop_depth_++;
@@ -752,9 +1319,60 @@ void CEmitter::emit_cond(const voyager::Operation& op,
 // ---------------------------------------------------------------------------
 
 void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
+  if (surveying_) {
+    // Record the first environment in which this dispatch's own guards hold.
+    if (!speculative_) concrete_env_.emplace(&op, env_);
+    return;
+  }
+
+  // Map and probe under an environment the program actually reaches. Inside a
+  // cond arm the iteration-0 predicate does not take, env_ holds placeholders,
+  // so the surveyed environment stands in; the patch expressions still name
+  // the C variables in scope here, which carry the run-time values.
+  struct EnvSwap {
+    ScalarEnv* slot;
+    ScalarEnv saved;
+    bool active = false;
+    ~EnvSwap() {
+      if (active) *slot = saved;
+    }
+  } env_swap{&env_, env_};
+  bool unsurveyed = false;
+  if (speculative_) {
+    // Absent means the survey -- which walks every iteration of the tile loop
+    // the firmware runs -- never reached this dispatch with its guard true.
+    const auto surveyed = concrete_env_.find(&op);
+    if (surveyed != concrete_env_.end()) {
+      env_ = surveyed->second;
+      env_swap.active = true;
+    } else {
+      unsurveyed = true;
+    }
+  }
+
   // Baseline params under the concrete iteration-0 env.
   std::deque<BaseParams*> params;
-  map_operation(op, env_, params);
+  try {
+    map_operation(op, env_, params);
+  } catch (const std::exception& error) {
+    if (unsurveyed) {
+      // No iteration takes this arm and there is no environment that describes
+      // it, so there are no honest params to send. The path should be dead;
+      // say so loudly rather than shipping bytes that mean nothing, and let
+      // the rest of the layer emit.
+      line(indent, "printf(\"FATAL: unreachable dispatch " + op.name() +
+                       "\\n\"); /* " + error.what() + " */");
+      line(indent, "while (1) { }");
+      return;
+    }
+    // Say which dispatch failed, and whether it was reached only
+    // speculatively -- an arm the iteration-0 predicate does not take is
+    // mapped under placeholder scalars, so a failure there says nothing
+    // about the arm the hardware will run.
+    throw std::runtime_error(std::string("mapping ") + op.name() +
+                             (speculative_ ? " (speculative arm)" : "") + ": " +
+                             error.what());
+  }
   const auto baseline = serialize_params(params);
   for (auto* param : params) delete param;
   params.clear();
@@ -796,15 +1414,41 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
     const int64_t base_value = to_int(env_.lookup(name));
     auto& probes = all_probes[name];
 
-    // A few small deltas establish affinity; resolve()'s range checks reject
-    // the ones that leave the buffer.
-    for (int64_t delta : {int64_t{1}, int64_t{-1}, int64_t{2}, int64_t{3}}) {
-      try_probe(name, base_value, delta, &probes);
+    // A scalar scaled off a loop counter is sampled at its own advance,
+    // which is legal by construction. Perturbing by 1 instead invents a
+    // state the program never reaches and the mapper refuses.
+    const int64_t step = derived_step(name);
+    if (step != 0) {
+      try_probe(name, base_value, step, &probes);
+      try_probe(name, base_value, -step, &probes);
+      if (!probes.empty()) derived_scalars_.insert(name);
+      // An advance the mapper refuses is one the program never takes, so
+      // the scalar holds base_value throughout and the baked bytes stand.
+      if (probes.empty()) continue;
+    }
+
+    // A scalar read from memory at run time has no derivable step; search
+    // for a delta the mapper accepts.
+    if (probes.empty()) {
+      for (int64_t delta : {int64_t{1}, int64_t{-1}, int64_t{2}, int64_t{3}}) {
+        try_probe(name, base_value, delta, &probes);
+      }
+      for (int64_t g = 4; probes.empty() && g <= (int64_t{1} << 22); g <<= 1) {
+        for (const int64_t direction : {int64_t{1}, int64_t{-1}}) {
+          try_probe(name, base_value, direction * g, &probes);
+        }
+      }
     }
     if (probes.empty()) {
       throw std::runtime_error("Dispatch " + op.name() +
                                ": no in-range probe " + "delta for scalar " +
                                name);
+    }
+    // The extremes scan steps in these units to stay on the accepted grid.
+    int64_t unit = 0;
+    for (const auto& probe : probes) {
+      const int64_t magnitude = std::abs(probe.delta);
+      if (unit == 0 || magnitude < unit) unit = magnitude;
     }
 
     // Then probe the accepted EXTREMES in both directions (double until
@@ -815,7 +1459,7 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
     // patch_bits would silently truncate.
     for (const int64_t direction : {int64_t{1}, int64_t{-1}}) {
       int64_t good = 0;
-      int64_t step = direction;
+      int64_t step = direction * unit;
       while (std::abs(step) <= (int64_t{1} << 22)) {
         ScalarEnv probe_env = env_;
         probe_env.define(name, base_value + step);
@@ -831,8 +1475,10 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
       }
       if (good == 0) continue;
       int64_t bad = step;
-      while (std::abs(bad - good) > 1) {
-        const int64_t mid = good + (bad - good) / 2;
+      while (std::abs(bad - good) > unit) {
+        const int64_t half = (bad - good) / (2 * unit) * unit;
+        if (half == 0) break;
+        const int64_t mid = good + half;
         ScalarEnv probe_env = env_;
         probe_env.define(name, base_value + mid);
         try {
@@ -878,27 +1524,46 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
       const int64_t stored_base = static_cast<int64_t>(
           extract_bits(baseline[run.param_idx].bytes, run.off, run.len));
 
-      // Per-unit coefficient from the first probe; verify every other probe
-      // agrees (affine in the scalar).
-      int64_t coefficient = 0;
+      // Per-unit coefficient from the first probe; every other probe must
+      // agree. The ratio need not be a whole number.
+      Ratio coefficient;
       bool have = false;
       for (const auto& probe : probes) {
         const int64_t stored = static_cast<int64_t>(extract_bits(
             probe.serialized[run.param_idx].bytes, run.off, run.len));
         const int64_t diff = stored - stored_base;
+        const auto detail = [&]() {
+          return " (params blob " + std::to_string(run.param_idx) + " bits [" +
+                 std::to_string(run.off) + ", " +
+                 std::to_string(run.off + run.len) + "), delta " +
+                 std::to_string(probe.delta) + ", stored " +
+                 std::to_string(stored) + " vs base " +
+                 std::to_string(stored_base) + ", coefficient " +
+                 std::to_string(coefficient.num) + "/" +
+                 std::to_string(coefficient.den) + ")";
+        };
         if (!have) {
-          if (diff % probe.delta != 0) {
-            throw std::runtime_error("Dispatch " + op.name() +
-                                     ": non-affine field for " + name);
-          }
-          coefficient = diff / probe.delta;
+          coefficient = make_ratio(diff, probe.delta);
           have = true;
-        } else if (diff != coefficient * probe.delta) {
+        } else if (diff * coefficient.den != coefficient.num * probe.delta) {
           throw std::runtime_error("Dispatch " + op.name() +
-                                   ": non-affine field for " + name);
+                                   ": non-affine field for " + name + detail());
+        }
+        // The emitted division truncates, so it is exact only where the
+        // divided quantity is a multiple of the denominator -- guaranteed
+        // when the samples came from the scalar's own step, not when the
+        // delta was searched for.
+        if (coefficient.den != 1 && derived_scalars_.count(name) == 0) {
+          throw std::runtime_error(
+              "Dispatch " + op.name() + ": field for " + name +
+              " advances by " + std::to_string(coefficient.num) + "/" +
+              std::to_string(coefficient.den) +
+              " per unit, but the scalar's run-time step is not derivable, so "
+              "the emitted integer division could truncate between samples" +
+              detail());
         }
       }
-      if (coefficient == 0) continue;  // spurious (aliased) run
+      if (coefficient.num == 0) continue;  // spurious (aliased) run
 
       // Merge with existing fields from other scalars. Runs that overlap but
       // do not coincide widen the field (an address affine in two scalars
@@ -919,9 +1584,13 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
                                    ": merged field wider than 64 bits.");
         }
         for (auto& [scalar, c] : field.coeff) {
-          c *= int64_t{1} << (field.off - new_off);
+          c = shift_ratio(c, field.off - new_off);
         }
-        field.coeff[name] += coefficient * (int64_t{1} << (run.off - new_off));
+        const Ratio shifted = shift_ratio(coefficient, run.off - new_off);
+        const auto existing = field.coeff.find(name);
+        field.coeff[name] = existing == field.coeff.end()
+                                ? shifted
+                                : add_ratio(existing->second, shifted);
         field.off = new_off;
         field.len = new_end - new_off;
         field.base = static_cast<int64_t>(
@@ -951,7 +1620,10 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
       for (const auto& field : fields) {
         int64_t value = field.base;
         const auto found = field.coeff.find(name);
-        if (found != field.coeff.end()) value += found->second * probe.delta;
+        if (found != field.coeff.end()) {
+          // Mirrors the emitted C exactly, truncating division included.
+          value += found->second.num * probe.delta / found->second.den;
+        }
         for (size_t b = 0; b < field.len; b++) {
           const size_t bit = field.off + b;
           unsigned char& byte = predicted[field.param_idx].bytes[bit / 8];
@@ -1000,16 +1672,39 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
     line(indent, "wait_for_accelerator_done();");
   }
   for (const auto& field : fields) {
-    std::string expr;
-    int64_t constant = field.base;
+    // Terms are written against each scalar's baseline so a fractional
+    // coefficient divides a multiple of its denominator. That fails with
+    // several scalars in one field: the toolchain divides their combined
+    // contribution once where separate terms each truncate, and every probe
+    // moves one scalar at a time so the self-check cannot see it.
     for (const auto& [name, coefficient] : field.coeff) {
-      constant -= coefficient * to_int(env_.lookup(name));
-      expr += " + " + std::to_string(coefficient) + "LL * " + ref(name);
+      if (coefficient.den != 1 && field.coeff.size() > 1) {
+        throw std::runtime_error(
+            "Dispatch " + op.name() + ": field at bits [" +
+            std::to_string(field.off) + ", " +
+            std::to_string(field.off + field.len) + ") depends on " +
+            std::to_string(field.coeff.size()) +
+            " scalars with a fractional coefficient on " + name +
+            "; the terms would truncate separately where the toolchain "
+            "divides once -- refusing to emit.");
+      }
+    }
+    std::string expr;
+    for (const auto& [name, coefficient] : field.coeff) {
+      std::string term = "(" + ref(name) + " - " +
+                         std::to_string(to_int(env_.lookup(name))) + "LL)";
+      if (coefficient.num != 1) {
+        term = std::to_string(coefficient.num) + "LL * " + term;
+      }
+      if (coefficient.den != 1) {
+        term = "(" + term + ") / " + std::to_string(coefficient.den) + "LL";
+      }
+      expr += " + " + term;
     }
     line(indent, "patch_bits(" + blob_names[field.param_idx] + ", " +
                      std::to_string(field.off) + ", " +
                      std::to_string(field.len) + ", (uint64_t)(" +
-                     std::to_string(constant) + "LL" + expr + "));");
+                     std::to_string(field.base) + "LL" + expr + "));");
   }
   // The synchronous post-drain below must observe each invocation group
   // actually run: ACCELERATOR_RUNNING alone cannot tell granted-but-unstarted
@@ -1017,62 +1712,93 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
   // Record each group's closing unit (the last one to start, in
   // Harness::dispatch_params' chunking) so the firmware can wait for its
   // inflight count to rise before draining.
-  std::vector<std::string> group_close_regs;
-  std::vector<size_t> group_ends;  // one past each group's last param set
+  // Blob indices per invocation group, in the order dispatch_params sends
+  // them, plus the register whose inflight count the group's closing unit
+  // raises. release_starts opens a group matrix -> spmm -> vector, so the
+  // closing unit is the last of those the group actually starts.
+  struct EmitGroup {
+    std::vector<size_t> sends;
+    std::string close_reg;
+  };
+  std::vector<EmitGroup> emit_groups;
   for (size_t i = 0; i < baseline.size();) {
-    std::string reg;
+    EmitGroup group;
     if (baseline[i].kind == kMatrixParams) {
       bool group_mvm = false;
 #if SUPPORT_MVM
       group_mvm = baseline[i].is_fc;
 #endif
-      reg = group_mvm ? "MVM_UNIT_OP_INFLIGHT" : "MATRIX_UNIT_OP_INFLIGHT";
-      i++;
+      bool group_spmm = false;
+#if SUPPORT_SPMM
+      group_spmm = !group_mvm && baseline[i].is_spmm;
+#endif
+      if (group_spmm) {
+        const size_t sparse = i++;
+        // A fused dense pass shares the group and is sent first, ahead of the
+        // sparse params, inverting their order in the deque.
+        if (i < baseline.size() && baseline[i].kind == kMatrixParams) {
+          group.sends.push_back(i++);
+        }
+        group.sends.push_back(sparse);
+        group.close_reg = "SPMM_UNIT_OP_INFLIGHT";
+      } else {
+        group.sends.push_back(i++);
+        group.close_reg =
+            group_mvm ? "MVM_UNIT_OP_INFLIGHT" : "MATRIX_UNIT_OP_INFLIGHT";
+      }
     }
     if (i < baseline.size() && baseline[i].kind == kVectorParams) {
-      reg = "VECTOR_UNIT_OP_INFLIGHT";
-      i += 2;  // VectorParams + VectorInstructionConfig
+      group.sends.push_back(i++);  // VectorParams
+      group.sends.push_back(i++);  // VectorInstructionConfig
+      group.close_reg = "VECTOR_UNIT_OP_INFLIGHT";
     }
-    group_close_regs.push_back(reg);
-    group_ends.push_back(i);
+    emit_groups.push_back(std::move(group));
   }
 
-  size_t group_idx = 0;
-  for (size_t i = 0; i < baseline.size(); i++) {
-    // Routing mirrors Harness::dispatch_params: an is_fc MatrixParams goes to
-    // the matrix-vector unit only when the build has one, else it falls back
-    // to the plain matrix unit.
-    bool to_mvm = false;
+  // The units arm their operand fetches the moment params arrive (the matrix
+  // unit fans params out before taking its start credit), so the operands
+  // must be in place by now. They are: the program's async_wait on each
+  // load's semaphore precedes this dispatch, and the firmware performed it.
+
+  for (size_t g = 0; g < emit_groups.size(); g++) {
+    for (const size_t i : emit_groups[g].sends) {
+      // Routing mirrors Harness::dispatch_params: an is_fc MatrixParams goes
+      // to the matrix-vector unit and an is_spmm one to the SpMM unit, each
+      // only when the build has that unit, else both fall back to the plain
+      // matrix unit.
+      bool to_mvm = false;
 #if SUPPORT_MVM
-    to_mvm = baseline[i].is_fc;
+      to_mvm = baseline[i].is_fc;
 #endif
-    switch (baseline[i].kind) {
-      case kMatrixParams:
-        line(indent, std::string(to_mvm ? "send_matrix_vector_unit_params("
-                                        : "send_matrix_unit_params(") +
-                         blob_names[i] + ");");
-        break;
-      case kVectorParams:
-        line(indent, "send_vector_params(" + blob_names[i] + ");");
-        break;
-      case kVectorConfig:
-        line(indent, "send_vector_instructions(" + blob_names[i] + ");");
-        break;
+      bool to_spmm = false;
+#if SUPPORT_SPMM
+      to_spmm = !to_mvm && baseline[i].is_spmm;
+#endif
+      switch (baseline[i].kind) {
+        case kMatrixParams:
+          line(indent, std::string(to_spmm  ? "send_spmm_unit_params("
+                                   : to_mvm ? "send_matrix_vector_unit_params("
+                                            : "send_matrix_unit_params(") +
+                           blob_names[i] + ");");
+          break;
+        case kVectorParams:
+          line(indent, "send_vector_params(" + blob_names[i] + ");");
+          break;
+        case kVectorConfig:
+          line(indent, "send_vector_instructions(" + blob_names[i] + ");");
+          break;
+      }
     }
+    // A synchronous dispatch mirrors Harness::execute's drain-dispatch-drain.
     // Each group's wait must follow its own sends, not trail the whole
     // dispatch: a later group's sends block on MMIO backpressure while
-    // earlier groups run, so trailing waits would miss their starts and
-    // spin forever. This mirrors dispatch_params exactly -- the
-    // between-groups drain of Harness.cc:395, with the last group's wait
-    // doubling as execute()'s post-dispatch drain (Harness.cc:690): nothing
-    // later -- in particular the next dispatch's params, which arm the
-    // units' fetch front-ends the moment they arrive -- may be sent until
-    // this dispatch has fully retired.
-    if (!in_commit_ && group_idx < group_ends.size() &&
-        i + 1 == group_ends[group_idx]) {
+    // earlier groups run, so trailing waits would miss their starts and spin
+    // forever. The last group's wait doubles as execute()'s post-dispatch
+    // drain. An asynchronous dispatch gets no wait here at all: its
+    // retirement is the commit's post, which the testbench observes.
+    if (!in_commit_) {
       line(indent,
-           "wait_for_dispatch_retired(" + group_close_regs[group_idx] + ");");
-      group_idx++;
+           "wait_for_dispatch_retired(" + emit_groups[g].close_reg + ");");
     }
   }
 }
@@ -1082,26 +1808,78 @@ void CEmitter::emit_dispatch(const voyager::Operation& op, int indent) {
 // ---------------------------------------------------------------------------
 
 std::string CEmitter::emit_layer(const Model::Selection& selection) {
-  decls_.str("");
-  body_.str("");
-  env_ = ScalarEnv();
-  scopes_.clear();
-  scopes_.push_back({});
-  name_counts_.clear();
   bounded_ = &selection.bounded;
-  loop_depth_ = 0;
   max_tiles_ = getenv_int("MAX_TILES", 0);
+  // Survives the survey walk; everything else is rebuilt by it.
+  concrete_env_.clear();
 
-  for (const auto* op : selection.ops) {
-    // Selection.bounded gates the MAX_TILES clamp exactly as it does in the
-    // interpreter; non-outermost loops are never clamped.
-    emit_operation(*op, 1);
+  // The same table the testbench builds from the same selection.
+  host_table_ = enumerate_host_ops(selection);
+  host_ordinals_.clear();
+  for (size_t i = 0; i < host_table_.size(); i++) {
+    host_ordinals_[host_table_[i].prim] = i;
   }
+
+  auto walk = [&]() {
+    decls_.str("");
+    body_.str("");
+    env_ = ScalarEnv();
+    scopes_.clear();
+    scopes_.push_back({});
+    name_counts_.clear();
+    sem_names_.clear();
+    // These hold pointers into the previous layer's protobuf.
+    scalar_def_.clear();
+    loop_counter_steps_.clear();
+    derived_scalars_.clear();
+    loop_depth_ = 0;
+    speculative_ = false;
+    in_commit_ = false;
+
+    for (const auto* op : selection.ops) {
+      // Selection.bounded gates the MAX_TILES clamp exactly as it does in the
+      // interpreter; non-outermost loops are never clamped.
+      emit_operation(*op, 1);
+    }
+  };
+
+  // Survey first, but only where it can pay off: the walk is deterministic, so
+  // a dispatch's guard is true at the same iterations both times, and the
+  // second walk can map a dispatch it reaches speculatively under the
+  // environment the first one recorded. Where no conditional guards a
+  // dispatch there is nothing to learn, and walking arms the emitting pass
+  // never enters concretely only risks evaluating states the program does not
+  // reach.
+  bool survey = getenv_int("SOC_SURVEY", 1) != 0;
+  if (survey) {
+    survey = false;
+    for (const auto* op : selection.ops) {
+      if (cond_guards_dispatch(*op)) {
+        survey = true;
+        break;
+      }
+    }
+  }
+  if (survey) {
+    // A refusal thrown mid-survey must not leave the flag set: this emitter
+    // serves every layer of the network in turn, and a walk that believes it
+    // is still surveying emits no dispatch at all.
+    surveying_ = true;
+    try {
+      walk();
+    } catch (...) {
+      surveying_ = false;
+      throw;
+    }
+    surveying_ = false;
+  }
+  walk();
 
   std::ostringstream out;
   out << "#include <stddef.h>\n";
   out << "#include <stdint.h>\n";
   out << "#include <stdio.h>\n\n";
+  out << "#include \"host_request.h\"\n";
   out << "#include \"mmio.h\"\n";
   out << "#include \"patch_bits.h\"\n";
   out << "#include \"run_voyager_operation.h\"\n";
@@ -1110,11 +1888,14 @@ std::string CEmitter::emit_layer(const Model::Selection& selection) {
   out << decls_.str();
   out << "int main() {\n";
   out << "\tenable_interrupts();\n";
-  out << "\tenable_semaphore_wait();\n\n";
+  out << "\tenable_semaphore_wait();\n";
+  out << "\thost_init();\n\n";
   out << "\treg_write64(VOYAGER_BASE_ADDR, SRAM_BASE);\n\n";
   out << body_.str();
   out << "\n\tprintf(\"All params sent!\\n\");\n\n";
-  out << "\twait_for_accelerator_done();\n\n";
+  out << "\twait_for_accelerator_done();\n";
+  // The testbench grades the outputs before the firmware goes on to exit.
+  out << "\thost_finish();\n\n";
   out << "\tprintf(\"Operation finished!\\n\");\n";
   out << "\tprintf(\"Matrix Unit Runtime     : %lu cycles\\n\", "
          "reg_read64(MATRIX_UNIT_CYCLE_COUNT));\n";

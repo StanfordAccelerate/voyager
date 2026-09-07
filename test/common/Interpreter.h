@@ -11,6 +11,11 @@
 #include "test/common/Model.h"
 #include "test/compiler/proto/voyager_ir.pb.h"
 
+// Evaluates one scalar prim -- sym_ite or a binary arithmetic/comparison op --
+// against `env`. Shared so the SoC replay recomputes a scalar exactly as the
+// interpreter did, rather than reimplementing the semantics.
+Scalar eval_scalar_prim(const voyager::PrimOp& prim, const ScalarEnv& env);
+
 // Interprets the bufferized graph.
 //
 // The IR spells out everything the backend used to invent: the tile loops, the

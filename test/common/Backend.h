@@ -70,6 +70,21 @@ class Backend {
   virtual void data_op(const voyager::Operation& op,
                        const voyager::PrimOp& prim, const ScalarEnv& env) {}
 
+  // A scalar the program reads out of memory at run time -- the CSR cursors a
+  // sparse layer appends against. A backend that records rather than executes
+  // has not populated that memory yet, so it takes the read here and performs
+  // it when it replays; the interpreter then continues on a placeholder.
+  virtual bool intercepts_scalar_reads() const { return false; }
+  virtual void scalar_read(const voyager::Operation& op,
+                           const voyager::PrimOp& prim, const ScalarEnv& env) {}
+
+  // Every other scalar op, offered so a recording backend can follow which
+  // values descend from a deferred read. Those were computed from a
+  // placeholder and must be recomputed when the real value is known; the rest
+  // -- loop indices and the like -- are already correct and are ignored.
+  virtual void scalar_op(const voyager::Operation& op,
+                         const voyager::PrimOp& prim, const ScalarEnv& env) {}
+
   // --- Committed (async) regions ------------------------------------------
   //
   // A `commit` dispatches a region asynchronously so a matrix tile's ramp-up
