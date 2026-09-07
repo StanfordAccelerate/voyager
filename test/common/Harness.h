@@ -409,6 +409,14 @@ struct Harness : public sc_module, public Backend {
   long pending_groups = 0;
   bool in_commit = false;
 
+  // The SoC integration gates vector_unit_start_rdy on its vector inflight
+  // count being zero (soc/src/main/scala/Voyager.scala), so consecutive
+  // vector passes never overlap: a pass can never fetch a tile the previous
+  // pass's output controller is still writing. release_starts applies the
+  // same gate here so the testbench is no more permissive than the SoC.
+  long vector_inflight = 0;
+  sc_event vector_retired;
+
   // Serialize one operation's params to the units and queue its invocation
   // groups; does not wait for them to execute.
   void dispatch_params(const voyager::Operation& op,

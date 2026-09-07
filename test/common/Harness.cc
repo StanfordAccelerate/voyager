@@ -456,6 +456,14 @@ void Harness::dispatch_params(const voyager::Operation& op,
 // processor at the front of its pipeline, so a release can land while the
 // previous group still drains through the accumulation buffer and output
 // controller behind it.
+//
+// The vector unit is the exception, as it is in the SoC (Voyager.scala's
+// vector_unit_start_rdy): its start is held until the previous vector pass
+// has retired. The vector unit raises start before it hands the params to
+// its fetcher, so nothing can run ahead into a tile the previous pass is
+// still writing -- the read-after-write between the two ops of a k-split
+// reduction's commit body (the GEMM's in-place accumulate and its epilogue),
+// and between the passes of a multi-pass op, is ordered by this gate alone.
 void Harness::release_starts() {
   matrix_unit_start.ResetRead();
   vector_unit_start.ResetRead();
@@ -495,7 +503,12 @@ void Harness::release_starts() {
 #if SUPPORT_DWC
     if (group.dwc) dwc_unit_start.SyncPop();
 #endif
-    if (group.vector) vector_unit_start.SyncPop();
+    if (group.vector) {
+      while (vector_inflight > 0) wait(vector_retired);
+      vector_unit_start.SyncPop();
+      assert(vector_inflight == 0);
+      vector_inflight++;
+    }
 
     // An operation's groups are contiguous, so the release time captured at
     // its op_begin group is still current at its op_end group.
@@ -540,7 +553,11 @@ void Harness::retire_dones() {
 #if SUPPORT_DWC
     if (group.dwc) dwc_unit_done.SyncPop();
 #endif
-    if (group.vector) vector_unit_done.SyncPop();
+    if (group.vector) {
+      vector_unit_done.SyncPop();
+      vector_inflight--;
+      vector_retired.notify(SC_ZERO_TIME);
+    }
 
     if (group.has_post) {
       post_semaphore(group.post_node, group.post_slot, group.post_amount);
