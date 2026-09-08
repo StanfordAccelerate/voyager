@@ -444,10 +444,10 @@ template <typename Input, typename Psum, typename Buffer, typename Scale>
 // Input: quantized input/weight type
 // Psum: accumulation type
 // Buffer: output type
-inline Buffer* DwC(std::any input_ptr, std::any input_scale_ptr,
-                   std::any weight_ptr, std::any weight_scale_ptr,
-                   std::any bias_ptr, const voyager::Operation& operation,
-                   const ScalarEnv& env) {
+inline std::shared_ptr<Buffer[]> DwC(
+    std::any input_ptr, std::any input_scale_ptr, std::any weight_ptr,
+    std::any weight_scale_ptr, std::any bias_ptr,
+    const voyager::Operation& operation, const ScalarEnv& env) {
   std::vector<int> BUFFER_DIM = {2, 9, 9};  // IC, X, Y
 
   const auto& op_list = get_prim_ops(operation);
