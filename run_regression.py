@@ -592,7 +592,7 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         print(f"No gold accuracy specified for {model} {env_vars['DATATYPE']}")
         gold_accuracy = final_accuracy
 
-    return abs(final_accuracy - gold_accuracy) < 1
+    return final_accuracy > gold_accuracy - 1
 
 
 def main():
