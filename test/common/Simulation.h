@@ -63,6 +63,10 @@ class Simulation {
   virtual ArrayMemory* make_memory(const std::string& sim,
                                    const std::vector<uint64_t>& sizes);
 
+  // Drops every output outside `partition` from the grade: a flow that reads
+  // back only the scratchpad has nothing else to compare.
+  void grade_only_partition(int partition);
+
  private:
   std::vector<std::string> sims;
   std::map<std::string, ArrayMemory*> memories;

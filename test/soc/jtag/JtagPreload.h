@@ -13,14 +13,13 @@
 // Host-side pieces of the full JTAG flow: program AND data go over the debug
 // link and no testbench runs alongside the DUT.
 //
-// The SoC testbench replays a recorded schedule: every load into the
-// scratchpad precedes the first dispatch (at MAX_TILES=2 the two ping-pong
-// slots hold both tiles), and after the dispatches only the store-backs
-// remain. The full JTAG flow takes the same recording and splits it at the
-// dispatches: the loads become the scratchpad image GDB writes before the
-// firmware starts, and the stores are applied to the scratchpad dump GDB
-// reads back afterwards, which is what gold is then graded against. Both
-// flows therefore stage and grade exactly the same bytes.
+// The firmware runs the whole program but its host requests compile to
+// nothing, so the scratchpad image GDB writes before the firmware starts
+// must hold every load the testbench would have staged: at MAX_TILES=2 the
+// two ping-pong slots hold both tiles. The recorded schedule, split at the
+// dispatches, says which loads those are. Afterwards GDB reads back the
+// scratchpad-resident results and jtag_sim_checker compares them with
+// gold's, which ran the same bounded program in place; nothing is replayed.
 
 // An ArrayMemory that can remember which bytes of the scratchpad partition
 // were written (to emit the preload image) and can report the scratchpad as
@@ -31,13 +30,10 @@ class JtagMemory : public ArrayMemory {
   JtagMemory(const std::vector<uint64_t>& sizes, bool sram_covered);
 
   void record_sram_writes() { recording_writes_ = true; }
-  void record_sram_reads() { recording_reads_ = true; }
-  void add_sram_read(uint64_t address, uint64_t num_bytes);
 
   // Merged, sorted [start, end) byte ranges of the scratchpad partition
-  // written (read) since record_sram_writes() (record_sram_reads()).
+  // written since record_sram_writes().
   std::vector<std::pair<uint64_t, uint64_t>> sram_regions() const;
-  std::vector<std::pair<uint64_t, uint64_t>> sram_read_regions() const;
 
   // The unmerged writes recorded so far, and those from index `first` on --
   // to tell the loads of one tile from the next.
@@ -58,17 +54,13 @@ class JtagMemory : public ArrayMemory {
  protected:
   void write_bytes_to_memory(const long long address, const int partition,
                              const int num_bytes, const char* bytes) override;
-  void read_bytes_from_memory(const long long address, const int partition,
-                              const int num_bytes, char* bytes) override;
 
  private:
   bool sram_covered_;
   bool recording_writes_ = false;
-  bool recording_reads_ = false;
   bool recording_copy_ = false;
   std::vector<std::pair<uint64_t, uint64_t>> ranges_;
   std::vector<std::pair<uint64_t, uint64_t>> copy_ranges_;
-  std::vector<std::pair<uint64_t, uint64_t>> read_ranges_;
 };
 
 // Physical SRAM address of a scratchpad-partition offset (SRAM_BASE in the
@@ -76,15 +68,12 @@ class JtagMemory : public ArrayMemory {
 constexpr uint64_t kScratchpadBase = 0x40000000ULL;
 
 // The scratchpad ranges the grade needs, i.e. what GDB has to read back after
-// the run: the selection's scratchpad-resident outputs (check_outputs
-// compares those directly -- only the bytes gold wrote, so `gold`'s write
-// mask bounds them), the store-backs' source tiles at their full extent (a
-// sparse store's data-dependent `count` is only known at run time) plus
-// whatever else the store phase touches, found by dry-running it.
+// the run: the selection's scratchpad-resident outputs, bounded to the bytes
+// gold wrote (a MAX_TILES-bounded run fills part of a buffer), which is what
+// check_outputs compares.
 std::vector<std::pair<uint64_t, uint64_t>> readback_regions(
     const Model& model, const Model::Selection& selection,
-    const std::vector<Step>& steps, const ArrayMemory& gold,
-    JtagMemory* memory);
+    const ArrayMemory& gold);
 
 // Emits <base_path><layer>_scratchpad_dump.txt: one "0x<phys> <bytes>" line
 // per region. run_jtag.gdb dumps exactly these (SCRATCHPAD_DUMP_LIST) and
@@ -93,18 +82,23 @@ void write_scratchpad_dump_list(
     const std::string& base_path, const std::string& layer,
     const std::vector<std::pair<uint64_t, uint64_t>>& regions);
 
+// Emits <base_path><layer>_scratchpad_expected.bin.<i>: what gold left in
+// each region, numbered as run_jtag.gdb numbers the dumps. Every byte of a
+// region is graded (readback_regions walks gold's write mask) and gold and
+// the accelerator are compared exactly, so a plain byte compare of a readback
+// against these is the verdict jtag_sim_checker gives -- letting the chip
+// flow grade itself with no gold, tensors or compiler.
+void write_scratchpad_reference(
+    const std::string& base_path, const std::string& layer,
+    const std::vector<std::pair<uint64_t, uint64_t>>& regions,
+    ArrayMemory& gold);
+
 // Which part of the schedule to apply.
 enum class JtagPhase {
-  kLoads,         // every host-side step before the first dispatch
-  kLateLoads,     // after it: copies into the scratchpad, zero-fills and the
-                  //   scalar reads their extents depend on -- the next tile's
-                  //   operands, staged while this one computes
-  kStores,        // after it: copies out of the scratchpad, host ops, scalar
-                  //   reads -- what turns the DUT's results into the grade
-  kDramPrologue,  // before it: only what lands outside the scratchpad
-                  //   (a DRAM output's zero-fill, DRAM-to-DRAM copies) --
-                  //   gold's write mask covers those, so the grade's memory
-                  //   must too; nothing that would clobber DUT results
+  kLoads,      // every host-side step before the first dispatch
+  kLateLoads,  // after it: copies into the scratchpad, zero-fills and the
+               //   scalar reads their extents depend on -- the next tile's
+               //   operands, staged while this one computes
 };
 
 // Applies the host-side steps of a recorded schedule to `memory` in program

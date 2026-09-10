@@ -1891,6 +1891,23 @@ std::string CEmitter::emit_layer(const Model::Selection& selection) {
   out << "\tenable_semaphore_wait();\n";
   out << "\thost_init();\n\n";
   out << "\treg_write64(VOYAGER_BASE_ADDR, SRAM_BASE);\n\n";
+
+  // POWER_LOOP: replay the program forever, for a steady-state power
+  // measurement on the chip. Every address is baked into the parameter blobs,
+  // so a pass repeats the same dispatches over the same scratchpad slots and
+  // nothing drifts; the drain and the semaphore re-init at the top of the body
+  // keep each pass well-formed. The firmware never returns, so these ELFs are
+  // for a manual run, not for the graded flow.
+  if (std::getenv("POWER_LOOP") != nullptr) {
+    out << "\t/* POWER_LOOP: never returns */\n";
+    out << "\twhile (1) {\n";
+    out << body_.str();
+    out << "\n\twait_for_accelerator_done();\n";
+    out << "\t}\n";
+    out << "}\n";
+    return out.str();
+  }
+
   out << body_.str();
   out << "\n\tprintf(\"All params sent!\\n\");\n\n";
   out << "\twait_for_accelerator_done();\n";

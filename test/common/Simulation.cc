@@ -147,6 +147,14 @@ void Simulation::run_gold() {
   }
 }
 
+void Simulation::grade_only_partition(int partition) {
+  live_out.erase(std::remove_if(live_out.begin(), live_out.end(),
+                                [partition](const voyager::TensorBox* box) {
+                                  return partition_of(*box) != partition;
+                                }),
+                 live_out.end());
+}
+
 int Simulation::check_outputs() {
   // Drop buffers the run did not retire at all. A short MAX_TILES walk can
   // legitimately leave later pipeline checkpoints untouched; buffers that did

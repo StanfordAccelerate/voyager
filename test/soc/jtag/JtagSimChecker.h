@@ -7,9 +7,11 @@
 #include "test/common/Simulation.h"
 
 // Grades a full-JTAG run from the scratchpad dump GDB read back after the
-// firmware finished: the dump becomes the accelerator simulator's scratchpad,
-// the recorded schedule's store-backs move the results to DRAM exactly as
-// the testbench would have, and gold is compared against them.
+// firmware finished: the dump becomes the accelerator simulator's scratchpad
+// and its scratchpad-resident results are compared against gold's, which
+// ran the same bounded program in place. The DRAM side is not graded: the
+// chip has no DRAM, and the store-backs that would fill it are exercised
+// by the testbench-driven modes.
 class JtagSimChecker : public Simulation {
  public:
   explicit JtagSimChecker(const std::string& dump_path);

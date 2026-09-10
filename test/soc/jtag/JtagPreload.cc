@@ -52,22 +52,7 @@ void JtagMemory::write_bytes_to_memory(const long long address,
   }
 }
 
-void JtagMemory::read_bytes_from_memory(const long long address,
-                                        const int partition,
-                                        const int num_bytes, char* bytes) {
-  ArrayMemory::read_bytes_from_memory(address, partition, num_bytes, bytes);
-  if (recording_reads_ && partition == SRAM_PARTITION && num_bytes > 0) {
-    add_sram_read(static_cast<uint64_t>(address), num_bytes);
-  }
-}
-
-void JtagMemory::add_sram_read(uint64_t address, uint64_t num_bytes) {
-  if (num_bytes > 0) read_ranges_.emplace_back(address, address + num_bytes);
-}
-
 Regions JtagMemory::sram_regions() const { return merge(ranges_); }
-
-Regions JtagMemory::sram_read_regions() const { return merge(read_ranges_); }
 
 Regions JtagMemory::sram_writes_from(size_t first) const {
   if (first >= ranges_.size()) return {};
@@ -101,21 +86,16 @@ std::vector<Step> record_schedule(const Model& model,
   return steps;
 }
 
-// The non-init steps of a schedule, one per line; a copy also shows its
-// source and destination as resolved under the recorded environment.
+// The steps of a schedule, one per line; a copy also shows its source and
+// destination as resolved under the recorded environment.
 void print_schedule(const std::string& layer, const std::vector<Step>& steps) {
-  static const char* kKind[] = {"COPY", "ZERO", "HOST", "SREAD", "SOP",
-                                "INIT", "WAIT", "POST", "DISP"};
-  std::cout << "  schedule of " << layer << " (non-init steps):" << std::endl;
+  static const char* kKind[] = {"COPY", "ZERO", "HOST", "SREAD", "SOP", "DISP"};
+  std::cout << "  schedule of " << layer << ":" << std::endl;
   for (size_t i = 0; i < steps.size(); i++) {
     const Step& s = steps[i];
-    if (s.kind == Step::kInit) continue;
     std::cout << "    " << i << " " << kKind[s.kind];
-    if (s.kind == Step::kWait || s.kind == Step::kPost) {
-      std::cout << " " << s.sem_node << "[" << s.sem_slot << "] amt "
-                << s.amount << (s.retire_post ? " RETIRE" : "");
-    } else if (s.kind == Step::kDispatch) {
-      std::cout << " " << s.op_name << (s.sync ? " SYNC" : "");
+    if (s.kind == Step::kDispatch) {
+      std::cout << " " << s.op_name;
     } else if (s.kind == Step::kCopy) {
       std::cout << " " << s.prim->name();
       try {
@@ -190,11 +170,10 @@ void apply_host_steps(const std::vector<Step>& steps, JtagPhase phase,
 
   auto* tracking = dynamic_cast<JtagMemory*>(memory);
 
+  const bool prologue = phase == JtagPhase::kLoads;
   bool dispatched = false;
   for (size_t index = 0; index < steps.size(); index++) {
     const Step& step = steps[index];
-    const bool prologue =
-        phase == JtagPhase::kLoads || phase == JtagPhase::kDramPrologue;
     if (step.kind == Step::kDispatch) {
       if (prologue) return;
       dispatched = true;
@@ -205,25 +184,12 @@ void apply_host_steps(const std::vector<Step>& steps, JtagPhase phase,
 
     switch (step.kind) {
       case Step::kCopy: {
-        if (phase == JtagPhase::kDramPrologue) {
-          // The grade's memory holds only the read-back regions, so a copy
-          // whose window depends on a scratchpad cell may not resolve here;
-          // such a copy is a scratchpad load anyway, never a DRAM write.
-          try {
-            const Tensor dst = resolve(*step.prim, "dst", step.env);
-            if (dst.partition == SRAM_PARTITION) continue;
-            run_async_copy(*step.prim, step.env, memory);
-          } catch (const std::exception& error) {
-            std::cout << "  prologue copy " << step.prim->name()
-                      << " skipped: " << error.what() << std::endl;
-          }
-          break;
-        }
-        if (phase != JtagPhase::kLoads) {
+        if (!prologue) {
+          // Only the loads: a store-back moves results the grade compares
+          // in the scratchpad.
           const Tensor dst = resolve(*step.prim, "dst", live_env(step));
-          const bool load = dst.partition == SRAM_PARTITION;
-          if (load != (phase == JtagPhase::kLateLoads)) continue;
-          if (load && keep && !keep(index)) continue;
+          if (dst.partition != SRAM_PARTITION) continue;
+          if (keep && !keep(index)) continue;
         }
         if (std::getenv("DUMP_SCHEDULE") != nullptr) {
           const Tensor src = resolve(*step.prim, "src", live_env(step));
@@ -239,13 +205,8 @@ void apply_host_steps(const std::vector<Step>& steps, JtagPhase phase,
       }
 
       case Step::kZero: {
-        if (phase == JtagPhase::kStores) continue;
-        if (phase == JtagPhase::kLateLoads && keep && !keep(index)) continue;
+        if (!prologue && keep && !keep(index)) continue;
         const auto& box = step.op->outputs(0).tensor_box();
-        if (phase == JtagPhase::kDramPrologue &&
-            partition_of(box) == SRAM_PARTITION) {
-          continue;  // the DUT's own results live there now
-        }
         if (step.prim->target() == "voyager::alloc") {
           for (uint32_t bank = 0; bank < banks_of(box); bank++) {
             zero_buffer(to_tensor(box, bank), 1, 0, memory);
@@ -258,26 +219,17 @@ void apply_host_steps(const std::vector<Step>& steps, JtagPhase phase,
       }
 
       case Step::kHostOp:
-        if (phase == JtagPhase::kLateLoads ||
-            phase == JtagPhase::kDramPrologue) {
-          continue;
-        }
-        // In the store phase the firmware has already run the bookkeeping
-        // on the chip (EmitC emits it in every mode), and its results are
-        // in the readback; running it again here would apply the
-        // running-base accumulation twice.
-        if (phase == JtagPhase::kStores) continue;
+        // After the first dispatch a host op is the firmware's bookkeeping;
+        // the image holds nothing it would change.
+        if (!prologue) continue;
         run_host_operation(*step.op, live_env(step), memory);
         break;
 
       case Step::kScalarRead: {
-        // Not in the DRAM prologue: the cells it would read are scratchpad
-        // loads the grade's memory never holds (only the read-back regions).
-        if (phase == JtagPhase::kDramPrologue) continue;
-        // Also in the late-load phase: a sparse tile's copies take their
-        // extents from CSR cells that earlier loads placed in the image, so
-        // the read is exact here -- only a cell the DUT itself produces would
-        // not be, and a load depending on one cannot be preloaded anyway.
+        // In the late-load phase a sparse tile's copies take their extents
+        // from CSR cells that earlier loads placed in the image, so the read
+        // is exact here -- only a cell the DUT itself produces would not be,
+        // and a load depending on one cannot be preloaded anyway.
         const Tensor input = resolve(*step.prim, "input", live_env(step));
         if (get_size(input) != 1) {
           throw std::runtime_error("Scalar operation " + step.op->name() +
@@ -302,15 +254,11 @@ void apply_host_steps(const std::vector<Step>& steps, JtagPhase phase,
       }
 
       case Step::kScalarOp: {
-        if (phase == JtagPhase::kDramPrologue) continue;
         const Scalar value = eval_scalar_prim(*step.prim, live_env(step));
         deferred[step.op->outputs(0).name()] = to_int(value);
         break;
       }
 
-      case Step::kInit:
-      case Step::kWait:
-      case Step::kPost:
       case Step::kDispatch:
         break;
     }
@@ -360,24 +308,24 @@ void write_scratchpad_data(const std::string& base_path,
 }
 
 Regions readback_regions(const Model& model, const Model::Selection& selection,
-                         const std::vector<Step>& steps,
-                         const ArrayMemory& gold, JtagMemory* memory) {
-  // The outputs check_outputs grades in place: with gold and accelerator both
-  // named, live_sets includes the scratchpad results, and compare_memories
-  // reads each as to_tensor(*box) -- but compares only the bytes gold wrote
-  // (a MAX_TILES-bounded run fills part of a buffer), so gold's write mask
-  // is the extent worth reading back.
+                         const ArrayMemory& gold) {
+  // What check_outputs grades: with gold and accelerator both named,
+  // live_sets includes the scratchpad results, and compare_memories reads
+  // each as to_tensor(*box) but compares only the bytes gold wrote (a
+  // MAX_TILES-bounded run fills part of a buffer), so gold's write mask is
+  // the extent worth reading back.
   std::vector<const voyager::TensorBox*> live_in;
   std::vector<const voyager::TensorBox*> live_out;
   model.live_sets(selection.ops, &live_in, &live_out,
                   /*include_scratchpad=*/true);
+  Regions regions;
   for (const auto* box : live_out) {
     if (partition_of(*box) != SRAM_PARTITION) continue;
     const Tensor tensor = to_tensor(*box);
     const uint64_t begin = tensor.address;
     const uint64_t end = begin + get_num_bytes(tensor);
     if (!gold.tracking()) {
-      memory->add_sram_read(begin, end - begin);
+      regions.emplace_back(begin, end);
       continue;
     }
     uint64_t run_start = 0;
@@ -388,36 +336,12 @@ Regions readback_regions(const Model& model, const Model::Selection& selection,
         run_start = addr;
         in_run = true;
       } else if (!written && in_run) {
-        memory->add_sram_read(run_start, addr - run_start);
+        regions.emplace_back(run_start, addr);
         in_run = false;
       }
     }
   }
-
-  // The store-backs' sources at full extent. A sparse store moves only
-  // `count` elements, and count is a value the DUT produces.
-  bool dispatched = false;
-  for (const Step& step : steps) {
-    if (step.kind == Step::kDispatch) dispatched = true;
-    if (!dispatched || step.kind != Step::kCopy) continue;
-    const Tensor src = resolve(*step.prim, "src", step.env);
-    if (src.partition == SRAM_PARTITION) {
-      memory->add_sram_read(src.address, get_num_bytes(src));
-    }
-  }
-
-  // Everything else the store phase reads (a host op's operands, a scalar
-  // cell), found by dry-running it. The scratchpad holds no results yet, so
-  // a data-dependent step may well fail here; what it read before failing
-  // is still a real read, and the full-extent sources above cover the rest.
-  memory->record_sram_reads();
-  try {
-    apply_host_steps(steps, JtagPhase::kStores, memory);
-  } catch (const std::exception& error) {
-    std::cout << "  (store-phase dry run stopped: " << error.what() << ")"
-              << std::endl;
-  }
-  return memory->sram_read_regions();
+  return merge(regions);
 }
 
 void write_scratchpad_dump_list(const std::string& base_path,
@@ -432,6 +356,22 @@ void write_scratchpad_dump_list(const std::string& base_path,
   }
   std::cout << "  scratchpad readback: " << regions.size() << " region(s), "
             << total << " bytes" << std::endl;
+}
+
+void write_scratchpad_reference(const std::string& base_path,
+                                const std::string& layer,
+                                const Regions& regions, ArrayMemory& gold) {
+  const char* sram = gold.get_memory(SRAM_PARTITION);
+  int i = 0;
+  for (const auto& [start, end] : regions) {
+    const std::string path =
+        base_path + layer + "_scratchpad_expected.bin." + std::to_string(i++);
+    std::ofstream out(path, std::ios::binary);
+    if (!out.is_open()) {
+      throw std::runtime_error("cannot write " + path);
+    }
+    out.write(sram + start, static_cast<std::streamsize>(end - start));
+  }
 }
 
 // ===========================================================================
@@ -541,7 +481,11 @@ void JtagPreload::emit(const std::string& base_path, const std::string& layer) {
   // Reading the whole scratchpad back over a bit-banged JTAG takes hours;
   // only what the grade needs is worth it, and gold's walk says what that is.
   run_gold();
-  write_scratchpad_dump_list(
-      base_path, layer,
-      readback_regions(model, selection, steps, *this->memory("gold"), memory));
+  const Regions readback =
+      readback_regions(model, selection, *this->memory("gold"));
+  write_scratchpad_dump_list(base_path, layer, readback);
+  // Emitted from the same gold walk as the dump list, so the reference cannot
+  // disagree with the ELF beside it about the program or MAX_TILES.
+  write_scratchpad_reference(base_path, layer, readback,
+                             *this->memory("gold"));
 }

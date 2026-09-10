@@ -71,14 +71,9 @@ int JtagSimChecker::grade() {
   load_data();
   run_gold();
 
-  ArrayMemory* memory = this->memory("accelerator");
-  const std::vector<Step> steps = record_schedule(model, selection, memory);
-  // What the testbench did to DRAM before the first dispatch (a DRAM
-  // output's zero-fill, say) is part of gold's write mask, so it has to be
-  // part of this memory's too -- without touching the scratchpad, which now
-  // holds what the DUT produced.
-  apply_host_steps(steps, JtagPhase::kDramPrologue, memory);
-  apply_host_steps(steps, JtagPhase::kStores, memory);
+  // Only the scratchpad is read back, so only its results are graded; a
+  // DRAM output would compare the loaded inputs against gold.
+  grade_only_partition(SRAM_PARTITION);
 
   return check_outputs();
 }
