@@ -112,7 +112,6 @@ jobs:
 
   rtl_simulation:
     needs: setup
-    if: github.event_name == 'pull_request'
     runs-on: self-hosted
     strategy:
       fail-fast: false
