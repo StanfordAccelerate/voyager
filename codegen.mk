@@ -55,7 +55,7 @@ $(CODEGEN_DIR)/networks/mobilebert/%/model.txt:
 
 $(CODEGEN_DIR)/networks/mobilebert_encoder/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) --compile_single_layer > $(dir $@)/codegen.log 2>&1
+	python voyager-compiler/test/test_codegen.py mobilebert $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) --model_name_or_path models/mobilebert/mobilebert-tiny-sst2-bf16 $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) --num_hidden_layers 1 > $(dir $@)/codegen.log 2>&1
 
 $(CODEGEN_DIR)/networks/bert/%/model.txt:
 	mkdir -p $(dir $@)

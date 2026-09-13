@@ -689,6 +689,10 @@ class TLVoyager(
       val mu_start_fire = bool("matrix_unit_start_rdy") && bool("matrix_unit_start_vld")
       val mu_dec_sem    = mu_start_fire && mu_wait_en
 
+      // BUG, kept as taped out (Sphinx silicon): a start and a done in the same
+      // cycle keep only the decrement below (last connect), so the count reads
+      // one low, accel_running drops early, and the next real idle wraps it to
+      // 3 (busy forever). Seen 2026-09-07, spmm up_proj at 16 tiles.
       when(mu_start_fire) {
         assert(matrix_op_inflight =/= 2.U, "Matrix inflight overflow!")
         matrix_op_inflight := matrix_op_inflight + 1.U
@@ -818,6 +822,7 @@ class TLVoyager(
         val mvm_start_fire = bool("matrix_vector_unit_start_rdy") && bool("matrix_vector_unit_start_vld")
         mvm_dec_sem := mvm_start_fire && mvm_wait_en_reg
 
+        // Same start/done same-cycle bug as the matrix counter above.
         when(mvm_start_fire) {
           assert(matrix_vector_op_inflight =/= 2.U, "MatrixVector inflight overflow!")
           matrix_vector_op_inflight := matrix_vector_op_inflight + 1.U
@@ -884,6 +889,7 @@ class TLVoyager(
         val spmm_start_fire = bool("spmm_unit_start_rdy") && bool("spmm_unit_start_vld")
         spmm_dec_sem := spmm_start_fire && spmm_wait_en_reg
 
+        // Same start/done same-cycle bug as the matrix counter above.
         when(spmm_start_fire) {
           assert(spmm_op_inflight =/= 2.U, "SpMM inflight overflow!")
           spmm_op_inflight := spmm_op_inflight + 1.U

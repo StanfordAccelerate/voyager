@@ -4,7 +4,12 @@
         "model": [
             "llama_decode",
             "llama_decode_mp",
-            "llama_decode_kivi"
+            "llama_decode_kivi",
+            "amd135m_decode_kivi",
+            "qwama_decode_kivi",
+            "llama2_7b_verify",
+            "llama2_7b_decode_kivi",
+            "llama31_8b_verify"
         ],
         "sim_type": [
             "gold_model",
