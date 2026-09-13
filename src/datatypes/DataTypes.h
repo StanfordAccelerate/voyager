@@ -7,6 +7,7 @@
 #include <ac_std_float.h>
 
 #include <numeric>
+#include <stdexcept>
 #include <string>
 
 // IWYU pragma: begin_exports
@@ -214,7 +215,15 @@ constexpr int get_type_index() {
 template <typename... Ts>
 size_t get_type_width(size_t index) {
   constexpr size_t widths[] = {Ts::width...};
-  assert(index < sizeof...(Ts) && "Invalid type index");
+#ifndef __SYNTHESIS__
+  // Throw rather than assert: the SoC firmware emitter catches per layer and
+  // moves on, while abort() would take every later layer of the batch with it.
+  if (index >= sizeof...(Ts)) {
+    throw std::out_of_range("Invalid type index " + std::to_string(index) +
+                            " for " + std::to_string(sizeof...(Ts)) +
+                            " types");
+  }
+#endif
   return widths[index];
 }
 
