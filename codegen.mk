@@ -25,7 +25,7 @@ COMMON_FLAGS := --layout_policy systolic --pe_array_size $(IC_DIMENSION),$(OC_DI
 EXTRA_COMPILER_FLAGS ?=
 
 CONTEXT ?= 1024
-LLM_FLAGS := --context_length $(CONTEXT) --compile_single_layer --quantize_attention_mask
+LLM_FLAGS := --context_length $(CONTEXT) --num_hidden_layers 1 --quantize_attention_mask
 
 ifneq ($(filter true 1,$(DOUBLE_BUFFERED_ACCUM_BUFFER)),)
 COMMON_FLAGS += --double_buffered_accum_buffer
