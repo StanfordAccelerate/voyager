@@ -2,14 +2,12 @@
 
 #include "test/toolchain/Common.h"
 
-void map_reducer_op(const codegen::Operation& param,
+void map_reducer_op(const voyager::Operation& operation, const ScalarEnv& env,
                     std::deque<BaseParams*>& mapped_params) {
-  const auto op_list = get_op_list(param);
-  const auto reduction_op = op_list[0];
-
-  const auto kwargs = reduction_op.kwargs();
-  const auto input = kwargs.at("input").tensor();
-  const auto output = get_op_outputs(param).back();
+  const auto& op_list = get_prim_ops(operation);
+  const auto& reduction_op = get_anchor_op(operation);
+  const auto input = resolve(reduction_op, "input", env);
+  const auto output = resolve_outputs(operation, env).back();
 
   auto input_shape = get_shape(input);
   const int rcount = input_shape.back() / REDUCER_WIDTH;
@@ -23,13 +21,13 @@ void map_reducer_op(const codegen::Operation& param,
   output_shape = split_loops(output_shape, 1024);
   pad_shape_to_ndim(output_shape, 3);
 
-  const auto target = reduction_op.target();
+  const auto target = strip_namespace(reduction_op.target());
 
   VectorParams* vector_params = new VectorParams;
   VectorInstructionConfig* vector_instruction_config =
       new VectorInstructionConfig;
 
-  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype());
+  int input_dtype = get_index_from_type_name<VU_INPUT_TYPES>(input.dtype);
   int input_dtype_width = get_type_width<VU_INPUT_TYPES>(input_dtype);
   int input_fetch_width = OC_DIMENSION * input_dtype_width;
 
@@ -73,7 +71,7 @@ void map_reducer_op(const codegen::Operation& param,
   }
 
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   VectorInstructions inst0;
   inst0.op_type = VectorInstructions::reduction;
@@ -103,15 +101,15 @@ void map_reducer_op(const codegen::Operation& param,
   mapped_params.push_back(vector_instruction_config);
 }
 
-void map_reduction(const codegen::Operation& param,
+void map_reduction(const voyager::Operation& operation, const ScalarEnv& env,
                    std::deque<BaseParams*>& mapped_params) {
-  const auto op_list = get_op_list(param);
-  const auto reduction_op = op_list[0];
-  const auto dim = reduction_op.kwargs().at("dim").int_list().values();
+  const auto& op_list = get_prim_ops(operation);
+  const auto& reduction_op = get_anchor_op(operation);
+  const auto dim = arg_ints(reduction_op, "dim", env);
   assert(dim.size() == 1 &&
          "Only single dimension reduction is supported in this function!");
 
-  const auto input = reduction_op.kwargs().at("input").tensor();
+  const auto input = resolve(reduction_op, "input", env);
   const auto input_shape = get_shape(input);
 
   int reduction_dim = dim[0];
@@ -120,7 +118,7 @@ void map_reduction(const codegen::Operation& param,
   }
 
   if (reduction_dim == input_shape.size() - 1) {
-    map_reducer_op(param, mapped_params);
+    map_reducer_op(operation, env, mapped_params);
   } else {
     spdlog::error(
         "Only reduction on the last dimension is supported in this function!");

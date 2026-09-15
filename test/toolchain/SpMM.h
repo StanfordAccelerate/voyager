@@ -5,32 +5,30 @@
 #include "ArchitectureParams.h"
 #include "spdlog/spdlog.h"
 #include "src/Params.h"
-#include "test/common/Network.h"
+#include "test/common/GraphUtils.h"
 #include "test/common/Tiling.h"
 #include "test/common/Utils.h"
-#include "test/compiler/proto/param.pb.h"
 #include "test/toolchain/Common.h"
 
-void map_spmm(const Operation& operation,
+void map_spmm(const voyager::Operation& operation, const ScalarEnv& env,
               std::deque<BaseParams*>& mapped_params, bool is_fused) {
   MatrixParams* spmm_param = new MatrixParams;
 
-  const auto param = operation.param;
-
-  const auto op_list = get_op_list(param);
-  const auto spmm_op = op_list[0];
+  const auto& op_list = get_prim_ops(operation);
+  const auto& spmm_op = get_anchor_op(operation);
 
   bool is_matmul = spmm_op.target().find("matmul") != std::string::npos;
   std::string weight_key = is_matmul ? "other" : "weight";
-  const auto weight_tensor = spmm_op.kwargs().at(weight_key).tensor();
-  const auto indptr_tensor = spmm_op.kwargs().at("A_indptr").tensor();
-  const auto indices_tensor = spmm_op.kwargs().at("A_indices").tensor();
-  const auto data_tensor = spmm_op.kwargs().at("A_data").tensor();
+  const auto weight_tensor = resolve(spmm_op, weight_key, env);
+  const auto indptr_tensor = resolve(spmm_op, "A_indptr", env);
+  const auto indices_tensor = resolve(spmm_op, "A_indices", env);
+  const auto data_tensor = resolve(spmm_op, "A_data", env);
 
   spmm_param->is_spmm = true;
 
-  float* indptr_array = read_constant_param(indptr_tensor);
-
+  // Only the indptr's length is needed here. Its contents are a run-time
+  // value the outlier quantize writes into the scratchpad, not a constant
+  // codegen dumps, so there is nothing on disk to read.
   // indptr is in y_loop_idx[0]
   // indices is in x_loop_idx[0]
   // K is in weight_loop_idx[0]
@@ -41,7 +39,7 @@ void map_spmm(const Operation& operation,
 
   // for fused SPMM, the sparse unit needs to match the tiling of the matrix op
   if (is_fused) {
-    tiling = get_tiling(operation);
+    tiling = get_tiling(operation, env);
   } else {
     tiling = {
         .loops = {{1, 2, 1, 1, 1, 1}, {k0, indptr_len / 2, 1, 1, 1, 1}},
@@ -62,10 +60,10 @@ void map_spmm(const Operation& operation,
   spmm_param->weight_offset = get_address(weight_tensor);
 
   spmm_param->weight_dtype =
-      get_index_from_type_name<WEIGHT_DATATYPE>(weight_tensor.dtype());
-  spmm_param->use_weight_codebook = spmm_op.kwargs().contains("weight_code");
+      get_index_from_type_name<WEIGHT_DATATYPE>(weight_tensor.dtype);
+  spmm_param->use_weight_codebook = has_arg(spmm_op, "weight_code");
   if (spmm_param->use_weight_codebook) {
-    const auto code = spmm_op.kwargs().at("weight_code").tensor();
+    const auto code = resolve(spmm_op, "weight_code", env);
     const auto size = get_size(code);
 
     float* weight_code = read_constant_param(code);
@@ -77,12 +75,12 @@ void map_spmm(const Operation& operation,
     delete[] weight_code;
   }
 
-  spmm_param->is_mx_op = spmm_op.kwargs().contains("weight_scale");
+  spmm_param->is_mx_op = has_arg(spmm_op, "weight_scale");
   if (spmm_param->is_mx_op) {
-    const int block_size = spmm_op.kwargs().at("block_size").int_value();
+    const int block_size = arg_int(spmm_op, "block_size", env);
     assert(block_size == std::max(IC_DIMENSION, OC_DIMENSION));
 
-    const auto scale_tensor = spmm_op.kwargs().at("weight_scale").tensor();
+    const auto scale_tensor = resolve(spmm_op, "weight_scale", env);
     spmm_param->weight_scale_offset = get_address(scale_tensor);
   }
 
@@ -124,7 +122,7 @@ void map_spmm(const Operation& operation,
   // vector instructions, just passing through the output for now
   VectorParams* vector_params = new VectorParams;
 
-  const auto output = get_op_outputs(param).back();
+  const auto output = resolve_outputs(operation, env).back();
   vector_params->vector_output_offset = get_address(output);
 
   // set output mode
@@ -154,7 +152,7 @@ void map_spmm(const Operation& operation,
   vector_params->output_loops[1][2] = 1;
 
   vector_params->output_dtype =
-      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype());
+      get_index_from_type_name<OUTPUT_DATATYPES>(output.dtype);
 
   VectorInstructions inst;
   inst.op_type = VectorInstructions::vector;

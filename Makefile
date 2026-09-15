@@ -29,6 +29,17 @@ INC := \
 	-I$(CONDA_PREFIX)/include \
 	-I.
 
+export INPUT_BUFFER_SIZE ?= 1024
+export WEIGHT_BUFFER_SIZE ?= 1024
+export ACCUM_BUFFER_SIZE ?= 1024
+
+# Defaulting these to false matches the #ifndef fallbacks in
+# ArchitectureParams.h, so -DX=false and leaving X undefined are equivalent.
+export DOUBLE_BUFFERED_ACCUM_BUFFER ?= false
+export SUPPORT_MVM ?= false
+export SUPPORT_SPMM ?= false
+export SUPPORT_DWC ?= false
+
 # TODO(fpedd): Fix code and remove Wno-* flags step by step
 override BASE_FLAGS += \
 	$(INC) \
@@ -46,49 +57,14 @@ override BASE_FLAGS += \
 	-DSPDLOG_EOL=\"\" \
 	-D$(DATATYPE) \
 	-DIC_DIMENSION=$(IC_DIMENSION) \
-	-DOC_DIMENSION=$(OC_DIMENSION)
-
-ifndef INPUT_BUFFER_SIZE
-	export INPUT_BUFFER_SIZE = 1024
-else
-	override BASE_FLAGS += -DINPUT_BUFFER_SIZE=$(INPUT_BUFFER_SIZE)
-endif
-
-ifndef WEIGHT_BUFFER_SIZE
-	export WEIGHT_BUFFER_SIZE = 1024
-else
-	override BASE_FLAGS += -DWEIGHT_BUFFER_SIZE=$(WEIGHT_BUFFER_SIZE)
-endif
-
-ifndef ACCUM_BUFFER_SIZE
-	export ACCUM_BUFFER_SIZE = 1024
-else
-	override BASE_FLAGS += -DACCUM_BUFFER_SIZE=$(ACCUM_BUFFER_SIZE)
-endif
-
-ifndef DOUBLE_BUFFERED_ACCUM_BUFFER
-	export DOUBLE_BUFFERED_ACCUM_BUFFER = false
-else
-	override BASE_FLAGS += -DDOUBLE_BUFFERED_ACCUM_BUFFER=$(DOUBLE_BUFFERED_ACCUM_BUFFER)
-endif
-
-ifndef SUPPORT_MVM
-	export SUPPORT_MVM = false
-else
-	override BASE_FLAGS += -DSUPPORT_MVM=$(SUPPORT_MVM)
-endif
-
-ifndef SUPPORT_SPMM
-	export SUPPORT_SPMM = false
-else
-	override BASE_FLAGS += -DSUPPORT_SPMM=$(SUPPORT_SPMM)
-endif
-
-ifndef SUPPORT_DWC
-	export SUPPORT_DWC = false
-else
-	override BASE_FLAGS += -DSUPPORT_DWC=$(SUPPORT_DWC)
-endif
+	-DOC_DIMENSION=$(OC_DIMENSION) \
+	-DINPUT_BUFFER_SIZE=$(INPUT_BUFFER_SIZE) \
+	-DWEIGHT_BUFFER_SIZE=$(WEIGHT_BUFFER_SIZE) \
+	-DACCUM_BUFFER_SIZE=$(ACCUM_BUFFER_SIZE) \
+	-DDOUBLE_BUFFERED_ACCUM_BUFFER=$(DOUBLE_BUFFERED_ACCUM_BUFFER) \
+	-DSUPPORT_MVM=$(SUPPORT_MVM) \
+	-DSUPPORT_SPMM=$(SUPPORT_SPMM) \
+	-DSUPPORT_DWC=$(SUPPORT_DWC)
 
 ifdef CLOCK_PERIOD
 	override BASE_FLAGS += -DCLOCK_PERIOD=$(CLOCK_PERIOD)
@@ -106,7 +82,7 @@ endif
 
 # We need to work with multiple C++ standards, as the SystemC lib is only
 # compatible with C++11 and the Universal Numbers Library requires C++17
-C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
+C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations -MMD -MP
 LDFLAGS += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS += -L$(CATAPULT_ROOT)/shared/lib/ -L$(CONDA_PREFIX)/lib
 LDFLAGS_NO_SYSC += -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
@@ -134,6 +110,10 @@ $(CC_BUILD_DIR)/spdlog.o: $(SPDLOG_OBJ_FILES)
 
 spdlog: $(CC_BUILD_DIR)/spdlog.o
 
+# Every compile emits a dependency file beside its object. This covers
+# transitive headers without forcing every object to rebuild on every run.
+-include $(wildcard $(CC_BUILD_DIR)/*.d)
+
 ###########################################################
 # Catapult Synthesis
 ###########################################################
@@ -142,17 +122,14 @@ export CATAPULT_BUILD_DIR ?= $(BUILD_DIR)/Catapult/$(TECHNOLOGY)/clock_$(CLOCK_P
 # Main target to run HLS and build RTL (Verilog)
 rtl: Accelerator
 
-# Generating RTL requires test/compiler/proto/{param.pb.cc, tiling.pb.cc} to
+# Generating RTL requires test/compiler/proto/voyager_ir.pb.cc to
 # exist. But we don't want to add it as a dependency, as it would trigger a
 # rebuild of the rtl target every time the proto files change. Instead we create
 # a conditional dependency on the proto files, which will only create the proto
 # file if it doesn't exist.
 PROTOS_DEPENDENCY =
-ifeq (,$(wildcard test/compiler/proto/param.pb.cc))
-PROTOS_DEPENDENCY += test/compiler/proto/param.pb.cc
-endif
-ifeq (,$(wildcard test/compiler/proto/tiling.pb.cc))
-PROTOS_DEPENDENCY += test/compiler/proto/tiling.pb.cc
+ifeq (,$(wildcard test/compiler/proto/voyager_ir.pb.cc))
+PROTOS_DEPENDENCY += test/compiler/proto/voyager_ir.pb.cc
 endif
 
 RTL_DEPENDENCIES =
@@ -301,10 +278,94 @@ rtl-sim-debug: rtl network-proto
 	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 SIM_DUMP_FSDB=1 make -f ./scverify/Verify_concat_sim_rtl_v_vcs.mk SIMTOOL=vcs sim
 
 ###########################################################
-# Standard Event-based SystemC Simulations
+# SystemC / RTL harness
 ###########################################################
+$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
-# Main target for accelerator simulations
+$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
+
+$(CC_BUILD_DIR)/Harness-checker.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
+
+$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -g -c -o $@ $<
+
+$(CC_BUILD_DIR)/GoldModel-checker.o: test/common/GoldModel.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -DCHECK_PE -g -c -o $@ $<
+
+$(CC_BUILD_DIR)/ArrayMemory.o: test/common/ArrayMemory.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/MapOperation.o: test/toolchain/MapOperation.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/PEChecker.o: test/checker/PEChecker.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/AccessCounter.o: test/common/AccessCounter.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/Tiling.o: test/common/Tiling.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+
+###########################################################
+# Bufferized-IR runtime
+###########################################################
+# One graph interpreter drives every flow. SIMS picks which two simulators to run and
+# compare (gold, accelerator, pytorch), exactly as before; only what executes an
+# accelerator operation differs. TESTS selects one top-level operation
+# (e.g. TESTS=while_loop_37); unset runs the whole network.
+IR_OBJS = $(CC_BUILD_DIR)/Model.o $(CC_BUILD_DIR)/GraphUtils.o \
+          $(CC_BUILD_DIR)/Interpreter.o \
+          $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/Checker.o \
+          $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/GoldModel.o \
+          $(CC_BUILD_DIR)/Tiling.o $(CC_BUILD_DIR)/voyager_ir.pb.o
+
+$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/%.o: test/common/%.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/%Runner.o: test/common/%Runner.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/Checker.o: test/common/Checker.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+###########################################################
+# SystemC / RTL
+###########################################################
+SIM_OBJS = $(CC_BUILD_DIR)/TestRunner.o $(IR_OBJS) $(CC_BUILD_DIR)/MapOperation.o \
+           $(CC_BUILD_DIR)/AccessCounter.o $(SPDLOG_OBJ_FILES)
+
+$(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(SIM_OBJS)
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(SIM_OBJS)
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+# The per-PE checker: pinpoints which PE diverges from the gold model. A manual
+# debug tool, not part of CI.
+$(CC_BUILD_DIR)/TestRunner-checker: $(CC_BUILD_DIR)/Harness-checker.o $(CC_BUILD_DIR)/GoldModel-checker.o \
+    $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/Model.o $(CC_BUILD_DIR)/GraphUtils.o \
+    $(CC_BUILD_DIR)/Interpreter.o $(CC_BUILD_DIR)/Simulation.o \
+    $(CC_BUILD_DIR)/Checker.o $(CC_BUILD_DIR)/ArrayMemory.o \
+    $(CC_BUILD_DIR)/Tiling.o $(CC_BUILD_DIR)/voyager_ir.pb.o $(CC_BUILD_DIR)/MapOperation.o \
+    $(CC_BUILD_DIR)/AccessCounter.o $(CC_BUILD_DIR)/PEChecker.o $(SPDLOG_OBJ_FILES)
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+.PHONY: TestRunner TestRunner-fast TestRunner-checker
+TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
+TestRunner-fast: check_env_var $(CC_BUILD_DIR)/TestRunner-fast
+TestRunner-checker: check_env_var $(CC_BUILD_DIR)/TestRunner-checker
+
 .PHONY: sim
 sim: $(CC_BUILD_DIR)/TestRunner network-proto
 	./$(CC_BUILD_DIR)/TestRunner
@@ -313,125 +374,56 @@ sim: $(CC_BUILD_DIR)/TestRunner network-proto
 fast-sim: $(CC_BUILD_DIR)/TestRunner-fast network-proto
 	./$(CC_BUILD_DIR)/TestRunner-fast
 
-.PHONY: fast-sim-check
-fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
-	./$(CC_BUILD_DIR)/TestRunner-checker
-
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner
+
+.PHONY: fast-sim-check
+fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
+	./$(CC_BUILD_DIR)/TestRunner-checker
 
 .PHONY: fast-sim-debug
 fast-sim-debug: $(CC_BUILD_DIR)/TestRunner-fast network-proto
 	gdb ./$(CC_BUILD_DIR)/TestRunner-fast
 
-.PHONY: TestRunner
-TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
+###########################################################
+# Developer targets that need no Catapult
+###########################################################
+$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
 
-.PHONY: TestRunner-fast
-TestRunner-fast: check_env_var $(CC_BUILD_DIR)/TestRunner-fast
-
-.PHONY: TestRunner-checker
-TestRunner-checker: check_env_var $(CC_BUILD_DIR)/TestRunner-checker
+$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(IR_OBJS) $(SPDLOG_OBJ_FILES)
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS) -pthread
 
 .PHONY: AccuracyTester
-AccuracyTester: ./$(CC_BUILD_DIR)/AccuracyTester
-
-.PHONY: MobileBertAccuracy
-MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
+AccuracyTester: check_env_var $(CC_BUILD_DIR)/AccuracyTester
 
 .PHONY: ResNetAccuracy
 ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
 	./$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
 
-$(CC_BUILD_DIR)/TestRunner: $(CC_BUILD_DIR)/Harness.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/tiling.pb.o $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/AccessCounter.o $(CC_BUILD_DIR)/Tiling.o  $(SPDLOG_OBJ_FILES)
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-$(CC_BUILD_DIR)/TestRunner-fast: $(CC_BUILD_DIR)/Harness-fast.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/tiling.pb.o $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/AccessCounter.o $(CC_BUILD_DIR)/Tiling.o $(SPDLOG_OBJ_FILES)
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-$(CC_BUILD_DIR)/TestRunner-checker: $(CC_BUILD_DIR)/Harness-checker.o $(CC_BUILD_DIR)/TestRunner.o $(CC_BUILD_DIR)/GoldModel-checker.o $(CC_BUILD_DIR)/Simulation.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o  $(CC_BUILD_DIR)/tiling.pb.o $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/PEChecker.o $(CC_BUILD_DIR)/AccessCounter.o $(CC_BUILD_DIR)/Tiling.o $(SPDLOG_OBJ_FILES)
-	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
-
-$(CC_BUILD_DIR)/AccuracyTester: $(CC_BUILD_DIR)/AccuracyTester.o $(CC_BUILD_DIR)/GoldModel.o $(CC_BUILD_DIR)/ArrayMemory.o $(CC_BUILD_DIR)/DataLoader.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/tiling.pb.o $(CC_BUILD_DIR)/Tiling.o $(SPDLOG_OBJ_FILES)
-	$(CC) -o $@ $^ $(LDLIBS_NO_SYSC) $(LDFLAGS_NO_SYSC) -pthread
-
-$(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/common/Harness.h test/common/Utils.h test/toolchain/MapOperation.h $(wildcard src/*.h) $(wildcard src/datatypes/*.h) $(wildcard src/vector_unit/*.h) $(wildcard src/matrix_vector_unit/*.h)
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/common/Harness.h test/common/Utils.h test/toolchain/MapOperation.h $(wildcard src/*.h) $(wildcard src/datatypes/*.h) $(wildcard src/vector_unit/*.h) $(wildcard src/matrix_vector_unit/*.h)
-	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
-
-$(CC_BUILD_DIR)/Harness-checker.o: test/common/Harness.cc test/common/Harness.h test/common/Utils.h test/toolchain/MapOperation.h $(wildcard src/*.h) $(wildcard src/datatypes/*.h) $(wildcard src/vector_unit/*.h) $(wildcard src/matrix_vector_unit/*.h) test/checker/PEChecker.h
-	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
-
-$(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/Utils.h src/ArchitectureParams.h src/vector_unit/ApproximationUnit.h test/toolchain/ApproximationConstants.h $(wildcard src/datatypes/*.h) $(wildcard test/common/operations/*.h)
-	$(CC) $(C17FLAGS) -g -c -o $@ $<
-
-$(CC_BUILD_DIR)/GoldModel-checker.o: test/common/GoldModel.cc test/common/GoldModel.h test/common/Utils.h src/ArchitectureParams.h $(wildcard src/datatypes/*.h) $(wildcard test/common/operations/*.h) test/checker/PEChecker.h
-	$(CC) $(C17FLAGS) -DCHECK_PE -g -c -o $@ $<
-
-$(CC_BUILD_DIR)/Simulation.o: test/common/Simulation.cc test/common/Simulation.h src/ArchitectureParams.h $(wildcard src/datatypes/*.h) test/common/Utils.h test/common/MemoryInterface.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/ArrayMemory.o: test/common/ArrayMemory.cc test/common/ArrayMemory.h test/common/MemoryInterface.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/DataLoader.o: test/common/DataLoader.cc test/common/DataLoader.h test/common/MemoryInterface.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/MapOperation.o: test/toolchain/MapOperation.cc $(wildcard test/toolchain/*.h)
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/TestRunner.o: test/common/TestRunner.cc
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/PEChecker.o: test/checker/PEChecker.cc test/checker/PEChecker.h $(wildcard src/datatypes/*.h)
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/AccuracyTester.o: test/common/AccuracyTester.cc $(wildcard src/datatypes/*.h) $(wildcard test/toolchain/*.h)
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/AccessCounter.o: test/common/AccessCounter.cc test/common/AccessCounter.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/Tiling.o: test/common/Tiling.cc test/common/Tiling.h
-	$(CC) $(C17FLAGS) -c -o $@ $<
+.PHONY: MobileBertAccuracy
+MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
+	./$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
 
 ###########################################################
 # Toolchain
 ###########################################################
-toolchain: $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/Tiling.o $(CC_BUILD_DIR)/Network.o $(CC_BUILD_DIR)/param.pb.o $(CC_BUILD_DIR)/tiling.pb.o
+toolchain: $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/Tiling.o $(CC_BUILD_DIR)/voyager_ir.pb.o
 
 ###########################################################
 # Networks
 ###########################################################
-$(CC_BUILD_DIR)/Network.o: test/common/Network.cc test/compiler/proto/param.pb.cc
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-test/compiler/proto/param.pb.cc: voyager-compiler/src/voyager_compiler/codegen/param.proto
+test/compiler/proto/voyager_ir.pb.cc: voyager-compiler/src/voyager_compiler/codegen/voyager_ir.proto
 	protoc -I=voyager-compiler/src/voyager_compiler/codegen --cpp_out=test/compiler/proto $<
 
-test/compiler/proto/tiling_pb2.py: test/compiler/proto/tiling.proto
-	protoc --proto_path=test/compiler/proto/ --python_out=test/compiler/proto $<
-
-test/compiler/proto/tiling.pb.cc: test/compiler/proto/tiling.proto
-	protoc -I=test/compiler/proto --cpp_out=test/compiler/proto $<
-
-$(CC_BUILD_DIR)/param.pb.o: test/compiler/proto/param.pb.cc
-	$(CC) $(C17FLAGS) -c -o $@ $<
-
-$(CC_BUILD_DIR)/tiling.pb.o: test/compiler/proto/tiling.pb.cc
+$(CC_BUILD_DIR)/voyager_ir.pb.o: test/compiler/proto/voyager_ir.pb.cc
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 .PHONY: network-proto
 network-proto: \
     $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/model.txt \
-    test/compiler/proto/param.pb.cc \
-    test/compiler/proto/tiling_pb2.py \
-    test/compiler/proto/tiling.pb.cc \
-    $(CODEGEN_DIR)/networks/$(NETWORK)/$(DATATYPE)/$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)/tilings.txtpb
+    test/compiler/proto/voyager_ir.pb.cc
 
 include codegen.mk
 

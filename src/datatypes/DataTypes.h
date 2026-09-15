@@ -7,6 +7,7 @@
 #include <ac_std_float.h>
 
 #include <numeric>
+#include <stdexcept>
 #include <string>
 
 // IWYU pragma: begin_exports
@@ -23,6 +24,9 @@
 
 namespace DataTypes {
 typedef Int<1, true> int1;
+// A torch bool: one unsigned bit, named "bool" in the compiler's programs
+// (e.g. the result of a comparison feeding aten::where).
+typedef Int<1, false> uint1;
 typedef Int<2, false> uint2;
 typedef Int<2, true> int2;
 typedef Int<4, true> int4;
@@ -57,6 +61,11 @@ struct TypeName {
 template <>
 struct TypeName<int1> {
   static std::string name() { return "int1"; }
+};
+
+template <>
+struct TypeName<uint1> {
+  static std::string name() { return "bool"; }
 };
 
 template <>
@@ -154,6 +163,7 @@ struct TypeName<posit8> {
 // clang-format off
 #define SUPPORTED_TYPES          \
   DataTypes::int1,               \
+  DataTypes::uint1,              \
   DataTypes::uint2,              \
   DataTypes::int2,               \
   DataTypes::int4,               \
@@ -205,7 +215,15 @@ constexpr int get_type_index() {
 template <typename... Ts>
 size_t get_type_width(size_t index) {
   constexpr size_t widths[] = {Ts::width...};
-  assert(index < sizeof...(Ts) && "Invalid type index");
+#ifndef __SYNTHESIS__
+  // Throw rather than assert: the SoC firmware emitter catches per layer and
+  // moves on, while abort() would take every later layer of the batch with it.
+  if (index >= sizeof...(Ts)) {
+    throw std::out_of_range("Invalid type index " + std::to_string(index) +
+                            " for " + std::to_string(sizeof...(Ts)) +
+                            " types");
+  }
+#endif
   return widths[index];
 }
 

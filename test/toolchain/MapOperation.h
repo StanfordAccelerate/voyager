@@ -1,11 +1,8 @@
 #pragma once
 
-#include "src/AccelTypes.h"
 #include "src/Params.h"
-#include "test/common/Network.h"
+#include "test/common/GraphUtils.h"
 #include "test/common/Utils.h"
 
-void map_operation(const Operation& operation,
+void map_operation(const voyager::Operation& operation, const ScalarEnv& env,
                    std::deque<BaseParams*>& mapped_params);
-std::deque<BaseParams*> get_ping_pong_params(std::deque<BaseParams*> params,
-                                             int offset);

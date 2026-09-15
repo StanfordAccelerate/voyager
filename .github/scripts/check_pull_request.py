@@ -73,6 +73,12 @@ def main():
         print("No regression results found in the current PR run.")
         sys.exit(0)
 
+    if main_df.empty:
+        # Main ran CI but uploaded no regression artifacts: either it predates
+        # rtl_simulation running on push, or the artifacts have expired.
+        print(f"No regression results in main run {main_run_id}; skipping comparison.")
+        sys.exit(0)
+
     categories = ["datatype", "rows", "cols", "input_buffer_size", "weight_buffer_size", "output_buffer_size", "Model"]
 
     def compute_grouped_runtime(df):

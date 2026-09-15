@@ -760,6 +760,7 @@ struct VectorParams : BaseParams {
     }
 
     vector_fetch_0_dtype = 0;
+    vector_fetch_0_stride = 0;
     vector_fetch_0_burst_size = 0;
     vector_fetch_0_num_beats = 1;
     vector_fetch_0_packing_factor = 1;
@@ -777,6 +778,7 @@ struct VectorParams : BaseParams {
       vector_fetch_1_k_loop_idx[i] = 2;
     }
     vector_fetch_1_dtype = 0;
+    vector_fetch_1_stride = 0;
     vector_fetch_1_burst_size = 0;
     vector_fetch_1_num_beats = 1;
     vector_fetch_1_packing_factor = 1;
@@ -794,6 +796,7 @@ struct VectorParams : BaseParams {
       vector_fetch_2_k_loop_idx[i] = 2;
     }
     vector_fetch_2_dtype = 0;
+    vector_fetch_2_stride = 0;
     vector_fetch_2_burst_size = 0;
     vector_fetch_2_num_beats = 1;
     vector_fetch_2_packing_factor = 1;

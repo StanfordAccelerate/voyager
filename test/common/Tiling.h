@@ -2,9 +2,8 @@
 
 #include <iostream>
 
-#include "test/common/Network.h"
-#include "test/compiler/proto/param.pb.h"
-#include "test/compiler/proto/tiling.pb.h"
+#include "test/common/GraphUtils.h"
+#include "test/compiler/proto/voyager_ir.pb.h"
 
 struct Tiling {
   int loops[2][6];
@@ -26,10 +25,6 @@ struct Tiling {
 };
 
 std::ostream& operator<<(std::ostream& os, const Tiling& tiling);
-Tiling get_interstellar_tiling(const voyager::Tiling& tiling);
-Tiling get_tiling(const Operation& operation);
+Tiling get_tiling(const voyager::Operation& operation, const ScalarEnv& env);
 
-Tiling get_conv2d_tiling(const codegen::OpOverload param);
-Tiling get_linear_tiling(const codegen::OpOverload param);
-Tiling get_pool2d_tiling(const codegen::OpOverload param);
-void adjust_tiling_for_dimension(Tiling& tiling);
+Tiling get_pool2d_tiling(const voyager::PrimOp& param, const ScalarEnv& env);

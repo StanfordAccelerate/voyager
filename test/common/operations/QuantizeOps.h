@@ -4,44 +4,48 @@
 #include <vector>
 
 #include "src/datatypes/DataTypes.h"
+#include "test/common/GraphUtils.h"
 #include "test/common/Utils.h"
-#include "test/compiler/proto/param.pb.h"
 
 template <typename Input, typename Scale>
-Input* quantize(std::any input, std::any scale, std::vector<int> shape) {
+std::shared_ptr<Input[]> quantize(std::any input, std::any scale,
+                                  std::vector<int> shape) {
   const int size = get_size(shape);
 
-  Input* inputs = std::any_cast<Input*>(input);
-  Scale* scales = std::any_cast<Scale*>(scale);
+  Input* inputs = std::any_cast<std::shared_ptr<Input[]>&>(input).get();
+  Scale* scales = std::any_cast<std::shared_ptr<Scale[]>&>(scale).get();
 
-  Input* outputs = new Input[size];
+  std::shared_ptr<Input[]> outputs(new Input[size]);
+
+  // A scalar quantize reaches the hardware as a multiply by a reciprocal
+  // immediate (set_vector_immediate), not as a division, and the two round
+  // differently. Mirror the immediate, as the elementwise div already does.
+  const Input inv_scale = 1.0 / (*scales);
 
   for (int i = 0; i < size; i++) {
-    outputs[i] = inputs[i] / (*scales);
+    outputs[i] = inputs[i] * inv_scale;
   }
-
-  delete[] inputs;
-  delete[] scales;
 
   return outputs;
 }
 
 template <typename Input, typename Meta>
-std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
-    std::any input, std::vector<int> input_shape, const int data_size,
-    Input threshold, int indptr_offset = 0) {
+std::tuple<std::shared_ptr<Input[]>, std::shared_ptr<Meta[]>,
+           std::shared_ptr<Meta[]>, std::shared_ptr<Input[]>>
+filter_outlier(std::any input, std::vector<int> input_shape,
+               const int data_size, Input threshold, int indptr_offset = 0) {
   spdlog::debug("Performing outlier filtering operation\n");
-  Input* inputs = std::any_cast<Input*>(input);
+  Input* inputs = std::any_cast<std::shared_ptr<Input[]>&>(input).get();
 
   // Expect 2D tensor
   const int ndim = input_shape.size();
   const int K = input_shape[ndim - 1];
   const int X = get_size(input_shape) / K;
 
-  Input* data = new Input[data_size];
-  Meta* indices = new Meta[data_size];
-  Meta* indptr = new Meta[X + 1];
-  Input* filtered = new Input[X * K];
+  std::shared_ptr<Input[]> data(new Input[data_size]);
+  std::shared_ptr<Meta[]> indices(new Meta[data_size]);
+  std::shared_ptr<Meta[]> indptr(new Meta[X + 1]);
+  std::shared_ptr<Input[]> filtered(new Input[X * K]);
 
   // Initialize indices and data
   for (int i = 0; i < data_size; i++) {
@@ -67,16 +71,15 @@ std::tuple<Input*, Meta*, Meta*, Input*> filter_outlier(
     indptr[x + 1] = indptr_offset + nnz;
   }
 
-  delete[] inputs;
-
   spdlog::debug("Filtered {} outliers\n", nnz - indptr_offset);
 
   return {data, indices, indptr, filtered};
 }
 
 template <typename Input, typename Scale>
-Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
-                   int block_size, int axis) {
+std::shared_ptr<Input[]> quantize_mx(std::any input, std::any scale,
+                                     std::vector<int> input_shape,
+                                     int block_size, int axis) {
   spdlog::debug("Performing microscaling quantization operation\n");
 
   // Handle the case of convolutional layers
@@ -90,15 +93,15 @@ Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
     axis += input_shape.size();
   }
 
-  Input* inputs = std::any_cast<Input*>(input);
-  Scale* scales = std::any_cast<Scale*>(scale);
+  Input* inputs = std::any_cast<std::shared_ptr<Input[]>&>(input).get();
+  Scale* scales = std::any_cast<std::shared_ptr<Scale[]>&>(scale).get();
 
   std::vector<int> scale_shape = input_shape;
   scale_shape[axis] = (scale_shape[axis] + block_size - 1) / block_size;
   const int num_dims = scale_shape.size();
 
   const int output_size = get_size(input_shape);
-  Input* outputs = new Input[output_size];
+  std::shared_ptr<Input[]> outputs(new Input[output_size]);
 
   // Perform elementwise division with broadcasting
   for (int i = 0; i < output_size; ++i) {
@@ -117,68 +120,68 @@ Input* quantize_mx(std::any input, std::any scale, std::vector<int> input_shape,
     }
 
     int flat_idx_b = get_flat_index(indices_b, scale_shape);
-    Input inv_scale = static_cast<Input>(scales[flat_idx_b]).reciprocal();
-    outputs[i] = inputs[i] * inv_scale;
+    const Input block_scale = static_cast<Input>(scales[flat_idx_b]);
+    // A zero scale needs no special case: reciprocal() saturates rather than
+    // returning an infinity, so an all-zero block still quantizes to zero and
+    // a block whose scale underflowed the scale type saturates. The hardware
+    // divides by whatever the scale pass stored, and does the same.
+    outputs[i] = inputs[i] * block_scale.reciprocal();
   }
-
-  delete[] inputs;
 
   return outputs;
 }
 
 template <typename Input, typename Output>
-bool dequantize(std::any input, std::any scale, Output*& output,
-                codegen::Tensor tensor) {
-  if (tensor.dtype() != DataTypes::TypeName<Input>::name()) {
+bool dequantize(std::any input, std::any scale,
+                std::shared_ptr<Output[]>& output, Tensor tensor) {
+  if (tensor.dtype != DataTypes::TypeName<Input>::name()) {
     return false;
   }
 
-  Input* casted_input = std::any_cast<Input*>(input);
-  Output* casted_scale = std::any_cast<Output*>(scale);
+  Input* casted_input = std::any_cast<std::shared_ptr<Input[]>&>(input).get();
+  Output* casted_scale = std::any_cast<std::shared_ptr<Output[]>&>(scale).get();
 
   const int size = get_size(tensor);
-  output = new Output[size];
+  output.reset(new Output[size]);
 
   for (int i = 0; i < size; i++) {
     output[i] = static_cast<Output>(casted_input[i]) * (*casted_scale);
   }
 
-  delete[] casted_input;
-  delete[] casted_scale;
-
   return true;
 }
 
 template <typename Output, typename... Ts>
-Output* dequantize_helper(std::any input, std::any scale,
-                          codegen::Tensor tensor) {
-  Output* output = nullptr;
+std::shared_ptr<Output[]> dequantize_helper(std::any input, std::any scale,
+                                            Tensor tensor) {
+  std::shared_ptr<Output[]> output;
   bool matched = (dequantize<Ts, Output>(input, scale, output, tensor) || ...);
   if (!matched) {
-    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
   }
   return output;
 }
 
 template <typename Output>
-Output* dequantize_tensor(std::any input, std::any scale,
-                          codegen::Tensor tensor) {
+std::shared_ptr<Output[]> dequantize_tensor(std::any input, std::any scale,
+                                            Tensor tensor) {
   return dequantize_helper<Output, SUPPORTED_TYPES>(input, scale, tensor);
 }
 
 template <typename Input, typename Scale, typename Vector, typename Output>
 bool dequantize_group(std::any input, std::any scale, std::any zero_point,
-                      Output*& output, codegen::Tensor tensor, int block_size,
-                      int axis) {
-  if (tensor.dtype() != DataTypes::TypeName<Input>::name()) {
+                      std::shared_ptr<Output[]>& output, Tensor tensor,
+                      int block_size, int axis) {
+  if (tensor.dtype != DataTypes::TypeName<Input>::name()) {
     return false;
   }
 
   const auto input_shape = get_shape(tensor);
 
-  Input* casted_input = std::any_cast<Input*>(input);
-  Scale* casted_scale = std::any_cast<Scale*>(scale);
-  Scale* casted_zero_point = std::any_cast<Scale*>(zero_point);
+  Input* casted_input = std::any_cast<std::shared_ptr<Input[]>&>(input).get();
+  Scale* casted_scale = std::any_cast<std::shared_ptr<Scale[]>&>(scale).get();
+  Scale* casted_zero_point =
+      std::any_cast<std::shared_ptr<Scale[]>&>(zero_point).get();
 
   const int num_dims = input_shape.size();
   if (axis < 0) {
@@ -190,7 +193,7 @@ bool dequantize_group(std::any input, std::any scale, std::any zero_point,
   scale_shape[axis] = (scale_shape[axis] + block_size - 1) / block_size;
 
   const int output_size = get_size(input_shape);
-  output = new Output[output_size];
+  output.reset(new Output[output_size]);
 
   // Elementwise dequantization with broadcasting
   for (int i = 0; i < output_size; ++i) {
@@ -217,34 +220,32 @@ bool dequantize_group(std::any input, std::any scale, std::any zero_point,
     output[i] = (static_cast<Vector>(casted_input[i]) - zp_val) * s_val;
   }
 
-  delete[] casted_input;
-  delete[] casted_scale;
-  if (casted_zero_point) {
-    delete[] casted_zero_point;
-  }
-
   return true;
 }
 
 template <typename Output, typename Scale, typename Vector, typename... Ts>
-Output* dequantize_group_helper(std::any input, std::any scale,
-                                std::any zero_point, codegen::Tensor tensor,
-                                int block_size, int axis) {
-  Output* output = nullptr;
+std::shared_ptr<Output[]> dequantize_group_helper(std::any input,
+                                                  std::any scale,
+                                                  std::any zero_point,
+                                                  Tensor tensor, int block_size,
+                                                  int axis) {
+  std::shared_ptr<Output[]> output;
   bool matched =
       (dequantize_group<Ts, Scale, Vector, Output>(
            input, scale, zero_point, output, tensor, block_size, axis) ||
        ...);
   if (!matched) {
-    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype());
+    throw std::runtime_error("Unsupported tensor dtype: " + tensor.dtype);
   }
   return output;
 }
 
 template <typename Output, typename Scale, typename Vector>
-Output* dequantize_tensor_group(std::any input, std::any scale,
-                                std::any zero_point, codegen::Tensor tensor,
-                                int block_size, int axis) {
+std::shared_ptr<Output[]> dequantize_tensor_group(std::any input,
+                                                  std::any scale,
+                                                  std::any zero_point,
+                                                  Tensor tensor, int block_size,
+                                                  int axis) {
   return dequantize_group_helper<Output, Scale, Vector, SUPPORTED_TYPES>(
       input, scale, zero_point, tensor, block_size, axis);
 }
