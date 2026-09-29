@@ -18,8 +18,23 @@ These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
   resident weight sets, narrow weight ports, both result layouts, mixed
   completions, output backpressure, and reset recovery. This also exercises
   `CIMTile`; there is no separate tile suite or geometry sweep.
+- `test-systemc-processor`: three configurations cover bit-parallel and
+  bit-serial macros and double-buffered accumulation. They check resident-set
+  replay and ring refills, bias and IC/FX/FY reductions, local-context reuse,
+  SRAM fallback, independent read/write progress, and output backpressure.
 
-Use either target independently. Generated models, dependency files, and
+The processor currently supports signed native INT8 operands and output-major
+results. It consumes ordered weight-sequence descriptors alongside packed
+weight beats. Backend defaults and the descriptor are declared in
+`src/cim/CIMConfig.h` and `src/cim/CIMTypes.h`.
+
+SRAM-backed reductions require enough independent output contexts between
+dependent operations to cover the accumulation-memory feedback latency. The
+processor diagnoses stale partial-sum reads in simulation; this check does
+not add a hardware interlock. These fixtures emulate memory backpressure and
+check that dependent reads follow completed writes.
+
+Use each target independently. Generated models, dependency files, and
 executables stay under `test/unittest/build/systemc`. Run `make -C test/unittest
 clean` after changing toolchains.
 
