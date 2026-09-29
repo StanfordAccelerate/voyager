@@ -208,6 +208,9 @@ def write_makefile(path: Path) -> None:
                 f"--top-module CIMIntElementPacked --prefix {case.prefix} "
                 f"--Mdir {case_dir} {verilator_params(case)}",
                 f"\t$(MAKE) -C {case_dir} -f {case.prefix}.mk CXX=$(SYSTEMC_CC)",
+                # Verilator can reuse an unchanged archive after a prerequisite
+                # changes. Mark the successful check so Make does not repeat it.
+                "\ttouch $@",
                 "",
             ]
         )
