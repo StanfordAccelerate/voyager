@@ -30,15 +30,28 @@ SYSTEMC_CXXFLAGS := -std=c++17 -O2 -MMD -MP \
 SYSTEMC_LDFLAGS := -L$(CATAPULT_ROOT)/shared/lib \
     -Wl,-rpath,$(CATAPULT_ROOT)/shared/lib -lsystemc -pthread
 
+SYSTEMC_PROCESSOR_CXXFLAGS := $(filter-out -DIC_DIMENSION=4,$(SYSTEMC_CXXFLAGS)) \
+    -DIC_DIMENSION=8
+PROCESSOR_CASES := parallel serial banked
+PROCESSOR_FLAGS_parallel := -DCIM_PROCESSOR_TEST_MODE=0
+PROCESSOR_FLAGS_serial := -DCIM_PROCESSOR_TEST_MODE=1
+PROCESSOR_FLAGS_banked := -DCIM_PROCESSOR_TEST_MODE=0 \
+    -DDOUBLE_BUFFERED_ACCUM_BUFFER=true
+PROCESSOR_TESTS := $(addprefix $(SYSTEMC_BUILD)/CIMProcessorTb-,$(PROCESSOR_CASES))
+-include $(addsuffix .d,$(PROCESSOR_TESTS))
+
 .PHONY: test-systemc test-systemc-element test-systemc-array test-verilog \
-    check-systemc-env clean
-test-systemc: test-systemc-element test-systemc-array
+    test-systemc-processor check-systemc-env clean
+test-systemc: test-systemc-element test-systemc-array test-systemc-processor
 
 test-systemc-element: $(SYSTEMC_BUILD)/CIMElementTb
 	$<
 
 test-systemc-array: $(SYSTEMC_BUILD)/CIMArrayTb
 	$<
+
+test-systemc-processor: $(PROCESSOR_TESTS)
+	@for test in $^; do echo "Running $${test##*/}"; "$$test" || exit $$?; done
 
 # The existing Verilog suites remain independently runnable.
 test-verilog:
@@ -65,6 +78,15 @@ $(SYSTEMC_BUILD)/CIMElementTb: $(SYSTEMC_BUILD)/CIMElementTb.o $(CIM_ELEMENT_VER
 
 $(SYSTEMC_BUILD)/CIMArrayTb: $(SYSTEMC_BUILD)/CIMArrayTb.o
 	$(SYSTEMC_CC) -o $@ $^ $(SYSTEMC_LDFLAGS)
+
+$(addsuffix .o,$(PROCESSOR_TESTS)): $(SYSTEMC_BUILD)/CIMProcessorTb-%.o: $(THIS_DIR)/systemc/CIMProcessorTb.cc $(THIS_DIR)/Makefile | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(SYSTEMC_PROCESSOR_CXXFLAGS) $(PROCESSOR_FLAGS_$*) -c -o $@ $<
+
+$(PROCESSOR_TESTS): $(SYSTEMC_BUILD)/CIMProcessorTb-%: $(SYSTEMC_BUILD)/CIMProcessorTb-%.o
+	$(SYSTEMC_CC) -o $@ $^ $(SYSTEMC_LDFLAGS)
+
+.SECONDARY: $(addsuffix .o,$(PROCESSOR_TESTS))
 
 check-systemc-env:
 	@test -n "$(CATAPULT_ROOT)" || { echo "CATAPULT_ROOT is unset; source .envrc with the CAD mount available."; exit 2; }
