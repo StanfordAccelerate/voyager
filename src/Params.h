@@ -1,5 +1,9 @@
 #pragma once
 
+#ifndef __SYNTHESIS__
+#include <cassert>
+#endif
+
 #ifndef NO_SYSC
 #include <mc_connections.h>
 #endif
@@ -11,6 +15,19 @@ struct BaseParams {
   // empty, only purpose is to serve as a base class for polymorphism
   // We need this or any other virtual member to make Base polymorphic
   virtual ~BaseParams() {}
+};
+
+// Semantic levels used by controller-facing matrix schedule accessors
+enum class MatrixLoopLevel : unsigned { L1 = 0, L2 = 1 };
+
+// Canonical matrix loop parameters independent of physical loop slots
+enum class MatrixLoopParam : unsigned {
+  OX = 0,
+  OY,
+  IC,
+  OC,
+  FX,
+  FY,
 };
 
 struct MatrixParams : BaseParams {
@@ -536,6 +553,75 @@ struct MatrixParams : BaseParams {
     return true;
   }
 };
+
+// Convert one semantic level to the legacy MatrixParams storage index
+inline int matrix_loop_storage_level(MatrixLoopLevel level) {
+  return level == MatrixLoopLevel::L1 ? 1 : 0;
+}
+
+// Return the physical position assigned to one semantic loop parameter
+inline ac_int<3, false> matrix_loop_position(const MatrixParams& params,
+                                            MatrixLoopLevel level,
+                                            MatrixLoopParam loop_param) {
+  const int storage_level = matrix_loop_storage_level(level);
+  switch (loop_param) {
+    case MatrixLoopParam::OX:
+      return params.x_loop_idx[storage_level];
+    case MatrixLoopParam::OY:
+      return params.y_loop_idx[storage_level];
+    case MatrixLoopParam::IC:
+      return params.reduction_loop_idx[storage_level];
+    case MatrixLoopParam::OC:
+      return params.weight_loop_idx[storage_level];
+    case MatrixLoopParam::FX:
+      return level == MatrixLoopLevel::L1 ? params.fx_loop_idx
+                                         : ac_int<3, false>(5);
+    case MatrixLoopParam::FY:
+      return params.fy_loop_idx[storage_level];
+  }
+  return 0;
+}
+
+// Return one bound by physical slot without exposing storage-level numbering
+inline ac_int<MatrixParams::LOOP_WIDTH, false> matrix_loop_slot_bound(
+    const MatrixParams& params, MatrixLoopLevel level, int slot) {
+  return params.loops[matrix_loop_storage_level(level)][slot];
+}
+
+// Return one bound by semantic loop parameter
+inline ac_int<MatrixParams::LOOP_WIDTH, false> matrix_loop_bound(
+    const MatrixParams& params, MatrixLoopLevel level, MatrixLoopParam loop_param) {
+  return matrix_loop_slot_bound(params, level,
+                               matrix_loop_position(params, level, loop_param));
+}
+
+// Return whether an OX/OY output dimension repeats the same weights
+//
+// At L1, one selected weight remains unchanged. At L2, each full L1 traversal
+// requests the same weights in the same order
+inline bool matrix_loop_reuses_weights(
+    const MatrixParams& params, MatrixLoopLevel level,
+    MatrixLoopParam output_dimension) {
+#ifndef __SYNTHESIS__
+  assert((output_dimension == MatrixLoopParam::OX ||
+          output_dimension == MatrixLoopParam::OY) &&
+         "weight reuse requires OX or OY");
+#endif
+  const auto output_loop_position =
+      matrix_loop_position(params, level, output_dimension);
+  return (matrix_loop_bound(params, level, MatrixLoopParam::OC) == 1 ||
+          matrix_loop_position(params, level, MatrixLoopParam::OC) <
+              output_loop_position) &&
+         (matrix_loop_bound(params, level, MatrixLoopParam::IC) == 1 ||
+          matrix_loop_position(params, level, MatrixLoopParam::IC) <
+              output_loop_position) &&
+         (matrix_loop_bound(params, level, MatrixLoopParam::FY) == 1 ||
+          matrix_loop_position(params, level, MatrixLoopParam::FY) <
+              output_loop_position) &&
+         (matrix_loop_bound(params, level, MatrixLoopParam::FX) == 1 ||
+          matrix_loop_position(params, level, MatrixLoopParam::FX) <
+              output_loop_position);
+}
 
 // TODO: this should be parameterized on VECTOR_DATATYPE
 struct VectorInstructions {
