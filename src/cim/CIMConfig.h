@@ -73,6 +73,11 @@
 #define CIM_C_PORT_TILES CIM_OUTPUT_AXIS_TILES
 #endif
 
+// CIMProcessor consumes one output-major beat containing the reduced result.
+#ifndef CIM_C_BEAT_LAYOUT
+#define CIM_C_BEAT_LAYOUT 1
+#endif
+
 #ifndef CIM_ARRAY_RESULT_SLOTS
 #define CIM_ARRAY_RESULT_SLOTS CIM_INPUT_AXIS_TILES
 #endif

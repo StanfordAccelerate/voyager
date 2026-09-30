@@ -3,15 +3,23 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include "ArchitectureParams.h"
 #include "DoubleBuffer.h"
 #include "DualPortBuffer.h"
 #include "InputController.h"
 #include "InputScaleController.h"
-#include "MatrixProcessor.h"
 #include "OutputController.h"
-#include "WeightController.h"
+#include "ParamsDeserializer.h"
 #include "WeightScaleController.h"
 #include "mc_scverify.h"
+
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+#include "cim/CIMProcessor.h"
+#include "cim/CIMWeightController.h"
+#else
+#include "MatrixProcessor.h"
+#include "WeightController.h"
+#endif
 
 SC_MODULE(MatrixUnit) {
   sc_in<bool> CCS_INIT_S1(clk);
@@ -29,6 +37,33 @@ SC_MODULE(MatrixUnit) {
   static constexpr int ACCUM_BUFFER_BANKS = 2;
 #else
   static constexpr int ACCUM_BUFFER_BANKS = 1;
+#endif
+
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+  using ActiveMatrixProcessor = CIMProcessor<
+      InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
+      ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE, IC_DIMENSION,
+      OC_DIMENSION, ACCUM_BUFFER_SIZE, CIM_MACRO_INPUT_LANES,
+      CIM_MACRO_OUTPUT_LANES, CIM_WEIGHT_SETS, CIM_BASE_A_WIDTH,
+      CIM_BASE_B_WIDTH, CIM_BASE_C_WIDTH, CIM_MACRO_WRITE_INPUT_LANES,
+      CIM_MAC_LATENCY, CIM_MODE, CIM_SIGNED, CIM_TILE_INPUT_AXIS_ELEMENTS,
+      CIM_TILE_OUTPUT_AXIS_ELEMENTS, CIM_INPUT_AXIS_TILES,
+      CIM_OUTPUT_AXIS_TILES, CIM_A_PORT_TILES, CIM_B_PORT_TILES,
+      CIM_C_PORT_TILES, CIM_C_BEAT_LAYOUT, CIM_ARRAY_RESULT_SLOTS,
+      CIM_LOCAL_ACCUM_CONTEXTS>;
+  using ActiveWeightController = CIMWeightController<
+      WeightTypeList, ACCUM_BUFFER_DATATYPE, IC_DIMENSION, OC_DIMENSION,
+      OC_PORT_WIDTH, ActiveMatrixProcessor::WEIGHT_ROW_WIDTH,
+      ActiveMatrixProcessor::WEIGHT_WRITE_WIDTH, CIM_WEIGHT_SETS>;
+#else
+  using ActiveMatrixProcessor =
+      MatrixProcessor<InputTypeList, WeightTypeList, SA_INPUT_TYPE,
+                      SA_WEIGHT_TYPE, ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE,
+                      SCALE_DATATYPE, IC_DIMENSION, OC_DIMENSION,
+                      ACCUM_BUFFER_SIZE>;
+  using ActiveWeightController =
+      WeightController<WeightTypeList, ACCUM_BUFFER_DATATYPE, IC_DIMENSION,
+                       OC_DIMENSION, OC_PORT_WIDTH, WEIGHT_BUFFER_WIDTH>;
 #endif
 
   MatrixParamsDeserializer<0, PARAMS_MODULE_COUNT> CCS_INIT_S1(
@@ -68,22 +103,28 @@ SC_MODULE(MatrixUnit) {
       input_scale_read_resp);
 #endif
 
-  WeightController<WeightTypeList, ACCUM_BUFFER_DATATYPE, IC_DIMENSION,
-                   OC_DIMENSION, OC_PORT_WIDTH, WEIGHT_BUFFER_WIDTH>
-      CCS_INIT_S1(weight_controller);
+  ActiveWeightController CCS_INIT_S1(weight_controller);
 
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+  Connections::Combinational<
+      ac_int<ActiveMatrixProcessor::WEIGHT_WRITE_WIDTH, false>>
+      CCS_INIT_S1(weight_channel);
+  Connections::Combinational<cim::WeightDescriptor> CCS_INIT_S1(
+      weight_descriptor_channel);
+#else
   DoubleBuffer<WEIGHT_BUFFER_SIZE, WEIGHT_BUFFER_WIDTH> CCS_INIT_S1(
       weight_buffer);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(weight_req);
-  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(weight_resp);
-  Connections::Out<MemoryRequest> CCS_INIT_S1(bias_req);
-  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(bias_resp);
   Connections::Combinational<
       BufferWriteRequest<ac_int<WEIGHT_BUFFER_WIDTH, false>>>
       weight_buffer_write_req[2];
   Connections::Combinational<BufferReadRequest> weight_buffer_read_req[2];
   Connections::Combinational<ac_int<WEIGHT_BUFFER_WIDTH, false>> CCS_INIT_S1(
       weight_buffer_read_resp);
+#endif
+  Connections::Out<MemoryRequest> CCS_INIT_S1(weight_req);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(weight_resp);
+  Connections::Out<MemoryRequest> CCS_INIT_S1(bias_req);
+  Connections::In<ac_int<OC_PORT_WIDTH, false>> CCS_INIT_S1(bias_resp);
 
 #if SUPPORT_MX
   WeightScaleController<SCALE_DATATYPE, IC_DIMENSION, OC_DIMENSION,
@@ -101,10 +142,7 @@ SC_MODULE(MatrixUnit) {
       weight_scale_read_resp);
 #endif
 
-  MatrixProcessor<InputTypeList, WeightTypeList, SA_INPUT_TYPE, SA_WEIGHT_TYPE,
-                  ACCUM_DATATYPE, ACCUM_BUFFER_DATATYPE, SCALE_DATATYPE,
-                  IC_DIMENSION, OC_DIMENSION, ACCUM_BUFFER_SIZE>
-      CCS_INIT_S1(matrix_processor);
+  ActiveMatrixProcessor CCS_INIT_S1(matrix_processor);
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
       CCS_INIT_S1(bias_data);
 
@@ -201,6 +239,10 @@ SC_MODULE(MatrixUnit) {
     weight_controller.bias_resp(bias_resp);
     weight_controller.bias_data(bias_data);
 
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+    weight_controller.weight_channel(weight_channel);
+    weight_controller.weight_descriptor_channel(weight_descriptor_channel);
+#else
     weight_buffer.clk(clk);
     weight_buffer.rstn(rstn);
     for (int i = 0; i < 2; i++) {
@@ -211,6 +253,7 @@ SC_MODULE(MatrixUnit) {
       weight_buffer.read_request[i](weight_buffer_read_req[i]);
     }
     weight_buffer.output(weight_buffer_read_resp);
+#endif
 
 #if SUPPORT_MX
     weight_scale_controller.clk(clk);
@@ -234,7 +277,12 @@ SC_MODULE(MatrixUnit) {
     matrix_processor.clk(clk);
     matrix_processor.rstn(rstn);
     matrix_processor.input_channel(window_buffer_out);
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+    matrix_processor.weight_channel(weight_channel);
+    matrix_processor.weight_descriptor_channel(weight_descriptor_channel);
+#else
     matrix_processor.weight_channel(weight_buffer_read_resp);
+#endif
     matrix_processor.bias_channel(bias_data);
     matrix_processor.params_in(matrix_params[2]);
     matrix_processor.start(start);
