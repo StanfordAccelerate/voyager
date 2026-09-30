@@ -204,9 +204,6 @@ proc pre_architect {} {
   }
 }
 
-# ==============================================================================
-# Pre-Extract
-# ==============================================================================
 proc pre_extract {} {
   global DOUBLE_BUFFERED_ACCUM_BUFFER
   ignore_memory_precedences -from WRITE_BANK_0* -to READ_BANK_0*
