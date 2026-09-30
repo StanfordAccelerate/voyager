@@ -165,6 +165,18 @@ using F9 = StdFloat<3, 5>;
 // Common Constants
 // ================================================================
 
+#define MATRIX_BACKEND_SYSTOLIC 0
+#define MATRIX_BACKEND_CIM 1
+
+#ifndef MATRIX_BACKEND
+#define MATRIX_BACKEND MATRIX_BACKEND_SYSTOLIC
+#endif
+
+#if MATRIX_BACKEND != MATRIX_BACKEND_SYSTOLIC && \
+    MATRIX_BACKEND != MATRIX_BACKEND_CIM
+#error "Unsupported matrix backend"
+#endif
+
 #ifndef DOUBLE_BUFFERED_ACCUM_BUFFER
 #define DOUBLE_BUFFERED_ACCUM_BUFFER false
 #endif
