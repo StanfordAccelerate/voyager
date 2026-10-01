@@ -20,13 +20,9 @@ static constexpr int CIM_C_BEAT_OUTPUT_MAJOR = 1;
 template <int MACRO_INPUT_LANES, int MACRO_OUTPUT_LANES, int WEIGHT_SETS,
           int BASE_A_WIDTH, int BASE_B_WIDTH,
           int BASE_C_WIDTH, int MACRO_WRITE_INPUT_LANES, int MAC_LATENCY, int MODE,
-          // A_WIDTH/B_WIDTH/C_WIDTH are the operand and accumulator widths from
-          // the datatype: A and B size the input and weight, C sizes the
-          // reduced result the processor accumulates and stores. C_WIDTH comes
-          // from the accumulation datatype (ACCUM_DATATYPE::width), the same
-          // way the systolic array takes its accumulator type; the per-tile
-          // BASE_C_WIDTH stays a separate free knob that only sizes one
-          // vector-matrix mul
+          // A_WIDTH, B_WIDTH, and C_WIDTH come from the input, weight, and
+          // accumulation datatypes. C_WIDTH sizes the reduced array result;
+          // BASE_C_WIDTH sizes each macro's accumulator.
           int A_WIDTH, int B_WIDTH, int C_WIDTH, bool SIGNED,
           // Tile-internal layout; the input axis reduces into C while the
           // output axis retains distinct B/C channels
@@ -37,26 +33,26 @@ template <int MACRO_INPUT_LANES, int MACRO_OUTPUT_LANES, int WEIGHT_SETS,
           // Output-axis tiles hold distinct B/C channels that
           // MACRequest::multicast optionally shares A among
           int OUTPUT_AXIS_TILES,
-          // --- Beat and port geometry
-          // --------------------------------------------------------------- One
-          // ready/valid transfer moves one beat, whose payload width is an
-          // integer number of complete tiles A_PORT_TILES is the number of A
-          // tiles per beat Each A tile carries one complete Tile::AData payload
-          // of Tile::INPUT_LANES scalars The current A beat spans the input axis; any
-          // future narrower beats must be assembled before MAC issue
+          // Beat and port geometry: one ready/valid transfer moves a beat
+          // containing an integer number of complete tile payloads.
+          // A_PORT_TILES is the number of A tiles per beat. Each carries one
+          // Tile::AData payload of Tile::INPUT_LANES scalars. The A beat spans
+          // the full input axis; narrower beats would need assembly before
+          // MAC issue.
           int A_PORT_TILES,
           // B_PORT_TILES is the number of B tiles per beat
           // A direct request addresses one aligned, non-wrapping span along the
           // output axis, so B_PORT_TILES must be no wider than that axis and
-          // must evenly divide it; data[input_index] maps to output_axis_tile_base + input_index A
-          // replicate request copies data[0] across the output axis and leaves
-          // the remaining payload tiles unused Routing a B beat wider than the
-          // output axis is deferred
+          // must evenly divide it. data[input_index] maps to
+          // output_axis_tile_base + input_index. A replicate request copies
+          // data[0] across the output axis and leaves the remaining payload
+          // tiles unused. Routing a B beat wider than the output axis is not
+          // implemented.
           int B_PORT_TILES,
           // C_PORT_TILES is the number of C tiles per beat
           int C_PORT_TILES,
           // C_BEAT_LAYOUT selects which tile axis advances first when one
-          // operation requires multiple C beats Input-major advances input
+          // operation requires multiple C beats. Input-major advances input
           // indices first; output-major advances output indices first
           int C_BEAT_LAYOUT,
           // Each output tile owns this many tile-vector result slots
@@ -377,7 +373,7 @@ SC_MODULE(CIMArray) {
 
     SC_METHOD(drive_write_admission);
     sensitive << rstn << write_request_channel.vld << write_request_channel.dat;
-    // Write admission now also depends on which set the MAC holds, so it needs
+    // Write admission depends on which set the MAC holds, so it needs
     // the same issue-path sensitivity as drive_mac_issue
     sensitive << held_compute_set << mac_request_channel.vld
               << mac_request_channel.dat;
@@ -726,11 +722,10 @@ SC_MODULE(CIMArray) {
 
   // Return whether a B write must wait for the MAC to release its set.
   //
-  // An element forbids writing the B set an issue window is using. The window
-  // is one cycle wide only for a bit-parallel macro; a bit-serial macro walks A
-  // a slice at a time and holds its set for the whole walk, so a single-cycle
-  // write is illegal anywhere inside it. The write is what yields, because the
-  // MAC side already waits for every window to close before it is admitted.
+  // An element holds its B set while consuming all A slices in either macro
+  // mode. Writes to that set must wait until the issue window closes. The MAC
+  // side waits for every element's previous issue window before accepting
+  // another request.
   //
   // The two terms are mutually exclusive. held_compute_set registers on the firing
   // edge, so it names the busy set for the remainder of an open window; on the

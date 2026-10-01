@@ -59,7 +59,9 @@ Tiling get_tiling(const voyager::Operation& operation, const ScalarEnv& env) {
   Tiling tiling;
   if (manual_tiling || !operation.has_tiling()) {
 #if MATRIX_BACKEND == MATRIX_BACKEND_CIM
-    throw std::invalid_argument("CIM matrix operations require compiler tiling");
+    throw std::invalid_argument(
+        "The MANUAL_TILING fallback is not implemented for CIM yet; "
+        "provide an explicit L1/L2 schedule in the IR");
 #endif
     spdlog::info("Using manual tiling for operation {} with target {}\n",
                  operation.name(), strip_namespace(first_op.target()));

@@ -24,7 +24,7 @@
 // produces one C vector using the weight set selected by compute_set.
 // A weight write supplies WRITE_INPUT_LANES consecutive input positions for
 // every output lane, starting at write_input_index in write_set.
-// Each element output lane combines WEIGHT_SLICES native macro output lanes.
+// Each element output lane combines WEIGHT_SLICES macro output lanes.
 
 `include "cim_typedefs.svh"
 
@@ -91,8 +91,8 @@ module CIMIntElement #(
   // For bit-parallel, the slice is the fixed BASE_A_WIDTH fed into the macro wrapper. For bit-serial, the internal
   // accumulator width may allow the macro wrapper to process a wider slice than BASE_A_WIDTH, so it performs an
   // additional "intra-slice" (or window) walking.
-  // We refer the base width the macro wrapper processes at a time as a "window", and the max width the macro wrapper
-  // can process a "slice". A slice contains one or more window.
+  // We call the base width the macro wrapper processes at a time a "window", and the maximum width the macro wrapper
+  // can process a "slice". A slice contains one or more windows. The full element operand may span multiple slices.
 
   // ---------------------------------------------------------------------------
   // Slice Walking
@@ -371,7 +371,7 @@ module CIMIntElement #(
     end
   end
 
-  // Weight slices occupy consecutive native macro output lanes:
+  // Weight slices occupy consecutive macro output lanes:
   // macro_output_index = output_index * WEIGHT_SLICES + slice_idx.
   // Each write covers the same input positions in every output lane.
   //
@@ -381,7 +381,7 @@ module CIMIntElement #(
   //   write offset 0   b[0][0]        b[0][1]
   //   write offset 1   b[1][0]        b[1][1]
   //
-  // macro_wrapper_b:         native output lanes
+  // macro_wrapper_b:         macro output lanes
   //                          0             1             2             3
   //   write offset 0   b[0][0].sl0   b[0][0].sl1   b[0][1].sl0   b[0][1].sl1
   //   write offset 1   b[1][0].sl0   b[1][0].sl1   b[1][1].sl0   b[1][1].sl1
@@ -510,7 +510,7 @@ module CIMIntElement #(
 
 endmodule
 
-// CIMIntElementPacked adapts Catapult-friendly packed buses to the native array RTL
+// CIMIntElementPacked adapts packed buses from Catapult to the array ports of CIMIntElement
 module CIMIntElementPacked #(
     parameter int unsigned MACRO_INPUT_LANES = 64,
     parameter int unsigned MACRO_OUTPUT_LANES = 8,

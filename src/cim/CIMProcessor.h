@@ -47,9 +47,7 @@ SC_MODULE(CIMProcessor) {
   static constexpr int INPUT_LANES = input_lanes;
   static constexpr int OUTPUT_LANES = output_lanes;
 
-  // A/B/C operand widths follow the datatypes the same way MatrixProcessor
-  // takes Input/Weight/Psum; the CIM array is width-parameterized, so derive
-  // the widths from those types here rather than passing them in separately
+  // Derive array input, weight, and accumulation widths from their datatypes.
   static constexpr int A_WIDTH = Input::width;
   static constexpr int B_WIDTH = Weight::width;
   static constexpr int C_WIDTH = Psum::width;
@@ -169,28 +167,22 @@ SC_MODULE(CIMProcessor) {
   static constexpr int ACCUM_BUFFER_BANKS = 1;
 #endif
 
-  static_assert(std::is_same<Input, DataTypes::int8>::value,
-                "CIMProcessor currently supports native INT8 input only");
-  static_assert(std::is_same<Weight, DataTypes::int8>::value,
-                "CIMProcessor currently supports native INT8 weights only");
+  static_assert(std::is_same<Input, Int<Input::width, SIGNED>>::value,
+                "CIMProcessor input must be an integer matching CIM_SIGNED");
+  static_assert(std::is_same<Weight, Int<Weight::width, SIGNED>>::value,
+                "CIMProcessor weight must be an integer matching CIM_SIGNED");
   static_assert(!SUPPORT_MX,
                 "CIMProcessor currently does not define microscaling across "
                 "the input axis");
   static_assert(!SUPPORT_CODEBOOK_QUANT,
                 "CIMProcessor currently does not decode codebook operands");
-  // Both macro modes are driven identically from here. The processor never
-  // assumes an issue-window length: it hands MAC requests to the array and
-  // waits on the array's ready/credit handshake, and every window- and
-  // latency-derived constant below the array comes from
-  // Element::issue_window(), which already accounts for the per-slice serial
-  // walk. Bit-serial therefore only makes each issue longer -- it does not
-  // change the protocol. The widths one serial slice needs are enforced in
-  // CIMElement
+  // Both macro modes use the same request protocol. The array's ready/credit
+  // handshake controls when the processor can issue a MAC. CIMElement derives
+  // the issue interval and result latency from the operand widths, base
+  // widths, and macro mode, and checks the bit-serial accumulator capacity.
   static_assert(MODE == 0 || MODE == 1,
                 "CIMProcessor supports bit-parallel (0) and bit-serial (1) CIM "
                 "macros");
-  static_assert(
-      SIGNED, "CIMProcessor currently requires signed native INT8 arithmetic");
   static_assert(C_BEAT_LAYOUT == CIM_C_BEAT_OUTPUT_MAJOR,
                 "CIMProcessor currently requires output-major C beats");
   static_assert(
@@ -370,7 +362,7 @@ SC_MODULE(CIMProcessor) {
 
 #ifndef __SYNTHESIS__
   // Diagnose read-after-write hazards at the SRAM feedback boundary in
-  // simulation This reference exists only to localize stale partial-sum reads,
+  // simulation. This reference exists only to localize stale partial-sum reads,
   // not to replace final-output checking or synthesize hardware dependency
   // checks
   struct AccumulationReadCheck {
@@ -978,8 +970,8 @@ SC_MODULE(CIMProcessor) {
         MACRequest request;
         request.a = pack_a_beat(input_channel.Pop());
         request.compute_set = selected_weight_set;
-        // Current mapping multicasts each A beat to every tile along the output
-        // axis output_tile_index is ignored for multicast requests; zero is its
+        // Multicast each A beat to every tile along the output axis.
+        // output_tile_index is ignored for multicast requests; zero is its
         // canonical unused value
         request.output_tile_index = 0;
         request.multicast = 1;

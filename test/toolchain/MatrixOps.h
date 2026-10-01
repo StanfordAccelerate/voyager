@@ -240,11 +240,13 @@ void map_matrix_operation(const voyager::Operation& operation,
 
 #if MATRIX_BACKEND == MATRIX_BACKEND_CIM
   if (!is_fc && !is_dwc &&
-      (input.dtype != "int8" || weight.dtype != "int8" || is_mx_op ||
+      (input.dtype != DataTypes::TypeName<SA_INPUT_TYPE>::name() ||
+       weight.dtype != DataTypes::TypeName<SA_WEIGHT_TYPE>::name() || is_mx_op ||
        has_arg(matrix_op, "input_code") || has_arg(matrix_op, "weight_code") ||
        weight_dequantize_op != nullptr || has_fused_spmm(matrix_op))) {
     throw std::invalid_argument(
-        "CIM matrix operations require native INT8 operands");
+        "CIM matrix operands must match the hardware datatypes; microscaling, "
+        "codebooks, weight dequantization, and sparse operands are unsupported");
   }
 #endif
 
