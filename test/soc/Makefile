@@ -109,6 +109,13 @@ COMMON_OBJS := \
 	$(CC_BUILD_DIR)/voyager_ir.pb.o \
 	$(CC_BUILD_DIR)/spdlog.o
 
+# Resolve these prerequisites even when the shared build directory is new.
+# The root Makefile owns their sources and dependency rules.
+TOOLCHAIN_OBJS := $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/Tiling.o \
+	$(CC_BUILD_DIR)/voyager_ir.pb.o
+$(TOOLCHAIN_OBJS): toolchain
+	@test -f $@
+
 SOC_OBJS := \
 	$(CC_BUILD_DIR)/EmitC.o \
 	$(CC_BUILD_DIR)/HostRequests.o
