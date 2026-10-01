@@ -5,7 +5,7 @@ set full_block_name_stripped [string map {" " ""} $full_block_name]
 proc pre_analyze {} {
   global CATAPULT_BUILD_DIR ROOT IC_DIMENSION
 
-  set path $ROOT/$CATAPULT_BUILD_DIR/ProcessingElement.log
+  set path [file join $ROOT $CATAPULT_BUILD_DIR ProcessingElement.log]
   puts $path
   if [file exist $path] {
         if {[catch {exec grep -P "Info:.+Final schedule of SEQUENTIAL '/ProcessingElement.+:run/run" $path} res] == 0} {
