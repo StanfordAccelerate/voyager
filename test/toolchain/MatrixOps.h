@@ -13,6 +13,32 @@
 #include "test/toolchain/SpMM.h"
 #endif
 
+// Project the matrix output loops in their scheduled order, excluding
+// reduction and filter loops even when they occupy outer slots.
+void set_matrix_outer_output_loops(
+    const Tiling& tiling, ac_int<VectorParams::LOOP_WIDTH, false> (&loops)[3],
+    ac_int<3, false>& x_idx, ac_int<3, false>& y_idx, ac_int<3, false>& k_idx) {
+  // DWC aliases its semantic indices to zero but uses all three bounds.
+  if (tiling.x_loop_idx[0] == 0 && tiling.y_loop_idx[0] == 0 &&
+      tiling.weight_loop_idx[0] == 0) {
+    for (int i = 0; i < 3; ++i) loops[i] = tiling.loops[0][i];
+    x_idx = y_idx = k_idx = 0;
+    return;
+  }
+
+  int output_slot = 0;
+  for (int slot = 0; slot < 5; ++slot) {
+    if (slot == tiling.x_loop_idx[0] || slot == tiling.y_loop_idx[0] ||
+        slot == tiling.weight_loop_idx[0]) {
+      loops[output_slot] = tiling.loops[0][slot];
+      if (slot == tiling.x_loop_idx[0]) x_idx = output_slot;
+      if (slot == tiling.y_loop_idx[0]) y_idx = output_slot;
+      if (slot == tiling.weight_loop_idx[0]) k_idx = output_slot;
+      ++output_slot;
+    }
+  }
+}
+
 void set_vector_fetch_1(const Tensor& tensor, const Tiling& tiling,
                         VectorParams* vector_params) {
   int nonzero_dims = 0;
@@ -37,12 +63,11 @@ void set_vector_fetch_1(const Tensor& tensor, const Tiling& tiling,
       OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   // copy loop values and indices
-  for (int i = 0; i < 3; i++) {
-    vector_params->vector_fetch_1_loops[0][i] = tiling.loops[0][i];
-  }
-  vector_params->vector_fetch_1_x_loop_idx[0] = tiling.x_loop_idx[0];
-  vector_params->vector_fetch_1_y_loop_idx[0] = tiling.y_loop_idx[0];
-  vector_params->vector_fetch_1_k_loop_idx[0] = tiling.weight_loop_idx[0];
+  set_matrix_outer_output_loops(
+      tiling, vector_params->vector_fetch_1_loops[0],
+      vector_params->vector_fetch_1_x_loop_idx[0],
+      vector_params->vector_fetch_1_y_loop_idx[0],
+      vector_params->vector_fetch_1_k_loop_idx[0]);
 
   int loop_index = 0;
   for (int i = 0; i < 6; i++) {
@@ -88,12 +113,11 @@ void set_vector_fetch_2(const Tensor& tensor, const Tiling& tiling,
       OC_DIMENSION / VECTOR_UNIT_WIDTH;
 
   // copy loop values and indices
-  for (int i = 0; i < 3; i++) {
-    vector_params->vector_fetch_2_loops[0][i] = tiling.loops[0][i];
-  }
-  vector_params->vector_fetch_2_x_loop_idx[0] = tiling.x_loop_idx[0];
-  vector_params->vector_fetch_2_y_loop_idx[0] = tiling.y_loop_idx[0];
-  vector_params->vector_fetch_2_k_loop_idx[0] = tiling.weight_loop_idx[0];
+  set_matrix_outer_output_loops(
+      tiling, vector_params->vector_fetch_2_loops[0],
+      vector_params->vector_fetch_2_x_loop_idx[0],
+      vector_params->vector_fetch_2_y_loop_idx[0],
+      vector_params->vector_fetch_2_k_loop_idx[0]);
 
   int loop_index = 0;
   for (int i = 0; i < 6; i++) {
@@ -213,6 +237,16 @@ void map_matrix_operation(const voyager::Operation& operation,
     throw std::runtime_error("DWC not supported in this build");
 #endif
   }
+
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+  if (!is_fc && !is_dwc &&
+      (input.dtype != "int8" || weight.dtype != "int8" || is_mx_op ||
+       has_arg(matrix_op, "input_code") || has_arg(matrix_op, "weight_code") ||
+       weight_dequantize_op != nullptr || has_fused_spmm(matrix_op))) {
+    throw std::invalid_argument(
+        "CIM matrix operations require native INT8 operands");
+  }
+#endif
 
   Tiling tiling;
 
@@ -637,12 +671,10 @@ void map_matrix_operation(const voyager::Operation& operation,
   vector_params->vector_output_offset = get_address(output);
 
   // Set outer loops
-  for (int i = 0; i < 3; i++) {
-    vector_params->output_loops[0][i] = tiling.loops[0][i];
-  }
-  vector_params->output_y_loop_idx[0] = tiling.y_loop_idx[0];
-  vector_params->output_x_loop_idx[0] = tiling.x_loop_idx[0];
-  vector_params->output_k_loop_idx[0] = tiling.weight_loop_idx[0];
+  set_matrix_outer_output_loops(
+      tiling, vector_params->output_loops[0],
+      vector_params->output_x_loop_idx[0], vector_params->output_y_loop_idx[0],
+      vector_params->output_k_loop_idx[0]);
 
   // Set inner loops
   int output_loop_idx = 0;
