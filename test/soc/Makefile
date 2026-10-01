@@ -3,6 +3,7 @@
 # ============================================================
 
 ACCEL_DIR = ../..
+include $(ACCEL_DIR)/config.mk
 
 # Build parameters (filled in from environment or defaults)
 BUILD_DIR ?= $(ACCEL_DIR)/build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)_$(SUPPORT_SPMM)
@@ -51,6 +52,7 @@ override BASE_FLAGS += \
 	-Wno-class-memaccess \
 	-Wall \
 	-Wno-bool-compare \
+	$(ARCHITECTURE_DEFINES) \
 	$(EXTRA_SIM_CXXFLAGS)
 
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
