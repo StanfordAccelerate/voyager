@@ -306,3 +306,8 @@ if {$SUPPORT_DWC} {
   set DWC_DATATYPE $INPUT_DATATYPE
   set DWC_PSUM $ACCUM_DATATYPE
 }
+
+source scripts/utils/cim_config.tcl
+if {$MATRIX_BACKEND == $MATRIX_BACKEND_CIM && $DATATYPE ni {INT8 INT8_32}} {
+  error "The CIM processor currently requires native INT8 operands (INT8 or INT8_32)"
+}
