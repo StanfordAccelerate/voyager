@@ -7,6 +7,8 @@ CC := $(CATAPULT_ROOT)/bin/g++
 
 export CODEGEN_DIR ?= test/compiler
 
+include config.mk
+
 # Check if the environment variable is set
 check_env_var:
 ifndef DATATYPE
@@ -29,17 +31,6 @@ INC := \
 	-I$(CONDA_PREFIX)/include \
 	-I.
 
-export INPUT_BUFFER_SIZE ?= 1024
-export WEIGHT_BUFFER_SIZE ?= 1024
-export ACCUM_BUFFER_SIZE ?= 1024
-
-# Defaulting these to false matches the #ifndef fallbacks in
-# ArchitectureParams.h, so -DX=false and leaving X undefined are equivalent.
-export DOUBLE_BUFFERED_ACCUM_BUFFER ?= false
-export SUPPORT_MVM ?= false
-export SUPPORT_SPMM ?= false
-export SUPPORT_DWC ?= false
-
 # TODO(fpedd): Fix code and remove Wno-* flags step by step
 override BASE_FLAGS += \
 	$(INC) \
@@ -55,20 +46,7 @@ override BASE_FLAGS += \
 	-Wno-bool-compare \
 	-DSPDLOG_COMPILED_LIB \
 	-DSPDLOG_EOL=\"\" \
-	-D$(DATATYPE) \
-	-DIC_DIMENSION=$(IC_DIMENSION) \
-	-DOC_DIMENSION=$(OC_DIMENSION) \
-	-DINPUT_BUFFER_SIZE=$(INPUT_BUFFER_SIZE) \
-	-DWEIGHT_BUFFER_SIZE=$(WEIGHT_BUFFER_SIZE) \
-	-DACCUM_BUFFER_SIZE=$(ACCUM_BUFFER_SIZE) \
-	-DDOUBLE_BUFFERED_ACCUM_BUFFER=$(DOUBLE_BUFFERED_ACCUM_BUFFER) \
-	-DSUPPORT_MVM=$(SUPPORT_MVM) \
-	-DSUPPORT_SPMM=$(SUPPORT_SPMM) \
-	-DSUPPORT_DWC=$(SUPPORT_DWC)
-
-ifdef CLOCK_PERIOD
-	override BASE_FLAGS += -DCLOCK_PERIOD=$(CLOCK_PERIOD)
-endif
+	$(ARCHITECTURE_DEFINES)
 
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG -g -O0 -ggdb
