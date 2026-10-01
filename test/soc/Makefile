@@ -16,14 +16,14 @@ export PROJECT_ROOT ?= $(ACCEL_DIR)
 # Toolchain
 # ============================================================
 
-CC := /cad/mentor/2024.2_2/Mgc_home/bin/g++
+CC := $(CATAPULT_ROOT)/bin/g++
 
 # ============================================================
 # Includes
 # ============================================================
 
 INC := \
-	-I/cad/mentor/2024.2_2/Mgc_home/shared/include/ \
+	-I$(CATAPULT_ROOT)/shared/include/ \
 	-I$(ACCEL_DIR)/lib/ \
 	-I$(ACCEL_DIR)/lib/xtensor/include \
 	-I$(ACCEL_DIR)/lib/xtl/include \
@@ -58,8 +58,9 @@ override BASE_FLAGS += \
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
 LDFLAGS  += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op \
             -labsl_log_internal_message -labsl_log_internal_nullguard \
-            -lrt -lpthread -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
-LDLIBS   += -L/cad/mentor/2024.2_2/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
+            -lrt -lpthread -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib \
+            -Wl,-rpath=$(CATAPULT_ROOT)/shared/lib
+LDLIBS   += -L$(CATAPULT_ROOT)/shared/lib/ -L$(CONDA_PREFIX)/lib
 
 # ============================================================
 # Debug / Release Mode Switch
