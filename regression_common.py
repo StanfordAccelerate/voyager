@@ -55,6 +55,13 @@ def get_build_folder(env_vars):
     return result.stdout.strip()
 
 
+def get_scverify_rtl_config(env_vars):
+    if env_vars.get("MATRIX_BACKEND", "0") == "1":
+        include_dir = Path(__file__).resolve().parent / "src/cim"
+        return "Verify_rtl_v_vcs.mk", ["-j1", f"VLOG_INCDIRS={include_dir}"]
+    return "Verify_concat_sim_rtl_v_vcs.mk", []
+
+
 def actual_tile_count(num_tiles):
     """Tiles a run actually executes: MAX_TILES bounds the tile loop; unset or
     0 means the whole loop runs (matching the interpreter, the C emitter, and

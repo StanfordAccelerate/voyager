@@ -27,12 +27,15 @@ if {![regexp {(^|\s)-DCLOCK_PERIOD=} $architecture_defines]} {
   append architecture_defines " -DCLOCK_PERIOD=$CLOCK_PERIOD"
 }
 solution options set Input/CompilerFlags $architecture_defines
-solution options set Input/SearchPath "$ROOT/lib"
+solution options set Input/SearchPath "$ROOT/lib $ROOT/src"
 solution options set Architectural/DefaultMemMapThreshold 1024
 solution options set Architectural/DefaultRegisterThreshold 4096
 solution options set Flows/Enable-SCVerify yes
 solution options set Flows/VCS/SYSC_VERSION 2.3.3
 solution options set Flows/VCS/VLOGAN_OPTS {+v2k -timescale=1ns/10ps +notimingcheck +define+UNIT_DELAY}
+if {$MATRIX_BACKEND == $MATRIX_BACKEND_CIM || [string match CIM* $BLOCK]} {
+  solution options set Flows/VCS/VLOGAN_OPTS "-sverilog +incdir+$ROOT/src/cim -timescale=1ns/10ps +notimingcheck +define+UNIT_DELAY"
+}
 # solution options set Flows/VCS/VCSSIM_OPTS {+fsdbfile+dump.fsdb +fsdb+all=on +fsdb+dumpon+0}
 solution options set Flows/VCS/VCSSIM_OPTS {+vcs+lic+wait}
 solution options set Flows/VCS/VCS_DOFILE "$ROOT/utils/dump.do"
@@ -54,6 +57,8 @@ flow package option set /SCVerify/USE_VCS true
 go new
 
 # Add source files
+# The accelerator hierarchy instantiates the concrete child templates selected
+# by each block script; an isolated template header is not a design instance.
 solution file add $ROOT/src/Accelerator.h -type CHEADER
 
 # Add testbench files

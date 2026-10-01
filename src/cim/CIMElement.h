@@ -180,8 +180,8 @@ SC_MODULE(CIMElementPacked) {
     ac_blackbox()
         .entity("CIMIntElementPacked")
         .verilog_files(
-            "cim/cim_macro_wrapper.sv cim/cim_macro_model.sv "
-            "cim/cim_macro_1.sv cim/cim_element.sv")
+            "cim_macro_wrapper.sv cim_macro_model.sv "
+            "cim_macro_1.sv cim_element.sv")
         .parameter("MACRO_INPUT_LANES", MACRO_INPUT_LANES)
         .parameter("MACRO_OUTPUT_LANES", MACRO_OUTPUT_LANES)
         .parameter("WEIGHT_SETS", WEIGHT_SETS)

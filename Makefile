@@ -126,6 +126,9 @@ ifeq ($(SUPPORT_SPMM), true)
 VU_RTL_DEPENDENCIES += $(CATAPULT_BUILD_DIR)/OutlierFilter/OutlierFilter.v1/concat_rtl.v
 endif
 
+###########################################################
+# Standalone synthesis targets
+###########################################################
 # For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
 InputController: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v
@@ -141,8 +144,40 @@ MatrixVectorUnit: $(CATAPULT_BUILD_DIR)/MatrixVectorUnit/MatrixVectorUnit.v1/con
 SpMMUnit: $(CATAPULT_BUILD_DIR)/SpMMUnit/SpMMUnit.v1/concat_rtl.v
 MulAddTree: $(CATAPULT_BUILD_DIR)/MulAddTree/MulAddTree.v1/concat_rtl.v
 DwCUnit: $(CATAPULT_BUILD_DIR)/DwCUnit/DwCUnit.v1/concat_rtl.v
-Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 
+###########################################################
+# CIM block synthesis
+###########################################################
+# Rebuild CIM blocks when their SystemC headers or blackbox RTL change.
+CIM_HEADERS := $(wildcard src/cim/*.h) src/PackUtils.h src/ConnectionsSignal.h
+CIM_RTL_SOURCES := $(wildcard src/cim/*.sv src/cim/*.svh)
+
+# Blocks containing SystemVerilog blackboxes emit concat_rtl.sv.
+# The weight controller has no blackbox and emits concat_rtl.v.
+CIMElement: $(CATAPULT_BUILD_DIR)/CIMElement/CIMElement.v1/concat_rtl.sv
+CIMArray: $(CATAPULT_BUILD_DIR)/CIMArray/CIMArray.v1/concat_rtl.sv
+CIMProcessor: $(CATAPULT_BUILD_DIR)/CIMProcessor/CIMProcessor.v1/concat_rtl.sv
+CIMWeightController: $(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v
+
+$(CATAPULT_BUILD_DIR)/CIMElement/CIMElement.v1/concat_rtl.sv: $(CIM_HEADERS) $(CIM_RTL_SOURCES) $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMElement catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMElement.log
+
+$(CATAPULT_BUILD_DIR)/CIMArray/CIMArray.v1/concat_rtl.sv: $(CIM_HEADERS) $(CIM_RTL_SOURCES) $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMArray catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMArray.log
+
+$(CATAPULT_BUILD_DIR)/CIMProcessor/CIMProcessor.v1/concat_rtl.sv: $(CIM_HEADERS) $(CIM_RTL_SOURCES) $(CATAPULT_BUILD_DIR)/CIMArray/CIMArray.v1/concat_rtl.sv $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMProcessor catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMProcessor.log
+
+$(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v: $(CIM_HEADERS) $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMWeightController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMWeightController.log
+
+###########################################################
+# Systolic matrix blocks and shared controllers
+###########################################################
 $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v: src/InputController.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=InputController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/InputController.log
@@ -171,6 +206,9 @@ $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/conca
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixParamsDeserializer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer.log
 
+###########################################################
+# Vector and optional accelerator blocks
+###########################################################
 $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v: src/vector_unit/VectorFetch.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorFetchUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorFetchUnit.log
@@ -231,29 +269,85 @@ $(CATAPULT_BUILD_DIR)/DwCUnit/DwCUnit.v1/concat_rtl.v: src/DwCUnit.h $(CATAPULT_
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=DwCUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/DwCUnit.log
 
-$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: \
-	src/Accelerator.h \
-	src/DoubleBuffer.h \
+###########################################################
+# MatrixUnit and Accelerator synthesis
+###########################################################
+# CIM parents emit .sv because their hierarchy contains CIM blackboxes.
+ifeq ($(MATRIX_BACKEND),1)
+MatrixUnit: $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv
+Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.sv
+
+$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv: \
+	src/MatrixUnit.h src/DoubleBuffer.h src/DualPortBuffer.h \
+	scripts/blocks/MatrixUnit.tcl scripts/main.tcl \
 	$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/CIMProcessor/CIMProcessor.v1/concat_rtl.sv \
 	$(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v \
+	$(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=MatrixUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixUnit.log
+
+$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.sv: \
+	src/Accelerator.h \
+	scripts/blocks/Accelerator.tcl scripts/main.tcl \
+	$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv \
+	$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v \
 	$(RTL_DEPENDENCIES) \
 	$(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log
+else
+# The systolic hierarchy emits concat_rtl.v, as in the original flow.
+MatrixUnit: $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v
+Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
+
+$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v: \
+	src/MatrixUnit.h src/DoubleBuffer.h src/DualPortBuffer.h \
+	scripts/blocks/MatrixUnit.tcl scripts/main.tcl \
+	$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v \
+	$(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=MatrixUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixUnit.log
+
+$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: \
+	src/Accelerator.h \
+	scripts/blocks/Accelerator.tcl scripts/main.tcl \
+	$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v \
+	$(RTL_DEPENDENCIES) \
+	$(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log
+endif
 
 .PHONY: rtl Accelerator InputController WeightController MatrixProcessor ProcessingElement VectorUnit VectorParamsDeserializer VectorFetchUnit VectorPipeline VectorReducer VectorAccumulator OutputController MatrixVectorUnit MulAddTree DwCUnit
+.PHONY: CIMElement CIMArray CIMProcessor CIMWeightController MatrixUnit
 
-# Run RTL simulation
+###########################################################
+# RTL simulation
+###########################################################
+SCVERIFY_RTL_ARGS :=
+ifeq ($(MATRIX_BACKEND),1)
+# This flow includes the separate CIM blackbox RTL files.
+SCVERIFY_RTL_MK := Verify_rtl_v_vcs.mk
+# Serialize library setup to avoid compilation starting before it finishes.
+SCVERIFY_RTL_ARGS := -j1 VLOG_INCDIRS=$(PROJ_ROOT)/src/cim
+else
+# Preserve the original concatenated-netlist flow for systolic builds.
+SCVERIFY_RTL_MK := Verify_concat_sim_rtl_v_vcs.mk
+endif
+
 .PHONY: rtl-sim
 rtl-sim: rtl network-proto
-	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 make -f ./scverify/Verify_concat_sim_rtl_v_vcs.mk SIMTOOL=vcs sim
+	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 $(MAKE) -f ./scverify/$(SCVERIFY_RTL_MK) $(SCVERIFY_RTL_ARGS) SIMTOOL=vcs sim
 
 .PHONY: rtl-sim-debug
 rtl-sim-debug: rtl network-proto
-	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 SIM_DUMP_FSDB=1 make -f ./scverify/Verify_concat_sim_rtl_v_vcs.mk SIMTOOL=vcs sim
+	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 SIM_DUMP_FSDB=1 $(MAKE) -f ./scverify/$(SCVERIFY_RTL_MK) $(SCVERIFY_RTL_ARGS) SIMTOOL=vcs sim
 
 ###########################################################
 # SystemC / RTL harness
