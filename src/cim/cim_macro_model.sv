@@ -23,7 +23,7 @@ module CIMIntMacroModel #(
     input  logic                  mac,                     // Signals the start of an MAC op, no need to stay high for the mac pipeline; for bit-serial, this performs one-bit mac; for bit-parallel, this performs an A_WIDTHxB_WIDTH mac
     input  logic                  init,                    // Serial: marks the first partial result when mac is high; ignored by bit-parallel
     input  logic                  a_signed,
-    input  logic                  b_signed [OUTPUT_LANES],       // Each output write_input_offset can have different signedness, which is needed to support wider signed B computation
+    input  logic                  b_signed [OUTPUT_LANES],       // Each output lane can have different signedness, which is needed to support wider signed B computation
     input  logic [INPUT_INDEX_WIDTH-1:0] write_input_index,                    // Input channel written across all output lanes
     input  logic [SET_INDEX_WIDTH-1:0]   write_set,                    // Weight set selected for writing B
     input  logic [SET_INDEX_WIDTH-1:0]   compute_set,                    // Weight set selected for MAC computation

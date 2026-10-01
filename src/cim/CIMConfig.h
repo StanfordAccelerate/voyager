@@ -2,7 +2,7 @@
 
 #include "ArchitectureParams.h"
 
-// Native macro geometry and arithmetic. Element output capacity also depends
+// Macro geometry and arithmetic. Element output capacity also depends
 // on the weight datatype width relative to CIM_BASE_B_WIDTH.
 
 #ifndef CIM_MACRO_INPUT_LANES
@@ -87,7 +87,7 @@
 #endif
 
 namespace cim {
-// Native INT8 processing uses one intermediate accumulation result at a time.
+// The processor passes one intermediate accumulation result at a time.
 constexpr int ACCUM_TO_WB_FIFO_DEPTH = 1;
 constexpr int OUTPUT_FIFO_DEPTH = 8;
 constexpr int ACCUM_METADATA_FIFO_DEPTH = 2;

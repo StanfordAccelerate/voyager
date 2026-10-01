@@ -18,7 +18,7 @@
 // Relative to a bare element the tile adds two registered stages: the A station
 // captures A/compute_set on an accepted issue and pulses the elements on the following
 // cycle, then the C stage registers the reduction across the input-axis
-// elements INPUT_AXIS_ELEMENTS and OUTPUT_AXIS_ELEMENTS describe the grid
+// elements. INPUT_AXIS_ELEMENTS and OUTPUT_AXIS_ELEMENTS describe the grid
 // dimensions; no Connections protocol is exposed here. The input axis reduces
 // into C while the output axis retains distinct B/C channels
 template <int MACRO_INPUT_LANES, int MACRO_OUTPUT_LANES, int WEIGHT_SETS,
