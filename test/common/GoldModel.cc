@@ -122,13 +122,18 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
   };
 
   // The vector unit computes in one type, so a buffer stored more narrowly --
-  // a residual kept in fp8 -- is converted as it is fetched. A value an
+  // a residual kept in fp8 -- is converted as it is fetched. A vector value an
   // earlier prim of this fusion produced is already in that type whatever
   // dtype the IR declares for it; the chain narrows once, at cast_output.
   const auto vector_operand = [&](const voyager::PrimOp& op,
                                   const std::string& key) {
-    const Tensor tensor = resolve(op, key, env);
+    Tensor tensor = resolve(op, key, env);
     std::any ptr = kwargs[tensor.node];
+    // A matrix producer retains the accumulator type until the vector unit
+    // consumes it, independently of the fused intermediate's declared dtype.
+    if (ptr.type() == typeid(std::shared_ptr<AccumBuffer[]>)) {
+      tensor.dtype = DataTypes::TypeName<AccumBuffer>::name();
+    }
     if (ptr.type() != typeid(std::shared_ptr<Vector[]>)) {
       cast_input<Vector, SUPPORTED_TYPES>(ptr, tensor);
     }
@@ -441,7 +446,14 @@ std::vector<std::any> run_operation(const voyager::Operation& operation,
   std::any output_ptr = kwargs[op_list.back()->name()];
   const auto output_tensor = output_tensors[num_outputs - 1];
 
-  cast_output<Vector, SUPPORTED_TYPES>(output_ptr, output_tensor, output_code);
+  // A direct matrix output bypasses the vector unit and retains its integer
+  // accumulator precision when the two engines use different types.
+  if (output_ptr.type() == typeid(std::shared_ptr<AccumBuffer[]>)) {
+    cast_output<AccumBuffer, SUPPORTED_TYPES>(output_ptr, output_tensor,
+                                            output_code);
+  } else {
+    cast_output<Vector, SUPPORTED_TYPES>(output_ptr, output_tensor, output_code);
+  }
   outputs.push_back(output_ptr);
 
   if (output_code != nullptr) {
