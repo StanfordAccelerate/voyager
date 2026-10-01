@@ -139,8 +139,12 @@ using F9 = StdFloat<3, 5>;
 // Number of bits used to represent the data type index
 #define DTYPE_INDEX_WIDTH 2
 
+#ifndef IC_PORT_WIDTH
 #define IC_PORT_WIDTH (IC_DIMENSION * 4)
+#endif
+#ifndef OC_PORT_WIDTH
 #define OC_PORT_WIDTH (OC_DIMENSION * 4)
+#endif
 #define MV_UNIT_WIDTH (OC_DIMENSION * 2)
 #define SPMM_UNIT_WIDTH OC_DIMENSION
 #define VECTOR_UNIT_WIDTH OC_DIMENSION
@@ -303,12 +307,14 @@ using WeightTypeList = std::tuple<WEIGHT_DATATYPE>;
 // ================================================================
 
 #ifndef IC_PORT_WIDTH
+#warning "IC_PORT_WIDTH is unset; using IC_DIMENSION * INPUT_DTYPE_WIDTH"
 #define IC_PORT_WIDTH (IC_DIMENSION * INPUT_DTYPE_WIDTH)
 #endif
 
 #define IC_PORT_TYPE ac_int<IC_PORT_WIDTH, false>
 
 #ifndef OC_PORT_WIDTH
+#warning "OC_PORT_WIDTH is unset; using OC_DIMENSION * WEIGHT_DTYPE_WIDTH"
 #define OC_PORT_WIDTH (OC_DIMENSION * WEIGHT_DTYPE_WIDTH)
 #endif
 
