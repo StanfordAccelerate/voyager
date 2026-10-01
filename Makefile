@@ -69,7 +69,7 @@ LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 ###########################################################
 # Build Directories
 ###########################################################
-BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)_$(SUPPORT_SPMM)
+BUILD_DIR ?= build/$(BUILD_NAME)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 # Create build dirs automatically
@@ -346,23 +346,23 @@ TestRunner-checker: check_env_var $(CC_BUILD_DIR)/TestRunner-checker
 
 .PHONY: sim
 sim: $(CC_BUILD_DIR)/TestRunner network-proto
-	./$(CC_BUILD_DIR)/TestRunner
+	$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim
 fast-sim: $(CC_BUILD_DIR)/TestRunner-fast network-proto
-	./$(CC_BUILD_DIR)/TestRunner-fast
+	$(CC_BUILD_DIR)/TestRunner-fast
 
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
-	gdb ./$(CC_BUILD_DIR)/TestRunner
+	gdb $(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim-check
 fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
-	./$(CC_BUILD_DIR)/TestRunner-checker
+	$(CC_BUILD_DIR)/TestRunner-checker
 
 .PHONY: fast-sim-debug
 fast-sim-debug: $(CC_BUILD_DIR)/TestRunner-fast network-proto
-	gdb ./$(CC_BUILD_DIR)/TestRunner-fast
+	gdb $(CC_BUILD_DIR)/TestRunner-fast
 
 ###########################################################
 # Developer targets that need no Catapult
@@ -378,11 +378,11 @@ AccuracyTester: check_env_var $(CC_BUILD_DIR)/AccuracyTester
 
 .PHONY: ResNetAccuracy
 ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
+	$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
 
 .PHONY: MobileBertAccuracy
 MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
+	$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
 
 ###########################################################
 # Toolchain

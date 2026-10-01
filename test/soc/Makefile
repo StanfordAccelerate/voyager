@@ -6,7 +6,7 @@ ACCEL_DIR = ../..
 include $(ACCEL_DIR)/config.mk
 
 # Build parameters (filled in from environment or defaults)
-BUILD_DIR ?= $(ACCEL_DIR)/build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)_$(SUPPORT_SPMM)
+BUILD_DIR ?= $(ACCEL_DIR)/build/$(BUILD_NAME)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 
 export CODEGEN_DIR ?= test/compiler
