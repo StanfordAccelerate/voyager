@@ -12,6 +12,7 @@ the log-scrape patterns both flows grade with.
 """
 
 import os
+from pathlib import Path
 import re
 import signal
 import subprocess
@@ -38,15 +39,20 @@ def set_default_env_vars(env_vars):
 
 
 def get_build_folder(env_vars):
-    return (
-        f"build/"
-        f"{env_vars['DATATYPE']}_"
-        f"{env_vars['IC_DIMENSION']}x{env_vars['OC_DIMENSION']}_"
-        f"{env_vars['INPUT_BUFFER_SIZE']}x{env_vars['WEIGHT_BUFFER_SIZE']}x{env_vars['ACCUM_BUFFER_SIZE']}_"
-        f"{env_vars['DOUBLE_BUFFERED_ACCUM_BUFFER']}_"
-        f"{env_vars['SUPPORT_MVM']}_"
-        f"{env_vars['SUPPORT_SPMM']}"
+    if env_vars.get("BUILD_DIR"):
+        return env_vars["BUILD_DIR"]
+    # Evaluate Make's configuration without running the root build recipes,
+    # adding a print target, or duplicating defaults and directory naming here.
+    result = subprocess.run(
+        ["make", "--no-print-directory", "-s", "-f", "config.mk", "-f", "-"],
+        input="$(info build/$(BUILD_NAME))\nconfig_query: ;\n",
+        cwd=Path(__file__).resolve().parent,
+        env=env_vars,
+        text=True,
+        capture_output=True,
+        check=True,
     )
+    return result.stdout.strip()
 
 
 def actual_tile_count(num_tiles):

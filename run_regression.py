@@ -73,7 +73,6 @@ def run_gold_model_unit_test(model, layer, output_folder):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
-    env_vars["CLOCK_PERIOD"] = "1"
     env_vars["SIMS"] = "gold,pytorch"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
@@ -93,6 +92,7 @@ def run_gold_model_unit_test(model, layer, output_folder):
 
 def run_gold_model_tests(layers, num_processes, results_folder):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
+    env_vars = os.environ.copy()
 
     # Build TestRunner binary
     # subprocess.run(["make", "clean"], env=env_vars)
@@ -100,7 +100,7 @@ def run_gold_model_tests(layers, num_processes, results_folder):
     with open(f"{results_folder}/build.log", "w") as stdout_file:
         subprocess.run(
             ["make", "-j", "TestRunner"],
-            env=os.environ,
+            env=env_vars,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
         )
@@ -136,7 +136,6 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
     env_vars = os.environ.copy()
     env_vars["NETWORK"] = model
     env_vars["TESTS"] = layer
-    env_vars["CLOCK_PERIOD"] = "1"
     env_vars["SIMS"] = "gold,accelerator"
 
     with open(f"{output_folder}/{model}_{layer}.log", "w") as stdout_file:
@@ -161,14 +160,15 @@ def run_systemc_unit_test(model, layer, output_folder, fast):
 
 def run_systemc_tests(layers, num_processes, results_folder, fast):
     check_environment_vars(["DATATYPE", "IC_DIMENSION", "OC_DIMENSION"])
+    env_vars = os.environ.copy()
 
     # Build TestRunner binary
-    subprocess.run(["make", "clean"], env=os.environ)
+    subprocess.run(["make", "clean"], env=env_vars)
 
     with open(f"{results_folder}/build.log", "w") as stdout_file:
         subprocess.run(
             ["make", "-j", "TestRunner-fast" if fast else "TestRunner"],
-            env=os.environ,
+            env=env_vars,
             stdout=stdout_file,
             stderr=subprocess.STDOUT,
         )
