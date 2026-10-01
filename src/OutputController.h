@@ -105,6 +105,8 @@ SC_MODULE(MatrixUnitOutputController) {
       }
 
       // set irrelevant loop bounds to 0
+      loop_bounds[0][params.reduction_loop_idx[0]] = 0;
+      loop_bounds[0][params.fy_loop_idx[0]] = 0;
       loop_bounds[1][params.reduction_loop_idx[1]] = 0;
       loop_bounds[1][params.fy_loop_idx[1]] = 0;
       loop_bounds[1][params.fx_loop_idx] = 0;
@@ -114,48 +116,57 @@ SC_MODULE(MatrixUnitOutputController) {
       for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-            for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
-              for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
-                  for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
-                    for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
-                      for (loop_counters[1][5] = 0;; loop_counters[1][5]++) {
-                        ac_int<LOOP_WIDTH, false> y1 =
-                            loop_counters[0][params.y_loop_idx[0]];
-                        ac_int<LOOP_WIDTH, false> x1 =
-                            loop_counters[0][params.x_loop_idx[0]];
-                        ac_int<LOOP_WIDTH, false> k1 =
-                            loop_counters[0][params.weight_loop_idx[0]];
-                        ac_int<LOOP_WIDTH, false> y0 =
-                            loop_counters[1][params.y_loop_idx[1]];
-                        ac_int<LOOP_WIDTH, false> x0 =
-                            loop_counters[1][params.x_loop_idx[1]];
-                        ac_int<LOOP_WIDTH, false> k0 =
-                            loop_counters[1][params.weight_loop_idx[1]];
+            for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
+              for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
+                for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
+                          for (loop_counters[1][5] = 0;;
+                               loop_counters[1][5]++) {
+                            ac_int<LOOP_WIDTH, false> y1 =
+                                loop_counters[0][params.y_loop_idx[0]];
+                            ac_int<LOOP_WIDTH, false> x1 =
+                                loop_counters[0][params.x_loop_idx[0]];
+                            ac_int<LOOP_WIDTH, false> k1 =
+                                loop_counters[0][params.weight_loop_idx[0]];
+                            ac_int<LOOP_WIDTH, false> y0 =
+                                loop_counters[1][params.y_loop_idx[1]];
+                            ac_int<LOOP_WIDTH, false> x0 =
+                                loop_counters[1][params.x_loop_idx[1]];
+                            ac_int<LOOP_WIDTH, false> k0 =
+                                loop_counters[1][params.weight_loop_idx[1]];
 
-                        ac_int<32, false> address = k0 * Y0 * X0 + y0 * X0 + x0;
+                            ac_int<32, false> address =
+                                k0 * Y0 * X0 + y0 * X0 + x0;
 
-                        accumulation_buffer_read_address
-                            [accumulation_buffer_bank]
-                                .Push(address);
+                            accumulation_buffer_read_address
+                                [accumulation_buffer_bank]
+                                    .Push(address);
 
-                        if (k0 == K1 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
-                          accumulation_buffer_done[accumulation_buffer_bank]
-                              .SyncPush();
-                          accumulation_buffer_bank = !accumulation_buffer_bank;
+                            if (k0 == K1 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
+                              accumulation_buffer_done[accumulation_buffer_bank]
+                                  .SyncPush();
+                              accumulation_buffer_bank =
+                                  !accumulation_buffer_bank;
+                            }
+
+                            if (loop_counters[1][5] == loop_bounds[1][5]) break;
+                          }
+                          if (loop_counters[1][4] == loop_bounds[1][4]) break;
                         }
-
-                        if (loop_counters[1][5] == loop_bounds[1][5]) break;
+                        if (loop_counters[1][3] == loop_bounds[1][3]) break;
                       }
-                      if (loop_counters[1][4] == loop_bounds[1][4]) break;
+                      if (loop_counters[1][2] == loop_bounds[1][2]) break;
                     }
-                    if (loop_counters[1][3] == loop_bounds[1][3]) break;
+                    if (loop_counters[1][1] == loop_bounds[1][1]) break;
                   }
-                  if (loop_counters[1][2] == loop_bounds[1][2]) break;
+                  if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
-                if (loop_counters[1][1] == loop_bounds[1][1]) break;
+                if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
-              if (loop_counters[1][0] == loop_bounds[1][0]) break;
+              if (loop_counters[0][3] == loop_bounds[0][3]) break;
             }
             if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
@@ -212,6 +223,8 @@ SC_MODULE(MatrixUnitOutputController) {
       }
 
       // set irrelevant loop bounds to 0
+      loop_bounds[0][params.reduction_loop_idx[0]] = 0;
+      loop_bounds[0][params.fy_loop_idx[0]] = 0;
       loop_bounds[1][params.reduction_loop_idx[1]] = 0;
       loop_bounds[1][params.fy_loop_idx[1]] = 0;
       loop_bounds[1][params.fx_loop_idx] = 0;
@@ -226,85 +239,92 @@ SC_MODULE(MatrixUnitOutputController) {
       for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-            for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
-              for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
-                for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
-                  for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
-                    for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
-                      for (loop_counters[1][5] = 0;; loop_counters[1][5]++) {
-                        ac_int<LOOP_WIDTH, false> y1 =
-                            loop_counters[0][params.y_loop_idx[0]];
-                        ac_int<LOOP_WIDTH, false> x1 =
-                            loop_counters[0][params.x_loop_idx[0]];
-                        ac_int<LOOP_WIDTH, false> k2 =
-                            loop_counters[0][params.weight_loop_idx[0]];
-                        ac_int<LOOP_WIDTH, false> y0 =
-                            loop_counters[1][params.y_loop_idx[1]];
-                        ac_int<LOOP_WIDTH, false> x0 =
-                            loop_counters[1][params.x_loop_idx[1]];
-                        ac_int<LOOP_WIDTH, false> k1 =
-                            loop_counters[1][params.weight_loop_idx[1]];
+            for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
+              for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
+                for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
+                  for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
+                    for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
+                      for (loop_counters[1][3] = 0;; loop_counters[1][3]++) {
+                        for (loop_counters[1][4] = 0;; loop_counters[1][4]++) {
+                          for (loop_counters[1][5] = 0;;
+                               loop_counters[1][5]++) {
+                            ac_int<LOOP_WIDTH, false> y1 =
+                                loop_counters[0][params.y_loop_idx[0]];
+                            ac_int<LOOP_WIDTH, false> x1 =
+                                loop_counters[0][params.x_loop_idx[0]];
+                            ac_int<LOOP_WIDTH, false> k2 =
+                                loop_counters[0][params.weight_loop_idx[0]];
+                            ac_int<LOOP_WIDTH, false> y0 =
+                                loop_counters[1][params.y_loop_idx[1]];
+                            ac_int<LOOP_WIDTH, false> x0 =
+                                loop_counters[1][params.x_loop_idx[1]];
+                            ac_int<LOOP_WIDTH, false> k1 =
+                                loop_counters[1][params.weight_loop_idx[1]];
 
-                        Pack1D<BufferType, width> outputs;
+                            Pack1D<BufferType, width> outputs;
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
-                        if (params.write_output_to_accum_buffer) {
-                          outputs = accumulation_buffer_read_data
-                                        [accumulation_buffer_bank]
-                                            .Pop();
-                          ac_int<LOOP_WIDTH, false> x0 =
-                              loop_counters[1][params.x_loop_idx[1]];
-                          ac_int<LOOP_WIDTH, false> y0 =
-                              loop_counters[1][params.y_loop_idx[1]];
-                          ac_int<LOOP_WIDTH, false> k1 =
-                              loop_counters[1][params.weight_loop_idx[1]];
+                            if (params.write_output_to_accum_buffer) {
+                              outputs = accumulation_buffer_read_data
+                                            [accumulation_buffer_bank]
+                                                .Pop();
+                              ac_int<LOOP_WIDTH, false> x0 =
+                                  loop_counters[1][params.x_loop_idx[1]];
+                              ac_int<LOOP_WIDTH, false> y0 =
+                                  loop_counters[1][params.y_loop_idx[1]];
+                              ac_int<LOOP_WIDTH, false> k1 =
+                                  loop_counters[1][params.weight_loop_idx[1]];
 
-                          if (k1 == k1_max && y0 == y0_max && x0 == x0_max) {
-                            accumulation_buffer_bank =
-                                !accumulation_buffer_bank;
-                          }
-                        } else
+                              if (k1 == k1_max && y0 == y0_max && x0 == x0_max) {
+                                accumulation_buffer_bank =
+                                    !accumulation_buffer_bank;
+                              }
+                            } else
 #endif
-                        {
-                          outputs = matrix_processor_output.Pop();
-                        }
+                            {
+                              outputs = matrix_processor_output.Pop();
+                            }
 
-                        if (params.output_to_memory) {
-                          ac_int<16, false> y = y1 * Y0 + y0;
-                          ac_int<16, false> x = x1 * X0 + x0;
-                          ac_int<16, false> k = k2 * K1 + k1 * width;
-                          ac_int<32, false> address = y * X * K + x * K + k;
+                            if (params.output_to_memory) {
+                              ac_int<16, false> y = y1 * Y0 + y0;
+                              ac_int<16, false> x = x1 * X0 + x0;
+                              ac_int<16, false> k = k2 * K1 + k1 * width;
+                              ac_int<32, false> address = y * X * K + x * K + k;
 
-                          bool found = (send_output_data_and_addr<
-                                            OutputTypes, width, BufferType,
-                                            OC_PORT_WIDTH, ADDRESS_WIDTH,
-                                            OutputTypes...>(
-                                            params.output_dtype, outputs,
-                                            params.output_offset, address,
-                                            matrix_unit_output_data,
-                                            matrix_unit_output_addr) ||
-                                        ...);
+                              bool found = (send_output_data_and_addr<
+                                                OutputTypes, width, BufferType,
+                                                OC_PORT_WIDTH, ADDRESS_WIDTH,
+                                                OutputTypes...>(
+                                                params.output_dtype, outputs,
+                                                params.output_offset, address,
+                                                matrix_unit_output_data,
+                                                matrix_unit_output_addr) ||
+                                            ...);
 #ifndef __SYNTHESIS__
-                          if (!found) {
-                            std::cerr << "Error: output type '"
-                                      << params.output_dtype
-                                      << "' is not valid.\n";
-                          }
+                              if (!found) {
+                                std::cerr << "Error: output type '"
+                                          << params.output_dtype
+                                          << "' is not valid.\n";
+                              }
 #endif
-                        } else {
-                          vector_unit_input_data.Push(outputs);
-                        }
+                            } else {
+                              vector_unit_input_data.Push(outputs);
+                            }
 
-                        if (loop_counters[1][5] == loop_bounds[1][5]) break;
+                            if (loop_counters[1][5] == loop_bounds[1][5]) break;
+                          }
+                          if (loop_counters[1][4] == loop_bounds[1][4]) break;
+                        }
+                        if (loop_counters[1][3] == loop_bounds[1][3]) break;
                       }
-                      if (loop_counters[1][4] == loop_bounds[1][4]) break;
+                      if (loop_counters[1][2] == loop_bounds[1][2]) break;
                     }
-                    if (loop_counters[1][3] == loop_bounds[1][3]) break;
+                    if (loop_counters[1][1] == loop_bounds[1][1]) break;
                   }
-                  if (loop_counters[1][2] == loop_bounds[1][2]) break;
+                  if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
-                if (loop_counters[1][1] == loop_bounds[1][1]) break;
+                if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
-              if (loop_counters[1][0] == loop_bounds[1][0]) break;
+              if (loop_counters[0][3] == loop_bounds[0][3]) break;
             }
             if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
