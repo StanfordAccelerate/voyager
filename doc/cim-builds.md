@@ -13,12 +13,13 @@ source ./.envrc && make -j2 TestRunner DATATYPE=INT8 \
 ```
 
 The CIM processor supports native INT8 operands with either `INT8` (24-bit
-accumulation) or `INT8_32` (32-bit accumulation). Workload mapping for CIM is
-a separate compiler integration step. The compiler now accepts matching
+accumulation) or `INT8_32` (32-bit accumulation). The compiler accepts matching
 `matrix_backend` and `cim_*` configuration through `AcceleratorConfig` and
 CLI flags such as `--matrix_backend 1 --pe_array_size 64,16`. It validates
-geometry and capacity, but rejects CIM transformation and compilation until
-the mapping and instruction lowering are implemented. Building the hardware
+geometry and capacity. Standalone CIM tiling models resident-weight reuse
+and streaming refills for padded INT8 GEMMs and dense unit-stride convolutions.
+CIM graph transformation and instruction lowering are unsupported;
+`transform()` and `compile()` reject CIM configurations. Building the hardware
 does not change the compiler's backend or layout policy.
 
 ## Geometry and configuration
