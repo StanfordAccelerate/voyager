@@ -1,4 +1,82 @@
-# Matrix backend build directories
+# Matrix backend builds
+
+`MATRIX_BACKEND=0` selects the systolic backend (the default), and
+`MATRIX_BACKEND=1` selects CIM. `config.mk` contains the shared hardware
+defaults and supplies the same defines to native C++ builds, Catapult, and
+SCVerify. Override settings through Make arguments or environment variables.
+
+Build the native accelerator with the default CIM geometry:
+
+```bash
+source ./.envrc && make -j2 TestRunner DATATYPE=INT8 \
+    IC_DIMENSION=64 OC_DIMENSION=16 MATRIX_BACKEND=1
+```
+
+The CIM processor supports native INT8 operands with either `INT8` (24-bit
+accumulation) or `INT8_32` (32-bit accumulation). Workload mapping for CIM is
+a separate compiler integration step; building the hardware does not change
+the compiler's current systolic layout policy.
+
+## Geometry and configuration
+
+`IC_DIMENSION` and `OC_DIMENSION` describe the complete array's hardware input
+and output lanes. The CIM macro settings describe each physical macro:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `CIM_MACRO_INPUT_LANES` | 64 | Physical macro input lanes |
+| `CIM_MACRO_OUTPUT_LANES` | 8 | Physical macro output lanes |
+| `CIM_WEIGHT_SETS` | 18 | Resident weight sets per macro |
+| `CIM_BASE_A_WIDTH`, `CIM_BASE_B_WIDTH` | 4, 4 | Native operand slice widths |
+| `CIM_BASE_C_WIDTH` | 20 | Native macro accumulation width |
+| `CIM_MACRO_WRITE_INPUT_LANES` | 1 | Input positions filled by each weight write |
+| `CIM_MODE` | 0 | Bit-parallel (0) or bit-serial (1) operation |
+| `CIM_TILE_INPUT_AXIS_ELEMENTS` | 1 | Elements reduced along a tile's input axis |
+| `CIM_TILE_OUTPUT_AXIS_ELEMENTS` | 4 | Elements along a tile's output axis |
+| `CIM_INPUT_AXIS_TILES`, `CIM_OUTPUT_AXIS_TILES` | 1, 1 | Array tile counts |
+
+With 8-bit weights and 4-bit native weight slices, each logical element output
+uses two physical macro output lanes. Thus the default geometry gives
+64 input lanes and `(8 / 2) * 4 = 16` output lanes.
+
+`CIM_A_PORT_TILES` defaults to the full input axis. `CIM_B_PORT_TILES` and
+`CIM_C_PORT_TILES` default to the full output axis. Narrowing the B port splits
+one logical weight row into multiple writes. The processor requires one
+complete reduced result in each output-major C beat (`CIM_C_BEAT_LAYOUT=1`).
+`CIM_ARRAY_RESULT_SLOTS` defaults to `CIM_INPUT_AXIS_TILES`, and
+`CIM_LOCAL_ACCUM_CONTEXTS` defaults to 4.
+
+`IC_PORT_WIDTH` and `OC_PORT_WIDTH` override the external memory port widths
+in bits. Leaving them unset retains the datatype's derived defaults.
+Non-MXNF4 builds warn when a width is implicit; their defaults use the full
+datatype width per lane. MXNF4 retains its four-bit-per-lane port defaults.
+`DOUBLE_BUFFERED_ACCUM_BUFFER` selects one or two accumulation SRAM banks.
+
+## HLS and RTL simulation
+
+Available standalone targets are `CIMElement`, `CIMArray`, `CIMProcessor`,
+`CIMWeightController`, and `MatrixUnit`. The CIM targets require
+`MATRIX_BACKEND=1`. Accelerator consumes the synthesized `MatrixUnit` and
+`VectorUnit` libraries. MatrixUnit selects the CIM or systolic child libraries
+and owns the input, weight, and accumulation SRAM mappings. Its block script
+is `scripts/blocks/MatrixUnit.tcl`, and it can also be built independently.
+These builds require a working Catapult license and the selected technology
+libraries.
+
+```bash
+source ./.envrc && make CIMProcessor DATATYPE=INT8 \
+    IC_DIMENSION=64 OC_DIMENSION=16 MATRIX_BACKEND=1 \
+    TECHNOLOGY=generic CLOCK_PERIOD=5
+```
+
+`CIMElement` exposes both `wclk` and `mclk`; the other targets use `clk`.
+CIM builds enable SystemVerilog and the `src/cim` include directory. Make rules
+target `concat_rtl.sv` for blocks containing CIM blackboxes and `concat_rtl.v`
+for the CIM weight controller and systolic blocks.
+`rtl-sim` and the regression runner select the SCVerify flow for the backend.
+CIM SCVerify builds run serially so library setup completes before compilation.
+MatrixUnit and Accelerator import each child's current synthesized library
+explicitly, avoiding stale revisions retained by other parent projects.
 
 Build directories use literal configuration values. Default systolic builds
 retain upstream's names; enabled depthwise convolution, explicit external port

@@ -37,7 +37,12 @@ if { [info exists clock_multiplier] } {
   set CLOCK_PERIOD [expr $CLOCK_PERIOD * $clock_multiplier]
 }
 
-directive set -CLOCKS "clk \"-CLOCK_PERIOD $CLOCK_PERIOD -CLOCK_EDGE rising -CLOCK_HIGH_TIME [expr $CLOCK_PERIOD / 2.0] -CLOCK_OFFSET 0.000000 -CLOCK_UNCERTAINTY 0.0 -RESET_KIND async -RESET_SYNC_NAME rst -RESET_SYNC_ACTIVE high -RESET_ASYNC_NAME arst_n -RESET_ASYNC_ACTIVE low -ENABLE_NAME {} -ENABLE_ACTIVE high\" "
+if {![info exists clock_ports]} { set clock_ports {clk} }
+set clock_directives {}
+foreach clock_port $clock_ports {
+  lappend clock_directives $clock_port "-CLOCK_PERIOD $CLOCK_PERIOD -CLOCK_EDGE rising -CLOCK_HIGH_TIME [expr $CLOCK_PERIOD / 2.0] -CLOCK_OFFSET 0.000000 -CLOCK_UNCERTAINTY 0.0 -RESET_KIND async -RESET_SYNC_NAME rst -RESET_SYNC_ACTIVE high -RESET_ASYNC_NAME arst_n -RESET_ASYNC_ACTIVE low -ENABLE_NAME {} -ENABLE_ACTIVE high"
+}
+directive set -CLOCKS $clock_directives
 directive set -CLOCK_OVERHEAD 0
 
 pre_assembly
