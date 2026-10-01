@@ -12,15 +12,18 @@ source ./.envrc && make -j2 TestRunner DATATYPE=INT8 \
     IC_DIMENSION=64 OC_DIMENSION=16 MATRIX_BACKEND=1
 ```
 
-The CIM processor supports native INT8 operands with either `INT8` (24-bit
-accumulation) or `INT8_32` (32-bit accumulation). The compiler accepts matching
-`matrix_backend` and `cim_*` configuration through `AcceleratorConfig` and
-CLI flags such as `--matrix_backend 1 --pe_array_size 64,16`. It validates
-geometry and capacity. Standalone CIM tiling models resident-weight reuse
-and streaming refills for padded INT8 GEMMs and dense unit-stride convolutions.
-CIM graph transformation and instruction lowering are unsupported;
-`transform()` and `compile()` reject CIM configurations. Building the hardware
-does not change the compiler's backend or layout policy.
+`DATATYPE=INT8` selects 8-bit operands and 24-bit accumulation;
+`DATATYPE=INT8_32` uses the same operands with 32-bit accumulation.
+
+Supply matching compiler settings through `AcceleratorConfig` or CLI flags.
+For the build above, use `--matrix_backend 1 --pe_array_size 64,16
+--layout_policy cim`. The compiler maps integer GEMMs and dense convolutions
+with stride and dilation equal to 1, estimates weight reuse and buffer use,
+and emits schedules through `transform()` and `compile()`.
+
+The instruction mapper accepts explicit L1/L2 schedules in the IR, including
+manually specified schedules. The `MANUAL_TILING=1` fallback is not implemented
+for CIM yet.
 
 ## Geometry and configuration
 
@@ -32,17 +35,22 @@ and output lanes. The CIM macro settings describe each physical macro:
 | `CIM_MACRO_INPUT_LANES` | 64 | Physical macro input lanes |
 | `CIM_MACRO_OUTPUT_LANES` | 8 | Physical macro output lanes |
 | `CIM_WEIGHT_SETS` | 18 | Resident weight sets per macro |
-| `CIM_BASE_A_WIDTH`, `CIM_BASE_B_WIDTH` | 4, 4 | Native operand slice widths |
-| `CIM_BASE_C_WIDTH` | 20 | Native macro accumulation width |
+| `CIM_BASE_A_WIDTH`, `CIM_BASE_B_WIDTH` | 4, 4 | Macro input and weight widths |
+| `CIM_BASE_C_WIDTH` | 20 | Macro accumulation width |
 | `CIM_MACRO_WRITE_INPUT_LANES` | 1 | Input positions filled by each weight write |
 | `CIM_MODE` | 0 | Bit-parallel (0) or bit-serial (1) operation |
+| `CIM_SIGNED` | true | Signed operands; false selects unsigned operands |
 | `CIM_TILE_INPUT_AXIS_ELEMENTS` | 1 | Elements reduced along a tile's input axis |
 | `CIM_TILE_OUTPUT_AXIS_ELEMENTS` | 4 | Elements along a tile's output axis |
 | `CIM_INPUT_AXIS_TILES`, `CIM_OUTPUT_AXIS_TILES` | 1, 1 | Array tile counts |
 
-With 8-bit weights and 4-bit native weight slices, each logical element output
-uses two physical macro output lanes. Thus the default geometry gives
-64 input lanes and `(8 / 2) * 4 = 16` output lanes.
+The base widths are configurable. Wider operands are split into slices, and
+their partial results are combined with shifts and accumulation. Each weight
+uses `weight width / CIM_BASE_B_WIDTH` macro output lanes. The weight width
+must be a multiple of `CIM_BASE_B_WIDTH`, and the slice count must divide
+`CIM_MACRO_OUTPUT_LANES`. With the table's defaults and 8-bit weights, each
+weight uses two macro lanes, giving 64 input lanes and `(8 / 2) * 4 = 16`
+output lanes across the array.
 
 `CIM_A_PORT_TILES` defaults to the full input axis. `CIM_B_PORT_TILES` and
 `CIM_C_PORT_TILES` default to the full output axis. Narrowing the B port splits
@@ -86,7 +94,7 @@ explicitly, avoiding stale revisions retained by other parent projects.
 Build directories use literal configuration values. Default systolic builds
 retain upstream's names; enabled depthwise convolution, explicit external port
 widths, and an explicit clock period add fields when supplied. CIM builds also
-encode macro dimensions, weight sets, operand and result widths, write width,
+encode macro dimensions, weight sets, macro base widths, write width,
 latency, mode, signedness, element and tile layout, tile ports, beat layout,
 result slots, and local accumulation contexts. Changing any CIM hardware
 setting selects a separate directory.

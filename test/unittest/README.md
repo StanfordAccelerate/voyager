@@ -23,9 +23,9 @@ These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
   replay and ring refills, bias and IC/FX/FY reductions, local-context reuse,
   SRAM fallback, independent read/write progress, and output backpressure.
 
-The processor currently supports signed native INT8 operands and output-major
-results. It consumes ordered weight-sequence descriptors alongside packed
-weight beats. Backend defaults and the descriptor are declared in
+The CIM processor supports signed and unsigned integer operands and emits
+output-major results. It consumes ordered weight-sequence descriptors alongside
+packed weight beats. Backend defaults and the descriptor are declared in
 `src/cim/CIMConfig.h` and `src/cim/CIMTypes.h`.
 
 SRAM-backed reductions require enough independent output contexts between

@@ -1,6 +1,6 @@
 // SystemC HLS adapter for the integer CIM element RTL block
 //
-// CIMElement is a PE-level Catapult block boundary for the native CIM vector
+// CIMElement is a PE-level Catapult block boundary for the CIM vector
 // and matrix interface. The synthesized implementation blackboxes the existing
 // SystemVerilog CIMIntElement, while the C++ body provides event-level
 // simulation of the issue/retire protocol: mac_ready lets upstream commit a
@@ -254,7 +254,7 @@ SC_MODULE(CIMElementPacked) {
     }
   }
 
-  // Compute one native CIM matrix-vector operation for the issued payload
+  // Compute one CIM matrix-vector operation for the issued payload
   PendingResult compute_result() {
     PendingResult pending;
     pending.cycles_remaining = operation_latency();
@@ -367,7 +367,7 @@ SC_MODULE(CIMElementPacked) {
 #endif
 };
 
-// CIMElement keeps the native A/B/C interface and adapts it to the packed
+// CIMElement keeps the array-shaped A/B/C interface and adapts it to the packed
 // blackbox ABI
 template <int MACRO_INPUT_LANES, int MACRO_OUTPUT_LANES, int WEIGHT_SETS,
           int BASE_A_WIDTH, int BASE_B_WIDTH,
@@ -493,7 +493,7 @@ SC_MODULE(CIMElement) {
     b_bus.write(packed_b);
   }
 
-  // Unpack the packed result bus back into the native CIMElement result ports
+  // Unpack the packed result bus into the CIMElement result ports
   void unpack_outputs() {
     const ac_int<C_BUS_WIDTH, false> packed_c = c_bus.read();
     CData c_data;
