@@ -1,6 +1,9 @@
 #include "test/common/Tiling.h"
 
+#include <stdexcept>
+
 #include "spdlog/spdlog.h"
+#include "src/Params.h"
 #include "test/common/Utils.h"
 
 // Used only inside this file: get_tiling picks between them.
@@ -55,6 +58,9 @@ Tiling get_tiling(const voyager::Operation& operation, const ScalarEnv& env) {
 
   Tiling tiling;
   if (manual_tiling || !operation.has_tiling()) {
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+    throw std::invalid_argument("CIM matrix operations require compiler tiling");
+#endif
     spdlog::info("Using manual tiling for operation {} with target {}\n",
                  operation.name(), strip_namespace(first_op.target()));
     if (is_conv) {
@@ -95,6 +101,63 @@ Tiling get_tiling(const voyager::Operation& operation, const ScalarEnv& env) {
 }
 
 namespace {
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
+  if (tiling.level_tilings_size() < 2) {
+    throw std::invalid_argument("CIM tiling requires L1 and L2 schedules");
+  }
+  Tiling result = {};
+  result.fx_unrolling = 1;
+
+  // Protobuf loops run inner to outer. Hardware slots run outer to inner,
+  // with six L1 slots and five L2 slots (outer FX is fixed to one).
+  for (int level = 0; level < 2; ++level) {
+    const int storage_level = 1 - level;
+    int outer_fx = 5;
+    int* positions[] = {
+        level == 0 ? &result.fx_loop_idx : &outer_fx,
+        &result.fy_loop_idx[storage_level],
+        &result.x_loop_idx[storage_level],
+        &result.y_loop_idx[storage_level],
+        &result.weight_loop_idx[storage_level],
+        &result.reduction_loop_idx[storage_level],
+    };
+    bool placed[6] = {};
+    for (int slot = 0; slot < 6; ++slot) {
+      result.loops[storage_level][slot] = 1;
+    }
+    int slot = level == 0 ? 5 : 4;
+    for (const auto& loop : tiling.level_tilings(level).loop_bounds()) {
+      const int semantic = loop.loop();
+      if (semantic == voyager::LOOP_ON ||
+          (level == 1 && semantic == voyager::LOOP_FX)) {
+        if (loop.bound() != 1) {
+          throw std::invalid_argument(
+              "CIM requires unit ON and outer FX loops");
+        }
+        continue;
+      }
+      if (semantic < 0 || semantic >= 6 || placed[semantic] ||
+          loop.bound() < 1 || loop.bound() >= (1 << MatrixParams::LOOP_WIDTH)) {
+        throw std::invalid_argument("Invalid CIM loop bound or semantic");
+      }
+      placed[semantic] = true;
+      *positions[semantic] = slot;
+      result.loops[storage_level][slot--] = loop.bound();
+    }
+
+    // Omitted unit loops occupy the remaining outer slots without changing
+    // the relative order of the scheduled loops.
+    for (int semantic = 0; semantic < 6; ++semantic) {
+      if (!placed[semantic] && !(level == 1 && semantic == voyager::LOOP_FX)) {
+        *positions[semantic] = slot--;
+      }
+    }
+  }
+  return result;
+}
+#else
+
 Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
   // `= {}` value-initializes every field to 0/false. A plain `Tiling t;` would
   // leave the scalar fields indeterminate, since Tiling is an aggregate with no
@@ -253,6 +316,7 @@ Tiling get_interstellar_tiling(const voyager::Tiling& tiling) {
 
   return accelerator_tiling;
 }
+#endif
 }  // namespace
 
 namespace {
