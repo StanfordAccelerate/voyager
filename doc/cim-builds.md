@@ -5,6 +5,11 @@
 defaults and supplies the same defines to native C++ builds, Catapult, and
 SCVerify. Override settings through Make arguments or environment variables.
 
+Make's network code-generation rules pass `MATRIX_BACKEND` and the CIM settings
+to the compiler's `AcceleratorConfig` and select the matching layout policy.
+When changing hardware settings, use a fresh `CODEGEN_DIR` or regenerate the
+model with `make -B`; existing `model.txt` targets are otherwise reused.
+
 Build the native accelerator with the default CIM geometry:
 
 ```bash
