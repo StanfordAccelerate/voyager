@@ -18,7 +18,7 @@ source ./.envrc && make -j2 TestRunner DATATYPE=INT8 \
 Supply matching compiler settings through `AcceleratorConfig` or CLI flags.
 For the build above, use `--matrix_backend 1 --pe_array_size 64,16
 --layout_policy cim`. The compiler maps integer GEMMs and dense convolutions
-with stride and dilation equal to 1, estimates weight reuse and buffer use,
+with dilation equal to 1, estimates weight reuse and buffer use,
 and emits schedules through `transform()` and `compile()`.
 
 The instruction mapper accepts explicit L1/L2 schedules in the IR, including
