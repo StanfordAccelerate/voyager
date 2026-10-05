@@ -1,4 +1,4 @@
-# CIM simulation
+# Datapath simulation
 
 From the checkout root:
 
@@ -22,6 +22,32 @@ These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
   bit-serial macros and double-buffered accumulation. They check resident-set
   replay and ring refills, bias and IC/FX/FY reductions, local-context reuse,
   SRAM fallback, independent read/write progress, and output backpressure.
+- `test-systemc-matrix`: the full CIM MatrixUnit runs against an independent
+  signed-integer GEMM/convolution calculation. It uses the actual input and
+  accumulation SRAMs, CIM weight controller, parameter deserializer, and
+  output controller. Three 8x2 builds cover bit-parallel and bit-serial macros,
+  plus double-buffered accumulation with narrow memory ports. Each build runs
+  twelve queued commands without intervening resets. Coverage includes
+  resident-sequence replay, ring refills, local and SRAM reductions, bias
+  followed by no bias, convolution and stride-2 halos, two L1 loop orders,
+  outer partial-output contexts, full-buffer addressing, memory and vector
+  output, bank handoff, and memory/output backpressure.
+
+Run the CIM MatrixUnit regression independently with:
+
+```sh
+source ./.envrc
+make -C test/unittest -j2 test-systemc-matrix
+```
+
+To isolate a job in all three configurations, pass
+`CIM_MATRIX_TEST_ARGS='--case ring_refill'` (or another job name from
+`systemc/MatrixUnitTb.cc`). Executables also accept `--case NAME` directly.
+Selecting a job retains its operand seed and memory layout. The test checks
+output values and addresses, memory request addresses/bursts and counts,
+completion handshakes, extra traffic, and a simulation watchdog.
+The MatrixUnit target generates its access-counter protobuf header under the
+test build directory using the existing Conda `protoc` and protobuf libraries.
 
 The CIM processor supports signed and unsigned integer operands and emits
 output-major results. It consumes ordered weight-sequence descriptors alongside
