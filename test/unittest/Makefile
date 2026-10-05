@@ -1,4 +1,4 @@
-# Standalone CIM simulation. Source the checkout's .envrc before invoking Make.
+# Standalone datapath simulation. Source the checkout's .envrc before Make.
 .DEFAULT_GOAL := test-systemc
 THIS_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 REPO_ROOT := $(abspath $(THIS_DIR)/../..)
@@ -40,9 +40,37 @@ PROCESSOR_FLAGS_banked := -DCIM_PROCESSOR_TEST_MODE=0 \
 PROCESSOR_TESTS := $(addprefix $(SYSTEMC_BUILD)/CIMProcessorTb-,$(PROCESSOR_CASES))
 -include $(addsuffix .d,$(PROCESSOR_TESTS))
 
+MATRIX_CASES := parallel serial banked
+MATRIX_FLAGS_parallel := -DCIM_MODE=0 -DDOUBLE_BUFFERED_ACCUM_BUFFER=false
+MATRIX_FLAGS_serial := -DCIM_MODE=1 -DDOUBLE_BUFFERED_ACCUM_BUFFER=false
+MATRIX_FLAGS_banked := -DCIM_MODE=0 -DDOUBLE_BUFFERED_ACCUM_BUFFER=true \
+    -DIC_PORT_WIDTH=32 -DOC_PORT_WIDTH=8
+MATRIX_CXXFLAGS := -std=c++17 -O2 -MMD -MP -DSC_INCLUDE_DYNAMIC_PROCESSES \
+    -DINT8 -DIC_DIMENSION=8 -DOC_DIMENSION=2 -DMATRIX_BACKEND=MATRIX_BACKEND_CIM \
+    -DCIM_MACRO_INPUT_LANES=2 -DCIM_MACRO_OUTPUT_LANES=2 -DCIM_WEIGHT_SETS=3 \
+    -DCIM_BASE_A_WIDTH=4 -DCIM_BASE_B_WIDTH=4 -DCIM_BASE_C_WIDTH=12 \
+    -DCIM_MACRO_WRITE_INPUT_LANES=1 -DCIM_MAC_LATENCY=1 -DCIM_SIGNED=true \
+    -DCIM_TILE_INPUT_AXIS_ELEMENTS=2 -DCIM_TILE_OUTPUT_AXIS_ELEMENTS=1 \
+    -DCIM_INPUT_AXIS_TILES=2 -DCIM_OUTPUT_AXIS_TILES=2 \
+    -DCIM_A_PORT_TILES=2 -DCIM_B_PORT_TILES=1 -DCIM_C_PORT_TILES=2 \
+    -DCIM_C_BEAT_LAYOUT=1 -DCIM_ARRAY_RESULT_SLOTS=2 -DCIM_LOCAL_ACCUM_CONTEXTS=4 \
+    -DINPUT_BUFFER_SIZE=64 -DWEIGHT_BUFFER_SIZE=64 -DACCUM_BUFFER_SIZE=32 \
+    -I$(CONDA_PREFIX)/include -I$(CATAPULT_ROOT)/shared/include \
+    -I$(SYSTEMC_GENERATED) -I$(REPO_ROOT) -I$(REPO_ROOT)/lib -I$(REPO_ROOT)/src \
+    -I$(REPO_ROOT)/lib/spdlog/include \
+    -Wno-unknown-pragmas -Wno-deprecated-declarations
+MATRIX_LDFLAGS := -L$(CONDA_PREFIX)/lib -Wl,-rpath,$(CONDA_PREFIX)/lib \
+    $(SYSTEMC_LDFLAGS) -labsl_hash -labsl_log_internal_check_op \
+    -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf
+MATRIX_TESTS := $(addprefix $(SYSTEMC_BUILD)/CIMMatrixUnitTb-,$(MATRIX_CASES))
+MATRIX_PROTO_DIR := $(SYSTEMC_GENERATED)/test/compiler/proto
+MATRIX_PROTO := $(MATRIX_PROTO_DIR)/voyager_ir.pb.h
+-include $(addsuffix .d,$(MATRIX_TESTS)) $(SYSTEMC_BUILD)/AccessCounter.d
+
 .PHONY: test-systemc test-systemc-element test-systemc-array test-verilog \
-    test-systemc-processor check-systemc-env clean
-test-systemc: test-systemc-element test-systemc-array test-systemc-processor
+    test-systemc-processor test-systemc-matrix check-systemc-env clean
+test-systemc: test-systemc-element test-systemc-array test-systemc-processor \
+    test-systemc-matrix
 
 test-systemc-element: $(SYSTEMC_BUILD)/CIMElementTb
 	$<
@@ -52,6 +80,10 @@ test-systemc-array: $(SYSTEMC_BUILD)/CIMArrayTb
 
 test-systemc-processor: $(PROCESSOR_TESTS)
 	@for test in $^; do echo "Running $${test##*/}"; "$$test" || exit $$?; done
+
+test-systemc-matrix: $(MATRIX_TESTS)
+	@status=0; for test in $^; do echo "Running $${test##*/}"; \
+	    "$$test" $(CIM_MATRIX_TEST_ARGS) || status=1; done; exit $$status
 
 # The existing Verilog suites remain independently runnable.
 test-verilog:
@@ -86,7 +118,22 @@ $(addsuffix .o,$(PROCESSOR_TESTS)): $(SYSTEMC_BUILD)/CIMProcessorTb-%.o: $(THIS_
 $(PROCESSOR_TESTS): $(SYSTEMC_BUILD)/CIMProcessorTb-%: $(SYSTEMC_BUILD)/CIMProcessorTb-%.o
 	$(SYSTEMC_CC) -o $@ $^ $(SYSTEMC_LDFLAGS)
 
-.SECONDARY: $(addsuffix .o,$(PROCESSOR_TESTS))
+$(MATRIX_PROTO): $(REPO_ROOT)/voyager-compiler/src/voyager_compiler/codegen/voyager_ir.proto
+	mkdir -p $(@D)
+	protoc -I$(dir $<) --cpp_out=$(@D) $<
+
+$(SYSTEMC_BUILD)/AccessCounter.o: $(REPO_ROOT)/test/common/AccessCounter.cc $(MATRIX_PROTO) $(THIS_DIR)/Makefile | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(MATRIX_CXXFLAGS) -c -o $@ $<
+
+$(addsuffix .o,$(MATRIX_TESTS)): $(SYSTEMC_BUILD)/CIMMatrixUnitTb-%.o: $(THIS_DIR)/systemc/MatrixUnitTb.cc $(MATRIX_PROTO) $(THIS_DIR)/Makefile | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(MATRIX_CXXFLAGS) $(MATRIX_FLAGS_$*) -c -o $@ $<
+
+$(MATRIX_TESTS): $(SYSTEMC_BUILD)/CIMMatrixUnitTb-%: $(SYSTEMC_BUILD)/CIMMatrixUnitTb-%.o $(SYSTEMC_BUILD)/AccessCounter.o
+	$(SYSTEMC_CC) -o $@ $^ $(MATRIX_LDFLAGS)
+
+.SECONDARY: $(addsuffix .o,$(PROCESSOR_TESTS) $(MATRIX_TESTS))
 
 check-systemc-env:
 	@test -n "$(CATAPULT_ROOT)" || { echo "CATAPULT_ROOT is unset; source .envrc with the CAD mount available."; exit 2; }
