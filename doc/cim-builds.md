@@ -27,8 +27,11 @@ with dilation equal to 1, estimates weight reuse and buffer use,
 and emits schedules through `transform()` and `compile()`.
 
 The instruction mapper accepts explicit L1/L2 schedules in the IR, including
-manually specified schedules. The `MANUAL_TILING=1` fallback is not implemented
-for CIM yet.
+manually specified schedules. CIM requires a complete schedule and rejects
+the C++ fallback selected by `MANUAL_TILING=1` or a missing schedule. Explicit
+matrix `l2_tiling` counts alone do not supply the internal schedule and are
+also rejected by the CIM compiler path. Use the compiler's tiling search or
+supply a complete schedule in the IR.
 
 ## Geometry and configuration
 
