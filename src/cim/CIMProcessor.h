@@ -20,6 +20,7 @@
 #include "CIMTypes.h"
 #include "PackUtils.h"
 #include "Params.h"
+#include "PerfMonitor.h"
 
 // Execute a lowered matrix schedule on a resident-weight CIM array
 //
@@ -251,6 +252,10 @@ SC_MODULE(CIMProcessor) {
 #endif
 
   Connections::SyncOut CCS_INIT_S1(start);
+#if ENABLE_PERF_COUNTERS
+  sc_out<MatrixPerformance::Counter>
+      perf_counters[MatrixPerformance::PROCESSOR_COUNTER_COUNT];
+#endif
 
  private:
   // Size tags for every queued descriptor plus the active compute descriptor
@@ -420,6 +425,11 @@ SC_MODULE(CIMProcessor) {
   Connections::Combinational<MatrixParams> CCS_INIT_S1(write_back_params_enq);
   Connections::Combinational<MatrixParams> CCS_INIT_S1(write_back_params_deq);
 
+#if ENABLE_PERF_COUNTERS
+  sc_signal<bool> perf_completion_toggle;
+  sc_signal<MatrixPerformance::Counter> perf_mac_wait_weight_set_load_cycles;
+#endif
+
  public:
   // Construct the array and the independent issue/result controllers
   SC_CTOR(CIMProcessor) {
@@ -500,6 +510,12 @@ SC_MODULE(CIMProcessor) {
     SC_THREAD(write_back);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+
+#if ENABLE_PERF_COUNTERS
+    SC_THREAD(monitor_performance);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+#endif
   }
 
  private:
@@ -846,6 +862,10 @@ SC_MODULE(CIMProcessor) {
     scheduled_weight_descriptor_deq.ResetRead();
     set_release_channel.ResetWrite();
     start.Reset();
+#if ENABLE_PERF_COUNTERS
+    MatrixPerformance::Counter mac_wait_weight_set_load_cycles = 0;
+    perf_mac_wait_weight_set_load_cycles.write(0);
+#endif
 
     wait();
 
@@ -952,6 +972,9 @@ SC_MODULE(CIMProcessor) {
           if (replay_index == 0) {
             while (!resident_set_is_ready_for(selected_weight_set,
                                               descriptor.descriptor_tag)) {
+#if ENABLE_PERF_COUNTERS
+              ++mac_wait_weight_set_load_cycles;
+#endif
               wait();
             }
           }
@@ -1003,6 +1026,12 @@ SC_MODULE(CIMProcessor) {
             "CIMProcessor",
             "matrix job ended before completing its weight sequence");
       }
+#endif
+#if ENABLE_PERF_COUNTERS
+      // Publish once per issued command. Per-cycle signal writes inside the
+      // weight-readiness loop would constrain the HLS datapath schedule.
+      perf_mac_wait_weight_set_load_cycles.write(
+          mac_wait_weight_set_load_cycles);
 #endif
     }
   }
@@ -1457,6 +1486,9 @@ SC_MODULE(CIMProcessor) {
 #endif
     }
 
+#if ENABLE_PERF_COUNTERS
+    perf_completion_toggle.write(false);
+#endif
     bool accumulation_buffer_bank = false;
     wait();
 
@@ -1502,6 +1534,41 @@ SC_MODULE(CIMProcessor) {
 
         advance_loop_counters(loop_counters, params);
       }
+#if ENABLE_PERF_COUNTERS
+      perf_completion_toggle.write(!perf_completion_toggle.read());
+#endif
     }
   }
+
+#if ENABLE_PERF_COUNTERS
+  // Keep totals independent of command overlap and reporting speed.
+  void monitor_performance() {
+    using namespace MatrixPerformance;
+    ProcessorCounters counters;
+    counters.reset();
+    Counter weight_beats = 0;
+#pragma hls_unroll yes
+    for (int i = 0; i < PROCESSOR_COUNTER_COUNT; i++) perf_counters[i].write(0);
+    wait();
+
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (true) {
+      counters.observe(params_in.vld.read() && params_in.rdy.read(),
+                       perf_completion_toggle.read(),
+                       mac_request_channel.vld.read(),
+                       mac_request_channel.rdy.read(),
+                       result_channel.vld.read(), result_channel.rdy.read());
+#pragma hls_unroll yes
+      for (int i = 0; i < COMMON_PROCESSOR_COUNTER_COUNT; i++)
+        perf_counters[i].write(counters.values[i]);
+      perf_counters[storage_index(MAC_WAIT_WEIGHT_SET_LOAD_CYCLES)].write(
+          perf_mac_wait_weight_set_load_cycles.read());
+      if (weight_channel.vld.read() && weight_channel.rdy.read())
+        ++weight_beats;
+      perf_counters[storage_index(CIM_WEIGHT_LOAD_CYCLES)].write(weight_beats);
+      wait();
+    }
+  }
+#endif
 };

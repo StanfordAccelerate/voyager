@@ -65,6 +65,10 @@ struct Harness : public sc_module, public Backend {
 
   Connections::SyncChannel CCS_INIT_S1(matrix_unit_start);
   Connections::SyncChannel CCS_INIT_S1(matrix_unit_done);
+#if ENABLE_PERF_COUNTERS
+  sc_signal<MatrixPerformance::CounterIndex> matrix_perf_counter_select;
+  sc_signal<MatrixPerformance::Counter> matrix_perf_counter_value;
+#endif
 
   //----------------------------------------------------------
   // MATRIX VECTOR UNIT CONNECTIONS
@@ -432,6 +436,13 @@ struct Harness : public sc_module, public Backend {
   void run_walker();
   void release_starts();
   void retire_dones();
+#if ENABLE_PERF_COUNTERS
+  void matrix_performance_monitor();
+  MatrixPerformance::Counter read_matrix_performance(unsigned index);
+  MatrixPerformance::SnapshotSequence matrix_perf_reported = 0;
+  MatrixPerformance::SnapshotSequence matrix_perf_retired = 0;
+  sc_event matrix_perf_reported_event;
+#endif
 };
 
 #endif

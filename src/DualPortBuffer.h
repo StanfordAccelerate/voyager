@@ -3,6 +3,9 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+#include "ArchitectureParams.h"
+#include "PerfMonitor.h"
+
 template <typename T, int size>
 SC_MODULE(DualPortBuffer) {
  private:
@@ -24,6 +27,10 @@ SC_MODULE(DualPortBuffer) {
   Connections::Out<T> read_data[NUM_BANKS * NUM_PORTS_PER_BANK];
   Connections::In<BufferWriteRequest<T>>
       write_request[NUM_BANKS * NUM_PORTS_PER_BANK];
+#if ENABLE_PERF_COUNTERS
+  sc_out<MatrixPerformance::Counter> perf_reads[NUM_BANKS],
+      perf_writes[NUM_BANKS];
+#endif
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   Connections::SyncIn done[NUM_BANKS * NUM_PORTS_PER_BANK];
@@ -41,6 +48,11 @@ SC_MODULE(DualPortBuffer) {
   }
 
   void bank0_run() {
+#if ENABLE_PERF_COUNTERS
+    MatrixPerformance::Counter reads = 0, writes = 0;
+    perf_reads[0].write(0);
+    perf_writes[0].write(0);
+#endif
     read_address[0].Reset();
     read_data[0].Reset();
     write_request[0].Reset();
@@ -81,6 +93,9 @@ SC_MODULE(DualPortBuffer) {
 #endif
           WRITE_BANK_0:
             bank0[req.address] = req.data;
+#if ENABLE_PERF_COUNTERS
+            perf_writes[0].write(++writes);
+#endif
           }
 
           ac_int<16, false> r_addr;
@@ -95,6 +110,9 @@ SC_MODULE(DualPortBuffer) {
             T r_data;
           READ_BANK_0:
             r_data = bank0[r_addr];
+#if ENABLE_PERF_COUNTERS
+            perf_reads[0].write(++reads);
+#endif
             read_data[port_sel].Push(r_data);
           }
 
@@ -112,6 +130,11 @@ SC_MODULE(DualPortBuffer) {
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   void bank1_run() {
+#if ENABLE_PERF_COUNTERS
+    MatrixPerformance::Counter reads = 0, writes = 0;
+    perf_reads[1].write(0);
+    perf_writes[1].write(0);
+#endif
     read_address[2].Reset();
     read_data[2].Reset();
     write_request[2].Reset();
@@ -150,6 +173,9 @@ SC_MODULE(DualPortBuffer) {
 
           WRITE_BANK_1:
             bank1[req.address] = req.data;
+#if ENABLE_PERF_COUNTERS
+            perf_writes[1].write(++writes);
+#endif
           }
 
           ac_int<16, false> r_addr;
@@ -164,6 +190,9 @@ SC_MODULE(DualPortBuffer) {
             T r_data;
           READ_BANK_1:
             r_data = bank1[r_addr];
+#if ENABLE_PERF_COUNTERS
+            perf_reads[1].write(++reads);
+#endif
             read_data[port_idx].Push(r_data);
           }
 #ifndef __SYNTHESIS__

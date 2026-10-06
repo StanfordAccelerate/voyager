@@ -33,6 +33,56 @@ matrix `l2_tiling` counts alone do not supply the internal schedule and are
 also rejected by the CIM compiler path. Use the compiler's tiling search or
 supply a complete schedule in the IR.
 
+## Performance counters
+
+`ENABLE_PERF_COUNTERS=1` adds the counters and their read ports to either
+matrix backend. They are off by default. Native and Catapult builds use the
+same setting, and build directories distinguish the two configurations.
+The `TestRunner-fast` and `TestRunner-checker` targets always omit them:
+their transaction-level Connections channels do not expose cycle handshakes.
+
+Each backend reports ten counters. Eight are common: processor-active cycles,
+issued vectors (`array_issue_cycles`), vector admission backpressure
+(`input_backpressure_cycles`), result backpressure, and read/write accesses to
+the input and accumulation buffers. Systolic adds weight-buffer reads/writes;
+CIM adds scheduler waits for resident weights and accepted weight-write beats
+(`cim_weight_load_cycles`). Counter indices are stable across backends;
+inapplicable indices read zero and are omitted from reports.
+
+For systolic, vector admission is at the input skewer and result backpressure
+is after result deskewing. CIM observes its array request and result channels.
+`array_issue_cycles` counts vectors, not scalar MACs. Processor-active time
+ends at write-back; the harness measures complete accelerator runtime separately.
+Stall counters can overlap and do not partition active time. CIM's resident-set
+wait diagnostic is not used for systolic PE weight-loading stalls.
+
+Buffer counters increment on actual SRAM accesses across all banks and clients,
+including the output controller. Synthetic zero responses that bypass SRAM and
+CIM reductions retained in local registers do not count. Stored padding does
+count. These totals cover the matrix data buffers; optional MX scale SRAMs are
+separate. Each access moves one complete buffer word, and the runner derives
+bytes from that word's width, retaining fractional bytes for non-byte-aligned
+words. CIM weight bytes and completed set fills are derived from weight-write
+beats, preserving partial sets across reports.
+There are no separate hardware byte or set-fill counters.
+The native runner's `Access counts:` summary is a separate diagnostic. It
+reports input and weight buffer reads in elements, which is the unit of the
+compiler's tiling estimate.
+
+Counters accumulate modulo 2^32 until reset. Each matrix-unit completion,
+including output drain, publishes a coherent snapshot and advances
+`snapshot_sequence`. The runner prints `MatrixPerfHardware:` differences between
+snapshots, derived byte counts, and `completed_commands`. It retries if the
+snapshot changes while reading. Reporting does not gate command execution, and
+pending reads finish after total runtime is recorded.
+
+Commands overlap and weights can be prefetched, so a reporting interval is not
+exclusive to one command. CIM scheduler weight-wait counts are published after
+issue finishes; intermediate snapshots may lag, but final totals include the waits.
+Slow readers may combine completions without losing totals, provided fewer than
+2^32 events occur per counter between accepted reads. For comparison with an
+individual compiler estimate, run that command in isolation.
+
 ## Geometry and configuration
 
 `IC_DIMENSION` and `OC_DIMENSION` describe the complete array's hardware input
@@ -100,8 +150,9 @@ MatrixUnit and Accelerator import each child's current synthesized library
 explicitly, avoiding stale revisions retained by other parent projects.
 
 Build directories use literal configuration values. Default systolic builds
-retain upstream's names; enabled depthwise convolution, explicit external port
-widths, and an explicit clock period add fields when supplied. CIM builds also
+retain upstream's names. Enabled performance counters add `_perf1`; enabled
+depthwise convolution, explicit external port widths, and an explicit clock
+period add fields when supplied. CIM builds also
 encode macro dimensions, weight sets, macro base widths, write width,
 latency, mode, signedness, element and tile layout, tile ports, beat layout,
 result slots, and local accumulation contexts. Changing any CIM hardware

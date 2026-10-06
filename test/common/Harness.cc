@@ -5,6 +5,8 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <iomanip>
+#include <limits>
 #include <memory>
 
 #include "AccelTypes.h"
@@ -41,6 +43,10 @@ Harness::Harness(sc_module_name name, const Model& model,
   accelerator.matrix_unit_output_addr(matrix_unit_output_addr);
   accelerator.matrix_unit_start(matrix_unit_start);
   accelerator.matrix_unit_done(matrix_unit_done);
+#if ENABLE_PERF_COUNTERS
+  accelerator.matrix_perf_counter_select(matrix_perf_counter_select);
+  accelerator.matrix_perf_counter_value(matrix_perf_counter_value);
+#endif
 #if SUPPORT_MVM
   accelerator.matrix_vector_unit_params_in(matrix_vector_unit_params_in);
   accelerator.matrix_vector_unit_input_req(matrix_vector_unit_input_req);
@@ -183,6 +189,9 @@ Harness::Harness(sc_module_name name, const Model& model,
   REGISTER_FN(run_walker)
   REGISTER_FN(release_starts)
   REGISTER_FN(retire_dones)
+#if ENABLE_PERF_COUNTERS
+  REGISTER_FN(matrix_performance_monitor)
+#endif
 
   access_counter = new AccessCounter();
 // do not set access counters for an RTL simulation
@@ -529,6 +538,9 @@ void Harness::release_starts() {
 // already retired.
 void Harness::retire_dones() {
   matrix_unit_done.ResetRead();
+#if ENABLE_PERF_COUNTERS
+  matrix_perf_retired = 0;
+#endif
   vector_unit_done.ResetRead();
 #if SUPPORT_MVM
   matrix_vector_unit_done.ResetRead();
@@ -547,7 +559,12 @@ void Harness::retire_dones() {
     InvocationGroup group = done_queue.front();
     done_queue.pop_front();
 
-    if (group.matrix) matrix_unit_done.SyncPop();
+    if (group.matrix) {
+      matrix_unit_done.SyncPop();
+#if ENABLE_PERF_COUNTERS
+      ++matrix_perf_retired;
+#endif
+    }
 #if SUPPORT_MVM
     if (group.matrix_vector) matrix_vector_unit_done.SyncPop();
 #endif
@@ -587,6 +604,115 @@ void Harness::retire_dones() {
     if (pending_groups == 0) group_retired.notify(SC_ZERO_TIME);
   }
 }
+
+#if ENABLE_PERF_COUNTERS
+MatrixPerformance::Counter Harness::read_matrix_performance(unsigned index) {
+  matrix_perf_counter_select.write(index);
+#ifdef CCS_DUT_RTL
+  // Selection and response each cross an RTL transactor boundary.
+  wait(clk.period());
+  wait(clk.period());
+#else
+  for (int delta = 0; delta < 4; ++delta) wait(SC_ZERO_TIME);
+#endif
+  return matrix_perf_counter_value.read();
+}
+
+// A slow reader may span several completions. Cumulative snapshots let the
+// report cover that entire interval without losing events or stalling commands.
+void Harness::matrix_performance_monitor() {
+  static const char* names[MatrixPerformance::COUNTER_COUNT] = {
+      "snapshot_sequence",
+      "processor_active_cycles",
+      "array_issue_cycles",
+      "input_backpressure_cycles",
+      "result_backpressure_cycles",
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+      "mac_wait_weight_set_load_cycles",
+      "cim_weight_load_cycles",
+#else
+      nullptr,
+      nullptr,
+#endif
+      "input_buffer_reads",
+      "input_buffer_writes",
+      "accum_buffer_reads",
+      "accum_buffer_writes",
+#if MATRIX_BACKEND == MATRIX_BACKEND_SYSTOLIC
+      "weight_buffer_reads",
+      "weight_buffer_writes",
+#else
+      nullptr,
+      nullptr,
+#endif
+  };
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+  uint64_t weight_beats = 0;
+#endif
+  MatrixPerformance::Counter previous[MatrixPerformance::COUNTER_COUNT];
+  for (auto& counter : previous) counter = 0;
+  matrix_perf_counter_select.write(MatrixPerformance::SNAPSHOT_SEQUENCE);
+  matrix_perf_reported = 0;
+  while (true) {
+    wait();
+    MatrixPerformance::Counter values[MatrixPerformance::COUNTER_COUNT];
+    values[0] = read_matrix_performance(MatrixPerformance::SNAPSHOT_SEQUENCE);
+    if (values[0] == matrix_perf_reported) continue;
+    for (int i = 1; i < MatrixPerformance::COUNTER_COUNT; ++i)
+      values[i] = read_matrix_performance(i);
+    if (read_matrix_performance(MatrixPerformance::SNAPSHOT_SEQUENCE) !=
+        values[0])
+      continue;
+
+    const MatrixPerformance::SnapshotSequence commands =
+        values[0] - matrix_perf_reported;
+    std::ostringstream line;
+    line << "MatrixPerfHardware: snapshot_sequence=" << values[0]
+         << " completed_commands=" << commands;
+    MatrixPerformance::Counter deltas[MatrixPerformance::COUNTER_COUNT] = {};
+    for (int i = 1; i < MatrixPerformance::COUNTER_COUNT; ++i) {
+      deltas[i] = values[i] - previous[i];
+      if (names[i]) line << " " << names[i] << "=" << deltas[i];
+      previous[i] = values[i];
+    }
+    using namespace MatrixPerformance;
+    // Preserve fractional bytes for buffer words that are not byte-aligned.
+    line << std::setprecision(std::numeric_limits<double>::max_digits10);
+    const auto buffer_bytes = [&](CounterId id, unsigned width) {
+      return double(deltas[id].to_uint()) * width / 8;
+    };
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+    using Processor = MatrixUnit::ActiveMatrixProcessor;
+    constexpr uint64_t beats_per_set =
+        IC_DIMENSION * Processor::WEIGHT_BEATS_PER_ROW;
+    const uint64_t previous_fills = weight_beats / beats_per_set;
+    weight_beats += deltas[CIM_WEIGHT_LOAD_CYCLES].to_uint();
+    line << " cim_set_fills=" << weight_beats / beats_per_set - previous_fills
+         << " cim_weight_load_bytes="
+         << uint64_t(deltas[CIM_WEIGHT_LOAD_CYCLES].to_uint()) *
+                ((Processor::WEIGHT_WRITE_WIDTH + 7) / 8);
+#else
+    line << " weight_buffer_read_bytes="
+         << buffer_bytes(WEIGHT_BUFFER_READS, WEIGHT_BUFFER_WIDTH)
+         << " weight_buffer_write_bytes="
+         << buffer_bytes(WEIGHT_BUFFER_WRITES, WEIGHT_BUFFER_WIDTH);
+#endif
+    line << " input_buffer_read_bytes="
+         << buffer_bytes(INPUT_BUFFER_READS, INPUT_BUFFER_WIDTH)
+         << " input_buffer_write_bytes="
+         << buffer_bytes(INPUT_BUFFER_WRITES, INPUT_BUFFER_WIDTH)
+         << " accum_buffer_read_bytes="
+         << buffer_bytes(ACCUM_BUFFER_READS,
+                         ACCUM_BUFFER_DATATYPE::width * OC_DIMENSION)
+         << " accum_buffer_write_bytes="
+         << buffer_bytes(ACCUM_BUFFER_WRITES,
+                         ACCUM_BUFFER_DATATYPE::width * OC_DIMENSION);
+    std::cout << line.str() << std::endl;
+    matrix_perf_reported = values[0];
+    matrix_perf_reported_event.notify(SC_ZERO_TIME);
+  }
+}
+#endif
 
 void Harness::drain() {
   while (pending_groups > 0) wait(group_retired);
@@ -671,6 +797,12 @@ void Harness::run_walker() {
                                       start.to_default_time_units())
             << " ns" << std::endl;
 
+  // Finish diagnostic reads after recording runtime. Reporting never gates
+  // operation dispatch or retirement.
+#if ENABLE_PERF_COUNTERS
+  while (matrix_perf_reported != matrix_perf_retired)
+    wait(matrix_perf_reported_event);
+#endif
   sc_stop();
 }
 
