@@ -27,6 +27,9 @@ SC_MODULE(DoubleBuffer) {
 
 #ifndef __SYNTHESIS__
   AccessCounter* access_counter;
+  // Elements in one buffer word. The access counter reports elements, which
+  // is the unit of the compiler's tiling estimate for every datatype.
+  int access_counter_elements = 1;
 #endif
 
   SC_CTOR(DoubleBuffer) {
@@ -92,10 +95,6 @@ SC_MODULE(DoubleBuffer) {
           done = true;
         }
 
-#ifndef __SYNTHESIS__
-        access_counter->increment(name(), width);
-#endif
-
         BufferReadResponse<ac_int<width, false>> response;
         response.last = req.last;
 
@@ -105,6 +104,9 @@ SC_MODULE(DoubleBuffer) {
           } else {
             response.data = mem1[address];
           }
+#ifndef __SYNTHESIS__
+          access_counter->increment(name(), access_counter_elements);
+#endif
         } else {
           response.data = 0;
         }
