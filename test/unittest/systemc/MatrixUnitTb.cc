@@ -1,5 +1,4 @@
-// Exercise CIM through MatrixUnit's real controllers and input/accumulation
-// SRAMs.
+// Exercise both matrix backends through their real controllers and SRAMs.
 #include <cstdint>
 #include <iostream>
 #include <map>
@@ -11,8 +10,6 @@
 
 #include "MatrixUnit.h"
 
-static_assert(MATRIX_BACKEND == MATRIX_BACKEND_CIM,
-              "This regression must use the CIM backend");
 static_assert(INPUT_DTYPE_WIDTH == 8 && WEIGHT_DTYPE_WIDTH == 8,
               "The memory fixture supplies signed INT8 operands");
 static_assert(IC_PORT_WIDTH % 8 == 0 && OC_PORT_WIDTH % 8 == 0,
@@ -62,6 +59,10 @@ SC_MODULE(MatrixUnitTb) {
   Connections::Combinational<ac_int<OC_PORT_WIDTH, false>> output_data;
   Connections::Combinational<ac_int<ADDRESS_WIDTH, false>> output_addr;
   Connections::SyncChannel start, done;
+#if ENABLE_PERF_COUNTERS
+  sc_signal<MatrixPerformance::CounterIndex> perf_counter_select;
+  sc_signal<MatrixPerformance::Counter> perf_counter_value;
+#endif
 
   std::vector<Job> jobs;
   std::vector<uint8_t> memory;
@@ -86,7 +87,12 @@ SC_MODULE(MatrixUnitTb) {
     dut.output_addr(output_addr);
     dut.start(start);
     dut.done(done);
+#if ENABLE_PERF_COUNTERS
+    dut.perf_counter_select(perf_counter_select);
+    dut.perf_counter_value(perf_counter_value);
+#endif
 
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
     Shape s;
     s.x = 2;
     s.outer_x = 3;
@@ -170,6 +176,34 @@ SC_MODULE(MatrixUnitTb) {
     s.x = 3;
     add("direct_after_buffered", s, 1);
 
+#else
+    Shape s;
+    s.x = 2;
+    s.outer_x = 3;
+    s.set_major = true;
+    add("reuse", s, 1);
+    s = Shape{};
+    s.x = 2;
+    s.ic = 2;
+    s.bias = true;
+    add("local_reduction", s, 1);
+    s.x = 8;
+    s.outer_x = 2;
+    s.set_major = true;
+    s.bias = false;
+    s.buffered = true;
+    add("sram_reduction", s, 1);
+    s = Shape{};
+    s.x = 3;
+    s.y = 2;
+    s.outer_oc = 2;
+    s.ic = s.oc = 2;
+    s.bias = true;
+    s.to_memory = true;
+    s.buffered = true;
+    add("memory_output", s, 1);
+#endif
+
     // Filtering retains each job's operand seed and memory addresses.
     for (auto it = jobs.begin(); it != jobs.end();) {
       if (!selected.empty() && it->name != selected)
@@ -230,6 +264,8 @@ SC_MODULE(MatrixUnitTb) {
     p.fx_loop_idx = s.spatial_first ? 5 : 3;
     p.y_loop_idx[1] = s.spatial_first ? 0 : 4;
     p.x_loop_idx[1] = s.spatial_first ? 1 : 5;
+    p.weight_reuse_idx[0] = p.y_loop_idx[1];
+    p.weight_reuse_idx[1] = p.x_loop_idx[1];
     p.loops[0][p.y_loop_idx[0]] = s.outer_y;
     p.loops[0][p.x_loop_idx[0]] = s.outer_x;
     p.loops[0][p.weight_loop_idx[0]] = s.outer_oc;
@@ -372,12 +408,136 @@ SC_MODULE(MatrixUnitTb) {
     return ok;
   }
 
+#if ENABLE_PERF_COUNTERS
+  unsigned read_counter(MatrixPerformance::CounterId id) {
+    perf_counter_select.write(id);
+    wait();
+    wait();
+    return perf_counter_value.read().to_uint();
+  }
+
+  void check_performance() {
+    unsigned expected_macs = 0, expected_bytes = 0;
+    for (const auto& j : jobs) {
+      const auto& s = j.shape;
+      expected_macs += s.x * s.y * s.outer_x * s.outer_y * s.ic * s.outer_ic *
+                       s.oc * s.outer_oc * s.fx * s.fy;
+      for (const auto& request : j.weights)
+        expected_bytes += request.second * OC_DIMENSION;
+    }
+    using namespace MatrixPerformance;
+    const unsigned commands = read_counter(SNAPSHOT_SEQUENCE);
+    const unsigned issued = read_counter(ARRAY_ISSUE_CYCLES);
+    const unsigned active = read_counter(PROCESSOR_ACTIVE_CYCLES);
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+    const unsigned loads = read_counter(CIM_WEIGHT_LOAD_CYCLES);
+    const unsigned bytes = loads *
+        ((MatrixUnit::ActiveMatrixProcessor::WEIGHT_WRITE_WIDTH + 7) / 8);
+    check(loads == expected_bytes /
+                       ((MatrixUnit::ActiveMatrixProcessor::WEIGHT_WRITE_WIDTH + 7) / 8),
+          "counter weight-write beats");
+    check(read_counter(WEIGHT_BUFFER_READS) == 0 &&
+              read_counter(WEIGHT_BUFFER_WRITES) == 0,
+          "CIM has no conventional weight SRAM");
+#else
+    unsigned expected_weight_reads = 0, expected_accum_accesses = 0;
+    for (const auto& j : jobs) {
+      const auto& s = j.shape;
+      // A single resident PE weight set also avoids SRAM rereads across
+      // spatial tiles; larger sequences replay from the same SRAM bank.
+      const unsigned spatial_reads =
+          s.set_major && s.ic == 1 && s.oc == 1 && s.fx == 1 && s.fy == 1
+              ? 1 : s.outer_x * s.outer_y;
+      expected_weight_reads += spatial_reads * s.outer_ic * s.outer_oc *
+                               s.ic * s.oc * s.fx * s.fy * IC_DIMENSION;
+      expected_accum_accesses += j.expected.size() *
+          (s.ic * s.outer_ic * s.fx * s.fy - 1 +
+           unsigned(j.params.write_output_to_accum_buffer));
+    }
+    const unsigned bytes = read_counter(WEIGHT_BUFFER_WRITES) * (WEIGHT_BUFFER_WIDTH / 8);
+    check(read_counter(WEIGHT_BUFFER_READS) == expected_weight_reads,
+          "systolic weight SRAM rereads");
+    check(read_counter(MAC_WAIT_WEIGHT_SET_LOAD_CYCLES) == 0 &&
+              read_counter(CIM_WEIGHT_LOAD_CYCLES) == 0,
+          "CIM-specific counters are absent on systolic");
+#endif
+    unsigned expected_input_writes = 0;
+    for (const auto& j : jobs) {
+      const auto& s = j.shape;
+      const unsigned window_x = (s.fx == 1 ? s.x : s.x * s.stride) + s.fx - 1;
+      const unsigned window_y = (s.fy == 1 ? s.y : s.y * s.stride) + s.fy - 1;
+      expected_input_writes += window_x * window_y * s.ic * s.outer_ic *
+                               s.outer_x * s.outer_y * s.outer_oc;
+    }
+    check(commands == jobs.size(), "counter completion count");
+    check(issued == expected_macs, "counter MAC count");
+    check(bytes == expected_bytes, "counter weight bytes");
+    check(active >= issued, "counter cycle bounds");
+    check(read_counter(INPUT_BUFFER_WRITES) == expected_input_writes,
+          "counter input SRAM writes");
+    const unsigned input_reads = read_counter(INPUT_BUFFER_READS);
+    const unsigned accum_reads = read_counter(ACCUM_BUFFER_READS);
+    const unsigned accum_writes = read_counter(ACCUM_BUFFER_WRITES);
+    if (jobs.size() > 1) {
+      check(accum_reads > 0 && accum_writes > 0, "SRAM reductions are counted");
+    }
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
+    // These complete schedules have simple independent access totals. The
+    // reduction fits in local registers; only banked final output uses SRAM.
+    if (jobs.size() == 1 &&
+        (jobs[0].name == "reuse" || jobs[0].name == "local_reduction" ||
+         jobs[0].name == "direct_after_buffered")) {
+      check(input_reads == expected_macs, "counter input SRAM reads");
+      check(accum_reads == 0 && accum_writes == 0,
+            "local accumulation avoids SRAM");
+    }
+    if (jobs.size() == 1 && jobs[0].name == "resident_sequence") {
+      check(input_reads == expected_macs,
+            "reused inputs are read for each weight set");
+      const unsigned output_accesses =
+          jobs[0].params.write_output_to_accum_buffer ? jobs[0].expected.size()
+                                                      : 0;
+      check(accum_reads == output_accesses && accum_writes == output_accesses,
+            "final snapshot includes output-controller SRAM reads");
+    }
+#else
+    check(input_reads == expected_macs, "systolic input SRAM reads");
+    check(accum_reads == expected_accum_accesses && accum_writes == expected_accum_accesses,
+          "systolic partial sums and output drain use SRAM");
+#endif
+    unsigned snapshot[COUNTER_COUNT];
+    for (int i = 0; i < COUNTER_COUNT; ++i)
+      snapshot[i] = read_counter(static_cast<CounterId>(i));
+    wait(12);
+    for (int i = 0; i < COUNTER_COUNT; ++i)
+      check(read_counter(static_cast<CounterId>(i)) == snapshot[i],
+            "stable idle snapshot");
+    check(read_counter(static_cast<CounterId>(31)) == 0,
+          "invalid counter index");
+    std::cout << "PASS matrix counters commands=" << commands << " macs=" << issued
+              << " weight_bytes=" << bytes
+              << " input_reads=" << input_reads
+              << " input_writes=" << expected_input_writes
+              << " accum_reads=" << accum_reads
+              << " accum_writes=" << accum_writes << '\n';
+    rstn = false;
+    wait(5);
+    for (int i = 0; i < COUNTER_COUNT; ++i)
+      check(read_counter(static_cast<CounterId>(i)) == 0, "snapshot reset");
+  }
+#endif
+
   void run() {
     params.ResetWrite();
     rstn = false;
     wait(5);
     rstn = true;
     wait(5);
+#if ENABLE_PERF_COUNTERS
+    if (!check(read_counter(MatrixPerformance::SNAPSHOT_SEQUENCE) == 0,
+               "counter reset"))
+      return;
+#endif
     if (!check(!jobs.empty(), "unknown case")) return;
     // Queue commands without resets, allowing prefetch and bank handoff to
     // overlap. Bias/no-bias and banked/direct transitions must retain no state.
@@ -393,7 +553,10 @@ SC_MODULE(MatrixUnitTb) {
                    bias_requests.empty(),
                "missing memory requests"))
       return;
-    std::cout << "PASS CIM MatrixUnit mode=" << CIM_MODE
+#if ENABLE_PERF_COUNTERS
+    check_performance();
+#endif
+    std::cout << "PASS MatrixUnit backend=" << MATRIX_BACKEND
               << " double_buffer=" << DOUBLE_BUFFERED_ACCUM_BUFFER << ": "
               << jobs.size() << " queued jobs\n";
     sc_stop();

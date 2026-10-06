@@ -330,11 +330,6 @@ SC_MODULE(CIMArray) {
   ConnectionsSignal::In<MACRequest> CCS_INIT_S1(mac_request_channel);
   ConnectionsSignal::In<WriteRequest> CCS_INIT_S1(write_request_channel);
   Connections::Out<CBeat, Connections::SYN_PORT> CCS_INIT_S1(result_channel);
-#if ENABLE_PERF_COUNTERS
-  sc_out<bool> CCS_INIT_S1(completion_storage_stall);
-  sc_out<bool> CCS_INIT_S1(result_slot_stall);
-  sc_out<bool> CCS_INIT_S1(completion_descriptor_stall);
-#endif
 
   // Construct CIM tiles and HLS control threads
   SC_CTOR(CIMArray) {
@@ -789,11 +784,6 @@ SC_MODULE(CIMArray) {
            output_tile_index++) {
         mac_issue[output_tile_index].write(false);
       }
-#if ENABLE_PERF_COUNTERS
-      completion_storage_stall.write(false);
-      result_slot_stall.write(false);
-      completion_descriptor_stall.write(false);
-#endif
       return;
     }
 
@@ -812,11 +802,6 @@ SC_MODULE(CIMArray) {
     const bool ready = rstn.read() && storage.all() && mac_tiles_ready();
     const bool fire = valid && ready;
     ConnectionsSignal::set_ready(mac_request_channel, ready);
-#if ENABLE_PERF_COUNTERS
-    completion_storage_stall.write(valid && !storage.all());
-    result_slot_stall.write(valid && !storage.result_slots);
-    completion_descriptor_stall.write(valid && !storage.descriptors);
-#endif
 
     bus_compute_set.write(fire ? request.compute_set : held_compute_set.read());
 #pragma hls_unroll yes

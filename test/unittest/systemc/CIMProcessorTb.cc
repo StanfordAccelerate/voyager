@@ -75,6 +75,10 @@ SC_MODULE(CIMProcessorTb) {
   Dut dut;
   sc_clock clk;
   sc_signal<bool> rstn;
+#if ENABLE_PERF_COUNTERS
+  sc_signal<MatrixPerformance::Counter>
+      perf_counters[MatrixPerformance::PROCESSOR_COUNTER_COUNT];
+#endif
 
   Connections::Combinational<ac_int<INPUT_BUFFER_WIDTH, false>> input_channel;
   Connections::Combinational<ac_int<Processor::WEIGHT_WRITE_WIDTH, false>>
@@ -128,6 +132,7 @@ SC_MODULE(CIMProcessorTb) {
   int queued_weight_sets;
   int completed_weight_sets;
   int checked_outputs;
+  int pushed_weight_beats = 0;
   bool test_failed;
 
   SC_HAS_PROCESS(CIMProcessorTb);
@@ -150,6 +155,10 @@ SC_MODULE(CIMProcessorTb) {
         test_failed(false) {
     dut.clk(clk);
     dut.rstn(rstn);
+#if ENABLE_PERF_COUNTERS
+    for (int i = 0; i < MatrixPerformance::PROCESSOR_COUNTER_COUNT; ++i)
+      dut.perf_counters[i](perf_counters[i]);
+#endif
     dut.input_channel(input_channel);
     dut.weight_channel(weight_channel);
     dut.weight_descriptor_channel(weight_descriptor_channel);
@@ -371,6 +380,7 @@ SC_MODULE(CIMProcessorTb) {
       for (int span = 0; span < Processor::WEIGHT_BEATS_PER_ROW; span++) {
         weight_channel.Push(
             make_weight_beat(weight_pattern, input_index, span));
+        pushed_weight_beats++;
       }
     }
   }
@@ -681,14 +691,15 @@ SC_MODULE(CIMProcessorTb) {
   }
 
   // Refill the complete ring while the next descriptor is already runnable
-  void send_consecutive_full_ring_replay_job(
-      int input_pattern, int first_weight_pattern, int second_weight_pattern) {
-    static constexpr int kReplaysPerDescriptor = 2;
+  void send_consecutive_full_ring_replay_job(int input_pattern,
+                                             int first_weight_pattern,
+                                             int second_weight_pattern,
+                                             int replays_per_descriptor = 2) {
     MatrixParams params = make_multiset_reuse_params(WEIGHT_SETS);
-    params.loops[0][params.x_loop_idx[0]] = 2 * kReplaysPerDescriptor;
+    params.loops[0][params.x_loop_idx[0]] = 2 * replays_per_descriptor;
     queue_weight_descriptors(
-        {make_weight_descriptor(WEIGHT_SETS, kReplaysPerDescriptor),
-         make_weight_descriptor(WEIGHT_SETS, kReplaysPerDescriptor)});
+        {make_weight_descriptor(WEIGHT_SETS, replays_per_descriptor),
+         make_weight_descriptor(WEIGHT_SETS, replays_per_descriptor)});
     params_channel.Push(params);
     start_channel.SyncPop();
 
@@ -702,7 +713,7 @@ SC_MODULE(CIMProcessorTb) {
     }
 
     for (int descriptor = 0; descriptor < 2; descriptor++) {
-      for (int replay = 0; replay < kReplaysPerDescriptor; replay++) {
+      for (int replay = 0; replay < replays_per_descriptor; replay++) {
         for (int set = 0; set < WEIGHT_SETS; set++) {
           input_channel.Push(make_inputs(input_pattern));
         }
@@ -749,6 +760,40 @@ SC_MODULE(CIMProcessorTb) {
       weight_descriptor_channel.Push(descriptor);
     }
   }
+
+#if ENABLE_PERF_COUNTERS
+  unsigned counter(MatrixPerformance::CounterId id) {
+    return perf_counters[MatrixPerformance::storage_index(id)].read().to_uint();
+  }
+
+  // Counters publish one cycle after the observed handshake. The held result
+  // backpressure job must stall the array result channel, and the first
+  // job's weights arrive after its parameters.
+  void check_performance_counters() {
+    using namespace MatrixPerformance;
+    tick();
+    tick();
+    const unsigned issued = counter(ARRAY_ISSUE_CYCLES);
+    require(issued > 0, "counter: no MAC vectors issued");
+    require(counter(PROCESSOR_ACTIVE_CYCLES) >= issued,
+            "counter: active cycles below issued vectors");
+    require(counter(CIM_WEIGHT_LOAD_CYCLES) == unsigned(pushed_weight_beats),
+            "counter: weight-write beats differ from pushed weight beats");
+    require(counter(MAC_WAIT_WEIGHT_SET_LOAD_CYCLES) > 0,
+            "counter: scheduler never waited for a resident set");
+    require(counter(RESULT_BACKPRESSURE_CYCLES) > 0,
+            "counter: delayed output ready never stalled the result channel");
+    require(counter(INPUT_BACKPRESSURE_CYCLES) > 0,
+            "counter: MAC issue never stalled");
+    std::cout << "counters: active=" << counter(PROCESSOR_ACTIVE_CYCLES)
+              << " issued=" << issued
+              << " input_backpressure=" << counter(INPUT_BACKPRESSURE_CYCLES)
+              << " result_backpressure=" << counter(RESULT_BACKPRESSURE_CYCLES)
+              << " weight_wait=" << counter(MAC_WAIT_WEIGHT_SET_LOAD_CYCLES)
+              << " weight_beats=" << counter(CIM_WEIGHT_LOAD_CYCLES)
+              << std::endl;
+  }
+#endif
 
   // Delay output ready to prove result-channel backpressure is lossless
   void check_outputs() {
@@ -922,6 +967,11 @@ SC_MODULE(CIMProcessorTb) {
     tick();
     rstn.write(true);
     tick();
+#if ENABLE_PERF_COUNTERS
+    for (int i = 0; i < MatrixPerformance::PROCESSOR_COUNTER_COUNT; i++) {
+      require(perf_counters[i].read() == 0, "counter: not zero after reset");
+    }
+#endif
 
     const BufferVector bias = queue_bias(10);
     for (int row = 0; row < 2; row++) {
@@ -967,7 +1017,25 @@ SC_MODULE(CIMProcessorTb) {
                     5);
     }
     send_progressive_release_job(6, 60);
-    const int expected_count = 12 + 4 * WEIGHT_SETS + WEIGHT_SETS + 2;
+
+    // Hold the first result of a long resident-set replay. The output FIFO
+    // and result path absorb about twelve results; the remaining results
+    // stall the array result channel, which check_performance_counters
+    // requires.
+    static constexpr int kBackpressureReplays = 8;
+    for (int descriptor = 0; descriptor < 2; descriptor++) {
+      for (int replay = 0; replay < kBackpressureReplays; replay++) {
+        for (int set = 0; set < WEIGHT_SETS; set++) {
+          const bool first = descriptor == 0 && replay == 0 && set == 0;
+          expect_output("result backpressure",
+                        expected_partial(2, 70 + descriptor * 10 + set),
+                        first ? 800 : 0);
+        }
+      }
+    }
+    send_consecutive_full_ring_replay_job(2, 70, 80, kBackpressureReplays);
+    const int expected_count = 12 + 4 * WEIGHT_SETS + WEIGHT_SETS + 2 +
+                               2 * kBackpressureReplays * WEIGHT_SETS;
     while (checked_outputs < expected_count) tick();
 
     // Reuse a context across completed rows, then exceed local context
@@ -984,6 +1052,9 @@ SC_MODULE(CIMProcessorTb) {
 #endif
     require(pending_weight_sets.empty() && pending_weight_descriptors.empty(),
             "unconsumed weight stream or descriptor");
+#if ENABLE_PERF_COUNTERS
+    check_performance_counters();
+#endif
     if (!test_failed) {
       std::cout << "[PASS] cim_processor_scheduling_and_accumulation"
                 << std::endl;

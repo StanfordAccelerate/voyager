@@ -7,7 +7,8 @@ VERILATOR ?= verilator
 SYSTEMC_CC ?= $(CATAPULT_ROOT)/bin/g++
 VERILATOR_ROOT ?= $(shell $(VERILATOR) -V 2>/dev/null | tr -d '\000' | sed -n 's/.*VERILATOR_ROOT *= *//p' | head -1)
 
-SYSTEMC_BUILD := $(THIS_DIR)/build/systemc
+ENABLE_PERF_COUNTERS ?= 1
+SYSTEMC_BUILD := $(THIS_DIR)/build/systemc$(if $(filter-out 1,$(ENABLE_PERF_COUNTERS)),_perf$(ENABLE_PERF_COUNTERS))
 SYSTEMC_GENERATED := $(SYSTEMC_BUILD)/generated
 CIM_VERILATED_DIR := $(SYSTEMC_BUILD)/verilated
 SYSTEMC_CASES := $(THIS_DIR)/systemc/cim_element_cosim_cases.py
@@ -21,7 +22,7 @@ CIM_RTL_SRCS := $(addprefix $(REPO_ROOT)/src/cim/,cim_typedefs.svh \
 
 # Common headers require a datatype and dimensions; the fixtures specify their
 # own CIM geometry explicitly and do not depend on these array dimensions.
-SYSTEMC_CXXFLAGS := -std=c++17 -O2 -MMD -MP \
+SYSTEMC_CXXFLAGS := -std=c++17 -O2 -MMD -MP -DENABLE_PERF_COUNTERS=$(ENABLE_PERF_COUNTERS) \
     -DSC_INCLUDE_DYNAMIC_PROCESSES -DINT8 -DIC_DIMENSION=4 -DOC_DIMENSION=2 \
     -I$(CATAPULT_ROOT)/shared/include -I$(REPO_ROOT)/lib -I$(REPO_ROOT)/src \
     -I$(VERILATOR_ROOT)/include -I$(SYSTEMC_GENERATED) \
@@ -46,6 +47,7 @@ MATRIX_FLAGS_serial := -DCIM_MODE=1 -DDOUBLE_BUFFERED_ACCUM_BUFFER=false
 MATRIX_FLAGS_banked := -DCIM_MODE=0 -DDOUBLE_BUFFERED_ACCUM_BUFFER=true \
     -DIC_PORT_WIDTH=32 -DOC_PORT_WIDTH=8
 MATRIX_CXXFLAGS := -std=c++17 -O2 -MMD -MP -DSC_INCLUDE_DYNAMIC_PROCESSES \
+    -DENABLE_PERF_COUNTERS=$(ENABLE_PERF_COUNTERS) \
     -DINT8 -DIC_DIMENSION=8 -DOC_DIMENSION=2 -DMATRIX_BACKEND=MATRIX_BACKEND_CIM \
     -DCIM_MACRO_INPUT_LANES=2 -DCIM_MACRO_OUTPUT_LANES=2 -DCIM_WEIGHT_SETS=3 \
     -DCIM_BASE_A_WIDTH=4 -DCIM_BASE_B_WIDTH=4 -DCIM_BASE_C_WIDTH=12 \
@@ -63,6 +65,11 @@ MATRIX_LDFLAGS := -L$(CONDA_PREFIX)/lib -Wl,-rpath,$(CONDA_PREFIX)/lib \
     $(SYSTEMC_LDFLAGS) -labsl_hash -labsl_log_internal_check_op \
     -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf
 MATRIX_TESTS := $(addprefix $(SYSTEMC_BUILD)/CIMMatrixUnitTb-,$(MATRIX_CASES))
+SA_MATRIX_CASES := single banked
+SA_MATRIX_FLAGS_single := -DDOUBLE_BUFFERED_ACCUM_BUFFER=false
+SA_MATRIX_FLAGS_banked := -DDOUBLE_BUFFERED_ACCUM_BUFFER=true -DIC_PORT_WIDTH=32 -DOC_PORT_WIDTH=8
+SA_MATRIX_TESTS := $(addprefix $(SYSTEMC_BUILD)/SystolicMatrixUnitTb-,$(SA_MATRIX_CASES))
+-include $(addsuffix .d,$(SA_MATRIX_TESTS))
 MATRIX_PROTO_DIR := $(SYSTEMC_GENERATED)/test/compiler/proto
 MATRIX_PROTO := $(MATRIX_PROTO_DIR)/voyager_ir.pb.h
 -include $(addsuffix .d,$(MATRIX_TESTS)) $(SYSTEMC_BUILD)/AccessCounter.d
@@ -81,7 +88,7 @@ test-systemc-array: $(SYSTEMC_BUILD)/CIMArrayTb
 test-systemc-processor: $(PROCESSOR_TESTS)
 	@for test in $^; do echo "Running $${test##*/}"; "$$test" || exit $$?; done
 
-test-systemc-matrix: $(MATRIX_TESTS)
+test-systemc-matrix: $(MATRIX_TESTS) $(SA_MATRIX_TESTS)
 	@status=0; for test in $^; do echo "Running $${test##*/}"; \
 	    "$$test" $(CIM_MATRIX_TEST_ARGS) || status=1; done; exit $$status
 
@@ -133,7 +140,14 @@ $(addsuffix .o,$(MATRIX_TESTS)): $(SYSTEMC_BUILD)/CIMMatrixUnitTb-%.o: $(THIS_DI
 $(MATRIX_TESTS): $(SYSTEMC_BUILD)/CIMMatrixUnitTb-%: $(SYSTEMC_BUILD)/CIMMatrixUnitTb-%.o $(SYSTEMC_BUILD)/AccessCounter.o
 	$(SYSTEMC_CC) -o $@ $^ $(MATRIX_LDFLAGS)
 
-.SECONDARY: $(addsuffix .o,$(PROCESSOR_TESTS) $(MATRIX_TESTS))
+$(addsuffix .o,$(SA_MATRIX_TESTS)): $(SYSTEMC_BUILD)/SystolicMatrixUnitTb-%.o: $(THIS_DIR)/systemc/MatrixUnitTb.cc $(MATRIX_PROTO) $(THIS_DIR)/Makefile | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(filter-out -DMATRIX_BACKEND=MATRIX_BACKEND_CIM,$(MATRIX_CXXFLAGS)) $(SA_MATRIX_FLAGS_$*) -c -o $@ $<
+
+$(SA_MATRIX_TESTS): $(SYSTEMC_BUILD)/SystolicMatrixUnitTb-%: $(SYSTEMC_BUILD)/SystolicMatrixUnitTb-%.o $(SYSTEMC_BUILD)/AccessCounter.o
+	$(SYSTEMC_CC) -o $@ $^ $(MATRIX_LDFLAGS)
+
+.SECONDARY: $(addsuffix .o,$(PROCESSOR_TESTS) $(MATRIX_TESTS) $(SA_MATRIX_TESTS))
 
 check-systemc-env:
 	@test -n "$(CATAPULT_ROOT)" || { echo "CATAPULT_ROOT is unset; source .envrc with the CAD mount available."; exit 2; }

@@ -150,7 +150,7 @@ DwCUnit: $(CATAPULT_BUILD_DIR)/DwCUnit/DwCUnit.v1/concat_rtl.v
 # CIM block synthesis
 ###########################################################
 # Rebuild CIM blocks when their SystemC headers or blackbox RTL change.
-CIM_HEADERS := $(wildcard src/cim/*.h) src/PackUtils.h src/ConnectionsSignal.h
+CIM_HEADERS := $(wildcard src/cim/*.h) src/PackUtils.h src/ConnectionsSignal.h src/PerfMonitor.h
 CIM_RTL_SOURCES := $(wildcard src/cim/*.sv src/cim/*.svh)
 
 # Blocks containing SystemVerilog blackboxes emit concat_rtl.sv.
@@ -199,7 +199,7 @@ $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicA
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=SystolicArray catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/SystolicArray.log
 
-$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
+$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h src/PerfMonitor.h $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixProcessor catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixProcessor.log
 
@@ -357,10 +357,10 @@ $(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/compiler/proto/voyager_ir
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
-	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
+	$(CC) $(filter-out -DENABLE_PERF_COUNTERS=%,$(C17FLAGS)) -DENABLE_PERF_COUNTERS=0 -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
 $(CC_BUILD_DIR)/Harness-checker.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
-	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
+	$(CC) $(filter-out -DENABLE_PERF_COUNTERS=%,$(C17FLAGS)) -DENABLE_PERF_COUNTERS=0 -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
 
 $(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/compiler/proto/voyager_ir.pb.cc
 	$(CC) $(C17FLAGS) -g -c -o $@ $<

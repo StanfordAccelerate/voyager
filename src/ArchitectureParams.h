@@ -185,6 +185,11 @@ using F9 = StdFloat<3, 5>;
 #define DOUBLE_BUFFERED_ACCUM_BUFFER false
 #endif
 
+// Matrix performance counters and their read ports. Set to 0 to remove them.
+#ifndef ENABLE_PERF_COUNTERS
+#define ENABLE_PERF_COUNTERS 1
+#endif
+
 #ifndef IC_DIMENSION
 #error "No IC dimension specified!"
 #endif
