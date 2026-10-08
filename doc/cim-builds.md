@@ -145,7 +145,7 @@ CIM builds enable SystemVerilog and the `src/cim` include directory. Make rules
 target `concat_rtl.sv` for blocks containing CIM blackboxes and `concat_rtl.v`
 for the CIM weight controller and systolic blocks.
 `rtl-sim` and the regression runner select the SCVerify flow for the backend.
-CIM SCVerify builds run serially so library setup completes before compilation.
+SCVerify builds run serially so library setup completes before compilation.
 MatrixUnit and Accelerator import each child's current synthesized library
 explicitly, avoiding stale revisions retained by other parent projects.
 

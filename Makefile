@@ -331,12 +331,13 @@ endif
 ###########################################################
 # RTL simulation
 ###########################################################
-SCVERIFY_RTL_ARGS :=
+# SCVerify must finish library setup before compilation starts, including when
+# the outer build passes parallel jobs through $(MAKE).
+SCVERIFY_RTL_ARGS := -j1
 ifeq ($(MATRIX_BACKEND),1)
 # This flow includes the separate CIM blackbox RTL files.
 SCVERIFY_RTL_MK := Verify_rtl_v_vcs.mk
-# Serialize library setup to avoid compilation starting before it finishes.
-SCVERIFY_RTL_ARGS := -j1 VLOG_INCDIRS=$(PROJ_ROOT)/src/cim
+SCVERIFY_RTL_ARGS += VLOG_INCDIRS=$(PROJ_ROOT)/src/cim
 else
 # Preserve the original concatenated-netlist flow for systolic builds.
 SCVERIFY_RTL_MK := Verify_concat_sim_rtl_v_vcs.mk
