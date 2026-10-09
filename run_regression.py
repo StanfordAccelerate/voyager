@@ -475,11 +475,10 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         ]
     elif env_vars["DATATYPE"] == "MXINT8":
         quantization_args = [
-            "--force_scale_power_of_two",
             "--activation",
-            "int8,qs=microscaling,bs=" + str(block_size),
+            f"int8,qs=microscaling,bs={block_size},pot=1",
             "--weight",
-            "int8,qs=microscaling,bs=" + str(block_size),
+            f"int8,qs=microscaling,bs={block_size},pot=1",
             "--bf16",
             "--calibration_steps",
             "10",
@@ -523,6 +522,8 @@ def run_accuracy(model, dataset, num_processes, output_folder):
         common_flags.append("--double_buffered_accum_buffer")
     if env_vars.get("CONV2D_IM2COL") == "1":
         common_flags.append("--conv2d_im2col")
+    if model == "vit":
+        common_flags.append("--remove_fp32_casts")
 
     subprocess.run(
         [
