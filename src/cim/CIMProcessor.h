@@ -87,12 +87,13 @@ SC_MODULE(CIMProcessor) {
     ac_int<1, false> starts_reduction;
     ac_int<1, false> finishes_reduction;
     ac_int<1, false> uses_local_accum_context;
+    ac_int<1, false> reads_accumulation_buffer;
     LocalAccumContext local_accum_context;
     ac_int<1, false> buffer_bank;
     ac_int<1, false> begins_matrix_command;
 
     static const unsigned int width = Pack1D<Psum, OUTPUT_LANES>::width +
-                                      Pack1D<Buffer, OUTPUT_LANES>::width + 5 +
+                                      Pack1D<Buffer, OUTPUT_LANES>::width + 6 +
                                       LocalAccumContext::width;
 
     template <unsigned int Size>
@@ -102,6 +103,7 @@ SC_MODULE(CIMProcessor) {
       m & starts_reduction;
       m & finishes_reduction;
       m & uses_local_accum_context;
+      m & reads_accumulation_buffer;
       m & local_accum_context;
       m & buffer_bank;
       m & begins_matrix_command;
@@ -116,6 +118,8 @@ SC_MODULE(CIMProcessor) {
       sc_trace(tf, metadata.finishes_reduction, name + ".finishes_reduction");
       sc_trace(tf, metadata.uses_local_accum_context,
                name + ".uses_local_accum_context");
+      sc_trace(tf, metadata.reads_accumulation_buffer,
+               name + ".reads_accumulation_buffer");
       sc_trace(tf, metadata.local_accum_context, name + ".local_accum_context");
       sc_trace(tf, metadata.buffer_bank, name + ".buffer_bank");
       sc_trace(tf, metadata.begins_matrix_command,
@@ -129,6 +133,7 @@ SC_MODULE(CIMProcessor) {
       os << metadata.starts_reduction << " ";
       os << metadata.finishes_reduction << " ";
       os << metadata.uses_local_accum_context << " ";
+      os << metadata.reads_accumulation_buffer << " ";
       os << metadata.local_accum_context << " ";
       os << metadata.buffer_bank << " ";
       os << metadata.begins_matrix_command;
@@ -142,6 +147,7 @@ SC_MODULE(CIMProcessor) {
              lhs.starts_reduction == rhs.starts_reduction &&
              lhs.finishes_reduction == rhs.finishes_reduction &&
              lhs.uses_local_accum_context == rhs.uses_local_accum_context &&
+             lhs.reads_accumulation_buffer == rhs.reads_accumulation_buffer &&
              lhs.local_accum_context == rhs.local_accum_context &&
              lhs.buffer_bank == rhs.buffer_bank &&
              lhs.begins_matrix_command == rhs.begins_matrix_command;
@@ -1093,16 +1099,40 @@ SC_MODULE(CIMProcessor) {
                             params.fy_loop_idx[1] < position)));
   }
 
-  // Bind local register lifetimes once per command, independently of SRAM
-  // addresses
+  // Bind registers to an inner reduction that fits, then spill at its end.
+  // A later outer reduction reloads the partial sum from its full SRAM address.
   struct LocalAccumLayout {
     ac_int<LOOP_WIDTH, false> extents[2][3];
+    // Physical slots run outermost first; 12 means no fitting reduction.
+    ac_int<4, false> reduction_boundary;
   };
 
-  // Collapse completed output groups while preserving all simultaneously live
-  // rows
+  // Prefer the largest inner reduction whose live outputs fit in registers.
+  // If even the innermost reduction is wider, retain the existing first-context
+  // optimization; those remaining SRAM dependencies have the wider spacing.
   static LocalAccumLayout local_accum_layout(const MatrixParams& params) {
     LocalAccumLayout layout;
+    layout.reduction_boundary = LOOP_LEVEL_COUNT * LOOP_SLOT_COUNT;
+    ac_int<32, false> outputs = 1;
+#pragma hls_unroll yes
+    for (int level = LOOP_LEVEL_COUNT - 1; level >= 0; level--) {
+#pragma hls_unroll yes
+      for (int slot = LOOP_SLOT_COUNT - 1; slot >= 0; slot--) {
+        const bool reduction = slot == params.reduction_loop_idx[level] ||
+                               slot == params.fy_loop_idx[level] ||
+                               (level == 1 && slot == params.fx_loop_idx);
+        const bool output = slot == params.x_loop_idx[level] ||
+                            slot == params.y_loop_idx[level] ||
+                            slot == params.weight_loop_idx[level];
+        if (output && outputs <= LOCAL_ACCUM_CONTEXTS) {
+          outputs *= params.loops[level][slot];
+        }
+        if (reduction && params.loops[level][slot] > 1 &&
+            outputs <= LOCAL_ACCUM_CONTEXTS) {
+          layout.reduction_boundary = level * LOOP_SLOT_COUNT + slot;
+        }
+      }
+    }
 #pragma hls_unroll yes
     for (int level = 0; level < LOOP_LEVEL_COUNT; level++) {
       const ac_int<3, false> positions[3] = {params.weight_loop_idx[level],
@@ -1110,9 +1140,14 @@ SC_MODULE(CIMProcessor) {
                                              params.x_loop_idx[level]};
 #pragma hls_unroll yes
       for (int axis = 0; axis < 3; axis++) {
+        const bool live = layout.reduction_boundary <
+                                  LOOP_LEVEL_COUNT * LOOP_SLOT_COUNT
+                              ? level * LOOP_SLOT_COUNT + positions[axis] >
+                                    layout.reduction_boundary
+                              : output_loop_is_live(params, level,
+                                                    positions[axis]);
         layout.extents[level][axis] =
-            (level != 0 || axis != 0) &&
-                    output_loop_is_live(params, level, positions[axis])
+            (level != 0 || axis != 0) && live
                 ? ac_int<LOOP_WIDTH, false>(
                       params.loops[level][positions[axis]])
                 : ac_int<LOOP_WIDTH, false>(1);
@@ -1121,8 +1156,35 @@ SC_MODULE(CIMProcessor) {
     return layout;
   }
 
-  // Reuse a slot only after every reduction enclosed by an omitted coordinate
-  // ends
+  // First/last contribution inside the local reduction, not the full command.
+  static bool local_reduction_boundary(
+      const MatrixParams& params, const LocalAccumLayout& layout,
+      const ac_int<LOOP_WIDTH, false> loop_counters[2][6], bool last) {
+    bool boundary = true;
+#pragma hls_unroll yes
+    for (int level = 0; level < LOOP_LEVEL_COUNT; level++) {
+      const ac_int<3, false> positions[3] = {
+          params.reduction_loop_idx[level], params.fy_loop_idx[level],
+          params.fx_loop_idx};
+#pragma hls_unroll yes
+      for (int reduction = 0; reduction < 3; reduction++) {
+        const auto position = positions[reduction];
+        if ((reduction != 2 || level == 1) &&
+            level * LOOP_SLOT_COUNT + position >=
+                layout.reduction_boundary) {
+          const ac_int<LOOP_WIDTH, false> final_index =
+              params.loops[level][position] - 1;
+          boundary = boundary &&
+                     (last ? loop_counters[level][position] == final_index
+                           : loop_counters[level][position] == 0);
+        }
+      }
+    }
+    return boundary;
+  }
+
+  // Outer output coordinates select SRAM addresses, but may reuse a register
+  // after the preceding local reduction's value has been captured for writeback.
   static ac_int<16, false> local_accum_context_index(
       const MatrixParams& params, const LocalAccumLayout& layout,
       const ac_int<LOOP_WIDTH, false> loop_counters[2][6]) {
@@ -1173,12 +1235,16 @@ SC_MODULE(CIMProcessor) {
   // Spill only nonlocal partial sums and route final buffered outputs
   // separately
   static bool writes_accumulation_buffer(
-      const MatrixParams& params,
+      const MatrixParams& params, const LocalAccumLayout& layout,
       const ac_int<LOOP_WIDTH, false> loop_counters[2][6],
       bool uses_local_accum_context) {
     const bool finishes_reduction =
         finishes_output_reduction(params, loop_counters);
-    return (!finishes_reduction && !uses_local_accum_context) ||
+    const bool finishes_local =
+        layout.reduction_boundary < LOOP_LEVEL_COUNT * LOOP_SLOT_COUNT &&
+        local_reduction_boundary(params, layout, loop_counters, true);
+    return (!finishes_reduction &&
+            (!uses_local_accum_context || finishes_local)) ||
            (finishes_reduction && DOUBLE_BUFFERED_ACCUM_BUFFER &&
             params.write_output_to_accum_buffer);
   }
@@ -1315,6 +1381,12 @@ SC_MODULE(CIMProcessor) {
         const ac_int<16, false> context =
             local_accum_context_index(params, layout, loop_counters);
         metadata.uses_local_accum_context = context < LOCAL_ACCUM_CONTEXTS;
+        const bool starts_local =
+            layout.reduction_boundary < LOOP_LEVEL_COUNT * LOOP_SLOT_COUNT &&
+            local_reduction_boundary(params, layout, loop_counters, false);
+        metadata.reads_accumulation_buffer =
+            !metadata.starts_reduction &&
+            (!metadata.uses_local_accum_context || starts_local);
         metadata.local_accum_context = metadata.uses_local_accum_context
                                            ? LocalAccumContext(context)
                                            : LocalAccumContext(0);
@@ -1328,13 +1400,13 @@ SC_MODULE(CIMProcessor) {
             }
             metadata.initial_value = bias;
           }
-        } else if (!metadata.uses_local_accum_context) {
+        } else if (metadata.reads_accumulation_buffer) {
           accumulation_buffer_read_address[accumulation_buffer_bank].Push(
               address);
         }
 
 #ifndef __SYNTHESIS__
-        if (!metadata.uses_local_accum_context) {
+        {
           if (address >= buffer_size) {
             throw std::runtime_error(
                 "CIM accumulation address exceeds buffer capacity");
@@ -1343,7 +1415,8 @@ SC_MODULE(CIMProcessor) {
                                                   [address.to_uint()];
           if (metadata.starts_reduction) {
             expected = metadata.initial_value;
-          } else {
+          }
+          if (metadata.reads_accumulation_buffer) {
             simulation_accumulation_reads.push_back(
                 {address.to_uint(), unsigned(accumulation_buffer_bank),
                  expected});
@@ -1403,14 +1476,15 @@ SC_MODULE(CIMProcessor) {
 
       Pack1D<Buffer, OUTPUT_LANES> previous = metadata.initial_value;
 
-      if (!metadata.starts_reduction && metadata.uses_local_accum_context) {
+      if (!metadata.starts_reduction && metadata.uses_local_accum_context &&
+          !metadata.reads_accumulation_buffer) {
 #pragma hls_unroll yes
         for (int context = 0; context < LOCAL_ACCUM_CONTEXTS; context++) {
           if (metadata.local_accum_context == context) {
             previous = local_accum_context_values[context];
           }
         }
-      } else if (!metadata.starts_reduction) {
+      } else if (metadata.reads_accumulation_buffer) {
 #pragma hls_unroll yes
         for (int bank = 0; bank < ACCUM_BUFFER_BANKS; bank++) {
           if (metadata.buffer_bank == bank) {
@@ -1509,7 +1583,7 @@ SC_MODULE(CIMProcessor) {
             local_accum_context_index(params, layout, loop_counters) <
             LOCAL_ACCUM_CONTEXTS;
         const bool writes_buffer = writes_accumulation_buffer(
-            params, loop_counters, uses_local_accum_context);
+            params, layout, loop_counters, uses_local_accum_context);
         const bool emits_output =
             finishes_output_reduction(params, loop_counters) && !writes_buffer;
 

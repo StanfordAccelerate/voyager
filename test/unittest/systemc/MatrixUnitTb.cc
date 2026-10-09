@@ -137,6 +137,16 @@ SC_MODULE(MatrixUnitTb) {
     s.buffered = false;
     add("set_major_replay", s, 1);
 
+    // Two nearby contributions must remain local for every row, including
+    // rows beyond the register count. Spill once between the outer-K passes.
+    s = Shape{};
+    s.x = 2;
+    s.ic = 2;
+    s.outer_x = 4;
+    s.outer_ic = 2;
+    s.set_major = true;
+    add("short_outer_reduction", s, 1);
+
     s = Shape{};
     s.x = 3;
     s.y = 2;
@@ -499,6 +509,10 @@ SC_MODULE(MatrixUnitTb) {
                                                       : 0;
       check(accum_reads == output_accesses && accum_writes == output_accesses,
             "final snapshot includes output-controller SRAM reads");
+    }
+    if (jobs.size() == 1 && jobs[0].name == "short_outer_reduction") {
+      check(accum_reads == 8 && accum_writes == 8,
+            "one partial-sum spill and reload per row across outer-K");
     }
 #else
     check(input_reads == expected_macs, "systolic input SRAM reads");
