@@ -71,3 +71,10 @@ clean` after changing toolchains.
 The Verilog suites remain available through `make -C test/unittest test-verilog
 TEST_ARGS='--jobs 4'`, or by invoking `verilog/test_cim_macro.py` and
 `verilog/test_cim_element.py` directly with Python.
+
+# Scratchpad port sharing
+
+`make -f test/unittest/Makefile test-systemc-scratchpad` exercises the shared
+standalone-harness arbiter: read/read and read/write contention, independent
+banks, partial and unaligned words, bank boundaries, backpressure, and
+configuration validation. It requires the usual sourced `./.envrc`.

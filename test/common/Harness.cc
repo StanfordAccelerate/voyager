@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <limits>
 #include <memory>
@@ -23,7 +24,18 @@ Harness::Harness(sc_module_name name, const Model& model,
           true),
       model(model),
       selection(selection),
-      memory(memory) {
+      memory(memory),
+      scratchpad(ScratchpadConfig::load(
+                     (std::filesystem::path(model.data_dir).parent_path() /
+                      "memory_config.txt").string()), clk.period()) {
+  const auto& config = scratchpad.config;
+  std::cout << "ScratchpadTiming: mode=" << (config.banked ? "banked" : "independent")
+            << " size_bytes=" << config.size << " banks=" << config.banks
+            << " bank_word_bytes=" << config.word_bytes
+            << " reserved_bytes=" << config.reserved
+            << " clock_ns=" << clk.period().to_seconds() * 1e9
+            << " compiler_frequency_ghz=" << config.compiler_frequency_ghz
+            << " DMA=untimed source=" << config.source << std::endl;
   accelerator.clk(clk);
   accelerator.rstn(rstn);
   accelerator.matrix_unit_params_in(matrix_unit_params_in);
@@ -208,7 +220,7 @@ Harness::Harness(sc_module_name name, const Model& model,
 template <int width>
 void Harness::process_read_request(
     Connections::Combinational<MemoryRequest>* request_out,
-    sc_fifo<ac_int<width, false>>* data_fifo) {
+    sc_fifo<ac_int<width, false>>* data_fifo, const char* port) {
   request_out->ResetRead();
 
   constexpr int num_bytes = width / 8;
@@ -229,14 +241,18 @@ void Harness::process_read_request(
 
     access_counter->increment(std::string(name()), total_bytes);
 
-    ac_int<width, false> bits;
-
     for (int i = 0; i < num_words; i++) {
-      for (int j = 0; j < num_bytes; j++) {
-        uint64_t address = base_address + i * num_bytes + j;
-        bits.set_slc(j * 8, static_cast<ac_int<8, false>>(memory[address]));
-      }
-
+      // A stalled consumer cannot reserve an unbounded run of future bank
+      // cycles. Only fetch when its bounded response FIFO has room.
+      while (data_fifo->num_free() == 0) wait(data_fifo->data_read_event());
+      ac_int<width, false> bits = 0;
+      const int bytes = std::min(num_bytes, total_bytes - i * num_bytes);
+      scratchpad.transfer(base_address + i * num_bytes, bytes, false, port,
+          [&](uint64_t address, uint64_t offset, uint64_t count) {
+            for (uint64_t j = 0; j < count; j++)
+              bits.set_slc(static_cast<int>((offset + j) * 8),
+                           static_cast<ac_int<8, false>>(memory[address + j]));
+          });
       data_fifo->write(bits);
     }
   }
@@ -258,7 +274,8 @@ void Harness::send_data_response(
 template <int width>
 void Harness::process_write_request(
     Connections::Combinational<ac_int<width, false>>* data_out,
-    Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out) {
+    Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out,
+    const char* port) {
   data_out->ResetRead();
   address_out->ResetRead();
 
@@ -268,6 +285,7 @@ void Harness::process_write_request(
 
   while (true) {
     uint64_t address = address_out->Pop();
+    ++pending_memory_writes;
     auto data = data_out->Pop();
 
     access_counter->increment(std::string(name()) + "_" + "outputs", num_bytes);
@@ -276,14 +294,18 @@ void Harness::process_write_request(
     for (int i = 0; i < num_bytes; i++) {
       bytes[i] = data.template slc<8>(i * 8);
     }
-    this->memory->write_bytes_to_memory(address, SRAM_PARTITION, num_bytes,
-                                        bytes);
+    scratchpad.transfer(address, num_bytes, true, port,
+        [&](uint64_t location, uint64_t offset, uint64_t count) {
+          this->memory->write_bytes_to_memory(location, SRAM_PARTITION, count,
+                                              bytes + offset);
+        });
+    if (--pending_memory_writes == 0) memory_writes_completed.notify(SC_ZERO_TIME);
   }
 }
 
 #define DEFINE_IO_FN(NAME)                                \
   void Harness::read_##NAME##_request() {                 \
-    process_read_request(&NAME##_req, &NAME##_resp_fifo); \
+    process_read_request(&NAME##_req, &NAME##_resp_fifo, #NAME); \
   }                                                       \
                                                           \
   void Harness::send_##NAME##_response() {                \
@@ -335,19 +357,19 @@ DEFINE_IO_FN(vector_fetch_1)
 DEFINE_IO_FN(vector_fetch_2)
 
 void Harness::store_matrix_unit_output() {
-  process_write_request(&matrix_unit_output_data, &matrix_unit_output_addr);
+  process_write_request(&matrix_unit_output_data, &matrix_unit_output_addr, "matrix_unit_output");
 }
 
 void Harness::store_vector_output() {
-  process_write_request(&vector_output_data, &vector_output_addr);
+  process_write_request(&vector_output_data, &vector_output_addr, "vector_output");
 }
 
 void Harness::store_mx_scale_output() {
-  process_write_request(&mx_scale_output_data, &mx_scale_output_addr);
+  process_write_request(&mx_scale_output_data, &mx_scale_output_addr, "mx_scale_output");
 }
 
 void Harness::store_sparse_tensor_output() {
-  process_write_request(&sparse_tensor_output_data, &sparse_tensor_output_addr);
+  process_write_request(&sparse_tensor_output_data, &sparse_tensor_output_addr, "sparse_tensor_output");
 }
 
 void Harness::reset() {
@@ -576,11 +598,13 @@ void Harness::retire_dones() {
 #endif
     if (group.vector) {
       vector_unit_done.SyncPop();
+      while (pending_memory_writes) wait(memory_writes_completed);
       vector_inflight--;
       vector_retired.notify(SC_ZERO_TIME);
     }
 
     if (group.has_post) {
+      while (pending_memory_writes) wait(memory_writes_completed);
       post_semaphore(group.post_node, group.post_slot, group.post_amount);
     }
 
@@ -716,6 +740,7 @@ void Harness::matrix_performance_monitor() {
 
 void Harness::drain() {
   while (pending_groups > 0) wait(group_retired);
+  while (pending_memory_writes) wait(memory_writes_completed);
 }
 
 void Harness::begin_commit() { in_commit = true; }
@@ -792,6 +817,7 @@ void Harness::run_walker() {
   drain();
 
   const sc_time end = sc_time_stamp();
+  scratchpad.report(std::cout);
   std::cout << "Total Runtime: "
             << static_cast<long long>(end.to_default_time_units() -
                                       start.to_default_time_units())

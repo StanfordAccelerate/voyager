@@ -75,9 +75,24 @@ MATRIX_PROTO := $(MATRIX_PROTO_DIR)/voyager_ir.pb.h
 -include $(addsuffix .d,$(MATRIX_TESTS)) $(SYSTEMC_BUILD)/AccessCounter.d
 
 .PHONY: test-systemc test-systemc-element test-systemc-array test-verilog \
-    test-systemc-processor test-systemc-matrix check-systemc-env clean
+    test-systemc-processor test-systemc-matrix test-systemc-scratchpad check-systemc-env clean
 test-systemc: test-systemc-element test-systemc-array test-systemc-processor \
-    test-systemc-matrix
+    test-systemc-matrix test-systemc-scratchpad
+
+test-systemc-scratchpad: $(SYSTEMC_BUILD)/ScratchpadTimingTb
+	$<
+
+$(SYSTEMC_BUILD)/ScratchpadTimingTb: $(THIS_DIR)/systemc/ScratchpadTimingTb.cc \
+    $(REPO_ROOT)/test/common/ScratchpadTiming.h $(MATRIX_PROTO) \
+    $(SYSTEMC_BUILD)/voyager_ir.pb.o | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) -std=c++17 -O2 -I$(SYSTEMC_GENERATED) -I$(REPO_ROOT) \
+	    -I$(CONDA_PREFIX)/include -I$(CATAPULT_ROOT)/shared/include \
+	    -o $@ $< $(SYSTEMC_BUILD)/voyager_ir.pb.o $(MATRIX_LDFLAGS)
+
+$(SYSTEMC_BUILD)/voyager_ir.pb.o: $(MATRIX_PROTO)
+	$(SYSTEMC_CC) -std=c++17 -O2 -I$(CONDA_PREFIX)/include \
+	    -c -o $@ $(MATRIX_PROTO:.h=.cc)
 
 test-systemc-element: $(SYSTEMC_BUILD)/CIMElementTb
 	$<

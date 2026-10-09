@@ -14,6 +14,7 @@
 #include "test/common/Backend.h"
 #include "test/common/Interpreter.h"
 #include "test/common/Model.h"
+#include "test/common/ScratchpadTiming.h"
 #include "test/common/Utils.h"
 
 #ifndef CFLOAT
@@ -278,6 +279,9 @@ struct Harness : public sc_module, public Backend {
   const Model& model;
   Model::Selection selection;
   MemoryInterface* memory;
+  ScratchpadTiming scratchpad;
+  unsigned pending_memory_writes = 0;
+  sc_event memory_writes_completed;
   AccessCounter* access_counter;
 
 #ifdef SIM_Accelerator
@@ -289,7 +293,7 @@ struct Harness : public sc_module, public Backend {
   template <int width>
   void process_read_request(
       Connections::Combinational<MemoryRequest>* request_out,
-      sc_fifo<ac_int<width, false>>* data_fifo);
+      sc_fifo<ac_int<width, false>>* data_fifo, const char* port);
 
   template <int width>
   void send_data_response(
@@ -299,7 +303,8 @@ struct Harness : public sc_module, public Backend {
   template <int width>
   void process_write_request(
       Connections::Combinational<ac_int<width, false>>* data_out,
-      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out);
+      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out,
+      const char* port);
 
   void read_matrix_unit_input_request();
   void send_matrix_unit_input_response();
