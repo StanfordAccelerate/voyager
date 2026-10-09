@@ -50,6 +50,7 @@ SC_MODULE(MatrixUnitOutputController) {
       matrix_processor_output);
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
+  Connections::SyncChannel CCS_INIT_S1(accumulation_buffer_reads_done);
   Connections::Out<ac_int<16, false>> accumulation_buffer_read_address[2];
   Connections::In<Pack1D<BufferType, width>> accumulation_buffer_read_data[2];
   Connections::SyncOut accumulation_buffer_done[2];
@@ -81,8 +82,7 @@ SC_MODULE(MatrixUnitOutputController) {
     read_accum_buffer_params.ResetRead();
     accumulation_buffer_read_address[0].Reset();
     accumulation_buffer_read_address[1].Reset();
-    accumulation_buffer_done[0].Reset();
-    accumulation_buffer_done[1].Reset();
+    accumulation_buffer_reads_done.ResetRead();
 
     bool accumulation_buffer_bank = 0;
 
@@ -146,8 +146,10 @@ SC_MODULE(MatrixUnitOutputController) {
                                     .Push(address);
 
                             if (k0 == K1 - 1 && y0 == Y0 - 1 && x0 == X0 - 1) {
-                              accumulation_buffer_done[accumulation_buffer_bank]
-                                  .SyncPush();
+                              // Keep later tiles out of this owner's read
+                              // stream until the response consumer has returned
+                              // the bank.
+                              accumulation_buffer_reads_done.SyncPop();
                               accumulation_buffer_bank =
                                   !accumulation_buffer_bank;
                             }
@@ -183,6 +185,9 @@ SC_MODULE(MatrixUnitOutputController) {
     read_accum_buffer_params.ResetWrite();
     accumulation_buffer_read_data[0].Reset();
     accumulation_buffer_read_data[1].Reset();
+    accumulation_buffer_done[0].Reset();
+    accumulation_buffer_done[1].Reset();
+    accumulation_buffer_reads_done.ResetWrite();
 #endif
     matrix_processor_output.Reset();
     vector_unit_input_data.Reset();
@@ -229,18 +234,19 @@ SC_MODULE(MatrixUnitOutputController) {
       loop_bounds[1][params.fy_loop_idx[1]] = 0;
       loop_bounds[1][params.fx_loop_idx] = 0;
 
-      ac_int<LOOP_WIDTH, false> y0_max = loop_bounds[1][params.y_loop_idx[1]];
-      ac_int<LOOP_WIDTH, false> x0_max = loop_bounds[1][params.x_loop_idx[1]];
-      ac_int<LOOP_WIDTH, false> k1_max =
-          loop_bounds[1][params.weight_loop_idx[1]];
-
+#if !DOUBLE_BUFFERED_ACCUM_BUFFER
 #pragma hls_pipeline_init_interval 1
 #pragma hls_pipeline_stall_mode flush
+#endif
       for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
             for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
               for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+#endif
                 for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
                   for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
                     for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
@@ -267,17 +273,6 @@ SC_MODULE(MatrixUnitOutputController) {
                               outputs = accumulation_buffer_read_data
                                             [accumulation_buffer_bank]
                                                 .Pop();
-                              ac_int<LOOP_WIDTH, false> x0 =
-                                  loop_counters[1][params.x_loop_idx[1]];
-                              ac_int<LOOP_WIDTH, false> y0 =
-                                  loop_counters[1][params.y_loop_idx[1]];
-                              ac_int<LOOP_WIDTH, false> k1 =
-                                  loop_counters[1][params.weight_loop_idx[1]];
-
-                              if (k1 == k1_max && y0 == y0_max && x0 == x0_max) {
-                                accumulation_buffer_bank =
-                                    !accumulation_buffer_bank;
-                              }
                             } else
 #endif
                             {
@@ -322,6 +317,16 @@ SC_MODULE(MatrixUnitOutputController) {
                   }
                   if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
+#if DOUBLE_BUFFERED_ACCUM_BUFFER
+                if (params.write_output_to_accum_buffer) {
+                  // Drain the complete output tile before returning its SRAM
+                  // bank. Ownership handshakes are outside the pipelined
+                  // transfer loop.
+                  accumulation_buffer_done[accumulation_buffer_bank].SyncPush();
+                  accumulation_buffer_reads_done.SyncPush();
+                  accumulation_buffer_bank = !accumulation_buffer_bank;
+                }
+#endif
                 if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
               if (loop_counters[0][3] == loop_bounds[0][3]) break;
