@@ -32,6 +32,8 @@ the C++ fallback selected by `MANUAL_TILING=1` or a missing schedule. Explicit
 matrix `l2_tiling` counts alone do not supply the internal schedule and are
 also rejected by the CIM compiler path. Use the compiler's tiling search or
 supply a complete schedule in the IR.
+See the [compiler CIM documentation](../voyager-compiler/docs/cim.md)
+for configuration and tiling details.
 
 ## Performance counters
 
