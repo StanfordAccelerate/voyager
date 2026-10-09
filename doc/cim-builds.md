@@ -163,3 +163,25 @@ configuration defaults into Python. Native regression uses `CLOCK_PERIOD`
 from the environment; the harness defaults to 1 ns when it is unset.
 `BUILD_DIR` and `CATAPULT_BUILD_DIR`
 remain overridable.
+
+## Scratchpad bank timing
+
+The SystemC and RTL harnesses read `memory_config.txt` beside `model.txt`, in
+the protobuf text format of `voyager_ir.proto`. The compiler writes the
+scratchpad size, bank count, bank width, reserved low-address region and
+compiler frequency into it. In banked mode, each bank serves one read or write
+word per accelerator cycle. All matrix, vector, bias, scale and sparse ports
+share this address-based arbitration; different banks operate concurrently.
+The harness prints its configuration and the per-bank and per-port counts.
+
+`SCRATCHPAD_MODEL=independent` replays with independent streams, as programs
+without `memory_config.txt` do. To share banks in such a program, set
+`SCRATCHPAD_MODEL=banked`, `SCRATCHPAD_SIZE`, `NUM_BANKS` and `BANK_WIDTH`;
+`SCRATCHPAD_OFFSET` defaults to 0. Overrides that disagree with
+`memory_config.txt` are rejected. `SCRATCHPAD_TRACE=<file>` records every bank
+grant.
+
+Host DMA copies stay untimed. The harness does not model DRAM, the SoC
+interconnect or the SRAM latency. Compile with `--frequency 0.1` to compare
+with generic RTL at `CLOCK_PERIOD=10`. Native SystemC and RTL cycles at the
+same clock come from different pipelines; report them separately.
