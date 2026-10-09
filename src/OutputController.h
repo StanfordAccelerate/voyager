@@ -4,6 +4,7 @@
 
 #include "AccelTypes.h"
 #include "ArchitectureParams.h"
+#include "TypeToBits.h"
 
 template <typename T, size_t N, typename BufferType, unsigned port_width,
           unsigned int addr_width, typename... Ts>
