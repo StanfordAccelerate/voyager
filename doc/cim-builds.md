@@ -124,6 +124,8 @@ in bits. Leaving them unset retains the datatype's derived defaults.
 Non-MXNF4 builds warn when a width is implicit; their defaults use the full
 datatype width per lane. MXNF4 retains its four-bit-per-lane port defaults.
 `DOUBLE_BUFFERED_ACCUM_BUFFER` selects one or two accumulation SRAM banks.
+Use one bank for CIM. With two banks, CIM RTL does not yet give correct
+results for every schedule.
 
 ## HLS and RTL simulation
 
