@@ -598,12 +598,16 @@ void Harness::retire_dones() {
 #endif
     if (group.vector) {
       vector_unit_done.SyncPop();
+      // Let store threads register transfers accepted on this same edge.
+      wait(SC_ZERO_TIME);
       while (pending_memory_writes) wait(memory_writes_completed);
       vector_inflight--;
       vector_retired.notify(SC_ZERO_TIME);
     }
 
     if (group.has_post) {
+      // A done handshake and its final store can wake in either order.
+      wait(SC_ZERO_TIME);
       while (pending_memory_writes) wait(memory_writes_completed);
       post_semaphore(group.post_node, group.post_slot, group.post_amount);
     }
