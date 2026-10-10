@@ -9,7 +9,8 @@ make -C test/unittest -j4 test-systemc
 
 This requires the existing Catapult installation (`CATAPULT_ROOT`) for SystemC,
 AC datatypes, Connections, and its C++ compiler, plus Verilator from Conda.
-These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
+These tests use event-driven SystemC. The buffer handoff fixture also runs in
+fast SystemC; the targets select `CONNECTIONS_FAST_SIM` for that build only.
 
 - `test-systemc-element`: three fixtures compare the SystemC element with
   Verilated RTL cycle by cycle, covering the packed interface, ready/busy/retire
@@ -37,6 +38,9 @@ These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
 - Two systolic MatrixUnit builds cover single and double-buffered accumulation,
   weight reuse, SRAM reductions, bias, and memory output. Counter checks cover
   issued vectors, SRAM accesses, completion snapshots, and reset on both backends.
+- `test-systemc-buffer`: checks independent SRAM writes under read backpressure
+  and double-buffer bank handoff. The handoff fixture checks both banks over
+  128 timing offsets in event-driven and fast SystemC.
 
 Run the MatrixUnit regression independently with:
 

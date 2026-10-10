@@ -142,6 +142,22 @@ SC_MODULE(DualPortBuffer) {
       }
 
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
+#ifndef __SYNTHESIS__
+      // A simulated channel can deliver done before the same owner's final
+      // write. Store the writes queued on this port before the other port
+      // owns the bank. A synthesized channel accepts that write first.
+      for (BufferWriteRequest<T> req; write_request[port_sel].PopNB(req);) {
+        if (req.address > size) {
+          CCS_LOG("Address " << req.address << " is out of bounds!");
+          throw std::runtime_error("Address out of bounds");
+        }
+        bank0[req.address] = req.data;
+#if ENABLE_PERF_COUNTERS
+        perf_writes[0].write(++writes);
+#endif
+        wait();
+      }
+#endif
       port_sel = !port_sel;
 #endif
     }
@@ -219,6 +235,22 @@ SC_MODULE(DualPortBuffer) {
 #endif
         }
       }
+#ifndef __SYNTHESIS__
+      // A simulated channel can deliver done before the same owner's final
+      // write. Store the writes queued on this port before the other port
+      // owns the bank. A synthesized channel accepts that write first.
+      for (BufferWriteRequest<T> req; write_request[port_idx].PopNB(req);) {
+        if (req.address > size) {
+          CCS_LOG("Address " << req.address << " is out of bounds!");
+          throw std::runtime_error("Address out of bounds");
+        }
+        bank1[req.address] = req.data;
+#if ENABLE_PERF_COUNTERS
+        perf_writes[1].write(++writes);
+#endif
+        wait();
+      }
+#endif
       port_sel = !port_sel;
     }
   }

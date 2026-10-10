@@ -71,6 +71,10 @@ SA_MATRIX_FLAGS_single := -DDOUBLE_BUFFERED_ACCUM_BUFFER=false
 SA_MATRIX_FLAGS_banked := -DDOUBLE_BUFFERED_ACCUM_BUFFER=true -DIC_PORT_WIDTH=32 -DOC_PORT_WIDTH=8
 SA_MATRIX_TESTS := $(addprefix $(SYSTEMC_BUILD)/SystolicMatrixUnitTb-,$(SA_MATRIX_CASES))
 -include $(addsuffix .d,$(SA_MATRIX_TESTS))
+BUFFER_HANDOFF_CASES := accurate fast
+BUFFER_HANDOFF_FLAGS_fast := -DCONNECTIONS_FAST_SIM
+BUFFER_HANDOFF_TESTS := $(addprefix $(SYSTEMC_BUILD)/DualPortBufferHandoffTb-,$(BUFFER_HANDOFF_CASES))
+-include $(addsuffix .d,$(BUFFER_HANDOFF_TESTS))
 MATRIX_PROTO_DIR := $(SYSTEMC_GENERATED)/test/compiler/proto
 MATRIX_PROTO := $(MATRIX_PROTO_DIR)/voyager_ir.pb.h
 -include $(addsuffix .d,$(MATRIX_TESTS)) $(SYSTEMC_BUILD)/AccessCounter.d
@@ -81,8 +85,8 @@ test-systemc: test-systemc-element test-systemc-array test-systemc-processor tes
     test-systemc-matrix test-systemc-scratchpad
 
 .PHONY: test-systemc-buffer
-test-systemc-buffer: $(SYSTEMC_BUILD)/DualPortBufferTb
-	$<
+test-systemc-buffer: $(SYSTEMC_BUILD)/DualPortBufferTb $(BUFFER_HANDOFF_TESTS)
+	@for test in $^; do "$$test" || exit $$?; done
 
 # A blocked read response must not stop the single-buffer CIM SRAM write port.
 $(SYSTEMC_BUILD)/DualPortBufferTb: $(THIS_DIR)/systemc/DualPortBufferTb.cc \
@@ -92,6 +96,12 @@ $(SYSTEMC_BUILD)/DualPortBufferTb: $(THIS_DIR)/systemc/DualPortBufferTb.cc \
 	$(SYSTEMC_CC) $(SYSTEMC_CXXFLAGS) -DMATRIX_BACKEND=MATRIX_BACKEND_CIM \
 	    -DDOUBLE_BUFFERED_ACCUM_BUFFER=false \
 	    -DFORCE_AUTO_PORT=Connections::SYN_PORT -o $@ $< $(SYSTEMC_LDFLAGS)
+
+$(BUFFER_HANDOFF_TESTS): $(SYSTEMC_BUILD)/DualPortBufferHandoffTb-%: $(THIS_DIR)/systemc/DualPortBufferHandoffTb.cc \
+    $(REPO_ROOT)/src/DualPortBuffer.h $(THIS_DIR)/Makefile | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(SYSTEMC_CXXFLAGS) -DDOUBLE_BUFFERED_ACCUM_BUFFER=true \
+	    $(BUFFER_HANDOFF_FLAGS_$*) -o $@ $< $(SYSTEMC_LDFLAGS)
 
 test-systemc-scratchpad: $(SYSTEMC_BUILD)/ScratchpadTimingTb
 	$<
