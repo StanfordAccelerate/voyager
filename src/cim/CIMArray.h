@@ -715,34 +715,23 @@ SC_MODULE(CIMArray) {
     return busy;
   }
 
-  // Return whether a B write must wait for the MAC to release its set.
-  //
-  // An element holds its B set while consuming all A slices in either macro
-  // mode. Writes to that set must wait until the issue window closes. The MAC
-  // side waits for every element's previous issue window before accepting
-  // another request.
-  //
-  // The two terms are mutually exclusive. held_compute_set registers on the firing
-  // edge, so it names the busy set for the remainder of an open window; on the
-  // firing edge itself the set is still only in the request being accepted.
+  // Protect the weights of both a pending request and an open issue window.
+  // A stalled MAC still needs its selected set even before it can reserve
+  // result storage. A new weight descriptor may already be waiting to reuse it.
   bool write_blocked_by_mac(const WriteRequest& request) const {
     const bool blocked_by_open_window =
         mac_set_busy() && request.write_set == held_compute_set.read();
 
     const bool mac_valid =
         rstn.read() && ConnectionsSignal::valid(mac_request_channel);
-    bool mac_fires = false;
-    Set firing_compute_set = 0;
+    bool blocked_by_pending_mac = false;
     if (mac_valid) {
       const MACRequest mac_request =
           ConnectionsSignal::peek(mac_request_channel);
-      mac_fires = completion_storage_availability(mac_request).all() &&
-                  mac_tiles_ready();
-      firing_compute_set = mac_request.compute_set;
+      blocked_by_pending_mac = request.write_set == mac_request.compute_set;
     }
-    const bool blocked_by_firing_mac = mac_fires && request.write_set == firing_compute_set;
 
-    return blocked_by_open_window || blocked_by_firing_mac;
+    return blocked_by_open_window || blocked_by_pending_mac;
   }
 
   // Return whether the shared tile issue bus can accept an operation
