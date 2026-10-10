@@ -19,13 +19,37 @@ P8_1_FLAGS := --activation posit8_1 --weight posit8_1 --bf16 --bank_width $(BYTE
 INT8_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int24 --bf16 --calibration_steps 3 --bank_width $(BYTE_BANK_WIDTH)
 INT8_32_FLAGS := --activation int8,qs=per_tensor_symmetric --weight int8,qs=per_tensor_symmetric --bias int32 --bf16 --calibration_steps 3 --bank_width $(BYTE_BANK_WIDTH)
 BLOCK_SIZE := $(shell [ $(IC_DIMENSION) -gt $(OC_DIMENSION) ] && echo $(IC_DIMENSION) || echo $(OC_DIMENSION))
-MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE) --weight int8,qs=microscaling,bs=$(BLOCK_SIZE) --force_scale_power_of_two --bf16 --bank_width $(BYTE_BANK_WIDTH)
-MXNF4_FLAGS := --activation nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight nf4_6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16 --residual fp8_e4m3 --quantize_fc --bank_width $(NIBBLE_BANK_WIDTH)
-COMMON_FLAGS := --layout_policy systolic --pe_array_size $(IC_DIMENSION),$(OC_DIMENSION) --dump_tensors --double_buffered_l2 --scratchpad_size $(SCRATCHPAD_SIZE) --scratchpad_offset $(SCRATCHPAD_OFFSET) --num_banks $(NUM_BANKS) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE)
+MXINT8_FLAGS := --activation int8,qs=microscaling,bs=$(BLOCK_SIZE),pot=1 --weight int8,qs=microscaling,bs=$(BLOCK_SIZE),pot=1 --bf16 --bank_width $(BYTE_BANK_WIDTH)
+MXNF4_FLAGS := --activation lut4_to_int6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --weight lut4_to_int6,qs=microscaling,bs=$(BLOCK_SIZE),scale=fp8_e5m3 --bf16 --residual fp8_e4m3 --quantize_fc --bank_width $(NIBBLE_BANK_WIDTH)
+COMMON_FLAGS := --matrix_backend $(MATRIX_BACKEND) --layout_policy $(if $(filter 1,$(MATRIX_BACKEND)),cim,systolic) --pe_array_size $(IC_DIMENSION),$(OC_DIMENSION) --dump_tensors --double_buffered_l2 --scratchpad_size $(SCRATCHPAD_SIZE) --scratchpad_offset $(SCRATCHPAD_OFFSET) --num_banks $(NUM_BANKS) --input_buffer_size $(INPUT_BUFFER_SIZE) --weight_buffer_size $(WEIGHT_BUFFER_SIZE) --accum_buffer_size $(ACCUM_BUFFER_SIZE)
 EXTRA_COMPILER_FLAGS ?=
 
+ifeq ($(MATRIX_BACKEND),1)
+# Forward the selected hardware values to the compiler's AcceleratorConfig.
+COMMON_FLAGS += --cim_macro_input_lanes $(CIM_MACRO_INPUT_LANES) \
+    --cim_macro_output_lanes $(CIM_MACRO_OUTPUT_LANES) \
+    --cim_weight_sets $(CIM_WEIGHT_SETS) \
+    --cim_base_a_width $(CIM_BASE_A_WIDTH) \
+    --cim_base_b_width $(CIM_BASE_B_WIDTH) \
+    --cim_base_c_width $(CIM_BASE_C_WIDTH) \
+    --cim_macro_write_input_lanes $(CIM_MACRO_WRITE_INPUT_LANES) \
+    --cim_mac_latency $(CIM_MAC_LATENCY) \
+    --cim_mode $(CIM_MODE) \
+    $(if $(filter true 1,$(CIM_SIGNED)),--cim_signed,--no-cim_signed) \
+    --cim_tile_input_axis_elements $(CIM_TILE_INPUT_AXIS_ELEMENTS) \
+    --cim_tile_output_axis_elements $(CIM_TILE_OUTPUT_AXIS_ELEMENTS) \
+    --cim_input_axis_tiles $(CIM_INPUT_AXIS_TILES) \
+    --cim_output_axis_tiles $(CIM_OUTPUT_AXIS_TILES) \
+    --cim_a_port_tiles $(CIM_A_PORT_TILES) \
+    --cim_b_port_tiles $(CIM_B_PORT_TILES) \
+    --cim_c_port_tiles $(CIM_C_PORT_TILES) \
+    --cim_c_beat_layout $(CIM_C_BEAT_LAYOUT) \
+    --cim_array_result_slots $(CIM_ARRAY_RESULT_SLOTS) \
+    --cim_local_accum_contexts $(CIM_LOCAL_ACCUM_CONTEXTS)
+endif
+
 CONTEXT ?= 1024
-LLM_FLAGS := --context_length $(CONTEXT) --num_hidden_layers 1 --quantize_attention_mask
+LLM_FLAGS := --context_length $(CONTEXT) --num_hidden_layers 1 --quantize_attention_mask --remove_fp32_casts
 
 ifneq ($(filter true 1,$(DOUBLE_BUFFERED_ACCUM_BUFFER)),)
 COMMON_FLAGS += --double_buffered_accum_buffer
@@ -75,19 +99,19 @@ $(CODEGEN_DIR)/networks/llama_decode_kivi/%/model.txt:
 
 $(CODEGEN_DIR)/networks/llama_prefill_mp/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxnf4_attn_head_int6 &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxlut4_int6_e5m3_attn_head_int6 &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_prefill_spmm/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxnf4_outlier &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_prefill $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxlut4_int6_e5m3_outlier &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/llama_decode_mp/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py llama_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxnf4_attn_head_int6 &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py llama_decode $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) $(LLM_FLAGS) --qconfig mxlut4_int6_e5m3_attn_head_int6 &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/vit/%/model.txt:
 	mkdir -p $(dir $@)
-	python voyager-compiler/test/test_codegen.py vit $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) &> $(dir $@)codegen.log
+	python voyager-compiler/test/test_codegen.py vit $($(notdir $(patsubst %/,%,$(dir $@)))_FLAGS) $(EXTRA_COMPILER_FLAGS) --model_output_dir $(dir $@) $(COMMON_FLAGS) --remove_fp32_casts &> $(dir $@)codegen.log
 
 $(CODEGEN_DIR)/networks/segformer/%/model.txt:
 	mkdir -p $(dir $@)

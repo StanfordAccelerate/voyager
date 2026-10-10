@@ -7,6 +7,8 @@ CC := $(CATAPULT_ROOT)/bin/g++
 
 export CODEGEN_DIR ?= test/compiler
 
+include config.mk
+
 # Check if the environment variable is set
 check_env_var:
 ifndef DATATYPE
@@ -29,17 +31,6 @@ INC := \
 	-I$(CONDA_PREFIX)/include \
 	-I.
 
-export INPUT_BUFFER_SIZE ?= 1024
-export WEIGHT_BUFFER_SIZE ?= 1024
-export ACCUM_BUFFER_SIZE ?= 1024
-
-# Defaulting these to false matches the #ifndef fallbacks in
-# ArchitectureParams.h, so -DX=false and leaving X undefined are equivalent.
-export DOUBLE_BUFFERED_ACCUM_BUFFER ?= false
-export SUPPORT_MVM ?= false
-export SUPPORT_SPMM ?= false
-export SUPPORT_DWC ?= false
-
 # TODO(fpedd): Fix code and remove Wno-* flags step by step
 override BASE_FLAGS += \
 	$(INC) \
@@ -55,20 +46,7 @@ override BASE_FLAGS += \
 	-Wno-bool-compare \
 	-DSPDLOG_COMPILED_LIB \
 	-DSPDLOG_EOL=\"\" \
-	-D$(DATATYPE) \
-	-DIC_DIMENSION=$(IC_DIMENSION) \
-	-DOC_DIMENSION=$(OC_DIMENSION) \
-	-DINPUT_BUFFER_SIZE=$(INPUT_BUFFER_SIZE) \
-	-DWEIGHT_BUFFER_SIZE=$(WEIGHT_BUFFER_SIZE) \
-	-DACCUM_BUFFER_SIZE=$(ACCUM_BUFFER_SIZE) \
-	-DDOUBLE_BUFFERED_ACCUM_BUFFER=$(DOUBLE_BUFFERED_ACCUM_BUFFER) \
-	-DSUPPORT_MVM=$(SUPPORT_MVM) \
-	-DSUPPORT_SPMM=$(SUPPORT_SPMM) \
-	-DSUPPORT_DWC=$(SUPPORT_DWC)
-
-ifdef CLOCK_PERIOD
-	override BASE_FLAGS += -DCLOCK_PERIOD=$(CLOCK_PERIOD)
-endif
+	$(ARCHITECTURE_DEFINES)
 
 ifeq ($(DEBUG), 1)
 	override BASE_FLAGS += -DDEBUG -g -O0 -ggdb
@@ -83,7 +61,8 @@ endif
 # We need to work with multiple C++ standards, as the SystemC lib is only
 # compatible with C++11 and the Universal Numbers Library requires C++17
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations -MMD -MP
-LDFLAGS += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
+LDFLAGS += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib \
+           -Wl,-rpath=$(CATAPULT_ROOT)/shared/lib
 LDLIBS += -L$(CATAPULT_ROOT)/shared/lib/ -L$(CONDA_PREFIX)/lib
 LDFLAGS_NO_SYSC += -lstdc++fs -labsl_hash -labsl_log_internal_check_op -labsl_log_internal_message -labsl_log_internal_nullguard -lprotobuf -lpthread -Wl,-rpath=$(CONDA_PREFIX)/lib
 LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
@@ -91,7 +70,7 @@ LDLIBS_NO_SYSC += -L$(CONDA_PREFIX)/lib
 ###########################################################
 # Build Directories
 ###########################################################
-BUILD_DIR ?= build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)_$(SUPPORT_SPMM)
+BUILD_DIR ?= build/$(BUILD_NAME)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 ALL_BUILD_DIRS = $(CC_BUILD_DIR) $(TOOLCHAIN_BUILD_DIRS)
 # Create build dirs automatically
@@ -148,6 +127,9 @@ ifeq ($(SUPPORT_SPMM), true)
 VU_RTL_DEPENDENCIES += $(CATAPULT_BUILD_DIR)/OutlierFilter/OutlierFilter.v1/concat_rtl.v
 endif
 
+###########################################################
+# Standalone synthesis targets
+###########################################################
 # For debugging it might be beneficial to only build sub-components in RTL and
 # have them integrate into the SystemC code
 InputController: $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v
@@ -163,8 +145,40 @@ MatrixVectorUnit: $(CATAPULT_BUILD_DIR)/MatrixVectorUnit/MatrixVectorUnit.v1/con
 SpMMUnit: $(CATAPULT_BUILD_DIR)/SpMMUnit/SpMMUnit.v1/concat_rtl.v
 MulAddTree: $(CATAPULT_BUILD_DIR)/MulAddTree/MulAddTree.v1/concat_rtl.v
 DwCUnit: $(CATAPULT_BUILD_DIR)/DwCUnit/DwCUnit.v1/concat_rtl.v
-Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 
+###########################################################
+# CIM block synthesis
+###########################################################
+# Rebuild CIM blocks when their SystemC headers or blackbox RTL change.
+CIM_HEADERS := $(wildcard src/cim/*.h) src/PackUtils.h src/ConnectionsSignal.h src/PerfMonitor.h
+CIM_RTL_SOURCES := $(wildcard src/cim/*.sv src/cim/*.svh)
+
+# Blocks containing SystemVerilog blackboxes emit concat_rtl.sv.
+# The weight controller has no blackbox and emits concat_rtl.v.
+CIMElement: $(CATAPULT_BUILD_DIR)/CIMElement/CIMElement.v1/concat_rtl.sv
+CIMArray: $(CATAPULT_BUILD_DIR)/CIMArray/CIMArray.v1/concat_rtl.sv
+CIMProcessor: $(CATAPULT_BUILD_DIR)/CIMProcessor/CIMProcessor.v1/concat_rtl.sv
+CIMWeightController: $(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v
+
+$(CATAPULT_BUILD_DIR)/CIMElement/CIMElement.v1/concat_rtl.sv: $(CIM_HEADERS) $(CIM_RTL_SOURCES) $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMElement catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMElement.log
+
+$(CATAPULT_BUILD_DIR)/CIMArray/CIMArray.v1/concat_rtl.sv: $(CIM_HEADERS) $(CIM_RTL_SOURCES) $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMArray catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMArray.log
+
+$(CATAPULT_BUILD_DIR)/CIMProcessor/CIMProcessor.v1/concat_rtl.sv: $(CIM_HEADERS) $(CIM_RTL_SOURCES) $(CATAPULT_BUILD_DIR)/CIMArray/CIMArray.v1/concat_rtl.sv $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMProcessor catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMProcessor.log
+
+$(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v: $(CIM_HEADERS) $(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=CIMWeightController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/CIMWeightController.log
+
+###########################################################
+# Systolic matrix blocks and shared controllers
+###########################################################
 $(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v: src/InputController.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=InputController catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/InputController.log
@@ -185,7 +199,7 @@ $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v: src/SystolicA
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=SystolicArray catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/SystolicArray.log
 
-$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
+$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v: src/MatrixProcessor.h src/SystolicArray.h src/Skewer.h src/PerfMonitor.h $(CATAPULT_BUILD_DIR)/SystolicArray/SystolicArray.v1/concat_rtl.v $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixProcessor catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixProcessor.log
 
@@ -193,6 +207,9 @@ $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/conca
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=MatrixParamsDeserializer catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer.log
 
+###########################################################
+# Vector and optional accelerator blocks
+###########################################################
 $(CATAPULT_BUILD_DIR)/VectorFetchUnit/VectorFetchUnit.v1/concat_rtl.v: src/vector_unit/VectorFetch.h $(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=VectorFetchUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/VectorFetchUnit.log
@@ -253,29 +270,86 @@ $(CATAPULT_BUILD_DIR)/DwCUnit/DwCUnit.v1/concat_rtl.v: src/DwCUnit.h $(CATAPULT_
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=DwCUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/DwCUnit.log
 
-$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: \
-	src/Accelerator.h \
-	src/DoubleBuffer.h \
+###########################################################
+# MatrixUnit and Accelerator synthesis
+###########################################################
+# CIM parents emit .sv because their hierarchy contains CIM blackboxes.
+ifeq ($(MATRIX_BACKEND),1)
+MatrixUnit: $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv
+Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.sv
+
+$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv: \
+	src/MatrixUnit.h src/DoubleBuffer.h src/DualPortBuffer.h \
+	scripts/blocks/MatrixUnit.tcl scripts/main.tcl \
 	$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v \
-	$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/CIMProcessor/CIMProcessor.v1/concat_rtl.sv \
 	$(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v \
+	$(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=MatrixUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixUnit.log
+
+$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.sv: \
+	src/Accelerator.h \
+	scripts/blocks/Accelerator.tcl scripts/main.tcl \
+	$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv \
+	$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v \
 	$(RTL_DEPENDENCIES) \
 	$(PROTOS_DEPENDENCY)
 	mkdir -p $(CATAPULT_BUILD_DIR)
 	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log
+else
+# The systolic hierarchy emits concat_rtl.v, as in the original flow.
+MatrixUnit: $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v
+Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
+
+$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v: \
+	src/MatrixUnit.h src/DoubleBuffer.h src/DualPortBuffer.h \
+	scripts/blocks/MatrixUnit.tcl scripts/main.tcl \
+	$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/MatrixProcessor/MatrixProcessor.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/MatrixParamsDeserializer/MatrixParamsDeserializer.v1/concat_rtl.v \
+	$(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=MatrixUnit catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/MatrixUnit.log
+
+$(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v: \
+	src/Accelerator.h \
+	scripts/blocks/Accelerator.tcl scripts/main.tcl \
+	$(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v \
+	$(CATAPULT_BUILD_DIR)/VectorUnit/VectorUnit.v1/concat_rtl.v \
+	$(RTL_DEPENDENCIES) \
+	$(PROTOS_DEPENDENCY)
+	mkdir -p $(CATAPULT_BUILD_DIR)
+	BLOCK=Accelerator catapult -shell -file scripts/main.tcl -logfile $(CATAPULT_BUILD_DIR)/Accelerator.log
+endif
 
 .PHONY: rtl Accelerator InputController WeightController MatrixProcessor ProcessingElement VectorUnit VectorParamsDeserializer VectorFetchUnit VectorPipeline VectorReducer VectorAccumulator OutputController MatrixVectorUnit MulAddTree DwCUnit
+.PHONY: CIMElement CIMArray CIMProcessor CIMWeightController MatrixUnit
 
-# Run RTL simulation
+###########################################################
+# RTL simulation
+###########################################################
+# SCVerify must finish library setup before compilation starts, including when
+# the outer build passes parallel jobs through $(MAKE).
+SCVERIFY_RTL_ARGS := -j1
+ifeq ($(MATRIX_BACKEND),1)
+# This flow includes the separate CIM blackbox RTL files.
+SCVERIFY_RTL_MK := Verify_rtl_v_vcs.mk
+SCVERIFY_RTL_ARGS += VLOG_INCDIRS=$(PROJ_ROOT)/src/cim
+else
+# Preserve the original concatenated-netlist flow for systolic builds.
+SCVERIFY_RTL_MK := Verify_concat_sim_rtl_v_vcs.mk
+endif
+
 .PHONY: rtl-sim
 rtl-sim: rtl network-proto
-	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 make -f ./scverify/Verify_concat_sim_rtl_v_vcs.mk SIMTOOL=vcs sim
+	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 $(MAKE) -f ./scverify/$(SCVERIFY_RTL_MK) $(SCVERIFY_RTL_ARGS) SIMTOOL=vcs sim
 
 .PHONY: rtl-sim-debug
 rtl-sim-debug: rtl network-proto
-	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 SIM_DUMP_FSDB=1 make -f ./scverify/Verify_concat_sim_rtl_v_vcs.mk SIMTOOL=vcs sim
+	cd $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1 && LD_PRELOAD=$(CONDA_PREFIX)/lib/libstdc++.so.6 SIM_DUMP_FSDB=1 $(MAKE) -f ./scverify/$(SCVERIFY_RTL_MK) $(SCVERIFY_RTL_ARGS) SIMTOOL=vcs sim
 
 ###########################################################
 # SystemC / RTL harness
@@ -284,10 +358,10 @@ $(CC_BUILD_DIR)/Harness.o: test/common/Harness.cc test/compiler/proto/voyager_ir
 	$(CC) $(C17FLAGS) -c -o $@ $<
 
 $(CC_BUILD_DIR)/Harness-fast.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
-	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -c -o $@ $<
+	$(CC) $(filter-out -DENABLE_PERF_COUNTERS=%,$(C17FLAGS)) -DENABLE_PERF_COUNTERS=0 -DCONNECTIONS_FAST_SIM -c -o $@ $<
 
 $(CC_BUILD_DIR)/Harness-checker.o: test/common/Harness.cc test/compiler/proto/voyager_ir.pb.cc
-	$(CC) $(C17FLAGS) -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
+	$(CC) $(filter-out -DENABLE_PERF_COUNTERS=%,$(C17FLAGS)) -DENABLE_PERF_COUNTERS=0 -DCONNECTIONS_FAST_SIM -DCHECK_PE -c -o $@ $<
 
 $(CC_BUILD_DIR)/GoldModel.o: test/common/GoldModel.cc test/compiler/proto/voyager_ir.pb.cc
 	$(CC) $(C17FLAGS) -g -c -o $@ $<
@@ -366,25 +440,35 @@ TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
 TestRunner-fast: check_env_var $(CC_BUILD_DIR)/TestRunner-fast
 TestRunner-checker: check_env_var $(CC_BUILD_DIR)/TestRunner-checker
 
+$(CC_BUILD_DIR)/GoldModelTb.o: test/unittest/systemc/GoldModelTb.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/GoldModelTb: $(CC_BUILD_DIR)/GoldModelTb.o $(IR_OBJS) $(SPDLOG_OBJ_FILES)
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+.PHONY: test-gold-model
+test-gold-model: check_env_var $(CC_BUILD_DIR)/GoldModelTb
+	$(CC_BUILD_DIR)/GoldModelTb
+
 .PHONY: sim
 sim: $(CC_BUILD_DIR)/TestRunner network-proto
-	./$(CC_BUILD_DIR)/TestRunner
+	$(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim
 fast-sim: $(CC_BUILD_DIR)/TestRunner-fast network-proto
-	./$(CC_BUILD_DIR)/TestRunner-fast
+	$(CC_BUILD_DIR)/TestRunner-fast
 
 .PHONY: sim-debug
 sim-debug: $(CC_BUILD_DIR)/TestRunner network-proto
-	gdb ./$(CC_BUILD_DIR)/TestRunner
+	gdb $(CC_BUILD_DIR)/TestRunner
 
 .PHONY: fast-sim-check
 fast-sim-check: $(CC_BUILD_DIR)/TestRunner-checker network-proto
-	./$(CC_BUILD_DIR)/TestRunner-checker
+	$(CC_BUILD_DIR)/TestRunner-checker
 
 .PHONY: fast-sim-debug
 fast-sim-debug: $(CC_BUILD_DIR)/TestRunner-fast network-proto
-	gdb ./$(CC_BUILD_DIR)/TestRunner-fast
+	gdb $(CC_BUILD_DIR)/TestRunner-fast
 
 ###########################################################
 # Developer targets that need no Catapult
@@ -400,11 +484,11 @@ AccuracyTester: check_env_var $(CC_BUILD_DIR)/AccuracyTester
 
 .PHONY: ResNetAccuracy
 ResNetAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
+	$(CC_BUILD_DIR)/AccuracyTester resnet18 data/imagenet_val 64
 
 .PHONY: MobileBertAccuracy
 MobileBertAccuracy: $(CC_BUILD_DIR)/AccuracyTester
-	./$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
+	$(CC_BUILD_DIR)/AccuracyTester mobilebert data/bert_sst2_val 64
 
 ###########################################################
 # Toolchain

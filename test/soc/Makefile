@@ -3,9 +3,10 @@
 # ============================================================
 
 ACCEL_DIR = ../..
+include $(ACCEL_DIR)/config.mk
 
 # Build parameters (filled in from environment or defaults)
-BUILD_DIR ?= $(ACCEL_DIR)/build/$(DATATYPE)_$(IC_DIMENSION)x$(OC_DIMENSION)_$(INPUT_BUFFER_SIZE)x$(WEIGHT_BUFFER_SIZE)x$(ACCUM_BUFFER_SIZE)_$(DOUBLE_BUFFERED_ACCUM_BUFFER)_$(SUPPORT_MVM)_$(SUPPORT_SPMM)
+BUILD_DIR ?= $(ACCEL_DIR)/build/$(BUILD_NAME)
 CC_BUILD_DIR = $(BUILD_DIR)/cc
 
 export CODEGEN_DIR ?= test/compiler
@@ -15,14 +16,14 @@ export PROJECT_ROOT ?= $(ACCEL_DIR)
 # Toolchain
 # ============================================================
 
-CC := /cad/mentor/2024.2_2/Mgc_home/bin/g++
+CC := $(CATAPULT_ROOT)/bin/g++
 
 # ============================================================
 # Includes
 # ============================================================
 
 INC := \
-	-I/cad/mentor/2024.2_2/Mgc_home/shared/include/ \
+	-I$(CATAPULT_ROOT)/shared/include/ \
 	-I$(ACCEL_DIR)/lib/ \
 	-I$(ACCEL_DIR)/lib/xtensor/include \
 	-I$(ACCEL_DIR)/lib/xtl/include \
@@ -51,13 +52,15 @@ override BASE_FLAGS += \
 	-Wno-class-memaccess \
 	-Wall \
 	-Wno-bool-compare \
+	$(ARCHITECTURE_DEFINES) \
 	$(EXTRA_SIM_CXXFLAGS)
 
 C17FLAGS += $(BASE_FLAGS) -std=c++17 -Wno-deprecated-declarations
 LDFLAGS  += -lsystemc -lstdc++fs -labsl_hash -labsl_log_internal_check_op \
             -labsl_log_internal_message -labsl_log_internal_nullguard \
-            -lrt -lpthread -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib
-LDLIBS   += -L/cad/mentor/2024.2_2/Mgc_home/shared/lib/ -L$(CONDA_PREFIX)/lib
+            -lrt -lpthread -lprotobuf -Wl,-rpath=$(CONDA_PREFIX)/lib \
+            -Wl,-rpath=$(CATAPULT_ROOT)/shared/lib
+LDLIBS   += -L$(CATAPULT_ROOT)/shared/lib/ -L$(CONDA_PREFIX)/lib
 
 # ============================================================
 # Debug / Release Mode Switch
@@ -106,6 +109,13 @@ COMMON_OBJS := \
 	$(CC_BUILD_DIR)/Tiling.o \
 	$(CC_BUILD_DIR)/voyager_ir.pb.o \
 	$(CC_BUILD_DIR)/spdlog.o
+
+# Resolve these prerequisites even when the shared build directory is new.
+# The root Makefile owns their sources and dependency rules.
+TOOLCHAIN_OBJS := $(CC_BUILD_DIR)/MapOperation.o $(CC_BUILD_DIR)/Tiling.o \
+	$(CC_BUILD_DIR)/voyager_ir.pb.o
+$(TOOLCHAIN_OBJS): toolchain
+	@test -f $@
 
 SOC_OBJS := \
 	$(CC_BUILD_DIR)/EmitC.o \

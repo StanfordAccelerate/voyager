@@ -47,6 +47,10 @@ SC_MODULE(Accelerator) {
 
   Connections::SyncOut CCS_INIT_S1(matrix_unit_start);
   Connections::SyncOut CCS_INIT_S1(matrix_unit_done);
+#if ENABLE_PERF_COUNTERS
+  sc_in<MatrixPerformance::CounterIndex> CCS_INIT_S1(matrix_perf_counter_select);
+  sc_out<MatrixPerformance::Counter> CCS_INIT_S1(matrix_perf_counter_value);
+#endif
 
   Connections::Combinational<Pack1D<ACCUM_BUFFER_DATATYPE, OC_DIMENSION>>
       CCS_INIT_S1(matrix_unit_output);
@@ -215,6 +219,10 @@ SC_MODULE(Accelerator) {
 #endif
     matrix_unit.start(matrix_unit_start);
     matrix_unit.done(matrix_unit_done);
+#if ENABLE_PERF_COUNTERS
+    matrix_unit.perf_counter_select(matrix_perf_counter_select);
+    matrix_unit.perf_counter_value(matrix_perf_counter_value);
+#endif
     matrix_unit.output_channel(matrix_unit_output);
     matrix_unit.output_data(matrix_unit_output_data);
     matrix_unit.output_addr(matrix_unit_output_addr);

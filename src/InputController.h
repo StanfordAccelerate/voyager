@@ -7,6 +7,22 @@
 #include "ArchitectureParams.h"
 #include "Utils.h"
 
+// Compute the row offset before subtracting padding. With one filter row per
+// L1 tile, include output stride and the L2 filter row: y0 * stride + fy1.
+// Otherwise y0 already walks the input window, including filter rows.
+// Fetcher and writer must use the same row for padding checks; otherwise the
+// writer can insert zero instead of consuming a fetched word.
+// Input-buffer addresses still use the original local y0.
+template <int loop_width>
+ac_int<loop_width, false> project_input_y0(ac_int<loop_width, false> y0,
+                                        ac_int<loop_width, false> fy1,
+                                        ac_int<4, false> fy0_extent,
+                                        ac_int<8, false> stride) {
+  ac_int<loop_width, false> input_y0 = y0;
+  if (fy0_extent == 1) input_y0 = y0 * stride + fy1;
+  return input_y0;
+}
+
 template <typename InputTypeTuple, int rows, int port_width, int buffer_width>
 struct InputController;
 
@@ -180,21 +196,21 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                                 loop_counters[0][params.x_loop_idx[0]];
                             ac_int<LOOP_WIDTH, false> c2 =
                                 loop_counters[0][params.reduction_loop_idx[0]];
-                            ac_int<LOOP_WIDTH, false> y0 =
+                            const ac_int<LOOP_WIDTH, false> y0 =
                                 loop_counters[1][params.y_loop_idx[1]];
                             ac_int<LOOP_WIDTH, false> x0 =
                                 loop_counters[1][params.x_loop_idx[1]];
                             ac_int<LOOP_WIDTH, false> c1 =
                                 loop_counters[1][params.reduction_loop_idx[1]];
-                            ac_int<LOOP_WIDTH, false> fy1 =
+                            const ac_int<LOOP_WIDTH, false> fy1 =
                                 loop_counters[0][params.fy_loop_idx[0]];
+                            const ac_int<LOOP_WIDTH, false> input_y0 =
+                                project_input_y0<LOOP_WIDTH>(y0, fy1, FY0,
+                                                            STRIDE);
 
                             // adjust address for stride
                             if (FX == 1) {
                               x0 = x0 * STRIDE;
-                            }
-                            if (FY0 == 1) {
-                              y0 = y0 * STRIDE + fy1;
                             }
 
                             if (params.is_resnet_replication) {
@@ -208,7 +224,8 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                               x0 = x0 << params.fx_unrolling_lg2;
                             }
 
-                            ac_int<16, true> y = y1 * IY0 + y0 - params.padding;
+                            ac_int<16, true> y =
+                                y1 * IY0 + input_y0 - params.padding;
                             ac_int<16, true> x = x1 * IX0 + x0 - params.padding;
                             ac_int<16, false> c = (c2 * C1 + c1) * c_stride;
 
@@ -375,13 +392,18 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                                   loop_counters[0][params.y_loop_idx[0]];
                               ac_int<LOOP_WIDTH, true> x1 =
                                   loop_counters[0][params.x_loop_idx[0]];
-                              ac_int<LOOP_WIDTH, true> y0 =
+                              const ac_int<LOOP_WIDTH, false> y0 =
                                   loop_counters[1][params.y_loop_idx[1]];
                               ac_int<LOOP_WIDTH, true> x0 =
                                   loop_counters[1][params.x_loop_idx[1]];
                               ac_int<LOOP_WIDTH, true> c1 =
                                   loop_counters[1]
                                                [params.reduction_loop_idx[1]];
+                              const ac_int<LOOP_WIDTH, false> fy1 =
+                                  loop_counters[0][params.fy_loop_idx[0]];
+                              const ac_int<LOOP_WIDTH, false> input_y0 =
+                                  project_input_y0<LOOP_WIDTH>(y0, fy1, FY0,
+                                                              STRIDE);
 
                               if (params.is_resnet_replication && x0 != 0) {
                                 x0 = (x0 - boundary_words) * packing_factor +
@@ -391,7 +413,7 @@ struct InputController<std::tuple<InputTypes...>, rows, port_width,
                               ac_int<16, true> x =
                                   x1 * IX0 + x0 - params.padding;
                               ac_int<16, true> y =
-                                  y1 * IY0 + y0 - params.padding;
+                                  y1 * IY0 + input_y0 - params.padding;
 
                               ac_int<buffer_width, false> data;
                               if (x < 0 || y < 0 || x >= X || y >= Y) {

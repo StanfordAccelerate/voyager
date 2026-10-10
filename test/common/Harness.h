@@ -14,6 +14,7 @@
 #include "test/common/Backend.h"
 #include "test/common/Interpreter.h"
 #include "test/common/Model.h"
+#include "test/common/ScratchpadTiming.h"
 #include "test/common/Utils.h"
 
 #ifndef CFLOAT
@@ -65,6 +66,10 @@ struct Harness : public sc_module, public Backend {
 
   Connections::SyncChannel CCS_INIT_S1(matrix_unit_start);
   Connections::SyncChannel CCS_INIT_S1(matrix_unit_done);
+#if ENABLE_PERF_COUNTERS
+  sc_signal<MatrixPerformance::CounterIndex> matrix_perf_counter_select;
+  sc_signal<MatrixPerformance::Counter> matrix_perf_counter_value;
+#endif
 
   //----------------------------------------------------------
   // MATRIX VECTOR UNIT CONNECTIONS
@@ -274,6 +279,9 @@ struct Harness : public sc_module, public Backend {
   const Model& model;
   Model::Selection selection;
   MemoryInterface* memory;
+  ScratchpadTiming scratchpad;
+  unsigned pending_memory_writes = 0;
+  sc_event memory_writes_completed;
   AccessCounter* access_counter;
 
 #ifdef SIM_Accelerator
@@ -285,7 +293,7 @@ struct Harness : public sc_module, public Backend {
   template <int width>
   void process_read_request(
       Connections::Combinational<MemoryRequest>* request_out,
-      sc_fifo<ac_int<width, false>>* data_fifo);
+      sc_fifo<ac_int<width, false>>* data_fifo, const char* port);
 
   template <int width>
   void send_data_response(
@@ -295,7 +303,8 @@ struct Harness : public sc_module, public Backend {
   template <int width>
   void process_write_request(
       Connections::Combinational<ac_int<width, false>>* data_out,
-      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out);
+      Connections::Combinational<ac_int<ADDRESS_WIDTH, false>>* address_out,
+      const char* port);
 
   void read_matrix_unit_input_request();
   void send_matrix_unit_input_response();
@@ -432,6 +441,13 @@ struct Harness : public sc_module, public Backend {
   void run_walker();
   void release_starts();
   void retire_dones();
+#if ENABLE_PERF_COUNTERS
+  void matrix_performance_monitor();
+  MatrixPerformance::Counter read_matrix_performance(unsigned index);
+  MatrixPerformance::SnapshotSequence matrix_perf_reported = 0;
+  MatrixPerformance::SnapshotSequence matrix_perf_retired = 0;
+  sc_event matrix_perf_reported_event;
+#endif
 };
 
 #endif
