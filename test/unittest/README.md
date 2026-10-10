@@ -81,3 +81,10 @@ TEST_ARGS='--jobs 4'`, or by invoking `verilog/test_cim_macro.py` and
 standalone-harness arbiter: read/read and read/write contention, independent
 banks, partial and unaligned words, bank boundaries, backpressure, and
 configuration validation. It requires the usual sourced `./.envrc`.
+
+# Gold model
+
+From the checkout root, `make test-gold-model DATATYPE=INT8 IC_DIMENSION=16
+OC_DIMENSION=16` checks BF16 vector GEMV with and without bias in a build whose
+matrix accumulator is integer. This covers bias-free reduction tiles such as
+ResNet18's fully connected layer. Source `./.envrc` first.

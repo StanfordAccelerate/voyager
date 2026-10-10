@@ -440,6 +440,16 @@ TestRunner: check_env_var $(CC_BUILD_DIR)/TestRunner
 TestRunner-fast: check_env_var $(CC_BUILD_DIR)/TestRunner-fast
 TestRunner-checker: check_env_var $(CC_BUILD_DIR)/TestRunner-checker
 
+$(CC_BUILD_DIR)/GoldModelTb.o: test/unittest/systemc/GoldModelTb.cc test/compiler/proto/voyager_ir.pb.cc
+	$(CC) $(C17FLAGS) -c -o $@ $<
+
+$(CC_BUILD_DIR)/GoldModelTb: $(CC_BUILD_DIR)/GoldModelTb.o $(IR_OBJS) $(SPDLOG_OBJ_FILES)
+	$(CC) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+
+.PHONY: test-gold-model
+test-gold-model: check_env_var $(CC_BUILD_DIR)/GoldModelTb
+	$(CC_BUILD_DIR)/GoldModelTb
+
 .PHONY: sim
 sim: $(CC_BUILD_DIR)/TestRunner network-proto
 	$(CC_BUILD_DIR)/TestRunner
