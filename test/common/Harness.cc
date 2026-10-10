@@ -869,6 +869,27 @@ void Harness::execute(const voyager::Operation& op, const ScalarEnv& env) {
   // fetches after their writes, and the interpreter posts Operation.semaphore
   // the moment execute returns.
   if (!in_commit) drain();
+  // A split reduction's fused vector tail reads its previous output from
+  // SRAM. The preceding tile can be matrix-only, so the vector-start gate
+  // alone does not order that read after the matrix's final stores.
+  bool reads_output = false;
+  for (const auto* prim : get_prim_ops(op)) {
+    for (const auto& [key, arg] : prim->kwargs()) {
+      if (!arg.has_tensor_box()) continue;
+      const auto& box = arg.tensor_box().box();
+      if (!model.has_box(box.node())) continue;
+      const Tensor input = resolve(*prim, key, env);
+      if (!input.materialized || input.is_constant) continue;
+      for (const Tensor& output : outputs) {
+        if (input.partition == output.partition &&
+            input.address < output.address + get_num_bytes(output) &&
+            output.address < input.address + get_num_bytes(input)) {
+          reads_output = true;
+        }
+      }
+    }
+  }
+  if (reads_output) drain();
   dispatch_params(op, params);
   if (!in_commit) drain();
 

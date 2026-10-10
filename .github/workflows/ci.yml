@@ -110,6 +110,14 @@ jobs:
           source load_env.sh          
           DATATYPE=${{ matrix.type }} IC_DIMENSION=${{ matrix.ic }} OC_DIMENSION=${{ matrix.oc }} CLOCK_PERIOD=5 SUPPORT_DWC=${{ matrix.dwc || 'false' }} ${{ matrix.extra || '' }} python run_regression.py --models ${{ matrix.models }} --sims fast-systemc --num_processes 16 --uniquify_layers --skip_layers
 
+      - name: Upload Failed SystemC Logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: systemc-failure-logs-${{ matrix.type }}-${{ matrix.ic }}x${{ matrix.oc }}
+          path: regression_results/latest/*.log
+          retention-days: 7
+
   rtl_simulation:
     needs: setup
     runs-on: self-hosted
