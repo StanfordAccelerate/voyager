@@ -3,8 +3,13 @@
 #include <mc_connections.h>
 #include <systemc.h>
 
+
 #include "ArchitectureParams.h"
 #include "PerfMonitor.h"
+
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM && !DOUBLE_BUFFERED_ACCUM_BUFFER
+#include <ac_shared.h>
+#endif
 
 template <typename T, int size>
 SC_MODULE(DualPortBuffer) {
@@ -13,9 +18,14 @@ SC_MODULE(DualPortBuffer) {
   static const unsigned int NUM_PORTS_PER_BANK =
       DOUBLE_BUFFERED_ACCUM_BUFFER ? 2 : 1;
 
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM && !DOUBLE_BUFFERED_ACCUM_BUFFER
+  // One physical 1r1w SRAM; each port can stall independently.
+  ac_shared<T[size]> bank0;
+#else
   T bank0[size];
 #if DOUBLE_BUFFERED_ACCUM_BUFFER
   T bank1[size];
+#endif
 #endif
 
  public:
@@ -37,6 +47,14 @@ SC_MODULE(DualPortBuffer) {
 #endif
 
   SC_CTOR(DualPortBuffer) {
+#if MATRIX_BACKEND == MATRIX_BACKEND_CIM && !DOUBLE_BUFFERED_ACCUM_BUFFER
+    SC_THREAD(bank0_read);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+    SC_THREAD(bank0_write);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+#else
     SC_THREAD(bank0_run);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
@@ -45,8 +63,10 @@ SC_MODULE(DualPortBuffer) {
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
 #endif
+#endif
   }
 
+#if !(MATRIX_BACKEND == MATRIX_BACKEND_CIM && !DOUBLE_BUFFERED_ACCUM_BUFFER)
   void bank0_run() {
 #if ENABLE_PERF_COUNTERS
     MatrixPerformance::Counter reads = 0, writes = 0;
@@ -204,4 +224,61 @@ SC_MODULE(DualPortBuffer) {
     }
   }
 #endif
+#else
+  void bank0_read() {
+#if ENABLE_PERF_COUNTERS
+    MatrixPerformance::Counter reads = 0;
+    perf_reads[0].write(0);
+#endif
+    read_address[0].Reset();
+    read_data[0].Reset();
+    wait();
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (true) {
+      ac_int<16, false> address;
+      if (read_address[0].PopNB(address)) {
+#ifndef __SYNTHESIS__
+        if (address >= size) throw std::runtime_error("Address out of bounds");
+#endif
+        T value = bank0[address];
+#if ENABLE_PERF_COUNTERS
+        perf_reads[0].write(++reads);
+#endif
+        read_data[0].Push(value);
+      }
+#ifndef __SYNTHESIS__
+      wait();
+#endif
+    }
+  }
+
+  void bank0_write() {
+#if ENABLE_PERF_COUNTERS
+    MatrixPerformance::Counter writes = 0;
+    perf_writes[0].write(0);
+#endif
+    write_request[0].Reset();
+    wait();
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (true) {
+      BufferWriteRequest<T> request;
+      if (write_request[0].PopNB(request)) {
+#ifndef __SYNTHESIS__
+        if (request.address >= size)
+          throw std::runtime_error("Address out of bounds");
+#endif
+        bank0[request.address] = request.data;
+#if ENABLE_PERF_COUNTERS
+        perf_writes[0].write(++writes);
+#endif
+      }
+#ifndef __SYNTHESIS__
+      wait();
+#endif
+    }
+  }
+#endif
+
 };

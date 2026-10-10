@@ -89,8 +89,12 @@ proc pre_architect {} {
   set banks {bank0}
   if {$DOUBLE_BUFFERED_ACCUM_BUFFER} { lappend banks bank1 }
   foreach bank $banks {
-    # Each bank is owned by its combined access process.
-    set path "/MatrixUnit/$accum_name/${bank}_run/$bank.value.$ACC_BUF_C_DATA_REP_NAME"
+    if {$MATRIX_BACKEND == $MATRIX_BACKEND_CIM && !$DOUBLE_BUFFERED_ACCUM_BUFFER} {
+      # Single-buffer CIM shares one SRAM between independent port processes.
+      set path "/MatrixUnit/$accum_name/$bank.d.value.$ACC_BUF_C_DATA_REP_NAME"
+    } else {
+      set path "/MatrixUnit/$accum_name/${bank}_run/$bank.value.$ACC_BUF_C_DATA_REP_NAME"
+    }
     directive set $path -WORD_WIDTH $accum_width
     if {$TECHNOLOGY != "generic" && $TECHNOLOGY != "tsmc40"} {
       directive set ${path}:rsc -MAP_TO_MODULE \
@@ -100,9 +104,11 @@ proc pre_architect {} {
 }
 
 proc pre_extract {} {
-  global DOUBLE_BUFFERED_ACCUM_BUFFER
-  ignore_memory_precedences -from WRITE_BANK_0* -to READ_BANK_0*
-  if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
-    ignore_memory_precedences -from WRITE_BANK_1* -to READ_BANK_1*
+  global DOUBLE_BUFFERED_ACCUM_BUFFER MATRIX_BACKEND MATRIX_BACKEND_CIM
+  if {$MATRIX_BACKEND != $MATRIX_BACKEND_CIM || $DOUBLE_BUFFERED_ACCUM_BUFFER} {
+    ignore_memory_precedences -from WRITE_BANK_0* -to READ_BANK_0*
+    if {$DOUBLE_BUFFERED_ACCUM_BUFFER == true} {
+      ignore_memory_precedences -from WRITE_BANK_1* -to READ_BANK_1*
+    }
   }
 }

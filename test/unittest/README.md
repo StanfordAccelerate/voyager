@@ -29,7 +29,7 @@ These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
   signed-integer GEMM/convolution calculation. They use the actual controllers,
   parameter deserializer, and SRAMs. Three CIM 8x2 builds cover bit-parallel and bit-serial macros,
   plus double-buffered accumulation with narrow memory ports. Each build runs
-  twelve queued commands without intervening resets. Coverage includes
+  thirteen queued commands without intervening resets. Coverage includes
   resident-sequence replay, ring refills, local and SRAM reductions, bias
   followed by no bias, convolution and stride-2 halos, two L1 loop orders,
   outer partial-output contexts, full-buffer addressing, memory and vector
