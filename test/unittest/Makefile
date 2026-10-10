@@ -18,7 +18,8 @@ CIM_RTL_SRCS := $(addprefix $(REPO_ROOT)/src/cim/,cim_typedefs.svh \
     cim_macro_wrapper.sv cim_macro_model.sv cim_macro_1.sv cim_element.sv)
 
 -include $(SYSTEMC_CASES_MK)
--include $(SYSTEMC_BUILD)/CIMElementTb.d $(SYSTEMC_BUILD)/CIMArrayTb.d
+-include $(SYSTEMC_BUILD)/CIMElementTb.d $(SYSTEMC_BUILD)/CIMArrayTb.d \
+    $(SYSTEMC_BUILD)/CIMPendingWeightTb.d
 
 # Common headers require a datatype and dimensions; the fixtures specify their
 # own CIM geometry explicitly and do not depend on these array dimensions.
@@ -97,8 +98,8 @@ $(SYSTEMC_BUILD)/voyager_ir.pb.o: $(MATRIX_PROTO)
 test-systemc-element: $(SYSTEMC_BUILD)/CIMElementTb
 	$<
 
-test-systemc-array: $(SYSTEMC_BUILD)/CIMArrayTb
-	$<
+test-systemc-array: $(SYSTEMC_BUILD)/CIMArrayTb $(SYSTEMC_BUILD)/CIMPendingWeightTb
+	@for test in $^; do "$$test" || exit $$?; done
 
 test-systemc-processor: $(PROCESSOR_TESTS)
 	@for test in $^; do echo "Running $${test##*/}"; "$$test" || exit $$?; done
@@ -129,6 +130,13 @@ $(SYSTEMC_BUILD)/CIMArrayTb.o: $(THIS_DIR)/systemc/CIMArrayTb.cc $(THIS_DIR)/Mak
 
 $(SYSTEMC_BUILD)/CIMElementTb: $(SYSTEMC_BUILD)/CIMElementTb.o $(CIM_ELEMENT_VERILATED_LIBS)
 	$(SYSTEMC_CC) -o $@ $^ $(CIM_ELEMENT_VERILATED_RUNTIME_LIB) $(SYSTEMC_LDFLAGS)
+
+$(SYSTEMC_BUILD)/CIMPendingWeightTb.o: $(THIS_DIR)/systemc/CIMPendingWeightTb.cc $(THIS_DIR)/Makefile | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(SYSTEMC_CXXFLAGS) -c -o $@ $<
+
+$(SYSTEMC_BUILD)/CIMPendingWeightTb: $(SYSTEMC_BUILD)/CIMPendingWeightTb.o
+	$(SYSTEMC_CC) -o $@ $^ $(SYSTEMC_LDFLAGS)
 
 $(SYSTEMC_BUILD)/CIMArrayTb: $(SYSTEMC_BUILD)/CIMArrayTb.o
 	$(SYSTEMC_CC) -o $@ $^ $(SYSTEMC_LDFLAGS)

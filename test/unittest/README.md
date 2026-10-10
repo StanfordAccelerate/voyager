@@ -18,6 +18,9 @@ These tests use event-driven SystemC; do not enable `CONNECTIONS_FAST_SIM`.
   resident weight sets, narrow weight ports, both result layouts, mixed
   completions, output backpressure, and reset recovery. This also exercises
   `CIMTile`; there is no separate tile suite or geometry sweep.
+  Two pending-request fixtures also fill result storage, stall a MAC, and check
+  that its weight set stays protected while another set remains writable, in
+  both parallel and serial macro modes.
 - `test-systemc-processor`: three configurations cover bit-parallel and
   bit-serial macros and double-buffered accumulation. They check resident-set
   replay and ring refills, bias and IC/FX/FY reductions, local-context reuse,
