@@ -19,7 +19,7 @@ CIM_RTL_SRCS := $(addprefix $(REPO_ROOT)/src/cim/,cim_typedefs.svh \
 
 -include $(SYSTEMC_CASES_MK)
 -include $(SYSTEMC_BUILD)/CIMElementTb.d $(SYSTEMC_BUILD)/CIMArrayTb.d \
-    $(SYSTEMC_BUILD)/CIMPendingWeightTb.d
+    $(SYSTEMC_BUILD)/CIMPendingWeightTb.d $(SYSTEMC_BUILD)/DualPortBufferTb.d
 
 # Common headers require a datatype and dimensions; the fixtures specify their
 # own CIM geometry explicitly and do not depend on these array dimensions.
@@ -77,8 +77,21 @@ MATRIX_PROTO := $(MATRIX_PROTO_DIR)/voyager_ir.pb.h
 
 .PHONY: test-systemc test-systemc-element test-systemc-array test-verilog \
     test-systemc-processor test-systemc-matrix test-systemc-scratchpad check-systemc-env clean
-test-systemc: test-systemc-element test-systemc-array test-systemc-processor \
+test-systemc: test-systemc-element test-systemc-array test-systemc-processor test-systemc-buffer \
     test-systemc-matrix test-systemc-scratchpad
+
+.PHONY: test-systemc-buffer
+test-systemc-buffer: $(SYSTEMC_BUILD)/DualPortBufferTb
+	$<
+
+# A blocked read response must not stop the single-buffer CIM SRAM write port.
+$(SYSTEMC_BUILD)/DualPortBufferTb: $(THIS_DIR)/systemc/DualPortBufferTb.cc \
+    $(REPO_ROOT)/src/DualPortBuffer.h $(REPO_ROOT)/src/ArchitectureParams.h \
+    $(REPO_ROOT)/src/AccelTypes.h $(REPO_ROOT)/src/PerfMonitor.h | check-systemc-env
+	mkdir -p $(@D)
+	$(SYSTEMC_CC) $(SYSTEMC_CXXFLAGS) -DMATRIX_BACKEND=MATRIX_BACKEND_CIM \
+	    -DDOUBLE_BUFFERED_ACCUM_BUFFER=false \
+	    -DFORCE_AUTO_PORT=Connections::SYN_PORT -o $@ $< $(SYSTEMC_LDFLAGS)
 
 test-systemc-scratchpad: $(SYSTEMC_BUILD)/ScratchpadTimingTb
 	$<
