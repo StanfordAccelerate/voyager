@@ -1007,8 +1007,8 @@ SC_MODULE(CIMProcessor) {
         // Reduction leaves one result per output-axis tile, and the C-port
         // assertion packs all OUTPUT_LANES values in one beat
         request.reduce = 1;
-        // Atomic request acceptance is the physical issue acknowledged by
-        // CIMArray
+        // The synthesized channel can buffer this request before physical
+        // issue, so the array protects both waiting and active requests.
         mac_request_channel.Push(request);
 
         advance_loop_counters(loop_counters, params);
@@ -1017,8 +1017,8 @@ SC_MODULE(CIMProcessor) {
             weight_set_boundary(params, loop_counters, l1_ox_reuses_weights,
                                 l1_oy_reuses_weights);
         if (selected_set_is_on_final_replay && finishes_set_run) {
-          // The array independently blocks same-set writes until this accepted
-          // MAC closes its physical issue window
+          // The array protects this set until the pending MAC and its physical
+          // issue window have both finished.
           ResidentSetEvent release_event;
           release_event.set = selected_weight_set;
           release_event.descriptor_tag = descriptor.descriptor_tag;
