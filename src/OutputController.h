@@ -105,11 +105,8 @@ SC_MODULE(MatrixUnitOutputController) {
       }
 
       // set irrelevant loop bounds to 0
-#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
-      // CIM schedules can place output loops in L2 slots 3 and 4.
       loop_bounds[0][params.reduction_loop_idx[0]] = 0;
       loop_bounds[0][params.fy_loop_idx[0]] = 0;
-#endif
       loop_bounds[1][params.reduction_loop_idx[1]] = 0;
       loop_bounds[1][params.fy_loop_idx[1]] = 0;
       loop_bounds[1][params.fx_loop_idx] = 0;
@@ -119,10 +116,8 @@ SC_MODULE(MatrixUnitOutputController) {
       for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
             for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
               for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
-#endif
                 for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
                   for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
                     for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
@@ -169,12 +164,10 @@ SC_MODULE(MatrixUnitOutputController) {
                   }
                   if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
-#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
                 if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
               if (loop_counters[0][3] == loop_bounds[0][3]) break;
             }
-#endif
             if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
           if (loop_counters[0][1] == loop_bounds[0][1]) break;
@@ -230,11 +223,8 @@ SC_MODULE(MatrixUnitOutputController) {
       }
 
       // set irrelevant loop bounds to 0
-#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
-      // CIM schedules can place output loops in L2 slots 3 and 4.
       loop_bounds[0][params.reduction_loop_idx[0]] = 0;
       loop_bounds[0][params.fy_loop_idx[0]] = 0;
-#endif
       loop_bounds[1][params.reduction_loop_idx[1]] = 0;
       loop_bounds[1][params.fy_loop_idx[1]] = 0;
       loop_bounds[1][params.fx_loop_idx] = 0;
@@ -249,10 +239,8 @@ SC_MODULE(MatrixUnitOutputController) {
       for (loop_counters[0][0] = 0;; loop_counters[0][0]++) {
         for (loop_counters[0][1] = 0;; loop_counters[0][1]++) {
           for (loop_counters[0][2] = 0;; loop_counters[0][2]++) {
-#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
             for (loop_counters[0][3] = 0;; loop_counters[0][3]++) {
               for (loop_counters[0][4] = 0;; loop_counters[0][4]++) {
-#endif
                 for (loop_counters[1][0] = 0;; loop_counters[1][0]++) {
                   for (loop_counters[1][1] = 0;; loop_counters[1][1]++) {
                     for (loop_counters[1][2] = 0;; loop_counters[1][2]++) {
@@ -334,12 +322,10 @@ SC_MODULE(MatrixUnitOutputController) {
                   }
                   if (loop_counters[1][0] == loop_bounds[1][0]) break;
                 }
-#if MATRIX_BACKEND == MATRIX_BACKEND_CIM
                 if (loop_counters[0][4] == loop_bounds[0][4]) break;
               }
               if (loop_counters[0][3] == loop_bounds[0][3]) break;
             }
-#endif
             if (loop_counters[0][2] == loop_bounds[0][2]) break;
           }
           if (loop_counters[0][1] == loop_bounds[0][1]) break;
