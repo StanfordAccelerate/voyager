@@ -279,7 +279,7 @@ MatrixUnit: $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv
 Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.sv
 
 $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.sv: \
-	src/MatrixUnit.h src/DoubleBuffer.h src/DualPortBuffer.h \
+	src/MatrixUnit.h src/OutputController.h src/DoubleBuffer.h src/DualPortBuffer.h \
 	scripts/blocks/MatrixUnit.tcl scripts/main.tcl \
 	$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v \
 	$(CATAPULT_BUILD_DIR)/CIMWeightController/CIMWeightController.v1/concat_rtl.v \
@@ -304,7 +304,7 @@ MatrixUnit: $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v
 Accelerator: $(CATAPULT_BUILD_DIR)/Accelerator/Accelerator.v1/concat_rtl.v
 
 $(CATAPULT_BUILD_DIR)/MatrixUnit/MatrixUnit.v1/concat_rtl.v: \
-	src/MatrixUnit.h src/DoubleBuffer.h src/DualPortBuffer.h \
+	src/MatrixUnit.h src/OutputController.h src/DoubleBuffer.h src/DualPortBuffer.h \
 	scripts/blocks/MatrixUnit.tcl scripts/main.tcl \
 	$(CATAPULT_BUILD_DIR)/InputController/InputController.v1/concat_rtl.v \
 	$(CATAPULT_BUILD_DIR)/WeightController/WeightController.v1/concat_rtl.v \
