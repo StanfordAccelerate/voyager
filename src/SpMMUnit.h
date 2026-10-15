@@ -157,6 +157,10 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
   // TODO: parameterisze buffer depth
   DoubleBuffer<32, SCALE_DATATYPE::width * OC_DIMENSION> CCS_INIT_S1(
       weight_scale_buffer);
+#if ENABLE_PERF_COUNTERS
+  sc_signal<MatrixPerformance::Counter> weight_scale_perf_reads[2],
+      weight_scale_perf_writes[2];
+#endif
   Connections::Combinational<BufferWriteRequest<SCALE_PORT_TYPE>>
       weight_scale_write_req[2];
   Connections::Combinational<BufferReadRequest> weight_scale_read_req[2];
@@ -191,6 +195,10 @@ struct SpMMUnit<std::tuple<WeightTypes...>, Input, Weight, Meta, Output, Scale,
     for (int i = 0; i < 2; i++) {
       weight_scale_buffer.write_request[i](weight_scale_write_req[i]);
       weight_scale_buffer.read_request[i](weight_scale_read_req[i]);
+#if ENABLE_PERF_COUNTERS
+      weight_scale_buffer.perf_reads[i](weight_scale_perf_reads[i]);
+      weight_scale_buffer.perf_writes[i](weight_scale_perf_writes[i]);
+#endif
     }
     weight_scale_buffer.output(weight_scale_data);
 #endif

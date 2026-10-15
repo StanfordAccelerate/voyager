@@ -4,6 +4,7 @@
 #include <systemc.h>
 
 #include "AccelTypes.h"
+#include "PerfMonitor.h"
 
 #ifndef __SYNTHESIS__
 #include "test/common/AccessCounter.h"
@@ -25,8 +26,15 @@ SC_MODULE(DoubleBuffer) {
       read_data[2];
   Connections::Out<ac_int<width, false>> CCS_INIT_S1(output);
 
+#if ENABLE_PERF_COUNTERS
+  sc_out<MatrixPerformance::Counter> perf_reads[2], perf_writes[2];
+#endif
+
 #ifndef __SYNTHESIS__
   AccessCounter* access_counter;
+  // Elements in one buffer word. The access counter reports elements, which
+  // is the unit of the compiler's tiling estimate for every datatype.
+  int access_counter_elements = 1;
 #endif
 
   SC_CTOR(DoubleBuffer) {
@@ -52,6 +60,12 @@ SC_MODULE(DoubleBuffer) {
     write_request[port].Reset();
     read_data[port].ResetWrite();
     read_request[port].Reset();
+
+#if ENABLE_PERF_COUNTERS
+    MatrixPerformance::Counter reads = 0, writes = 0;
+    perf_reads[port].write(0);
+    perf_writes[port].write(0);
+#endif
 
     wait();
 
@@ -82,6 +96,9 @@ SC_MODULE(DoubleBuffer) {
         } else {
           mem1[address] = data;
         }
+#if ENABLE_PERF_COUNTERS
+        perf_writes[port].write(++writes);
+#endif
       }
 
       done = false;
@@ -92,10 +109,6 @@ SC_MODULE(DoubleBuffer) {
           done = true;
         }
 
-#ifndef __SYNTHESIS__
-        access_counter->increment(name(), width);
-#endif
-
         BufferReadResponse<ac_int<width, false>> response;
         response.last = req.last;
 
@@ -105,6 +118,12 @@ SC_MODULE(DoubleBuffer) {
           } else {
             response.data = mem1[address];
           }
+#if ENABLE_PERF_COUNTERS
+          perf_reads[port].write(++reads);
+#endif
+#ifndef __SYNTHESIS__
+          access_counter->increment(name(), access_counter_elements);
+#endif
         } else {
           response.data = 0;
         }
