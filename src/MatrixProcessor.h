@@ -5,6 +5,7 @@
 
 #include "ArchitectureParams.h"
 #include "ParamsDeserializer.h"
+#include "PerfMonitor.h"
 #include "Skewer.h"
 #include "SystolicArray.h"
 #include "Utils.h"
@@ -99,6 +100,11 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
 #endif
 
   Connections::SyncOut CCS_INIT_S1(start);
+#if ENABLE_PERF_COUNTERS
+  sc_out<MatrixPerformance::Counter>
+      perf_counters[MatrixPerformance::PROCESSOR_COUNTER_COUNT];
+  sc_signal<bool> perf_completion_toggle;
+#endif
 
   SC_CTOR(MatrixProcessor) {
     input_skewer.clk(clk);
@@ -169,6 +175,12 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     SC_THREAD(write_back);
     sensitive << clk.pos();
     async_reset_signal_is(rstn, false);
+
+#if ENABLE_PERF_COUNTERS
+    SC_THREAD(monitor_performance);
+    sensitive << clk.pos();
+    async_reset_signal_is(rstn, false);
+#endif
   }
 
   void push_weights() {
@@ -645,6 +657,9 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
     accumulation_buffer_done[1].Reset();
 #endif
     accum_output_enq.ResetWrite();
+#if ENABLE_PERF_COUNTERS
+    perf_completion_toggle.write(false);
+#endif
 
     bool accumulation_buffer_bank = 0;
 
@@ -756,6 +771,47 @@ struct MatrixProcessor<std::tuple<InputTypes...>, std::tuple<WeightTypes...>,
           }
         }
       }
+#if ENABLE_PERF_COUNTERS
+      perf_completion_toggle.write(!perf_completion_toggle.read());
+#endif
     }
   }
+
+#if ENABLE_PERF_COUNTERS
+  // Count vectors admitted to the input skewer and backpressure after result
+  // deskewing. These interfaces preserve whole-vector semantics across rows.
+  void monitor_performance() {
+    using namespace MatrixPerformance;
+    ProcessorCounters counters;
+    counters.reset();
+#pragma hls_unroll yes
+    for (int i = 0; i < PROCESSOR_COUNTER_COUNT; ++i) perf_counters[i].write(0);
+    wait();
+#pragma hls_pipeline_init_interval 1
+#pragma hls_pipeline_stall_mode flush
+    while (true) {
+      counters.observe(params_in.vld.read() && params_in.rdy.read(),
+                       perf_completion_toggle.read(),
+#ifdef __SYNTHESIS__
+                       // HLS reads only wires this module owns, and the
+                       // synthesized channel has one vld/rdy pair. In accurate
+                       // Connections simulation the default channel has
+                       // separate in_vld/in_rdy and out_vld/out_rdy signals and
+                       // no vld/rdy members, so the child ports supply the
+                       // consumer handshake there.
+                       input_skewer_din.vld.read(), input_skewer_din.rdy.read(),
+                       psum_out_skewer_dout.vld.read(),
+                       psum_out_skewer_dout.rdy.read());
+#else
+                       input_skewer.din.vld.read(), input_skewer.din.rdy.read(),
+                       psum_out_skewer.dout.vld.read(),
+                       psum_out_skewer.dout.rdy.read());
+#endif
+#pragma hls_unroll yes
+      for (int i = 0; i < COMMON_PROCESSOR_COUNTER_COUNT; ++i)
+        perf_counters[i].write(counters.values[i]);
+      wait();
+    }
+  }
+#endif
 };
