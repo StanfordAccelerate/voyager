@@ -160,8 +160,12 @@ if { $DATATYPE == "P8_1" } {
   set ACCUM_DATATYPE_WIDTH 16
   set SCALE_DATATYPE_WIDTH 8
 
-  set IC_PORT_WIDTH [expr {$IC_DIMENSION * 4}]
-  set OC_PORT_WIDTH [expr {$OC_DIMENSION * 4}]
+  if {![info exists IC_PORT_WIDTH]} {
+    set IC_PORT_WIDTH [expr {$IC_DIMENSION * 4}]
+  }
+  if {![info exists OC_PORT_WIDTH]} {
+    set OC_PORT_WIDTH [expr {$OC_DIMENSION * 4}]
+  }
   set MV_UNIT_WIDTH [expr {$OC_DIMENSION * 2}]
   set SPMM_UNIT_WIDTH $OC_DIMENSION
 
@@ -258,10 +262,12 @@ if {![info exists WEIGHT_DTYPE_WIDTH]} {
 
 if {![info exists IC_PORT_WIDTH]} {
   set IC_PORT_WIDTH [expr {$IC_DIMENSION * $INPUT_DTYPE_WIDTH}]
+  puts "Warning: IC_PORT_WIDTH is unset; using $IC_PORT_WIDTH bits (IC_DIMENSION * INPUT_DTYPE_WIDTH)"
 }
 
 if {![info exists OC_PORT_WIDTH]} {
   set OC_PORT_WIDTH [expr {$OC_DIMENSION * $WEIGHT_DTYPE_WIDTH}]
+  puts "Warning: OC_PORT_WIDTH is unset; using $OC_PORT_WIDTH bits (OC_DIMENSION * WEIGHT_DTYPE_WIDTH)"
 }
 
 # ================================================================
@@ -300,3 +306,5 @@ if {$SUPPORT_DWC} {
   set DWC_DATATYPE $INPUT_DATATYPE
   set DWC_PSUM $ACCUM_DATATYPE
 }
+
+source scripts/utils/cim_config.tcl
